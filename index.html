@@ -232,6 +232,8 @@
     .cal-pill.reservation{ background:#d7e6f5; color:#1e40af; }
     .cal-pill.event{ background:#fdebc4; color:#92400e; }
     .cal-pill.timeoff{ background:#f6dad4; color:#A52B1E; }
+    .cal-pill.special{ background:#e7d9b0; color:#7a4d12; }
+    .cal-pill.schedule{ background:#dfe5ee; color:#13314f; }
     .event-card.timeoff{ border-left-color:var(--wax); }
     .ev-tag{ display:inline-block; align-self:flex-start; font-size:0.62rem; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; color:#fff; background:var(--wax); padding:2px 7px; border-radius:var(--r); font-family:'Archivo',sans-serif; }
     .cal-more{ font-size:0.68rem; color:var(--sub); margin-top:2px; }
@@ -478,6 +480,8 @@
   <div class="cal-legend">
     <span><span class="cal-legend-dot" style="background:#a9c7e8;"></span>Reservation</span>
     <span><span class="cal-legend-dot" style="background:var(--cheddar);"></span>Event</span>
+    <span><span class="cal-legend-dot" style="background:#c8a24a;"></span>Special</span>
+    <span><span class="cal-legend-dot" style="background:#13314f;"></span>Schedule</span>
     <span><span class="cal-legend-dot" style="background:var(--wax);"></span>Time Off</span>
   </div>
   <div class="cal-main">
@@ -769,6 +773,8 @@ async function loadSchedules() {
     _schedules = (data||[]).map(mapSched);
   } catch(e) { _schedules = []; }
   renderSchedCards();
+  const cal = document.getElementById('panel-calendar');
+  if (cal && cal.classList.contains('active')) renderCalendar();
 }
 // Approved time-off rendered as schedule items (kept in sync from portal_time_off).
 function approvedTimeOff() {
@@ -1004,6 +1010,22 @@ async function renderCalendar() {
       (toByDate[key] = toByDate[key] || []).push(r.name);
     }
   });
+  // Specials — recurrence expanded across the month.
+  const spByDate = {};
+  _specials.forEach(s => {
+    occurrences(s, monthStartStr, monthEndStr).forEach(d => { (spByDate[d] = spByDate[d] || []).push(s.title); });
+  });
+  // Schedules — spread across each schedule's date range.
+  const schByDate = {};
+  _schedules.forEach(s => {
+    if (!s.date) return;
+    const start = new Date(s.date + 'T00:00:00');
+    const end = new Date((s.endDate || s.date) + 'T00:00:00');
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const key = fmt(d);
+      if (key >= monthStartStr && key <= monthEndStr) (schByDate[key] = schByDate[key] || []).push(s.name);
+    }
+  });
   const today = fmt(new Date());
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -1011,11 +1033,11 @@ async function renderCalendar() {
   let html = '', dayCount = 0;
   for (let i = firstDay - 1; i >= 0; i--) {
     const d = fmt(new Date(year, month - 1, prevDays - i));
-    html += dayCell(d, prevDays - i, true, today, _calReservations, evByDate, toByDate); dayCount++;
+    html += dayCell(d, prevDays - i, true, today, _calReservations, evByDate, toByDate, spByDate, schByDate); dayCount++;
   }
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = fmt(new Date(year, month, d));
-    html += dayCell(dateStr, d, false, today, _calReservations, evByDate, toByDate); dayCount++;
+    html += dayCell(dateStr, d, false, today, _calReservations, evByDate, toByDate, spByDate, schByDate); dayCount++;
   }
   let trailing = 1;
   while (dayCount % 7 !== 0) {
@@ -1024,7 +1046,7 @@ async function renderCalendar() {
   }
   document.getElementById('calBody').innerHTML = html;
 }
-function dayCell(dateStr, dayNum, otherMonth, today, resByDate, evByDate, toByDate) {
+function dayCell(dateStr, dayNum, otherMonth, today, resByDate, evByDate, toByDate, spByDate, schByDate) {
   const isToday = dateStr === today;
   let cls = 'cal-day';
   if (otherMonth) cls += ' other-month';
@@ -1036,6 +1058,12 @@ function dayCell(dateStr, dayNum, otherMonth, today, resByDate, evByDate, toByDa
   const evs = evByDate[dateStr] || [];
   evs.slice(0,2).forEach(name => { pills += `<div class="cal-pill event">🎉 ${esc(name)}</div>`; });
   if (evs.length > 2) pills += `<div class="cal-more">+${evs.length-2} more</div>`;
+  const sps = (spByDate && spByDate[dateStr]) || [];
+  sps.slice(0,2).forEach(name => { pills += `<div class="cal-pill special">🍷 ${esc(name)}</div>`; });
+  if (sps.length > 2) pills += `<div class="cal-more">+${sps.length-2} specials</div>`;
+  const schs = (schByDate && schByDate[dateStr]) || [];
+  schs.slice(0,2).forEach(name => { pills += `<div class="cal-pill schedule">📆 ${esc(name)}</div>`; });
+  if (schs.length > 2) pills += `<div class="cal-more">+${schs.length-2} shifts</div>`;
   const offs = (toByDate && toByDate[dateStr]) || [];
   offs.slice(0,2).forEach(name => { pills += `<div class="cal-pill timeoff">🌴 ${esc(name)}</div>`; });
   if (offs.length > 2) pills += `<div class="cal-more">+${offs.length-2} off</div>`;
