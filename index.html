@@ -263,6 +263,9 @@
     .special-title{ font-weight:800; font-size:0.92rem; color:var(--wax); font-family:'Archivo',sans-serif; }
     .special-body{ font-size:0.85rem; color:var(--ink); line-height:1.5; margin-top:4px; white-space:pre-wrap; }
     .special-time{ font-size:0.78rem; color:var(--sub); margin-top:4px; font-weight:600; }
+    .special-day{ font-size:0.66rem; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:var(--sub); font-family:'Archivo',sans-serif; margin-bottom:3px; }
+    .special-tile.today{ background:#fff7e2; border-left-color:var(--cheddar); }
+    .special-tile.today .special-day{ color:var(--wax); }
     .rep-badge{ font-size:0.6rem; font-weight:800; text-transform:uppercase; letter-spacing:0.4px; color:var(--navy2); background:var(--gold); padding:1px 6px; border-radius:var(--r); vertical-align:middle; }
   </style>
 </head>
@@ -318,9 +321,9 @@
 
   <div class="specials-card">
     <div class="specials-top">
-      <span class="specials-label">🍽️ Today's Specials</span>
+      <span class="specials-label">🍽️ Specials This Week</span>
     </div>
-    <div id="specialsGrid" class="specials-grid"><div class="note-empty">No specials today.</div></div>
+    <div id="specialsGrid" class="specials-grid"><div class="note-empty">No specials this week.</div></div>
   </div>
 
   <div class="dash-events-col">
@@ -682,17 +685,26 @@ function renderNotes(){
   </div>`).join('');
 }
 
-// SPECIALS -> today's tiles
+// SPECIALS -> this week's tiles (today + next 6 days), today highlighted
 function renderSpecials(){
   const grid = document.getElementById('specialsGrid');
   if (!grid) return;
-  const today = fmt(new Date());
-  const todays = _specials.filter(s => occurrences(s, today, today).length > 0);
-  if (!todays.length){ grid.innerHTML = '<div class="note-empty">No specials today.</div>'; return; }
-  grid.innerHTML = todays.map(s => {
+  const todayD = new Date(); todayD.setHours(0,0,0,0);
+  const todayStr = fmt(todayD);
+  const endD = new Date(todayD); endD.setDate(endD.getDate() + 6);
+  const endStr = fmt(endD);
+  const occ = [];
+  _specials.forEach(s => { occurrences(s, todayStr, endStr).forEach(d => occ.push({ date:d, s })); });
+  occ.sort((a,b) => a.date.localeCompare(b.date) || (a.s.time||'').localeCompare(b.s.time||''));
+  if (!occ.length){ grid.innerHTML = '<div class="note-empty">No specials this week.</div>'; return; }
+  grid.innerHTML = occ.map(o => {
+    const s = o.s;
+    const isToday = o.date === todayStr;
+    const dayLabel = isToday ? 'Today' : fmtDisplay(o.date);
     const rl = repeatLabel(s.repeat);
     const timeStr = s.time ? fmtTime(s.time) : '';
-    return `<div class="special-tile">
+    return `<div class="special-tile${isToday?' today':''}">
+      <div class="special-day">${isToday?'⭐ ':''}${dayLabel}</div>
       <div class="special-title">🍽️ ${esc(s.title)}${rl ? ` <span class="rep-badge">↻ ${rl}</span>` : ''}</div>
       ${s.body ? `<div class="special-body">${esc(s.body)}</div>` : ''}
       ${timeStr ? `<div class="special-time">${timeStr}</div>` : ''}
