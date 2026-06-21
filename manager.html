@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GREYS Memphis · Manager Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --paper:#E9DFC7; --card:#FBF7EB; --rind:#211D19;
+      --navy:#0B2138; --navy2:#06273A; --navy-soft:#13314f;
+      --wax:#A52B1E; --cheddar:#E0A21C; --gold:#E2D827;
+      --ink:#221E1B; --sub:#6E6353; --line:#D6C8AB; --line-soft:#e7dcc4;
+      --r:2px;
+    }
+    *{ box-sizing:border-box; margin:0; padding:0; }
+    body{ font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--paper); color:var(--ink); min-height:100vh; }
+    h1,h2,h3{ font-family:'Archivo',sans-serif; }
+
+    header{ background:var(--navy); color:#fff; padding:16px 28px; display:flex; align-items:center; justify-content:space-between; border-bottom:3px solid var(--cheddar); }
+    header h1{ font-size:1.3rem; font-weight:900; letter-spacing:-0.5px; }
+    header .subtitle{ font-size:0.7rem; font-weight:600; letter-spacing:0.4px; text-transform:uppercase; color:var(--cheddar); margin-top:3px; }
+    .head-actions{ display:flex; gap:10px; align-items:center; }
+    .head-link{ color:#cfe0ef; font-size:0.8rem; font-weight:600; text-decoration:none; border:1px solid rgba(255,255,255,0.25); padding:6px 12px; border-radius:var(--r); }
+    .head-link:hover{ background:rgba(255,255,255,0.08); }
+
+    /* LOGIN */
+    .login-wrap{ display:flex; align-items:center; justify-content:center; padding:70px 16px; }
+    .login-card{ background:var(--card); border:1px solid var(--line); border-top:4px solid var(--cheddar); border-radius:var(--r); padding:30px; width:360px; max-width:100%; }
+    .login-card h2{ font-size:1.15rem; color:var(--navy); margin-bottom:4px; }
+    .login-card p{ font-size:0.84rem; color:var(--sub); margin-bottom:18px; }
+    .login-card input{ width:100%; padding:11px 13px; border:1px solid var(--line); border-radius:var(--r); font-size:0.95rem; background:#fff; margin-bottom:12px; font-family:inherit; }
+    .login-card input:focus{ outline:none; border-color:var(--cheddar); }
+    .login-err{ font-size:0.8rem; color:var(--wax); min-height:18px; margin-bottom:8px; }
+
+    /* TABS */
+    .tabs{ background:var(--navy2); display:flex; overflow-x:auto; scrollbar-width:none; }
+    .tabs::-webkit-scrollbar{ display:none; }
+    .tab{ padding:13px 20px; color:rgba(231,238,245,0.5); font-size:0.74rem; font-weight:700; cursor:pointer; border-bottom:3px solid transparent; white-space:nowrap; letter-spacing:0.5px; text-transform:uppercase; }
+    .tab:hover{ color:rgba(255,255,255,0.9); }
+    .tab.active{ color:#fff; border-bottom-color:var(--cheddar); }
+
+    .panel{ display:none; padding:24px 28px; }
+    .panel.active{ display:block; }
+    .section-card{ background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:22px; margin-bottom:20px; }
+    .section-card h2{ font-size:1rem; color:var(--navy); margin-bottom:4px; }
+    .section-card .hint{ font-size:0.8rem; color:var(--sub); margin-bottom:16px; }
+
+    label.fld{ font-size:0.7rem; font-weight:700; color:var(--sub); text-transform:uppercase; letter-spacing:0.4px; display:block; margin-bottom:4px; }
+    textarea,input[type=text],input[type=date],input[type=time]{ width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:var(--r); font-size:0.9rem; background:#fff; font-family:inherit; }
+    textarea:focus,input:focus{ outline:none; border-color:var(--cheddar); }
+    textarea{ min-height:90px; resize:vertical; }
+
+    .btn{ border:none; border-radius:var(--r); padding:9px 18px; font-size:0.84rem; font-weight:700; cursor:pointer; font-family:inherit; }
+    .btn-gold{ background:var(--gold); color:var(--navy2); }
+    .btn-gold:hover{ background:var(--cheddar); color:#fff; }
+    .btn-navy{ background:var(--navy); color:#fff; }
+    .btn-navy:hover{ background:var(--navy-soft); }
+    .btn-ghost{ background:none; border:1px solid var(--line); color:var(--rind); }
+    .btn-ghost:hover{ background:#efe7d3; }
+    .btn-wax{ background:none; border:1px solid #f0d6cf; color:var(--wax); }
+    .btn-wax:hover{ background:#f6dad4; }
+    .btn-sm{ padding:5px 10px; font-size:0.74rem; }
+    .row-actions{ display:flex; gap:14px; align-items:center; margin-top:12px; flex-wrap:wrap; }
+    .save-msg{ font-size:0.8rem; font-weight:600; color:#0a7a52; }
+    .save-msg.err{ color:var(--wax); }
+
+    /* BULK TABLE */
+    .toolbar{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+    .toolbar .spacer{ flex:1; }
+    .bulk-wrap{ overflow:auto; border:1px solid var(--line); border-radius:var(--r); background:#fff; }
+    table.bulk{ width:100%; border-collapse:collapse; font-size:0.86rem; min-width:760px; }
+    table.bulk thead th{ background:var(--navy); color:#fff; font-family:'Archivo',sans-serif; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.4px; padding:9px 10px; text-align:left; white-space:nowrap; }
+    table.bulk tbody td{ padding:6px 8px; border-bottom:1px solid var(--line-soft); vertical-align:middle; }
+    table.bulk input{ border:1px solid transparent; background:#fff; padding:7px 8px; }
+    table.bulk input:hover{ border-color:var(--line-soft); }
+    table.bulk input:focus{ border-color:var(--cheddar); background:#fffdf6; }
+    table.bulk tr.dirty td{ background:#fff7e2; }
+    table.bulk tr.newrow td{ background:#eef7ee; }
+    .td-actions{ white-space:nowrap; }
+    .empty-row{ text-align:center; color:var(--sub); font-style:italic; padding:22px; }
+    .pill{ display:inline-block; font-size:0.64rem; font-weight:800; text-transform:uppercase; letter-spacing:0.4px; padding:2px 7px; border-radius:var(--r); }
+    .pill-new{ background:#d1fae5; color:#065f46; }
+    .pill-dirty{ background:#fdebc4; color:#92400e; }
+
+    .csv-box{ border:1px dashed var(--line); border-radius:var(--r); padding:14px 16px; background:#fffdf6; display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+    .csv-box .csv-status{ font-size:0.8rem; color:var(--sub); }
+
+    /* TIME OFF */
+    .to-item{ display:flex; align-items:flex-start; gap:14px; padding:14px 0; border-bottom:1px solid var(--line-soft); }
+    .to-item:last-child{ border-bottom:none; }
+    .to-info{ flex:1; min-width:0; }
+    .to-name{ font-weight:800; color:var(--rind); }
+    .to-meta{ font-size:0.8rem; color:var(--sub); margin-top:2px; }
+    .to-reason{ font-size:0.78rem; color:var(--sub); font-style:italic; margin-top:2px; }
+    .to-right{ display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
+    .badge{ display:inline-block; padding:3px 10px; border-radius:var(--r); font-size:0.68rem; font-weight:800; text-transform:uppercase; }
+    .badge-pending{ background:#fdebc4; color:#92400e; }
+    .badge-approved{ background:#d1fae5; color:#065f46; }
+    .badge-denied{ background:#f6dad4; color:var(--wax); }
+    .to-empty{ padding:28px; text-align:center; color:var(--sub); font-style:italic; }
+    .hide{ display:none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>GREYS Memphis · Manager Console</h1>
+    <div class="subtitle">Edit everything the staff portal shows</div>
+  </div>
+  <div class="head-actions">
+    <a class="head-link" href="index.html">↗ Staff portal</a>
+    <button class="head-link" id="logoutBtn" style="background:none;cursor:pointer;display:none;" onclick="logout()">Log out</button>
+  </div>
+</header>
+
+<!-- LOGIN -->
+<div id="loginView" class="login-wrap">
+  <div class="login-card">
+    <h2>🔒 Manager Login</h2>
+    <p>Enter the manager password to manage notes, specials, events, schedules and time-off.</p>
+    <input type="password" id="loginPass" placeholder="Password" onkeydown="if(event.key==='Enter') doLogin()" />
+    <div class="login-err" id="loginErr"></div>
+    <button class="btn btn-navy" style="width:100%;" onclick="doLogin()">Unlock</button>
+  </div>
+</div>
+
+<!-- CONSOLE -->
+<div id="consoleView" class="hide">
+  <div class="tabs">
+    <div class="tab active" onclick="mtab('content')">Notes &amp; Specials</div>
+    <div class="tab" onclick="mtab('events')">Events</div>
+    <div class="tab" onclick="mtab('schedules')">Schedules</div>
+    <div class="tab" onclick="mtab('timeoff')">Time Off</div>
+  </div>
+
+  <!-- NOTES & SPECIALS -->
+  <div id="panel-content" class="panel active">
+    <div class="section-card">
+      <h2>📌 Staff Notes</h2>
+      <div class="hint">Shown at the top of the staff portal for everyone.</div>
+      <textarea id="notesArea" placeholder="Type the note staff should see…"></textarea>
+      <div class="row-actions">
+        <button class="btn btn-gold" onclick="saveNotes()">Save Notes</button>
+        <span class="save-msg" id="notesMsg"></span>
+      </div>
+    </div>
+    <div class="section-card">
+      <h2>🍽️ Current Specials</h2>
+      <div class="hint">Shown on the staff dashboard.</div>
+      <textarea id="specialsArea" placeholder="e.g. Soup: Tomato Bisque · Fish: Grilled Halibut · Dessert: Crème Brûlée"></textarea>
+      <div class="row-actions">
+        <button class="btn btn-gold" onclick="saveSpecials()">Save Specials</button>
+        <span class="save-msg" id="specialsMsg"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- EVENTS -->
+  <div id="panel-events" class="panel">
+    <div class="section-card">
+      <h2>🎉 Events — Bulk Editor</h2>
+      <div class="hint">Edit any cell, add rows, or import a CSV. Changed rows are highlighted; nothing saves until you click Save all changes.</div>
+      <div class="toolbar">
+        <button class="btn btn-ghost btn-sm" onclick="evAddRow()">＋ Add row</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('events')">⬇ Download CSV template</button>
+        <div class="spacer"></div>
+        <button class="btn btn-gold" onclick="evSaveAll()">Save all changes</button>
+      </div>
+      <div class="bulk-wrap">
+        <table class="bulk">
+          <thead><tr>
+            <th style="width:24%;">Name</th><th>Date</th><th>Time</th><th>End date</th><th style="width:30%;">Description</th><th></th>
+          </tr></thead>
+          <tbody id="evBody"></tbody>
+        </table>
+      </div>
+      <div class="csv-box">
+        <strong style="font-size:0.82rem;">Import CSV:</strong>
+        <input type="file" id="evCsv" accept=".csv,text/csv" onchange="csvPick('events')" />
+        <button class="btn btn-navy btn-sm" onclick="csvImport('events')">Import rows</button>
+        <span class="csv-status" id="evCsvStatus">Columns: name, date, time, end_date, description</span>
+      </div>
+      <div class="row-actions"><span class="save-msg" id="evMsg"></span></div>
+    </div>
+  </div>
+
+  <!-- SCHEDULES -->
+  <div id="panel-schedules" class="panel">
+    <div class="section-card">
+      <h2>📆 Schedules — Bulk Editor</h2>
+      <div class="hint">Edit any cell, add rows, or import a CSV. Changed rows are highlighted; nothing saves until you click Save all changes.</div>
+      <div class="toolbar">
+        <button class="btn btn-ghost btn-sm" onclick="schAddRow()">＋ Add row</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('schedules')">⬇ Download CSV template</button>
+        <div class="spacer"></div>
+        <button class="btn btn-gold" onclick="schSaveAll()">Save all changes</button>
+      </div>
+      <div class="bulk-wrap">
+        <table class="bulk">
+          <thead><tr>
+            <th style="width:30%;">Title</th><th>Date</th><th>End date</th><th style="width:34%;">Note</th><th></th>
+          </tr></thead>
+          <tbody id="schBody"></tbody>
+        </table>
+      </div>
+      <div class="csv-box">
+        <strong style="font-size:0.82rem;">Import CSV:</strong>
+        <input type="file" id="schCsv" accept=".csv,text/csv" onchange="csvPick('schedules')" />
+        <button class="btn btn-navy btn-sm" onclick="csvImport('schedules')">Import rows</button>
+        <span class="csv-status" id="schCsvStatus">Columns: name, date, end_date, note</span>
+      </div>
+      <div class="row-actions"><span class="save-msg" id="schMsg"></span></div>
+    </div>
+  </div>
+
+  <!-- TIME OFF -->
+  <div id="panel-timeoff" class="panel">
+    <div class="section-card">
+      <h2>🗓️ Time-Off Requests</h2>
+      <div class="hint">Approve, deny, or delete. Approved requests appear on the staff schedule and calendar.</div>
+      <div id="toList"><div class="to-empty">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SB_URL = 'https://vdvtrevhqalmjwhjhjug.supabase.co';
+const SB_KEY = 'sb_publishable_LnlevWReed7K8cFk_f_Mxg_UywktQ5_';
+const FN_URL = SB_URL + '/functions/v1/portal-api';
+const sb = window.supabase.createClient(SB_URL, SB_KEY);
+let MGR_PASS = null;
+
+async function fn(action, payload) {
+  const res = await fetch(FN_URL + '?action=' + encodeURIComponent(action), {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'apikey':SB_KEY, 'Authorization':'Bearer '+SB_KEY },
+    body: JSON.stringify(Object.assign({ password: MGR_PASS }, payload || {}))
+  });
+  let data={}; try{ data=await res.json(); }catch(_){}
+  return { ok:res.ok, status:res.status, data };
+}
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtDisplay(d){ if(!d) return ''; return new Date(d+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}); }
+
+/* ---- LOGIN ---- */
+async function doLogin(){
+  const p = document.getElementById('loginPass').value;
+  const err = document.getElementById('loginErr');
+  err.textContent = '';
+  if(!p){ err.textContent='Enter the password.'; return; }
+  const r = await fn('verify', { password:p });
+  if(r.ok){
+    MGR_PASS = p;
+    document.getElementById('loginView').classList.add('hide');
+    document.getElementById('consoleView').classList.remove('hide');
+    document.getElementById('logoutBtn').style.display='inline-block';
+    loadAll();
+  } else {
+    err.textContent = r.status===403 ? '❌ Incorrect password' : '❌ Could not connect';
+  }
+}
+function logout(){ MGR_PASS=null; location.reload(); }
+
+function mtab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector('.tab[onclick*="'+name+'"]').classList.add('active');
+  document.getElementById('panel-'+name).classList.add('active');
+}
+
+function loadAll(){ loadContent(); loadEvents(); loadSchedules(); loadTimeOff(); }
+
+/* ---- NOTES & SPECIALS ---- */
+async function loadContent(){
+  try{
+    const { data } = await sb.from('portal_settings').select('key,value');
+    const map = {}; (data||[]).forEach(r=>map[r.key]=r.value);
+    document.getElementById('notesArea').value = map['note'] || '';
+    document.getElementById('specialsArea').value = map['specials'] || '';
+  }catch(e){}
+}
+async function saveNotes(){
+  const r = await fn('save-notes', { value: document.getElementById('notesArea').value });
+  flash('notesMsg', r);
+}
+async function saveSpecials(){
+  const r = await fn('save-specials', { value: document.getElementById('specialsArea').value });
+  flash('specialsMsg', r);
+}
+function flash(id, r){
+  const el=document.getElementById(id);
+  if(r.ok){ el.className='save-msg'; el.textContent='✅ Saved'; }
+  else { el.className='save-msg err'; el.textContent='❌ '+(r.data.error||'Failed'); }
+  setTimeout(()=>{ el.textContent=''; }, 3000);
+}
+
+/* ===================================================================
+   GENERIC BULK EDITOR  (events & schedules share the same machinery)
+   =================================================================== */
+const SCHEMA = {
+  events: {
+    body:'evBody', msg:'evMsg', csvStatus:'evCsvStatus', table:'portal_events',
+    cols:[
+      {k:'name', type:'text', ph:'Event name'},
+      {k:'date', type:'date'},
+      {k:'time', type:'time'},
+      {k:'endDate', type:'date'},
+      {k:'desc', type:'text', ph:'Description'}
+    ],
+    map:r=>({ id:r.id, name:r.name, date:r.date, time:r.time||'', endDate:r.end_date||'', desc:r.description||'' }),
+    csvHeader:['name','date','time','end_date','description'],
+    csvRowToObj:c=>({ name:c[0]||'', date:c[1]||'', time:c[2]||'', endDate:c[3]||'', desc:c[4]||'' }),
+    sample:[
+      ['Wine & Cheese Tasting','2026-07-18','18:30','','Six wines paired with our cheese flight'],
+      ['Private Dining — Smith Party','2026-07-22','19:00','','Party of 12, back room'],
+      ['Summer Market Pop-Up','2026-08-01','10:00','2026-08-02','Two-day outdoor market']
+    ],
+    addAction:'add-event', updateAction:'update-event', deleteAction:'delete-event', bulkAction:'bulk-add-events'
+  },
+  schedules: {
+    body:'schBody', msg:'schMsg', csvStatus:'schCsvStatus', table:'portal_schedules',
+    cols:[
+      {k:'name', type:'text', ph:'Schedule title'},
+      {k:'date', type:'date'},
+      {k:'endDate', type:'date'},
+      {k:'note', type:'text', ph:'Note'}
+    ],
+    map:r=>({ id:r.id, name:r.name, date:r.date, endDate:r.end_date||'', note:r.note||'' }),
+    csvHeader:['name','date','end_date','note'],
+    csvRowToObj:c=>({ name:c[0]||'', date:c[1]||'', endDate:c[2]||'', note:c[3]||'' }),
+    sample:[
+      ['Front of House — Week of Jul 14','2026-07-14','2026-07-20','Maya opens Mon/Wed/Fri'],
+      ['Kitchen — Jul 14','2026-07-14','','Prep team in at 7am']
+    ],
+    addAction:'add-schedule', updateAction:'update-schedule', deleteAction:'delete-schedule', bulkAction:'bulk-add-schedules'
+  }
+};
+const ROWS = { events:[], schedules:[] };
+const PENDING_CSV = { events:null, schedules:null };
+
+async function loadKind(kind){
+  const S = SCHEMA[kind];
+  try{
+    const { data } = await sb.from(S.table).select('*').order('date');
+    ROWS[kind] = (data||[]).map(r=>{ const o=S.map(r); o._dirty=false; o._new=false; return o; });
+  }catch(e){ ROWS[kind]=[]; }
+  renderKind(kind);
+}
+function loadEvents(){ return loadKind('events'); }
+function loadSchedules(){ return loadKind('schedules'); }
+
+function renderKind(kind){
+  const S = SCHEMA[kind];
+  const body = document.getElementById(S.body);
+  const span = S.cols.length + 1;
+  if(!ROWS[kind].length){
+    body.innerHTML = '<tr><td class="empty-row" colspan="'+span+'">No rows yet. Add one or import a CSV.</td></tr>';
+    return;
+  }
+  body.innerHTML = ROWS[kind].map((row,i)=>{
+    const cls = row._new ? 'newrow' : (row._dirty ? 'dirty' : '');
+    const cells = S.cols.map(c=>{
+      const v = esc(row[c.k]||'');
+      const ph = c.ph ? ' placeholder="'+c.ph+'"' : '';
+      return '<td><input type="'+c.type+'" value="'+v+'"'+ph+' oninput="cellEdit(\''+kind+'\','+i+',\''+c.k+'\',this.value)"></td>';
+    }).join('');
+    const tag = row._new ? '<span class="pill pill-new">new</span>' : (row._dirty ? '<span class="pill pill-dirty">edited</span>' : '');
+    return '<tr class="'+cls+'">'+cells+'<td class="td-actions">'+tag+' <button class="btn btn-wax btn-sm" onclick="rowDelete(\''+kind+'\','+i+')">🗑</button></td></tr>';
+  }).join('');
+}
+function cellEdit(kind,i,field,val){
+  const row = ROWS[kind][i];
+  row[field] = val;
+  if(!row._new) row._dirty = true;
+  const tr = document.getElementById(SCHEMA[kind].body).children[i];
+  if(tr && !row._new && !tr.classList.contains('dirty')){
+    tr.classList.add('dirty');
+    const cell = tr.querySelector('.td-actions');
+    if(cell && !cell.querySelector('.pill')) cell.insertAdjacentHTML('afterbegin','<span class="pill pill-dirty">edited</span> ');
+  }
+}
+function evAddRow(){ addRow('events'); }
+function schAddRow(){ addRow('schedules'); }
+function addRow(kind){
+  const blank = { _new:true, _dirty:false };
+  SCHEMA[kind].cols.forEach(c=>blank[c.k]='');
+  ROWS[kind].push(blank);
+  renderKind(kind);
+  const body = document.getElementById(SCHEMA[kind].body);
+  const last = body.querySelector('tr:last-child input');
+  if(last) last.focus();
+}
+async function rowDelete(kind,i){
+  const row = ROWS[kind][i];
+  if(row._new){ ROWS[kind].splice(i,1); renderKind(kind); return; }
+  if(!confirm('Delete this row? This removes it immediately.')) return;
+  const r = await fn(SCHEMA[kind].deleteAction, { id: row.id });
+  if(r.ok){ ROWS[kind].splice(i,1); renderKind(kind); }
+  else msg(kind, '❌ '+(r.data.error||'Delete failed'), true);
+}
+function evSaveAll(){ return saveAll('events'); }
+function schSaveAll(){ return saveAll('schedules'); }
+async function saveAll(kind){
+  const S = SCHEMA[kind];
+  const rows = ROWS[kind];
+  const news = rows.filter(r=>r._new && r.name && r.date);
+  const dirty = rows.filter(r=>!r._new && r._dirty);
+  const invalid = rows.filter(r=>(r._new||r._dirty) && (!r.name || !r.date));
+  if(invalid.length){ msg(kind, '❌ Every changed row needs at least a name and date.', true); return; }
+  if(!news.length && !dirty.length){ msg(kind, 'Nothing to save.', false); return; }
+  let errs = 0;
+  for(const r of dirty){
+    const res = await fn(S.updateAction, r);
+    if(!res.ok) errs++;
+  }
+  if(news.length){
+    const res = await fn(S.bulkAction, { rows: news });
+    if(!res.ok) errs++;
+  }
+  if(errs){ msg(kind, '❌ '+errs+' change(s) failed to save.', true); }
+  else { msg(kind, '✅ Saved '+(dirty.length+news.length)+' change(s).', false); }
+  await loadKind(kind);
+}
+function msg(kind, text, isErr){
+  const el = document.getElementById(SCHEMA[kind].msg);
+  el.className = 'save-msg' + (isErr?' err':'');
+  el.textContent = text;
+  setTimeout(()=>{ el.textContent=''; }, 4000);
+}
+
+/* ---- CSV TEMPLATE DOWNLOAD ---- */
+function csvCell(v){ v = String(v==null?'':v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
+function toCSV(header, rows){ return [header.join(',')].concat(rows.map(r=>r.map(csvCell).join(','))).join('\r\n'); }
+function downloadTemplate(kind){
+  const S = SCHEMA[kind];
+  const csv = toCSV(S.csvHeader, S.sample);
+  const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'greys-'+kind+'-template.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* ---- CSV PARSE + IMPORT ---- */
+function parseCSV(text){
+  const rows=[]; let row=[], cur='', inQ=false;
+  text = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(inQ){
+      if(ch==='"'){ if(text[i+1]==='"'){ cur+='"'; i++; } else inQ=false; }
+      else cur+=ch;
+    } else {
+      if(ch==='"') inQ=true;
+      else if(ch===','){ row.push(cur); cur=''; }
+      else if(ch==='\n'){ row.push(cur); rows.push(row); row=[]; cur=''; }
+      else cur+=ch;
+    }
+  }
+  if(cur.length || row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r=>r.some(c=>c.trim()!==''));
+}
+function csvPick(kind){
+  const input = document.getElementById(kind==='events'?'evCsv':'schCsv');
+  const status = document.getElementById(SCHEMA[kind].csvStatus);
+  const file = input.files[0];
+  if(!file){ PENDING_CSV[kind]=null; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      let rows = parseCSV(e.target.result);
+      if(!rows.length){ status.textContent='⚠️ File looks empty.'; PENDING_CSV[kind]=null; return; }
+      // drop header row if first cell matches a known header name
+      const first = (rows[0][0]||'').trim().toLowerCase();
+      if(first==='name') rows = rows.slice(1);
+      const objs = rows.map(SCHEMA[kind].csvRowToObj).filter(o=>o.name && o.date);
+      PENDING_CSV[kind] = objs;
+      status.textContent = '✓ '+objs.length+' valid row(s) ready to import.';
+    }catch(err){ status.textContent='❌ Could not read file.'; PENDING_CSV[kind]=null; }
+  };
+  reader.readAsText(file);
+}
+async function csvImport(kind){
+  const status = document.getElementById(SCHEMA[kind].csvStatus);
+  const objs = PENDING_CSV[kind];
+  if(!objs || !objs.length){ status.textContent='Pick a CSV first (need name + date in each row).'; return; }
+  const r = await fn(SCHEMA[kind].bulkAction, { rows: objs });
+  if(r.ok){
+    status.textContent = '✅ Imported '+(r.data.inserted||objs.length)+' row(s).';
+    PENDING_CSV[kind]=null;
+    document.getElementById(kind==='events'?'evCsv':'schCsv').value='';
+    await loadKind(kind);
+  } else {
+    status.textContent = '❌ '+(r.data.error||'Import failed');
+  }
+}
+
+/* ---- TIME OFF ---- */
+let _to = [];
+async function loadTimeOff(){
+  try{
+    const { data } = await sb.from('portal_time_off').select('*').order('start_date');
+    _to = data||[];
+  }catch(e){ _to=[]; }
+  renderTimeOff();
+}
+function renderTimeOff(){
+  const el = document.getElementById('toList');
+  if(!_to.length){ el.innerHTML='<div class="to-empty">No requests.</div>'; return; }
+  el.innerHTML = _to.map(r=>{
+    const range = (r.end_date && r.end_date!==r.start_date) ? fmtDisplay(r.start_date)+' – '+fmtDisplay(r.end_date) : fmtDisplay(r.start_date);
+    const label = (r.status||'pending').charAt(0).toUpperCase()+(r.status||'pending').slice(1);
+    return '<div class="to-item"><div class="to-info"><div class="to-name">'+esc(r.name)+'</div>'+
+      '<div class="to-meta">📅 '+range+'</div>'+
+      (r.reason?'<div class="to-reason">"'+esc(r.reason)+'"</div>':'')+
+      '</div><div class="to-right"><span class="badge badge-'+(r.status||'pending')+'">'+label+'</span>'+
+      '<div style="display:flex;gap:6px;">'+
+        (r.status!=='approved'?'<button class="btn btn-gold btn-sm" onclick="toSet('+r.id+',\'approved\')">Approve</button>':'')+
+        (r.status!=='denied'?'<button class="btn btn-wax btn-sm" onclick="toSet('+r.id+',\'denied\')">Deny</button>':'')+
+        '<button class="btn btn-ghost btn-sm" onclick="toDel('+r.id+')">Delete</button>'+
+      '</div></div></div>';
+  }).join('');
+}
+async function toSet(id,status){
+  const r = await fn('set-timeoff', { id, status });
+  if(r.ok) loadTimeOff(); else alert('❌ '+(r.data.error||'Failed'));
+}
+async function toDel(id){
+  if(!confirm('Delete this request?')) return;
+  const r = await fn('delete-timeoff', { id });
+  if(r.ok) loadTimeOff(); else alert('❌ '+(r.data.error||'Failed'));
+}
+
+window.addEventListener('DOMContentLoaded', ()=>{ document.getElementById('loginPass').focus(); });
+</script>
+</body>
+</html>

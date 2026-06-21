@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: greys-staff-portal
+    runtime: static
+    # No build step — static index.html + manager.html that talk directly to
+    # Supabase (DB) and the Supabase Edge Function (Wix proxy). No server to boot.
+    buildCommand: ""
+    staticPublishPath: .
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
