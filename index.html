@@ -978,15 +978,23 @@ async function loadCalendarMonth(year, month) {
     params.set('startDateFrom', start.toISOString());
     params.set('startDateTo',   end.toISOString());
     const res = await wixFetch(params);
-    if (!res.ok) return;
+    if (!res.ok) { _calReservations = {}; return; }
     const data = await res.json();
     _calReservations = {};
+    const skip = ['CANCELLED','DECLINED','NO_SHOW'];
     (data.reservations||[]).forEach(r => {
       if (!r.details || !r.details.startDate) return;
-      const d = fmt(new Date(r.details.startDate));
-      _calReservations[d] = (_calReservations[d]||0) + 1;
+      if (skip.includes(r.status)) return;
+      const dt = new Date(r.details.startDate);
+      const d = fmt(dt);
+      const reservee = r.reservee || {};
+      const name = [reservee.firstName, reservee.lastName].filter(Boolean).join(' ').trim() || 'Guest';
+      const party = r.details.partySize || '?';
+      const time = dt.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+      (_calReservations[d] = _calReservations[d] || []).push({ name, party, time, t: dt.getTime() });
     });
-  } catch(e) {}
+    Object.values(_calReservations).forEach(arr => arr.sort((a,b) => a.t - b.t));
+  } catch(e) { _calReservations = {}; }
 }
 async function renderCalendar() {
   const year = _calYear, month = _calMonth;
@@ -1042,7 +1050,7 @@ async function renderCalendar() {
   let trailing = 1;
   while (dayCount % 7 !== 0) {
     const d = fmt(new Date(year, month + 1, trailing));
-    html += dayCell(d, trailing, true, today, _calReservations, evByDate, toByDate); trailing++; dayCount++;
+    html += dayCell(d, trailing, true, today, _calReservations, evByDate, toByDate, spByDate, schByDate); trailing++; dayCount++;
   }
   document.getElementById('calBody').innerHTML = html;
 }
@@ -1053,8 +1061,11 @@ function dayCell(dateStr, dayNum, otherMonth, today, resByDate, evByDate, toByDa
   if (isToday) cls += ' today';
   const numEl = isToday ? `<div class="cal-day-num"><span>${dayNum}</span></div>` : `<div class="cal-day-num">${dayNum}</div>`;
   let pills = '';
-  const resCount = resByDate[dateStr] || 0;
-  if (resCount > 0 && !otherMonth) pills += `<div class="cal-pill reservation">🍽 ${resCount} reservation${resCount>1?'s':''}</div>`;
+  const resv = resByDate[dateStr] || [];
+  resv.slice(0,4).forEach(r => {
+    pills += `<div class="cal-pill reservation" title="${esc(r.time + ' · ' + r.name + ' · party of ' + r.party)}">${esc(r.time)} · ${esc(r.name)} · 👥${esc(r.party)}</div>`;
+  });
+  if (resv.length > 4) pills += `<div class="cal-more">+${resv.length-4} more reservations</div>`;
   const evs = evByDate[dateStr] || [];
   evs.slice(0,2).forEach(name => { pills += `<div class="cal-pill event">🎉 ${esc(name)}</div>`; });
   if (evs.length > 2) pills += `<div class="cal-more">+${evs.length-2} more</div>`;
