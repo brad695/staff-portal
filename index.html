@@ -252,6 +252,18 @@
     .playlist-info .pl-name{ font-size:0.9rem; font-weight:800; color:var(--rind); }
     .playlist-info .pl-desc{ font-size:0.75rem; color:var(--sub); margin-top:2px; }
     .pl-open{ margin-left:auto; font-size:0.72rem; font-weight:800; color:#1db954; white-space:nowrap; }
+
+    /* ── CONTENT TILES (notes & specials) ── */
+    .notes-grid,.specials-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
+    .note-empty{ color:var(--sub); font-style:italic; font-size:0.88rem; padding:4px 0; }
+    .note-tile{ background:#fff; border:1px solid var(--line); border-left:4px solid var(--cheddar); border-radius:var(--r); padding:12px 14px; }
+    .note-title{ font-weight:800; font-size:0.9rem; color:var(--rind); font-family:'Archivo',sans-serif; }
+    .note-body{ font-size:0.85rem; color:var(--ink); line-height:1.5; margin-top:4px; white-space:pre-wrap; }
+    .special-tile{ background:#fff; border:1px solid var(--line); border-left:4px solid var(--wax); border-radius:var(--r); padding:12px 14px; }
+    .special-title{ font-weight:800; font-size:0.92rem; color:var(--wax); font-family:'Archivo',sans-serif; }
+    .special-body{ font-size:0.85rem; color:var(--ink); line-height:1.5; margin-top:4px; white-space:pre-wrap; }
+    .special-time{ font-size:0.78rem; color:var(--sub); margin-top:4px; font-weight:600; }
+    .rep-badge{ font-size:0.6rem; font-weight:800; text-transform:uppercase; letter-spacing:0.4px; color:var(--navy2); background:var(--gold); padding:1px 6px; border-radius:var(--r); vertical-align:middle; }
   </style>
 </head>
 <body>
@@ -286,7 +298,7 @@
   <div class="notes-top">
     <span class="notes-label">📌 Staff Notes</span>
   </div>
-  <div id="notesDisplay" class="empty">No notes yet.</div>
+  <div id="notesGrid" class="notes-grid"><div class="note-empty">No notes posted.</div></div>
 </div>
 
 <!-- ══ DASHBOARD ══ -->
@@ -306,9 +318,9 @@
 
   <div class="specials-card">
     <div class="specials-top">
-      <span class="specials-label">🍽️ Current Specials</span>
+      <span class="specials-label">🍽️ Today's Specials</span>
     </div>
-    <div id="specialsDisplay" class="empty">No specials posted yet.</div>
+    <div id="specialsGrid" class="specials-grid"><div class="note-empty">No specials today.</div></div>
   </div>
 
   <div class="dash-events-col">
@@ -606,86 +618,129 @@ function esc(str) {
 })();
 
 window.addEventListener('DOMContentLoaded', () => {
-  loadNote();
-  loadSpecials();
+  loadItems();
   loadReservations();
   loadDashboard();
-  loadEvents();
   loadSchedules();
   loadTimeOff();
 });
 
 // ─────────────────────────────────────────
-//  NOTES
+//  CONTENT ITEMS (notes · specials · events)
 // ─────────────────────────────────────────
-async function loadNote() {
-  try {
-    const { data } = await sb.from('portal_settings').select('value').eq('key','note').maybeSingle();
-    const el = document.getElementById('notesDisplay');
-    const note = (data && data.value) ? data.value : '';
-    if (note.trim()) { el.textContent = note; el.classList.remove('empty'); }
-    else { el.textContent = 'No notes yet.'; el.classList.add('empty'); }
-  } catch(e) {}
+let _notes = [], _specials = [], _events = [];
+function mapItem(r){
+  return { id:r.id, type:r.type||'note', title:r.title||'', body:r.body||'', date:r.date||'', time:r.time||'', endDate:r.end_date||'', repeat:r.repeat||'none', repeatUntil:r.repeat_until||'' };
 }
-
-// ─────────────────────────────────────────
-//  SPECIALS
-// ─────────────────────────────────────────
-async function loadSpecials() {
+async function loadItems(){
   try {
-    const { data } = await sb.from('portal_settings').select('value').eq('key','specials').maybeSingle();
-    const el = document.getElementById('specialsDisplay');
-    const sp = (data && data.value) ? data.value : '';
-    if (sp.trim()) { el.textContent = sp; el.classList.remove('empty'); }
-    else { el.textContent = 'No specials posted yet.'; el.classList.add('empty'); }
-  } catch(e) {}
-}
-
-// ─────────────────────────────────────────
-//  EVENTS
-// ─────────────────────────────────────────
-let _events = [];
-function mapEvent(r) {
-  return { id:r.id, name:r.name, date:r.date, endDate:r.end_date||'', time:r.time||'', desc:r.description||'' };
-}
-async function loadEvents() {
-  try {
-    const { data } = await sb.from('portal_events').select('*').order('date').order('time');
-    _events = (data||[]).map(mapEvent);
-  } catch(e) { _events = []; }
+    const { data } = await sb.from('portal_items').select('*');
+    const items = (data||[]).map(mapItem);
+    _notes    = items.filter(i => i.type === 'note');
+    _specials = items.filter(i => i.type === 'special');
+    _events   = items.filter(i => i.type === 'event')
+      .map(e => ({ id:e.id, name:e.title, date:e.date, time:e.time, endDate:e.endDate, desc:e.body, repeat:e.repeat, repeatUntil:e.repeatUntil }));
+  } catch(e){ _notes=[]; _specials=[]; _events=[]; }
+  renderNotes();
+  renderSpecials();
   renderEventCards();
   renderDashEvents();
+  const cal = document.getElementById('panel-calendar');
+  if (cal && cal.classList.contains('active')) renderCalendar();
 }
-function renderEventCards() {
+
+// recurrence -> array of YYYY-MM-DD occurrences within [winStart, winEnd]
+function occurrences(item, winStart, winEnd){
+  const out = []; if (!item.date) return out;
+  const rep = item.repeat || 'none';
+  const start = new Date(item.date + 'T12:00:00');
+  const winS = new Date(winStart + 'T12:00:00'), winE = new Date(winEnd + 'T12:00:00');
+  const until = item.repeatUntil ? new Date(item.repeatUntil + 'T12:00:00') : winE;
+  const hardEnd = until < winE ? until : winE;
+  if (rep === 'none'){ if (start >= winS && start <= winE) out.push(fmt(start)); return out; }
+  let d = new Date(start), i = 0;
+  while (d <= hardEnd && i < 600){
+    if (d >= winS) out.push(fmt(d));
+    if (rep === 'weekly') d.setDate(d.getDate() + 7);
+    else if (rep === 'biweekly') d.setDate(d.getDate() + 14);
+    else if (rep === 'monthly') d.setMonth(d.getMonth() + 1);
+    else break;
+    i++;
+  }
+  return out;
+}
+function repeatLabel(rep){ return rep === 'weekly' ? 'Weekly' : rep === 'biweekly' ? 'Every 2 wks' : rep === 'monthly' ? 'Monthly' : ''; }
+
+// NOTES -> tiles
+function renderNotes(){
+  const grid = document.getElementById('notesGrid');
+  if (!grid) return;
+  if (!_notes.length){ grid.innerHTML = '<div class="note-empty">No notes posted.</div>'; return; }
+  grid.innerHTML = _notes.map(n => `<div class="note-tile">
+    <div class="note-title">📌 ${esc(n.title)}</div>
+    ${n.body ? `<div class="note-body">${esc(n.body)}</div>` : ''}
+  </div>`).join('');
+}
+
+// SPECIALS -> today's tiles
+function renderSpecials(){
+  const grid = document.getElementById('specialsGrid');
+  if (!grid) return;
+  const today = fmt(new Date());
+  const todays = _specials.filter(s => occurrences(s, today, today).length > 0);
+  if (!todays.length){ grid.innerHTML = '<div class="note-empty">No specials today.</div>'; return; }
+  grid.innerHTML = todays.map(s => {
+    const rl = repeatLabel(s.repeat);
+    const timeStr = s.time ? fmtTime(s.time) : '';
+    return `<div class="special-tile">
+      <div class="special-title">🍽️ ${esc(s.title)}${rl ? ` <span class="rep-badge">↻ ${rl}</span>` : ''}</div>
+      ${s.body ? `<div class="special-body">${esc(s.body)}</div>` : ''}
+      ${timeStr ? `<div class="special-time">${timeStr}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// EVENTS -> expand recurrence
+function eventInstances(winStart, winEnd){
+  const out = [];
+  _events.forEach(ev => {
+    occurrences(ev, winStart, winEnd).forEach(d => out.push(Object.assign({}, ev, { date:d, endDate:'', _repeat:ev.repeat })));
+  });
+  return out.sort((a,b) => (a.date||'').localeCompare(b.date||'') || (a.time||'').localeCompare(b.time||''));
+}
+function renderEventCards(){
   const grid = document.getElementById('eventsGrid');
   const today = fmt(new Date());
-  if (!_events.length) {
-    grid.innerHTML = '<div class="no-events"><div class="icon">🎉</div><p>No events yet. Add one!</p></div>';
-    document.getElementById('dash-event-count').textContent = '0';
-    document.getElementById('dash-next-event').textContent = 'no upcoming events';
-    return;
-  }
-  const upcoming = _events.filter(e => e.date >= today);
+  const horizon = fmt(new Date(Date.now() + 150*864e5));
+  const singles = _events.filter(e => (e.repeat||'none') === 'none');
+  const recurring = [];
+  _events.filter(e => (e.repeat||'none') !== 'none').forEach(ev => {
+    occurrences(ev, today, horizon).forEach(d => recurring.push(Object.assign({}, ev, { date:d, endDate:'', _repeat:ev.repeat })));
+  });
+  const all = singles.concat(recurring).sort((a,b) => (a.date||'').localeCompare(b.date||'') || (a.time||'').localeCompare(b.time||''));
+  const upcoming = all.filter(e => e.date >= today);
   document.getElementById('dash-event-count').textContent = upcoming.length;
-  document.getElementById('dash-next-event').textContent = upcoming.length
-    ? 'next: ' + fmtDisplay(upcoming[0].date) : 'no upcoming events';
-  grid.innerHTML = _events.map(ev => {
+  document.getElementById('dash-next-event').textContent = upcoming.length ? 'next: ' + fmtDisplay(upcoming[0].date) : 'no upcoming events';
+  if (!all.length){ grid.innerHTML = '<div class="no-events"><div class="icon">🎉</div><p>No events yet.</p></div>'; return; }
+  grid.innerHTML = all.map(ev => {
     const isPast = ev.date < today;
     const timeStr = ev.time ? ' · ' + fmtTime(ev.time) : '';
     const rangeStr = (ev.endDate && ev.endDate !== ev.date) ? fmtDisplay(ev.date) + ' – ' + fmtDisplay(ev.endDate) : fmtDisplay(ev.date);
+    const rl = (ev._repeat && ev._repeat !== 'none') ? ` <span class="rep-badge">↻ ${repeatLabel(ev._repeat)}</span>` : '';
     return `<div class="event-card${isPast?' past':''}">
       <div class="ev-date-badge">${isPast?'Past · ':''}${rangeStr}${timeStr}</div>
-      <div class="ev-name">${esc(ev.name)}</div>
+      <div class="ev-name">${esc(ev.name)}${rl}</div>
       ${ev.desc ? `<div class="ev-desc">${esc(ev.desc)}</div>` : ''}
     </div>`;
   }).join('');
 }
-function renderDashEvents() {
+function renderDashEvents(){
   const list = document.getElementById('dash-events-list');
   const today = fmt(new Date());
-  const upcoming = _events.filter(e => e.date >= today).slice(0, 6);
-  if (!upcoming.length) { list.innerHTML = '<li class="empty-state-small">No upcoming events.</li>'; return; }
-  list.innerHTML = upcoming.map(ev => {
+  const horizon = fmt(new Date(Date.now() + 150*864e5));
+  const inst = eventInstances(today, horizon).slice(0, 6);
+  if (!inst.length){ list.innerHTML = '<li class="empty-state-small">No upcoming events.</li>'; return; }
+  list.innerHTML = inst.map(ev => {
     const timeStr = ev.time ? ' · ' + fmtTime(ev.time) : '';
     return `<li class="event-item-dash"><div class="ev-title">${esc(ev.name)}</div><div class="ev-meta">${fmtDisplay(ev.date)}${timeStr}</div></li>`;
   }).join('');
@@ -920,8 +975,12 @@ async function renderCalendar() {
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   document.getElementById('calMonthLabel').textContent = months[month] + ' ' + year;
   await loadCalendarMonth(year, month);
+  const monthStartStr = fmt(new Date(year, month, 1));
+  const monthEndStr = fmt(new Date(year, month + 1, 0));
   const evByDate = {};
-  _events.forEach(ev => { (evByDate[ev.date] = evByDate[ev.date] || []).push(ev.name); });
+  _events.forEach(ev => {
+    occurrences(ev, monthStartStr, monthEndStr).forEach(d => { (evByDate[d] = evByDate[d] || []).push(ev.name); });
+  });
   // Approved time off — spread the name across every day in its range.
   const toByDate = {};
   approvedTimeOff().forEach(r => {
