@@ -230,6 +230,7 @@
     .cal-day.today .cal-day-num{ background:var(--cheddar); color:#fff; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.75rem; }
     .cal-pill{ font-size:0.7rem; font-weight:700; padding:2px 6px; border-radius:var(--r); margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .cal-pill.reservation{ background:#d7e6f5; color:#1e40af; }
+    .cal-pill.reservation.cancelled{ background:#f6dad4; color:#991b1b; text-decoration:line-through; }
     .cal-pill.event{ background:#fdebc4; color:#92400e; }
     .cal-pill.timeoff{ background:#f6dad4; color:#A52B1E; }
     .cal-pill.special{ background:#e7d9b0; color:#7a4d12; }
@@ -478,7 +479,8 @@
     <button class="btn-cal-today" onclick="calGoToday()">Today</button>
   </div>
   <div class="cal-legend">
-    <span><span class="cal-legend-dot" style="background:#a9c7e8;"></span>Reservation</span>
+    <span><span class="cal-legend-dot" style="background:#a9c7e8;"></span>Reserved</span>
+    <span><span class="cal-legend-dot" style="background:#e0a3a3;"></span>Cancelled</span>
     <span><span class="cal-legend-dot" style="background:var(--cheddar);"></span>Event</span>
     <span><span class="cal-legend-dot" style="background:#c8a24a;"></span>Special</span>
     <span><span class="cal-legend-dot" style="background:#13314f;"></span>Schedule</span>
@@ -617,10 +619,11 @@ function esc(str) {
 //  INIT
 // ─────────────────────────────────────────
 (function() {
-  const today = new Date(), plus30 = new Date();
-  plus30.setDate(today.getDate() + 30);
-  document.getElementById('dateFrom').value = fmt(today);
-  document.getElementById('dateTo').value   = fmt(plus30);
+  const today = new Date();
+  const from = new Date(); from.setDate(today.getDate() - 30);
+  const to = new Date(); to.setDate(today.getDate() + 60);
+  document.getElementById('dateFrom').value = fmt(from);
+  document.getElementById('dateTo').value   = fmt(to);
   const ts = document.getElementById('toStart'); if (ts) ts.value = fmt(today);
 })();
 
@@ -981,17 +984,15 @@ async function loadCalendarMonth(year, month) {
     if (!res.ok) { _calReservations = {}; return; }
     const data = await res.json();
     _calReservations = {};
-    const skip = ['CANCELLED','DECLINED','NO_SHOW'];
     (data.reservations||[]).forEach(r => {
       if (!r.details || !r.details.startDate) return;
-      if (skip.includes(r.status)) return;
       const dt = new Date(r.details.startDate);
       const d = fmt(dt);
       const reservee = r.reservee || {};
       const name = [reservee.firstName, reservee.lastName].filter(Boolean).join(' ').trim() || 'Guest';
       const party = r.details.partySize || '?';
       const time = dt.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-      (_calReservations[d] = _calReservations[d] || []).push({ name, party, time, t: dt.getTime() });
+      (_calReservations[d] = _calReservations[d] || []).push({ name, party, time, status: r.status || 'UNKNOWN', t: dt.getTime() });
     });
     Object.values(_calReservations).forEach(arr => arr.sort((a,b) => a.t - b.t));
   } catch(e) { _calReservations = {}; }
@@ -1061,9 +1062,12 @@ function dayCell(dateStr, dayNum, otherMonth, today, resByDate, evByDate, toByDa
   if (isToday) cls += ' today';
   const numEl = isToday ? `<div class="cal-day-num"><span>${dayNum}</span></div>` : `<div class="cal-day-num">${dayNum}</div>`;
   let pills = '';
+  const cancelledSet = ['CANCELLED','DECLINED','NO_SHOW'];
   const resv = resByDate[dateStr] || [];
   resv.slice(0,4).forEach(r => {
-    pills += `<div class="cal-pill reservation" title="${esc(r.time + ' · ' + r.name + ' · party of ' + r.party)}">${esc(r.time)} · ${esc(r.name)} · 👥${esc(r.party)}</div>`;
+    const cls = cancelledSet.includes(r.status) ? 'reservation cancelled' : 'reservation';
+    const st = (r.status||'').replace(/_/g,' ').toLowerCase();
+    pills += `<div class="cal-pill ${cls}" title="${esc(r.time + ' · ' + r.name + ' · party of ' + r.party + ' · ' + st)}">${esc(r.time)} · ${esc(r.name)} · 👥${esc(r.party)}</div>`;
   });
   if (resv.length > 4) pills += `<div class="cal-more">+${resv.length-4} more reservations</div>`;
   const evs = evByDate[dateStr] || [];
