@@ -680,27 +680,45 @@ function renderNotes(){
   </div>`).join('');
 }
 
-// Specials occurring this week (Mon–Sun), sorted.
-function weekSpecials(){
+// Specials shown this week (Mon–Sun): a continuous run (end_date) is ONE entry
+// with a date range; a recurring special is one entry per occurrence.
+function weekSpecialEntries(){
   const wk = currentWeek();
-  const occ = [];
-  _specials.forEach(s => { occurrences(s, wk.start, wk.end).forEach(d => occ.push({ date:d, s })); });
-  return occ.sort((a,b) => a.date.localeCompare(b.date) || (a.s.time||'').localeCompare(b.s.time||''));
+  const entries = [];
+  _specials.forEach(s => {
+    const rep = s.repeat || 'none';
+    if (rep === 'none' && s.endDate && s.endDate > s.date) {
+      if (s.date <= wk.end && s.endDate >= wk.start) entries.push({ s, start:s.date, end:s.endDate, range:true });
+    } else {
+      occurrences(s, wk.start, wk.end).forEach(d => entries.push({ s, start:d, end:d, range:false }));
+    }
+  });
+  return entries.sort((a,b) => a.start.localeCompare(b.start) || (a.s.time||'').localeCompare(b.s.time||''));
+}
+function specialDayLabel(e){
+  const today = fmt(new Date());
+  if (e.range) {
+    const now = (today >= e.start && today <= e.end) ? '⭐ Now · ' : '';
+    return now + fmtDisplay(e.start) + ' – ' + fmtDisplay(e.end);
+  }
+  return e.start === today ? '⭐ Today' : fmtDisplay(e.start);
+}
+function specialActive(e){
+  const today = fmt(new Date());
+  return e.range ? (today >= e.start && today <= e.end) : (e.start === today);
 }
 
 // SPECIALS (dashboard summary) -> minimal tiles, click opens the Specials tab
 function renderSpecials(){
   const grid = document.getElementById('specialsGrid');
   if (!grid) return;
-  const todayStr = fmt(new Date());
-  const occ = weekSpecials();
-  if (!occ.length){ grid.innerHTML = '<div class="note-empty">No specials this week.</div>'; return; }
-  grid.innerHTML = occ.map(o => {
-    const s = o.s;
-    const isToday = o.date === todayStr;
+  const entries = weekSpecialEntries();
+  if (!entries.length){ grid.innerHTML = '<div class="note-empty">No specials this week.</div>'; return; }
+  grid.innerHTML = entries.map(e => {
+    const s = e.s;
     const timeStr = s.time ? ' · ' + fmtTime(s.time) : '';
-    return `<div class="special-tile clickable${isToday?' today':''}" onclick="openOnTab('specials','spec-${s.id}-${o.date}')">
-      <div class="special-day">${isToday?'⭐ Today':fmtDisplay(o.date)}${timeStr}</div>
+    return `<div class="special-tile clickable${specialActive(e)?' today':''}" onclick="openOnTab('specials','spec-${s.id}-${e.start}')">
+      <div class="special-day">${specialDayLabel(e)}${timeStr}</div>
       <div class="special-title">🍽️ ${esc(s.title)}</div>
     </div>`;
   }).join('');
@@ -710,16 +728,14 @@ function renderSpecials(){
 function renderSpecialsFull(){
   const grid = document.getElementById('specialsFullGrid');
   if (!grid) return;
-  const todayStr = fmt(new Date());
-  const occ = weekSpecials();
-  if (!occ.length){ grid.innerHTML = '<div class="no-events"><div class="icon">🍽️</div><p>No specials this week.</p></div>'; return; }
-  grid.innerHTML = occ.map(o => {
-    const s = o.s;
-    const isToday = o.date === todayStr;
+  const entries = weekSpecialEntries();
+  if (!entries.length){ grid.innerHTML = '<div class="no-events"><div class="icon">🍽️</div><p>No specials this week.</p></div>'; return; }
+  grid.innerHTML = entries.map(e => {
+    const s = e.s;
     const rl = repeatLabel(s.repeat);
     const timeStr = s.time ? fmtTime(s.time) : '';
-    return `<div class="event-card special-card" id="spec-${s.id}-${o.date}">
-      <div class="ev-date-badge">${isToday?'⭐ Today · ':''}${fmtDisplay(o.date)}${timeStr?' · '+timeStr:''}${rl?` · ↻ ${rl}`:''}</div>
+    return `<div class="event-card special-card" id="spec-${s.id}-${e.start}">
+      <div class="ev-date-badge">${specialDayLabel(e)}${timeStr?' · '+timeStr:''}${rl?` · ↻ ${rl}`:''}</div>
       <div class="ev-name">🍽️ ${esc(s.title)}</div>
       ${s.body ? `<div class="ev-desc">${esc(s.body)}</div>` : ''}
     </div>`;
