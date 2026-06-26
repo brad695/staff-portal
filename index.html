@@ -270,6 +270,15 @@
     .special-tile.today{ background:#fff7e2; border-left-color:var(--cheddar); }
     .special-tile.today .special-day{ color:var(--wax); }
     .rep-badge{ font-size:0.6rem; font-weight:800; text-transform:uppercase; letter-spacing:0.4px; color:var(--navy2); background:var(--gold); padding:1px 6px; border-radius:var(--r); vertical-align:middle; }
+    .special-tile.clickable, .event-item-dash.clickable, .note-tile.clickable{ cursor:pointer; }
+    .special-tile.clickable:hover, .event-item-dash.clickable:hover, .note-tile.clickable:hover{ box-shadow:0 2px 8px rgba(11,33,56,0.13); }
+    .note-tile .note-body{ display:none; }
+    .note-tile.open .note-body{ display:block; }
+    .tile-more{ font-size:0.7rem; color:var(--sub); font-weight:600; }
+    .special-card{ border-left:4px solid var(--wax) !important; }
+    .special-card .ev-date-badge{ color:var(--wax); }
+    @keyframes flashpulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(224,162,28,0);} 30%{ box-shadow:0 0 0 3px rgba(224,162,28,0.95);} }
+    .flash{ animation:flashpulse 1.8s ease; }
   </style>
 </head>
 <body>
@@ -296,7 +305,7 @@
   <div class="tab" onclick="switchTab('events')">Events</div>
   <div class="tab" onclick="switchTab('scheduling')">Scheduling</div>
   <div class="tab" onclick="switchTab('calendar')">Calendar</div>
-  <div class="tab" onclick="switchTab('music')">Music</div>
+  <div class="tab" onclick="switchTab('specials')">Specials</div>
 </div>
 
 <!-- ── STAFF NOTES ── -->
@@ -502,47 +511,14 @@
   </div>
 </div>
 
-<!-- ══ MUSIC ══ -->
-<div id="panel-music" class="panel">
-  <div class="music-toolbar">
-    <h2>🎵 Music</h2>
+<!-- ══ SPECIALS ══ -->
+<div id="panel-specials" class="panel">
+  <div class="events-toolbar">
+    <h2>🍽️ Specials This Week</h2>
   </div>
-  <div class="music-main">
-    <div class="spotify-embed">
-      <iframe id="spotifyPlayer"
-        src="https://open.spotify.com/embed/playlist/37i9dQZF1DX4fpCWaHOned?utm_source=generator&theme=0"
-        height="152" allowfullscreen allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-        loading="lazy"></iframe>
-    </div>
-    <div class="playlist-grid">
-      <div class="playlist-card active" onclick="loadPlaylist(this,'3fnpQsxGPwJbEgLlBZnV1l')">
-        <div class="playlist-icon">🍷</div>
-        <div class="playlist-info"><div class="pl-name">80's</div><div class="pl-desc">Some random 80's Pop</div></div>
-      </div>
-      <div class="playlist-card" onclick="loadPlaylist(this,'65q00GHVrw694ev2XygUgd')">
-        <div class="playlist-icon">🎸</div>
-        <div class="playlist-info"><div class="pl-name">Mississippi</div><div class="pl-desc">Bluesy, Southern Rocky kinda stuff</div></div>
-      </div>
-      <div class="playlist-card" onclick="loadPlaylist(this,'37i9dQZF1EIUmlZoT3Otk2')">
-        <div class="playlist-icon">🎷</div>
-        <div class="playlist-info"><div class="pl-name">Anderson.Paak</div><div class="pl-desc">Public Playlist</div></div>
-      </div>
-      <div class="playlist-card" onclick="loadPlaylist(this,'37i9dQZF1DX0SM0LYsmbMT')">
-        <div class="playlist-icon">🎹</div>
-        <div class="playlist-info"><div class="pl-name">Piano Bar</div><div class="pl-desc">Elegant piano for upscale dining</div></div>
-      </div>
-      <div class="playlist-card" onclick="loadPlaylist(this,'37i9dQZF1DX12G1GAEuIuj')">
-        <div class="playlist-icon">🎺</div>
-        <div class="playlist-info"><div class="pl-name">Memphis Blues</div><div class="pl-desc">Blues classics from the home of the blues</div></div>
-      </div>
-      <div class="playlist-card" onclick="loadPlaylist(this,'37i9dQZF1DWYkaDif7Ztbp')">
-        <div class="playlist-icon">🌆</div>
-        <div class="playlist-info"><div class="pl-name">Late Night Vibes</div><div class="pl-desc">Laid-back grooves for closing hours</div></div>
-      </div>
-      <div class="playlist-card" onclick="loadPlaylist(this,'37i9dQZF1E4u9AWc8Micxc')">
-        <div class="playlist-icon">🎤</div>
-        <div class="playlist-info"><div class="pl-name">Chris Stapleton</div><div class="pl-desc">Soulful country from a Memphis favorite</div></div>
-      </div>
+  <div class="events-main">
+    <div class="events-grid" id="specialsFullGrid">
+      <div class="no-events"><div class="icon">🍽️</div><p>No specials this week.</p></div>
     </div>
   </div>
 </div>
@@ -568,12 +544,6 @@ function wixFetch(params) {
 // ─────────────────────────────────────────
 //  CLOCK + MUSIC
 // ─────────────────────────────────────────
-function loadPlaylist(el, id) {
-  document.querySelectorAll('.playlist-card').forEach(c => c.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('spotifyPlayer').src =
-    'https://open.spotify.com/embed/playlist/' + id + '?utm_source=generator&theme=0';
-}
 function updateClock() {
   const now = new Date();
   document.getElementById('clockTime').textContent =
@@ -587,7 +557,7 @@ setInterval(updateClock, 1000);
 // ─────────────────────────────────────────
 //  TABS
 // ─────────────────────────────────────────
-const TAB_ORDER = ['dashboard','reservations','events','scheduling','calendar','music'];
+const TAB_ORDER = ['dashboard','reservations','events','scheduling','calendar','specials'];
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach((t,i) => {
     t.classList.toggle('active', TAB_ORDER[i] === name);
@@ -595,6 +565,22 @@ function switchTab(name) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('panel-' + name).classList.add('active');
   if (name === 'calendar') renderCalendar();
+  if (name === 'specials') renderSpecialsFull();
+}
+// Jump to a tab and highlight a specific card.
+function openOnTab(tab, cardId){
+  switchTab(tab);
+  setTimeout(() => {
+    const el = document.getElementById(cardId);
+    if (el){ el.scrollIntoView({ behavior:'smooth', block:'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1800); }
+  }, 120);
+}
+// Monday–Sunday of the current week.
+function currentWeek(){
+  const d = new Date(); d.setHours(0,0,0,0);
+  const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  return { start: fmt(mon), end: fmt(sun) };
 }
 
 // ─────────────────────────────────────────
@@ -657,6 +643,8 @@ async function loadItems(){
   renderDashEvents();
   const cal = document.getElementById('panel-calendar');
   if (cal && cal.classList.contains('active')) renderCalendar();
+  const sp = document.getElementById('panel-specials');
+  if (sp && sp.classList.contains('active')) renderSpecialsFull();
 }
 
 // recurrence -> array of YYYY-MM-DD occurrences within [winStart, winEnd]
@@ -681,40 +669,59 @@ function occurrences(item, winStart, winEnd){
 }
 function repeatLabel(rep){ return rep === 'weekly' ? 'Weekly' : rep === 'biweekly' ? 'Every 2 wks' : rep === 'monthly' ? 'Monthly' : ''; }
 
-// NOTES -> tiles
+// NOTES -> tiles (title; click to reveal the full note)
 function renderNotes(){
   const grid = document.getElementById('notesGrid');
   if (!grid) return;
   if (!_notes.length){ grid.innerHTML = '<div class="note-empty">No notes posted.</div>'; return; }
-  grid.innerHTML = _notes.map(n => `<div class="note-tile">
-    <div class="note-title">📌 ${esc(n.title)}</div>
+  grid.innerHTML = _notes.map(n => `<div class="note-tile${n.body?' clickable':''}"${n.body?` onclick="this.classList.toggle('open')"`:''}>
+    <div class="note-title">📌 ${esc(n.title)}${n.body?' <span class="tile-more">▾</span>':''}</div>
     ${n.body ? `<div class="note-body">${esc(n.body)}</div>` : ''}
   </div>`).join('');
 }
 
-// SPECIALS -> this week's tiles (today + next 6 days), today highlighted
+// Specials occurring this week (Mon–Sun), sorted.
+function weekSpecials(){
+  const wk = currentWeek();
+  const occ = [];
+  _specials.forEach(s => { occurrences(s, wk.start, wk.end).forEach(d => occ.push({ date:d, s })); });
+  return occ.sort((a,b) => a.date.localeCompare(b.date) || (a.s.time||'').localeCompare(b.s.time||''));
+}
+
+// SPECIALS (dashboard summary) -> minimal tiles, click opens the Specials tab
 function renderSpecials(){
   const grid = document.getElementById('specialsGrid');
   if (!grid) return;
-  const todayD = new Date(); todayD.setHours(0,0,0,0);
-  const todayStr = fmt(todayD);
-  const endD = new Date(todayD); endD.setDate(endD.getDate() + 6);
-  const endStr = fmt(endD);
-  const occ = [];
-  _specials.forEach(s => { occurrences(s, todayStr, endStr).forEach(d => occ.push({ date:d, s })); });
-  occ.sort((a,b) => a.date.localeCompare(b.date) || (a.s.time||'').localeCompare(b.s.time||''));
+  const todayStr = fmt(new Date());
+  const occ = weekSpecials();
   if (!occ.length){ grid.innerHTML = '<div class="note-empty">No specials this week.</div>'; return; }
   grid.innerHTML = occ.map(o => {
     const s = o.s;
     const isToday = o.date === todayStr;
-    const dayLabel = isToday ? 'Today' : fmtDisplay(o.date);
+    const timeStr = s.time ? ' · ' + fmtTime(s.time) : '';
+    return `<div class="special-tile clickable${isToday?' today':''}" onclick="openOnTab('specials','spec-${s.id}-${o.date}')">
+      <div class="special-day">${isToday?'⭐ Today':fmtDisplay(o.date)}${timeStr}</div>
+      <div class="special-title">🍽️ ${esc(s.title)}</div>
+    </div>`;
+  }).join('');
+}
+
+// SPECIALS (full tab) -> this week's cards with full details
+function renderSpecialsFull(){
+  const grid = document.getElementById('specialsFullGrid');
+  if (!grid) return;
+  const todayStr = fmt(new Date());
+  const occ = weekSpecials();
+  if (!occ.length){ grid.innerHTML = '<div class="no-events"><div class="icon">🍽️</div><p>No specials this week.</p></div>'; return; }
+  grid.innerHTML = occ.map(o => {
+    const s = o.s;
+    const isToday = o.date === todayStr;
     const rl = repeatLabel(s.repeat);
     const timeStr = s.time ? fmtTime(s.time) : '';
-    return `<div class="special-tile${isToday?' today':''}">
-      <div class="special-day">${isToday?'⭐ ':''}${dayLabel}</div>
-      <div class="special-title">🍽️ ${esc(s.title)}${rl ? ` <span class="rep-badge">↻ ${rl}</span>` : ''}</div>
-      ${s.body ? `<div class="special-body">${esc(s.body)}</div>` : ''}
-      ${timeStr ? `<div class="special-time">${timeStr}</div>` : ''}
+    return `<div class="event-card special-card" id="spec-${s.id}-${o.date}">
+      <div class="ev-date-badge">${isToday?'⭐ Today · ':''}${fmtDisplay(o.date)}${timeStr?' · '+timeStr:''}${rl?` · ↻ ${rl}`:''}</div>
+      <div class="ev-name">🍽️ ${esc(s.title)}</div>
+      ${s.body ? `<div class="ev-desc">${esc(s.body)}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -746,7 +753,7 @@ function renderEventCards(){
     const timeStr = ev.time ? ' · ' + fmtTime(ev.time) : '';
     const rangeStr = (ev.endDate && ev.endDate !== ev.date) ? fmtDisplay(ev.date) + ' – ' + fmtDisplay(ev.endDate) : fmtDisplay(ev.date);
     const rl = (ev._repeat && ev._repeat !== 'none') ? ` <span class="rep-badge">↻ ${repeatLabel(ev._repeat)}</span>` : '';
-    return `<div class="event-card${isPast?' past':''}">
+    return `<div class="event-card${isPast?' past':''}" id="ev-${ev.id}-${ev.date}">
       <div class="ev-date-badge">${isPast?'Past · ':''}${rangeStr}${timeStr}</div>
       <div class="ev-name">${esc(ev.name)}${rl}</div>
       ${ev.desc ? `<div class="ev-desc">${esc(ev.desc)}</div>` : ''}
@@ -761,7 +768,7 @@ function renderDashEvents(){
   if (!inst.length){ list.innerHTML = '<li class="empty-state-small">No upcoming events.</li>'; return; }
   list.innerHTML = inst.map(ev => {
     const timeStr = ev.time ? ' · ' + fmtTime(ev.time) : '';
-    return `<li class="event-item-dash"><div class="ev-title">${esc(ev.name)}</div><div class="ev-meta">${fmtDisplay(ev.date)}${timeStr}</div></li>`;
+    return `<li class="event-item-dash clickable" onclick="openOnTab('events','ev-${ev.id}-${ev.date}')"><div class="ev-title">${esc(ev.name)}</div><div class="ev-meta">${fmtDisplay(ev.date)}${timeStr}</div></li>`;
   }).join('');
 }
 
