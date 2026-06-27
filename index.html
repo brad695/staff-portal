@@ -143,6 +143,15 @@
     .cal-more{ font-size:0.56rem; color:var(--sub); margin-top:1px; }
     .cd-res{ background:#9fc0ee; } .cd-cancel{ background:#e6a8a0; } .cd-event{ background:#eaa6c6; }
     .cd-special{ background:#8fd3b2; } .cd-sched{ background:#eac08c; } .cd-off{ background:#d99a90; }
+    .ag-day{ background:var(--surface); border-radius:16px; box-shadow:var(--shadow); padding:13px 16px; margin-bottom:12px; }
+    .ag-date{ font-weight:800; font-size:0.95rem; margin-bottom:6px; display:flex; align-items:center; }
+    .ag-today{ font-size:0.6rem; font-weight:800; background:var(--accent); color:#fff; padding:2px 8px; border-radius:20px; margin-left:7px; text-transform:uppercase; }
+    .ag-row{ font-size:0.9rem; padding:7px 0; border-top:1px solid var(--line); display:flex; align-items:flex-start; gap:8px; line-height:1.35; }
+    .ag-tag{ font-size:0.58rem; font-weight:800; text-transform:uppercase; letter-spacing:0.2px; padding:3px 8px; border-radius:20px; white-space:nowrap; flex-shrink:0; margin-top:1px; }
+    .t-res{ background:#dceafe; color:#2f6fd0; } .t-cancel{ background:#fae3e0; color:var(--wax); }
+    .t-event{ background:#fbe7f0; color:#c43d77; } .t-special{ background:#e1f4ea; color:#1f9c6b; }
+    .t-sched{ background:#fcede1; color:#cc7a33; } .t-off{ background:#f3e2df; color:var(--wax); }
+    .ag-strike{ text-decoration:line-through; color:var(--sub); }
 
     /* time off form */
     .form-card{ background:var(--surface); border-radius:18px; box-shadow:var(--shadow); padding:18px; margin-bottom:16px; }
@@ -251,22 +260,7 @@
         <button class="cal-nav" onclick="calNav(1)">›</button>
         <button class="cal-today" onclick="calGoToday()">Today</button>
       </div>
-      <div class="cal-legend">
-        <span><span class="dot cd-res"></span>Reserved</span>
-        <span><span class="dot cd-cancel"></span>Cancelled</span>
-        <span><span class="dot cd-event"></span>Event</span>
-        <span><span class="dot cd-special"></span>Special</span>
-        <span><span class="dot cd-sched"></span>Schedule</span>
-        <span><span class="dot cd-off"></span>Time Off</span>
-      </div>
-      <div class="cal-grid">
-        <div class="cal-hrow">
-          <div class="cal-hcell">S</div><div class="cal-hcell">M</div><div class="cal-hcell">T</div>
-          <div class="cal-hcell">W</div><div class="cal-hcell">T</div><div class="cal-hcell">F</div><div class="cal-hcell">S</div>
-        </div>
-        <div class="cal-body" id="calBody"></div>
-      </div>
-      <div id="calDetail" class="cal-detail"></div>
+      <div id="agendaList" class="agenda"></div>
     </div>
   </div>
 
@@ -633,46 +627,28 @@ async function renderCalendar(){
   _calData.sp={}; _specials.forEach(s=>{ if((s.repeat||'none')==='none'&&s.endDate&&s.endDate>s.date){ spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sp[k]=_calData.sp[k]||[]).push(s.title);}); } else { occurrences(s,mS,mE).forEach(d=>{(_calData.sp[d]=_calData.sp[d]||[]).push(s.title);}); } });
   _calData.sch={}; _schedules.forEach(s=>{ if(!s.date) return; spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sch[k]=_calData.sch[k]||[]).push(s.name);}); });
   _calData.off={}; approvedTimeOff().forEach(r=>{ if(!r.date) return; spanDays(r.date,r.endDate,mS,mE,k=>{(_calData.off[k]=_calData.off[k]||[]).push(r.name);}); });
-  const today=fmt(new Date()), first=new Date(y,m,1).getDay(), dim=new Date(y,m+1,0).getDate(), prev=new Date(y,m,0).getDate();
-  let html='', n=0;
-  for(let i=first-1;i>=0;i--){ html+=cell(fmt(new Date(y,m-1,prev-i)),prev-i,true,today); n++; }
-  for(let d=1;d<=dim;d++){ html+=cell(fmt(new Date(y,m,d)),d,false,today); n++; }
-  let tr=1; while(n%7!==0){ html+=cell(fmt(new Date(y,m+1,tr)),tr,true,today); tr++; n++; }
-  document.getElementById('calBody').innerHTML=html;
-  const want = (today>=mS && today<=mE) ? today : mS;
-  selectDay((_selDay && _selDay>=mS && _selDay<=mE) ? _selDay : want);
+  renderAgenda(y,m);
 }
-function calDots(dateStr){
-  let dots=''; const can=['CANCELLED','DECLINED','NO_SHOW'];
-  const res=_calData.res[dateStr]||[];
-  if(res.some(r=>!can.includes(r.status))) dots+='<div class="cal-dot cd-res"></div>';
-  if(res.some(r=>can.includes(r.status))) dots+='<div class="cal-dot cd-cancel"></div>';
-  if((_calData.ev[dateStr]||[]).length) dots+='<div class="cal-dot cd-event"></div>';
-  if((_calData.sp[dateStr]||[]).length) dots+='<div class="cal-dot cd-special"></div>';
-  if((_calData.sch[dateStr]||[]).length) dots+='<div class="cal-dot cd-sched"></div>';
-  if((_calData.off[dateStr]||[]).length) dots+='<div class="cal-dot cd-off"></div>';
-  return dots;
-}
-function cell(dateStr,num,other,today){
-  let cls='cal-day'; if(other) cls+=' other'; if(dateStr===today) cls+=' today'; if(dateStr===_selDay) cls+=' sel';
-  return `<div class="${cls}" data-d="${dateStr}" onclick="selectDay('${dateStr}')"><div class="cal-daynum">${num}</div>${calDots(dateStr)}</div>`;
-}
-function selectDay(date){
-  _selDay=date;
-  document.querySelectorAll('.cal-day').forEach(c=>c.classList.toggle('sel', c.getAttribute('data-d')===date));
-  const det=document.getElementById('calDetail'); if(!det) return;
-  const can=['CANCELLED','DECLINED','NO_SHOW'];
-  const res=_calData.res[date]||[], ev=_calData.ev[date]||[], sp=_calData.sp[date]||[], sch=_calData.sch[date]||[], off=_calData.off[date]||[];
-  let any=false;
-  function blk(label,items){ if(!items.length) return ''; any=true; return '<div class="cd-block"><div class="cd-lbl">'+label+'</div>'+items.map(i=>'<div class="cd-item">'+i+'</div>').join('')+'</div>'; }
-  let h='<div class="cd-date">'+new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})+'</div>';
-  h+=blk('🍷 Reservations', res.map(r=>esc(r.time)+' · '+esc(r.name)+' · 👥'+esc(r.party)+(can.includes(r.status)?' · <span class="cd-x">'+r.status.replace(/_/g,' ').toLowerCase()+'</span>':'')));
-  h+=blk('🎉 Events', ev.map(e=>esc(e.name)+(e.time?' · '+fmtTime(e.time):'')));
-  h+=blk('🍽️ Specials', sp.map(esc));
-  h+=blk('📆 Schedule', sch.map(esc));
-  h+=blk('🌴 Time off', off.map(esc));
-  if(!any) h+='<div class="pv-empty">Nothing scheduled.</div>';
-  det.innerHTML=h;
+function agRow(tag,label,text){ return '<div class="ag-row"><span class="ag-tag '+tag+'">'+label+'</span><span>'+text+'</span></div>'; }
+function renderAgenda(y,m){
+  const list=document.getElementById('agendaList'); if(!list) return;
+  const dim=new Date(y,m+1,0).getDate(), today=fmt(new Date()), can=['CANCELLED','DECLINED','NO_SHOW'];
+  let html='', any=false;
+  for(let d=1; d<=dim; d++){
+    const date=fmt(new Date(y,m,d));
+    const res=_calData.res[date]||[], ev=_calData.ev[date]||[], sp=_calData.sp[date]||[], sch=_calData.sch[date]||[], off=_calData.off[date]||[];
+    if(!(res.length||ev.length||sp.length||sch.length||off.length)) continue;
+    any=true;
+    const dl=new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    let rows='';
+    sp.forEach(t=>rows+=agRow('t-special','Special',esc(t)));
+    ev.forEach(e=>rows+=agRow('t-event','Event',esc(e.name)+(e.time?' · '+fmtTime(e.time):'')));
+    res.forEach(r=>{ const c=can.includes(r.status); const txt=esc(r.time)+' · '+esc(r.name)+' · 👥'+esc(r.party); rows+=agRow(c?'t-cancel':'t-res', c?'Cancelled':'Reserved', c?'<span class="ag-strike">'+txt+'</span>':txt); });
+    sch.forEach(n=>rows+=agRow('t-sched','Schedule',esc(n)));
+    off.forEach(n=>rows+=agRow('t-off','Time Off',esc(n)));
+    html+='<div class="ag-day"><div class="ag-date">'+dl+(date===today?'<span class="ag-today">Today</span>':'')+'</div>'+rows+'</div>';
+  }
+  list.innerHTML = any ? html : '<div class="empty"><span class="ic">📅</span>Nothing scheduled this month.</div>';
 }
 function calNav(dir){ _calMonth+=dir; if(_calMonth>11){_calMonth=0;_calYear++;} if(_calMonth<0){_calMonth=11;_calYear--;} renderCalendar(); }
 function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().getMonth(); _selDay=fmt(new Date()); renderCalendar(); }
