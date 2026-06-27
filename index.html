@@ -633,8 +633,9 @@ function agRow(tag,label,text){ return '<div class="ag-row"><span class="ag-tag 
 function renderAgenda(y,m){
   const list=document.getElementById('agendaList'); if(!list) return;
   const dim=new Date(y,m+1,0).getDate(), today=fmt(new Date()), can=['CANCELLED','DECLINED','NO_SHOW'];
+  const now=new Date(); const startDay=(y===now.getFullYear() && m===now.getMonth()) ? now.getDate() : 1;
   let html='', any=false;
-  for(let d=1; d<=dim; d++){
+  for(let d=startDay; d<=dim; d++){
     const date=fmt(new Date(y,m,d));
     const res=_calData.res[date]||[], ev=_calData.ev[date]||[], sp=_calData.sp[date]||[], sch=_calData.sch[date]||[], off=_calData.off[date]||[];
     if(!(res.length||ev.length||sp.length||sch.length||off.length)) continue;
