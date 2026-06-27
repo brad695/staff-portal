@@ -280,26 +280,6 @@
     </div>
   </div>
 
-  <!-- ══ REQUEST OFF ══ -->
-  <div id="view-requestoff" class="view">
-    <div class="sec-head"><button class="back-btn" onclick="showView('home')">‹</button><h2>Request Off</h2></div>
-    <div class="sec-body">
-      <div class="form-card">
-        <h3>🌴 Submit a request</h3>
-        <div class="field"><label>Your name</label><input type="text" id="toName" placeholder="First & last name" /></div>
-        <div class="row2">
-          <div class="field"><label>Start date</label><input type="date" id="toStart" /></div>
-          <div class="field"><label>End date (optional)</label><input type="date" id="toEnd" /></div>
-        </div>
-        <div class="field"><label>Reason (optional)</label><input type="text" id="toReason" placeholder="e.g. vacation" /></div>
-        <button class="btn btn-primary btn-block" onclick="submitTimeOff()">Submit request</button>
-        <div class="to-msg" id="toMsg"></div>
-      </div>
-      <div class="section-label">All requests</div>
-      <div id="toList"><div class="empty">No requests yet.</div></div>
-    </div>
-  </div>
-
   <!-- ══ ONBOARDING (placeholder) ══ -->
   <div id="view-onboarding" class="view">
     <div class="sec-head"><button class="back-btn" onclick="showView('home')">‹</button><h2>Onboarding</h2></div>
@@ -346,7 +326,7 @@ function closePreview(){
 }
 function tileTap(section){
   if (section === 'calendar'){ showView('calendar'); return; }   // calendar opens directly
-  if (_openTile === section){ showView(section); return; }   // second tap → full section
+  if (_openTile === section){ if (section === 'requestoff'){ closePreview(); return; } showView(section); return; }   // second tap → full section (requestoff just collapses)
   _openTile = section;
   document.querySelectorAll('.tile').forEach(t => t.classList.remove('on'));
   const tb = document.getElementById('tile-' + section); if (tb) tb.classList.add('on');
@@ -382,7 +362,16 @@ function renderPreview(section){
   } else if (section === 'calendar'){
     p.innerHTML = pvHead('📅 Calendar','calendar') + '<div class="pv-empty">Tap “View all” for the month view.</div>';
   } else if (section === 'requestoff'){
-    p.innerHTML = pvHead('🌴 Request off','requestoff') + '<div class="pv-empty">Tap “View all” to submit a time-off request.</div>';
+    p.innerHTML = '<div class="pv-head"><span class="pv-title">🌴 Request off</span></div>'
+      + '<div class="field"><label>Your name</label><input type="text" id="toName" placeholder="First & last name" /></div>'
+      + '<div class="row2"><div class="field"><label>Start date</label><input type="date" id="toStart" /></div>'
+      + '<div class="field"><label>End date (optional)</label><input type="date" id="toEnd" /></div></div>'
+      + '<div class="field"><label>Reason (optional)</label><input type="text" id="toReason" placeholder="e.g. vacation" /></div>'
+      + '<button class="btn btn-primary btn-block" onclick="submitTimeOff()">Submit request</button>'
+      + '<div class="to-msg" id="toMsg"></div>'
+      + '<div class="section-label" style="margin:14px 0 8px;">Your requests</div><div id="toList"></div>';
+    const ts = document.getElementById('toStart'); if (ts) ts.value = fmt(new Date());
+    renderTimeOffList();
   } else if (section === 'onboarding'){
     p.innerHTML = pvHead('🎓 Onboarding','onboarding') + '<div class="pv-empty">Coming soon.</div>';
   }
