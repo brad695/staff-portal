@@ -126,7 +126,14 @@
     .cal-grid{ background:var(--surface); border-radius:18px; box-shadow:var(--shadow); overflow:hidden; }
     .cal-hrow,.cal-body{ display:grid; grid-template-columns:repeat(7,1fr); }
     .cal-hcell{ text-align:center; font-size:0.62rem; font-weight:700; color:var(--sub); padding:9px 0; text-transform:uppercase; }
-    .cal-day{ min-height:64px; border-top:1px solid var(--line); border-right:1px solid var(--line); padding:4px 4px; position:relative; }
+    .cal-day{ min-height:54px; border-top:1px solid var(--line); border-right:1px solid var(--line); padding:4px 4px; position:relative; cursor:pointer; }
+    .cal-day.sel{ box-shadow:inset 0 0 0 2px var(--accent); }
+    .cal-detail{ background:var(--surface); border-radius:18px; box-shadow:var(--shadow); padding:16px; margin-top:14px; }
+    .cd-date{ font-weight:800; font-size:1.0rem; margin-bottom:4px; }
+    .cd-block{ margin-top:12px; }
+    .cd-lbl{ font-size:0.72rem; font-weight:800; text-transform:uppercase; letter-spacing:0.3px; color:var(--sub); margin-bottom:3px; }
+    .cd-item{ font-size:0.9rem; padding:4px 0; line-height:1.35; }
+    .cd-x{ color:var(--wax); font-weight:700; }
     .cal-day:nth-child(7n){ border-right:none; }
     .cal-day.other{ background:#fafafe; }
     .cal-daynum{ font-size:0.72rem; font-weight:700; color:var(--ink); }
@@ -259,6 +266,7 @@
         </div>
         <div class="cal-body" id="calBody"></div>
       </div>
+      <div id="calDetail" class="cal-detail"></div>
     </div>
   </div>
 
@@ -343,6 +351,7 @@ function closePreview(){
   document.querySelectorAll('.tile').forEach(t => t.classList.remove('on'));
 }
 function tileTap(section){
+  if (section === 'calendar'){ showView('calendar'); return; }   // calendar opens directly
   if (_openTile === section){ showView(section); return; }   // second tap → full section
   _openTile = section;
   document.querySelectorAll('.tile').forEach(t => t.classList.remove('on'));
@@ -596,49 +605,77 @@ function renderReservations(recs){
 }
 
 // ═══ CALENDAR ═══
-let _calYear=new Date().getFullYear(), _calMonth=new Date().getMonth(), _calRes={};
+let _calYear=new Date().getFullYear(), _calMonth=new Date().getMonth(), _selDay=null;
+let _calData={ res:{}, ev:{}, sp:{}, sch:{}, off:{} };
 async function loadCalMonth(y,m){
+  _calData.res={};
   try{
     const start=new Date(y,m,1), end=new Date(y,m+1,0,23,59,59);
     const p=new URLSearchParams(); p.set('paging.limit','100'); p.set('startDateFrom',start.toISOString()); p.set('startDateTo',end.toISOString());
-    const res=await wixFetch(p); if(!res.ok){ _calRes={}; return; }
-    const data=await res.json(); _calRes={};
-    (data.reservations||[]).forEach(r=>{ if(!r.details||!r.details.startDate) return; const d=fmt(new Date(r.details.startDate)); (_calRes[d]=_calRes[d]||[]).push({ status:r.status||'UNKNOWN' }); });
-  }catch(e){ _calRes={}; }
+    const res=await wixFetch(p); if(!res.ok) return;
+    const data=await res.json();
+    (data.reservations||[]).forEach(r=>{ if(!r.details||!r.details.startDate) return;
+      const dt=new Date(r.details.startDate), d=fmt(dt), who=r.reservee||{};
+      const name=[who.firstName,who.lastName].filter(Boolean).join(' ')||'Guest';
+      (_calData.res[d]=_calData.res[d]||[]).push({ time:dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}), name, party:r.details.partySize||'?', status:r.status||'UNKNOWN', t:dt.getTime() });
+    });
+    Object.values(_calData.res).forEach(a=>a.sort((x,y)=>x.t-y.t));
+  }catch(e){}
 }
+function spanDays(startDate,endDate,mS,mE,cb){ let d=new Date((startDate<mS?mS:startDate)+'T00:00:00'); const lim=((endDate||startDate)>mE?mE:(endDate||startDate)); const e=new Date(lim+'T00:00:00'); for(;d<=e;d.setDate(d.getDate()+1)) cb(fmt(d)); }
 async function renderCalendar(){
   const y=_calYear, m=_calMonth;
   const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
   document.getElementById('calMonthLabel').textContent=months[m]+' '+y;
   await loadCalMonth(y,m);
   const mS=fmt(new Date(y,m,1)), mE=fmt(new Date(y,m+1,0));
-  const evBy={}; _events.forEach(ev=>occurrences(ev,mS,mE).forEach(d=>{(evBy[d]=evBy[d]||0); evBy[d]++;}));
-  const spBy={}; _specials.forEach(s=>{ if((s.repeat||'none')==='none'&&s.endDate&&s.endDate>s.date){ let d=new Date((s.date<mS?mS:s.date)+'T00:00:00'); const e=new Date((s.endDate>mE?mE:s.endDate)+'T00:00:00'); for(;d<=e;d.setDate(d.getDate()+1)){const k=fmt(d); spBy[k]=(spBy[k]||0)+1;} } else { occurrences(s,mS,mE).forEach(d=>spBy[d]=(spBy[d]||0)+1); } });
-  const schBy={}; _schedules.forEach(s=>{ if(!s.date) return; let d=new Date(s.date+'T00:00:00'); const e=new Date((s.endDate||s.date)+'T00:00:00'); for(;d<=e;d.setDate(d.getDate()+1)){const k=fmt(d); if(k>=mS&&k<=mE) schBy[k]=(schBy[k]||0)+1;} });
-  const offBy={}; approvedTimeOff().forEach(r=>{ if(!r.date) return; let d=new Date(r.date+'T00:00:00'); const e=new Date((r.endDate||r.date)+'T00:00:00'); for(;d<=e;d.setDate(d.getDate()+1)){const k=fmt(d); if(k>=mS&&k<=mE) offBy[k]=(offBy[k]||0)+1;} });
+  _calData.ev={}; _events.forEach(ev=>occurrences(ev,mS,mE).forEach(d=>{(_calData.ev[d]=_calData.ev[d]||[]).push({name:ev.name,time:ev.time});}));
+  _calData.sp={}; _specials.forEach(s=>{ if((s.repeat||'none')==='none'&&s.endDate&&s.endDate>s.date){ spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sp[k]=_calData.sp[k]||[]).push(s.title);}); } else { occurrences(s,mS,mE).forEach(d=>{(_calData.sp[d]=_calData.sp[d]||[]).push(s.title);}); } });
+  _calData.sch={}; _schedules.forEach(s=>{ if(!s.date) return; spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sch[k]=_calData.sch[k]||[]).push(s.name);}); });
+  _calData.off={}; approvedTimeOff().forEach(r=>{ if(!r.date) return; spanDays(r.date,r.endDate,mS,mE,k=>{(_calData.off[k]=_calData.off[k]||[]).push(r.name);}); });
   const today=fmt(new Date()), first=new Date(y,m,1).getDay(), dim=new Date(y,m+1,0).getDate(), prev=new Date(y,m,0).getDate();
   let html='', n=0;
-  for(let i=first-1;i>=0;i--){ html+=cell(fmt(new Date(y,m-1,prev-i)),prev-i,true,today,evBy,spBy,schBy,offBy); n++; }
-  for(let d=1;d<=dim;d++){ html+=cell(fmt(new Date(y,m,d)),d,false,today,evBy,spBy,schBy,offBy); n++; }
-  let tr=1; while(n%7!==0){ html+=cell(fmt(new Date(y,m+1,tr)),tr,true,today,evBy,spBy,schBy,offBy); tr++; n++; }
+  for(let i=first-1;i>=0;i--){ html+=cell(fmt(new Date(y,m-1,prev-i)),prev-i,true,today); n++; }
+  for(let d=1;d<=dim;d++){ html+=cell(fmt(new Date(y,m,d)),d,false,today); n++; }
+  let tr=1; while(n%7!==0){ html+=cell(fmt(new Date(y,m+1,tr)),tr,true,today); tr++; n++; }
   document.getElementById('calBody').innerHTML=html;
+  const want = (today>=mS && today<=mE) ? today : mS;
+  selectDay((_selDay && _selDay>=mS && _selDay<=mE) ? _selDay : want);
 }
-function cell(dateStr,num,other,today,evBy,spBy,schBy,offBy){
-  let cls='cal-day'; if(other) cls+=' other'; if(dateStr===today) cls+=' today';
-  const numEl=`<div class="cal-daynum">${num}</div>`;
-  let dots='';
-  const res=_calRes[dateStr]||[]; const can=['CANCELLED','DECLINED','NO_SHOW'];
-  const okRes=res.filter(r=>!can.includes(r.status)).length, canRes=res.filter(r=>can.includes(r.status)).length;
-  if(okRes) dots+='<div class="cal-dot cd-res"></div>';
-  if(canRes) dots+='<div class="cal-dot cd-cancel"></div>';
-  if(evBy[dateStr]) dots+='<div class="cal-dot cd-event"></div>';
-  if(spBy[dateStr]) dots+='<div class="cal-dot cd-special"></div>';
-  if(schBy[dateStr]) dots+='<div class="cal-dot cd-sched"></div>';
-  if(offBy[dateStr]) dots+='<div class="cal-dot cd-off"></div>';
-  return `<div class="${cls}">${numEl}${dots}</div>`;
+function calDots(dateStr){
+  let dots=''; const can=['CANCELLED','DECLINED','NO_SHOW'];
+  const res=_calData.res[dateStr]||[];
+  if(res.some(r=>!can.includes(r.status))) dots+='<div class="cal-dot cd-res"></div>';
+  if(res.some(r=>can.includes(r.status))) dots+='<div class="cal-dot cd-cancel"></div>';
+  if((_calData.ev[dateStr]||[]).length) dots+='<div class="cal-dot cd-event"></div>';
+  if((_calData.sp[dateStr]||[]).length) dots+='<div class="cal-dot cd-special"></div>';
+  if((_calData.sch[dateStr]||[]).length) dots+='<div class="cal-dot cd-sched"></div>';
+  if((_calData.off[dateStr]||[]).length) dots+='<div class="cal-dot cd-off"></div>';
+  return dots;
+}
+function cell(dateStr,num,other,today){
+  let cls='cal-day'; if(other) cls+=' other'; if(dateStr===today) cls+=' today'; if(dateStr===_selDay) cls+=' sel';
+  return `<div class="${cls}" data-d="${dateStr}" onclick="selectDay('${dateStr}')"><div class="cal-daynum">${num}</div>${calDots(dateStr)}</div>`;
+}
+function selectDay(date){
+  _selDay=date;
+  document.querySelectorAll('.cal-day').forEach(c=>c.classList.toggle('sel', c.getAttribute('data-d')===date));
+  const det=document.getElementById('calDetail'); if(!det) return;
+  const can=['CANCELLED','DECLINED','NO_SHOW'];
+  const res=_calData.res[date]||[], ev=_calData.ev[date]||[], sp=_calData.sp[date]||[], sch=_calData.sch[date]||[], off=_calData.off[date]||[];
+  let any=false;
+  function blk(label,items){ if(!items.length) return ''; any=true; return '<div class="cd-block"><div class="cd-lbl">'+label+'</div>'+items.map(i=>'<div class="cd-item">'+i+'</div>').join('')+'</div>'; }
+  let h='<div class="cd-date">'+new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})+'</div>';
+  h+=blk('🍷 Reservations', res.map(r=>esc(r.time)+' · '+esc(r.name)+' · 👥'+esc(r.party)+(can.includes(r.status)?' · <span class="cd-x">'+r.status.replace(/_/g,' ').toLowerCase()+'</span>':'')));
+  h+=blk('🎉 Events', ev.map(e=>esc(e.name)+(e.time?' · '+fmtTime(e.time):'')));
+  h+=blk('🍽️ Specials', sp.map(esc));
+  h+=blk('📆 Schedule', sch.map(esc));
+  h+=blk('🌴 Time off', off.map(esc));
+  if(!any) h+='<div class="pv-empty">Nothing scheduled.</div>';
+  det.innerHTML=h;
 }
 function calNav(dir){ _calMonth+=dir; if(_calMonth>11){_calMonth=0;_calYear++;} if(_calMonth<0){_calMonth=11;_calYear--;} renderCalendar(); }
-function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().getMonth(); renderCalendar(); }
+function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().getMonth(); _selDay=fmt(new Date()); renderCalendar(); }
 </script>
 </body>
 </html>
