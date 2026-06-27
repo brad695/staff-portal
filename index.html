@@ -369,8 +369,8 @@ updateWhen(); setInterval(updateWhen, 30000);
 
 // ── INIT ──
 (function(){
-  const today=new Date(); const from=new Date(); from.setDate(today.getDate()-30); const to=new Date(); to.setDate(today.getDate()+60);
-  const f=document.getElementById('dateFrom'); if(f) f.value=fmt(from);
+  const today=new Date(); const to=new Date(); to.setDate(today.getDate()+60);
+  const f=document.getElementById('dateFrom'); if(f) f.value=fmt(today);
   const t=document.getElementById('dateTo'); if(t) t.value=fmt(to);
   const ts=document.getElementById('toStart'); if(ts) ts.value=fmt(today);
 })();
