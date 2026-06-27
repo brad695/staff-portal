@@ -2,1181 +2,613 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>GREYS Memphis · Staff Portal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="theme-color" content="#ffffff"/>
+  <title>GREYS Memphis · Staff</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    /* ════ GREYS THEME ════ */
     :root{
-      --paper:#E9DFC7; --card:#FBF7EB; --rind:#211D19;
-      --navy:#0B2138; --navy2:#06273A; --navy-soft:#13314f;
-      --wax:#A52B1E; --cheddar:#E0A21C; --gold:#E2D827;
-      --ink:#221E1B; --sub:#6E6353; --line:#D6C8AB; --line-soft:#e7dcc4;
-      --r:2px;
+      --bg:#f3f4f8; --surface:#ffffff; --ink:#1c1d22; --sub:#7b7e8a; --line:#ecedf2;
+      --accent:#5b53d6; --wax:#c0392b; --shadow:0 6px 22px rgba(28,29,34,0.07);
+      --lav:#ECE9FB; --lav-i:#5b53d6; --mint:#E1F4EA; --mint-i:#1f9c6b;
+      --sky:#E4EEFC; --sky-i:#2f6fd0; --peach:#FCEDE1; --peach-i:#cc7a33;
+      --pink:#FBE7F0; --pink-i:#c43d77; --butter:#FBF1D6; --butter-i:#b08a14;
+      --gray:#EDEFF3; --gray-i:#5f626d;
+      --r:20px;
     }
-    *{ box-sizing:border-box; margin:0; padding:0; }
-    body{ font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--paper); color:var(--ink); min-height:100vh; }
-    h1,h2,h3,.archivo{ font-family:'Archivo',sans-serif; }
+    *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    html,body{ height:100%; }
+    body{ font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--ink); }
+    .app{ max-width:520px; margin:0 auto; min-height:100vh; background:var(--bg); position:relative; padding-bottom:84px; }
 
-    /* ── HEADER ── */
-    header{ background:var(--navy); color:#fff; padding:16px 28px; display:flex; align-items:center; justify-content:space-between; border-bottom:3px solid var(--cheddar); }
-    header h1{ font-size:1.35rem; font-weight:900; letter-spacing:-0.5px; }
-    header .subtitle{ font-size:0.72rem; font-weight:600; letter-spacing:0.4px; text-transform:uppercase; color:var(--cheddar); margin-top:3px; }
-    .header-time{ font-size:0.8rem; opacity:0.8; text-align:right; }
-    .header-time .time{ font-size:1.45rem; font-weight:800; font-family:'Archivo',sans-serif; opacity:1; }
+    /* top bar */
+    .topbar{ display:flex; align-items:center; gap:10px; padding:18px 20px 6px; }
+    .topbar .brand{ font-weight:800; font-size:1.05rem; letter-spacing:-0.3px; }
+    .topbar .loc{ font-size:0.74rem; color:var(--sub); font-weight:600; }
+    .topbar .spacer{ flex:1; }
+    .icon-btn{ width:40px; height:40px; border-radius:50%; border:none; background:var(--surface); box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; font-size:1.05rem; cursor:pointer; color:var(--ink); text-decoration:none; }
 
-    /* ── TABS ── */
-    .tabs{ background:var(--navy2); display:flex; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
-    .tabs::-webkit-scrollbar{ display:none; }
-    .tab{ flex:1; min-width:78px; padding:13px 10px 11px; color:rgba(231,238,245,0.5); font-size:0.68rem; font-weight:700; cursor:pointer; border-bottom:3px solid transparent; transition:all 0.15s; white-space:nowrap; text-align:center; display:flex; flex-direction:column; align-items:center; gap:4px; letter-spacing:0.5px; text-transform:uppercase; }
-    .tab-icon{ font-size:1.25rem; }
-    .tab:hover{ color:rgba(255,255,255,0.9); background:rgba(255,255,255,0.04); }
-    .tab.active{ color:#fff; border-bottom-color:var(--cheddar); background:rgba(255,255,255,0.06); }
+    /* views */
+    .view{ display:none; }
+    .view.active{ display:block; }
 
-    /* ── NOTES ── */
-    .notes-section{ background:var(--card); border-bottom:1px solid var(--line); border-left:5px solid var(--cheddar); padding:14px 28px; }
-    .notes-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
-    .notes-label{ font-size:0.72rem; font-weight:800; text-transform:uppercase; letter-spacing:0.7px; color:var(--wax); font-family:'Archivo',sans-serif; }
-    .notes-edit-btn,.specials-edit-btn{ background:none; border:1px solid var(--cheddar); color:var(--rind); border-radius:var(--r); padding:4px 12px; font-size:0.76rem; font-weight:700; cursor:pointer; }
-    .notes-edit-btn:hover,.specials-edit-btn:hover{ background:var(--cheddar); color:#fff; }
-    #notesDisplay{ font-size:0.93rem; color:var(--ink); line-height:1.6; min-height:20px; white-space:pre-wrap; }
-    #notesDisplay.empty,#specialsDisplay.empty{ color:var(--sub); font-style:italic; font-size:0.88rem; }
-    #notesEditArea,#specialsEditArea{ display:none; }
-    #notesTextarea,#specialsTextarea{ width:100%; min-height:70px; padding:10px 14px; border:1px solid var(--line); border-radius:var(--r); font-size:0.92rem; font-family:inherit; margin-bottom:10px; resize:vertical; background:#fff; }
-    #notesTextarea:focus,#specialsTextarea:focus{ outline:none; border-color:var(--cheddar); }
-    .notes-actions,.specials-actions{ display:flex; gap:10px; align-items:center; }
-    .btn-save,.btn-save-specials{ background:var(--gold); color:var(--navy2); border:none; border-radius:var(--r); padding:8px 20px; font-size:0.85rem; font-weight:700; cursor:pointer; }
-    .btn-save:hover,.btn-save-specials:hover{ background:var(--cheddar); color:#fff; }
-    .btn-cancel-note{ background:none; border:1px solid var(--line); color:var(--sub); border-radius:var(--r); padding:8px 16px; font-size:0.85rem; cursor:pointer; }
-    #notesSaveMsg,#specialsSaveMsg{ font-size:0.82rem; color:#065f46; font-weight:600; display:none; }
-    #notesSaveMsg.error{ color:var(--wax); }
+    /* HOME */
+    .home-head{ padding:8px 20px 4px; }
+    .home-head h1{ font-size:1.85rem; font-weight:800; letter-spacing:-0.6px; line-height:1.1; }
+    .home-head .when{ color:var(--sub); font-size:0.86rem; font-weight:600; margin-top:4px; }
 
-    /* ── MODAL ── */
-    .modal-overlay{ display:none; position:fixed; inset:0; background:rgba(11,33,56,0.55); z-index:200; align-items:center; justify-content:center; padding:16px; }
-    .modal-overlay.active{ display:flex; }
-    .modal{ background:var(--card); border:1px solid var(--line); border-top:4px solid var(--cheddar); border-radius:var(--r); padding:26px; width:360px; max-width:100%; box-shadow:0 18px 50px rgba(11,33,56,0.3); }
-    .modal h3{ font-size:1.05rem; font-weight:800; margin-bottom:6px; color:var(--navy); }
-    .modal p{ font-size:0.82rem; color:var(--sub); margin-bottom:16px; }
-    .modal input,.modal textarea,.modal select{ width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:var(--r); font-size:0.92rem; margin-bottom:10px; font-family:inherit; background:#fff; }
-    .modal input:focus,.modal textarea:focus,.modal select:focus{ outline:none; border-color:var(--cheddar); }
-    .modal textarea{ min-height:80px; resize:vertical; }
-    .modal label{ font-size:0.72rem; font-weight:700; color:var(--sub); text-transform:uppercase; letter-spacing:0.4px; display:block; margin-bottom:4px; }
-    #modalError,#specialsModalError{ font-size:0.78rem; color:var(--wax); min-height:18px; margin-bottom:10px; }
-    .modal-btns{ display:flex; gap:10px; margin-top:6px; }
-    .modal-btns button{ flex:1; padding:10px; border-radius:var(--r); font-size:0.86rem; font-weight:700; cursor:pointer; border:none; }
-    .btn-modal-primary{ background:var(--navy); color:#fff; }
-    .btn-modal-primary:hover{ background:var(--navy-soft); }
-    .btn-modal-cancel{ background:#efe7d3; color:var(--rind); }
-    .btn-modal-gold{ background:var(--gold); color:var(--navy2); }
+    .notes-banner{ margin:14px 20px 4px; }
+    .note-card{ background:var(--surface); border-radius:16px; box-shadow:var(--shadow); padding:13px 16px; margin-bottom:10px; cursor:pointer; }
+    .note-card .nt{ font-weight:700; font-size:0.92rem; display:flex; align-items:center; gap:7px; }
+    .note-card .nt .chev{ margin-left:auto; color:var(--sub); font-size:0.8rem; transition:transform .2s; }
+    .note-card.open .nt .chev{ transform:rotate(180deg); }
+    .note-card .nb{ display:none; font-size:0.88rem; color:var(--ink); line-height:1.5; margin-top:8px; white-space:pre-wrap; }
+    .note-card.open .nb{ display:block; }
+    .notes-empty{ display:none; }
 
-    /* ── PANELS ── */
-    .panel{ display:none; }
-    .panel.active{ display:block; }
+    .tiles{ display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:14px 20px 4px; }
+    .tile{ background:var(--surface); border-radius:var(--r); box-shadow:var(--shadow); padding:18px 16px 16px; cursor:pointer; border:none; text-align:left; transition:transform .08s; min-height:118px; display:flex; flex-direction:column; gap:12px; }
+    .tile:active{ transform:scale(0.97); }
+    .tile .ic{ width:46px; height:46px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:1.4rem; }
+    .tile .tl{ font-weight:700; font-size:1.02rem; letter-spacing:-0.2px; }
+    .tile .ts{ font-size:0.76rem; color:var(--sub); font-weight:500; margin-top:-6px; }
+    .tile.full{ grid-column:1 / -1; flex-direction:row; align-items:center; min-height:0; padding:16px; gap:14px; }
+    .tile.full .tl{ font-size:1.0rem; }
+    .tile.soon{ opacity:0.85; }
+    .badge-soon{ margin-left:auto; font-size:0.66rem; font-weight:700; color:var(--gray-i); background:var(--gray); padding:4px 9px; border-radius:20px; }
+    .ic-lav{ background:var(--lav); color:var(--lav-i);} .ic-mint{ background:var(--mint); color:var(--mint-i);}
+    .ic-sky{ background:var(--sky); color:var(--sky-i);} .ic-peach{ background:var(--peach); color:var(--peach-i);}
+    .ic-pink{ background:var(--pink); color:var(--pink-i);} .ic-butter{ background:var(--butter); color:var(--butter-i);}
+    .ic-gray{ background:var(--gray); color:var(--gray-i);}
 
-    /* ── TOOLBARS / SUB-BARS ── */
-    .sub-bar{ background:var(--card); border-bottom:1px solid var(--line); padding:11px 28px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-    .sub-note{ font-size:0.78rem; color:var(--sub); }
+    /* section header */
+    .sec-head{ position:sticky; top:0; z-index:20; background:var(--bg); display:flex; align-items:center; gap:12px; padding:16px 18px 10px; }
+    .back-btn{ width:42px; height:42px; border-radius:50%; border:none; background:var(--surface); box-shadow:var(--shadow); font-size:1.2rem; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--ink); }
+    .sec-head h2{ font-size:1.5rem; font-weight:800; letter-spacing:-0.5px; }
+    .sec-body{ padding:6px 18px 20px; }
 
-    /* ── DASHBOARD ── */
-    .dash-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; padding:24px 28px 8px; }
-    .dash-card{ background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:20px; display:flex; flex-direction:column; gap:6px; }
-    .dash-card.accent-blue{ border-left:5px solid var(--navy); }
-    .dash-card.accent-amber{ border-left:5px solid var(--cheddar); }
-    .dash-card .label{ font-size:0.7rem; font-weight:800; text-transform:uppercase; letter-spacing:0.6px; color:var(--sub); font-family:'Archivo',sans-serif; }
-    .dash-card .value{ font-size:2.1rem; font-weight:900; font-family:'Archivo',sans-serif; color:var(--navy); line-height:1; }
-    .dash-card .sub{ font-size:0.8rem; color:var(--sub); }
-    .dash-events-col{ padding:8px 28px 28px; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-    @media(max-width:760px){ .dash-events-col{ grid-template-columns:1fr; } }
-    .dash-section-title{ font-size:0.7rem; font-weight:800; text-transform:uppercase; letter-spacing:0.6px; color:var(--wax); margin-bottom:12px; font-family:'Archivo',sans-serif; }
-    .dash-card-tall{ background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:20px; }
-    .today-res-list{ list-style:none; display:flex; flex-direction:column; gap:8px; max-height:280px; overflow-y:auto; }
-    .today-res-item{ display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:var(--r); background:#fff; border:1px solid var(--line-soft); font-size:0.85rem; }
-    .today-res-time{ font-weight:800; font-family:'Archivo',sans-serif; color:var(--navy); min-width:64px; }
-    .today-res-name{ flex:1; }
-    .today-res-party{ color:var(--sub); font-size:0.78rem; }
-    .upcoming-events-list{ list-style:none; display:flex; flex-direction:column; gap:10px; max-height:280px; overflow-y:auto; }
-    .event-item-dash{ padding:10px 12px; border-radius:var(--r); background:#fff; border-left:3px solid var(--cheddar); border-top:1px solid var(--line-soft); border-right:1px solid var(--line-soft); border-bottom:1px solid var(--line-soft); }
-    .event-item-dash .ev-title{ font-weight:700; font-size:0.88rem; color:var(--rind); }
-    .event-item-dash .ev-meta{ font-size:0.78rem; color:var(--sub); margin-top:2px; }
-    .empty-state-small{ color:var(--sub); font-size:0.85rem; font-style:italic; padding:20px 0; }
+    /* generic card list */
+    .card{ background:var(--surface); border-radius:18px; box-shadow:var(--shadow); padding:16px; margin-bottom:12px; }
+    .card .c-top{ display:flex; align-items:center; gap:8px; margin-bottom:2px; }
+    .c-day{ font-size:0.72rem; font-weight:800; letter-spacing:0.2px; color:var(--accent); text-transform:uppercase; }
+    .c-day.wax{ color:var(--wax); } .c-day.gold{ color:var(--butter-i); }
+    .c-title{ font-weight:700; font-size:1.05rem; letter-spacing:-0.2px; margin-top:2px; }
+    .c-body{ font-size:0.9rem; color:var(--sub); line-height:1.5; margin-top:5px; }
+    .c-pill{ font-size:0.64rem; font-weight:800; text-transform:uppercase; letter-spacing:0.3px; padding:3px 9px; border-radius:20px; }
+    .pill-rep{ background:var(--butter); color:var(--butter-i); }
+    .empty{ text-align:center; color:var(--sub); padding:48px 20px; font-size:0.92rem; }
+    .empty .ic{ font-size:2.4rem; display:block; margin-bottom:10px; }
+    .flash{ animation:flash 1.8s ease; }
+    @keyframes flash{ 0%,100%{ box-shadow:var(--shadow);} 25%{ box-shadow:0 0 0 3px rgba(91,83,214,0.55);} }
 
-    /* ── SPECIALS ── */
-    .specials-card{ background:var(--card); border:1px solid var(--line); border-left:5px solid var(--wax); border-radius:var(--r); padding:20px; margin:16px 28px; }
-    .specials-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
-    .specials-label{ font-size:0.72rem; font-weight:800; text-transform:uppercase; letter-spacing:0.6px; color:var(--wax); font-family:'Archivo',sans-serif; }
-    .specials-edit-btn{ border-color:var(--wax); }
-    .specials-edit-btn:hover{ background:var(--wax); }
-    #specialsDisplay{ font-size:0.93rem; color:var(--ink); line-height:1.7; white-space:pre-wrap; min-height:20px; }
-    #specialsEditArea{ margin-top:10px; }
-    #specialsTextarea:focus{ border-color:var(--wax); }
-    .btn-save-specials{ background:var(--wax); color:#fff; }
-    .btn-save-specials:hover{ background:#86231a; color:#fff; }
+    /* specials accent */
+    .card.special{ border-left:4px solid var(--mint-i); }
+    .card.special .c-day{ color:var(--mint-i); }
+    .card.event{ border-left:4px solid var(--pink-i); }
+    .card.event .c-day{ color:var(--pink-i); }
+    .card.event.past{ opacity:0.6; }
+    .card.sched{ border-left:4px solid var(--peach-i); }
+    .card.sched .c-day{ color:var(--peach-i); }
+    .card.timeoff{ border-left:4px solid var(--wax); }
+    .card.timeoff .c-day{ color:var(--wax); }
 
-    /* ── RESERVATIONS ── */
-    .filters{ background:var(--card); padding:14px 28px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; }
-    .filter-group{ display:flex; flex-direction:column; gap:4px; }
-    .filter-group label{ font-size:0.68rem; font-weight:700; color:var(--sub); text-transform:uppercase; letter-spacing:0.5px; }
-    .filter-group input,.filter-group select{ padding:8px 11px; border:1px solid var(--line); border-radius:var(--r); font-size:0.88rem; background:#fff; color:var(--ink); min-width:140px; }
-    .btn{ padding:9px 20px; border:none; border-radius:var(--r); font-size:0.85rem; font-weight:700; cursor:pointer; transition:background 0.15s; }
-    .btn-primary{ background:var(--gold); color:var(--navy2); }
-    .btn-primary:hover{ background:var(--cheddar); color:#fff; }
-    .btn-refresh{ background:var(--navy); color:#fff; }
-    .btn-refresh:hover{ background:var(--navy-soft); }
-    .stats{ padding:9px 28px; background:#efe7d3; border-bottom:1px solid var(--line); font-size:0.83rem; color:var(--sub); display:flex; align-items:center; }
-    .stats strong{ color:var(--navy); }
-    .stats .timestamp{ margin-left:auto; font-size:0.75rem; color:var(--sub); }
-    .main{ padding:20px 28px; }
-    .table-card{ background:var(--card); border:1px solid var(--line); border-radius:var(--r); overflow:auto; }
-    table{ width:100%; border-collapse:collapse; font-size:0.875rem; min-width:900px; }
-    thead th{ background:var(--navy); color:rgba(255,255,255,0.9); padding:11px 15px; text-align:left; font-weight:700; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; font-family:'Archivo',sans-serif; }
-    tbody tr{ border-bottom:1px solid var(--line-soft); }
-    tbody tr:last-child{ border-bottom:none; }
-    tbody tr:hover{ background:#fff; }
-    tbody td{ padding:11px 15px; vertical-align:middle; }
-    .badge{ display:inline-block; padding:3px 10px; border-radius:var(--r); font-size:0.7rem; font-weight:800; text-transform:uppercase; white-space:nowrap; letter-spacing:0.3px; }
-    .badge-RESERVED{ background:#d1fae5; color:#065f46; }
-    .badge-HELD{ background:#fdebc4; color:#92400e; }
-    .badge-SEATED{ background:#d7e6f5; color:#1e40af; }
-    .badge-FINISHED{ background:#e7dcc4; color:#5b5036; }
-    .badge-CANCELLED{ background:#f6dad4; color:var(--wax); }
-    .badge-NO_SHOW{ background:#fce7f3; color:#9d174d; }
-    .badge-WAITLISTED{ background:#ece3f7; color:#5b21b6; }
-    .badge-UNKNOWN{ background:#eee7d6; color:var(--sub); }
-    .state-box{ text-align:center; padding:60px 24px; color:var(--sub); }
-    .state-box .icon{ font-size:2.5rem; margin-bottom:12px; }
-    .state-box.error{ color:var(--wax); }
-    .state-box.error p{ max-width:500px; margin:0 auto; line-height:1.5; }
-    .spinner{ display:inline-block; width:20px; height:20px; border:3px solid var(--line); border-top-color:var(--cheddar); border-radius:50%; animation:spin 0.65s linear infinite; vertical-align:middle; margin-right:8px; }
-    @keyframes spin{ to{ transform:rotate(360deg); } }
-    .note-cell{ max-width:160px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--sub); font-size:0.82rem; }
-    .row-num{ color:var(--line); font-size:0.78rem; }
+    /* reservation cards */
+    .res-filters{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; align-items:flex-end; }
+    .fg{ display:flex; flex-direction:column; gap:4px; }
+    .fg label{ font-size:0.64rem; font-weight:700; color:var(--sub); text-transform:uppercase; letter-spacing:0.3px; }
+    .fg input, .fg select{ padding:9px 11px; border:1px solid var(--line); border-radius:12px; font-size:0.86rem; background:var(--surface); font-family:inherit; color:var(--ink); }
+    .btn{ border:none; border-radius:14px; padding:11px 18px; font-size:0.9rem; font-weight:700; cursor:pointer; font-family:inherit; }
+    .btn-primary{ background:var(--accent); color:#fff; }
+    .btn-block{ width:100%; }
+    .res-card{ background:var(--surface); border-radius:16px; box-shadow:var(--shadow); padding:14px 16px; margin-bottom:10px; display:flex; align-items:center; gap:14px; }
+    .res-when{ text-align:center; min-width:58px; }
+    .res-when .t{ font-weight:800; font-size:0.98rem; }
+    .res-when .d{ font-size:0.68rem; color:var(--sub); font-weight:600; }
+    .res-main{ flex:1; min-width:0; }
+    .res-name{ font-weight:700; font-size:0.98rem; }
+    .res-meta{ font-size:0.78rem; color:var(--sub); margin-top:2px; }
+    .res-badge{ font-size:0.62rem; font-weight:800; text-transform:uppercase; padding:4px 9px; border-radius:20px; white-space:nowrap; }
+    .b-ok{ background:var(--mint); color:var(--mint-i); }
+    .b-cancel{ background:#fae3e0; color:var(--wax); }
+    .b-other{ background:var(--gray); color:var(--gray-i); }
+    .res-stats{ font-size:0.8rem; color:var(--sub); font-weight:600; margin-bottom:10px; }
+    .res-card.cancel .res-name{ text-decoration:line-through; color:var(--sub); }
 
-    /* ── EVENTS / SCHEDULING ── */
-    .events-toolbar{ background:var(--card); padding:14px 28px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; }
-    .events-toolbar h2{ font-size:1.05rem; font-weight:800; color:var(--navy); }
-    .btn-add-event{ background:var(--gold); color:var(--navy2); border:none; border-radius:var(--r); padding:9px 18px; font-size:0.85rem; font-weight:700; cursor:pointer; }
-    .btn-add-event:hover{ background:var(--cheddar); color:#fff; }
-    .events-main{ padding:20px 28px; }
-    .events-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; }
-    .event-card{ background:var(--card); border:1px solid var(--line); border-left:4px solid var(--cheddar); border-radius:var(--r); padding:18px; display:flex; flex-direction:column; gap:8px; }
-    .event-card.past{ border-left-color:var(--line); opacity:0.65; }
-    .event-card .ev-date-badge{ font-size:0.7rem; font-weight:800; text-transform:uppercase; color:var(--wax); letter-spacing:0.5px; font-family:'Archivo',sans-serif; }
-    .event-card.past .ev-date-badge{ color:var(--sub); }
-    .event-card .ev-name{ font-size:1rem; font-weight:800; color:var(--rind); }
-    .event-card .ev-time{ font-size:0.82rem; color:var(--sub); }
-    .event-card .ev-desc{ font-size:0.85rem; color:var(--ink); line-height:1.5; }
-    .event-card .ev-actions{ display:flex; gap:8px; margin-top:4px; }
-    .btn-ev-delete{ background:none; border:1px solid #f0d6cf; color:var(--wax); border-radius:var(--r); padding:4px 12px; font-size:0.76rem; font-weight:600; cursor:pointer; }
-    .btn-ev-delete:hover{ background:#f6dad4; }
-    .no-events{ text-align:center; padding:60px 24px; color:var(--sub); }
-    .no-events .icon{ font-size:2.5rem; margin-bottom:12px; }
-
-    /* ── TIME-OFF ── */
-    .to-divider{ display:flex; align-items:center; gap:12px; margin:28px 0 18px; color:var(--wax); font-size:0.72rem; font-weight:800; text-transform:uppercase; letter-spacing:0.7px; font-family:'Archivo',sans-serif; }
-    .to-divider::before,.to-divider::after{ content:''; flex:1; height:1px; background:var(--line); }
-    .to-widget{ display:grid; grid-template-columns:320px 1fr; gap:16px; align-items:start; }
-    @media(max-width:820px){ .to-widget{ grid-template-columns:1fr; } }
-    .to-form-card,.to-requests-card{ background:var(--card); border:1px solid var(--line); border-radius:var(--r); overflow:hidden; }
-    .to-form-header{ background:var(--navy); color:#fff; padding:13px 18px; font-size:0.86rem; font-weight:800; font-family:'Archivo',sans-serif; }
-    .to-form-body{ padding:18px; display:flex; flex-direction:column; gap:12px; }
-    .to-form-body .filter-group input{ width:100%; }
-    .to-form-row{ display:flex; gap:10px; }
-    .to-form-row .filter-group{ flex:1; }
-    .to-submit-row{ display:flex; align-items:center; gap:10px; padding-top:2px; }
-    .to-submit-btn{ background:var(--gold); color:var(--navy2); border:none; border-radius:var(--r); padding:10px 0; font-size:0.86rem; font-weight:700; cursor:pointer; flex:1; }
-    .to-submit-btn:hover{ background:var(--cheddar); color:#fff; }
-    .to-msg{ font-size:0.8rem; font-weight:600; display:none; }
-    .to-requests-header{ display:flex; align-items:center; justify-content:space-between; padding:13px 18px; border-bottom:1px solid var(--line); background:#efe7d3; }
-    .to-requests-label{ font-size:0.72rem; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:var(--sub); font-family:'Archivo',sans-serif; }
-    .to-mgr-btn{ background:none; border:1px solid var(--line); color:var(--sub); border-radius:var(--r); padding:4px 12px; font-size:0.74rem; font-weight:700; cursor:pointer; }
-    .to-mgr-btn:hover{ background:#efe7d3; }
-    .to-mgr-btn.unlocked{ background:var(--cheddar); border-color:var(--cheddar); color:#fff; }
-    .to-req-item{ display:flex; align-items:flex-start; gap:12px; padding:13px 18px; border-bottom:1px solid var(--line-soft); }
-    .to-req-item:last-child{ border-bottom:none; }
-    .to-req-info{ flex:1; min-width:0; }
-    .to-req-name{ font-weight:800; font-size:0.9rem; color:var(--rind); }
-    .to-req-meta{ font-size:0.78rem; color:var(--sub); margin-top:2px; }
-    .to-req-reason{ font-size:0.75rem; color:var(--sub); font-style:italic; margin-top:2px; }
-    .to-req-submitted{ font-size:0.68rem; color:var(--line); margin-top:3px; }
-    .to-req-right{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0; }
-    .to-actions{ display:flex; gap:5px; }
-    .to-empty{ padding:32px 18px; text-align:center; color:var(--sub); font-size:0.85rem; font-style:italic; }
-    .badge-pending{ background:#fdebc4; color:#92400e; }
-    .badge-approved{ background:#d1fae5; color:#065f46; }
-    .badge-denied{ background:#f6dad4; color:var(--wax); }
-    .btn-to-approve{ background:#d1fae5; color:#065f46; border:none; border-radius:var(--r); padding:4px 9px; font-size:0.72rem; font-weight:800; cursor:pointer; }
-    .btn-to-deny{ background:#f6dad4; color:var(--wax); border:none; border-radius:var(--r); padding:4px 9px; font-size:0.72rem; font-weight:800; cursor:pointer; }
-    .btn-to-delete{ background:none; border:1px solid var(--line-soft); color:var(--sub); border-radius:var(--r); padding:4px 7px; font-size:0.72rem; cursor:pointer; }
-
-    /* ── CALENDAR ── */
-    .cal-toolbar{ background:var(--card); padding:14px 28px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:16px; }
-    .cal-toolbar h2{ font-size:1.1rem; font-weight:800; color:var(--navy); min-width:180px; text-align:center; }
-    .btn-cal-nav{ background:#efe7d3; border:1px solid var(--line); border-radius:var(--r); padding:6px 14px; font-size:1rem; cursor:pointer; color:var(--rind); }
-    .btn-cal-nav:hover{ background:var(--cheddar); color:#fff; }
-    .btn-cal-today{ background:var(--navy); color:#fff; border:none; border-radius:var(--r); padding:8px 14px; font-size:0.8rem; font-weight:700; cursor:pointer; margin-left:auto; }
-    .cal-main{ padding:20px 28px; }
-    .cal-grid{ background:var(--card); border:1px solid var(--line); border-radius:var(--r); overflow:hidden; }
-    .cal-header-row{ display:grid; grid-template-columns:repeat(7,1fr); background:var(--navy); }
-    .cal-header-cell{ color:rgba(255,255,255,0.78); font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; padding:10px 0; text-align:center; font-family:'Archivo',sans-serif; }
-    .cal-body{ display:grid; grid-template-columns:repeat(7,1fr); }
-    .cal-day{ min-height:110px; border-right:1px solid var(--line-soft); border-bottom:1px solid var(--line-soft); padding:6px 8px; position:relative; background:var(--card); }
+    /* calendar */
+    .cal-bar{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    .cal-bar h3{ font-size:1.05rem; font-weight:800; flex:1; text-align:center; }
+    .cal-nav{ width:38px; height:38px; border-radius:50%; border:none; background:var(--surface); box-shadow:var(--shadow); font-size:1rem; cursor:pointer; }
+    .cal-today{ border:none; background:var(--accent); color:#fff; border-radius:12px; padding:8px 13px; font-weight:700; font-size:0.78rem; cursor:pointer; }
+    .cal-legend{ display:flex; flex-wrap:wrap; gap:9px 14px; font-size:0.72rem; color:var(--sub); margin-bottom:12px; }
+    .cal-legend .dot{ width:9px; height:9px; border-radius:3px; display:inline-block; margin-right:4px; vertical-align:middle; }
+    .cal-grid{ background:var(--surface); border-radius:18px; box-shadow:var(--shadow); overflow:hidden; }
+    .cal-hrow,.cal-body{ display:grid; grid-template-columns:repeat(7,1fr); }
+    .cal-hcell{ text-align:center; font-size:0.62rem; font-weight:700; color:var(--sub); padding:9px 0; text-transform:uppercase; }
+    .cal-day{ min-height:64px; border-top:1px solid var(--line); border-right:1px solid var(--line); padding:4px 4px; position:relative; }
     .cal-day:nth-child(7n){ border-right:none; }
-    .cal-day.other-month{ background:#efe7d3; }
-    .cal-day.today{ background:#fff7e2; }
-    .cal-day-num{ font-size:0.82rem; font-weight:800; color:var(--rind); margin-bottom:4px; font-family:'Archivo',sans-serif; }
-    .cal-day.other-month .cal-day-num{ color:var(--line); }
-    .cal-day.today .cal-day-num{ background:var(--cheddar); color:#fff; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.75rem; }
-    .cal-pill{ font-size:0.7rem; font-weight:700; padding:2px 6px; border-radius:var(--r); margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .cal-pill.reservation{ background:#d7e6f5; color:#1e40af; }
-    .cal-pill.reservation.cancelled{ background:#f6dad4; color:#991b1b; text-decoration:line-through; }
-    .cal-pill.event{ background:#fdebc4; color:#92400e; }
-    .cal-pill.timeoff{ background:#f6dad4; color:#A52B1E; }
-    .cal-pill.special{ background:#e7d9b0; color:#7a4d12; }
-    .cal-pill.schedule{ background:#dfe5ee; color:#13314f; }
-    .event-card.timeoff{ border-left-color:var(--wax); }
-    .ev-tag{ display:inline-block; align-self:flex-start; font-size:0.62rem; font-weight:800; letter-spacing:0.5px; text-transform:uppercase; color:#fff; background:var(--wax); padding:2px 7px; border-radius:var(--r); font-family:'Archivo',sans-serif; }
-    .cal-more{ font-size:0.68rem; color:var(--sub); margin-top:2px; }
-    .cal-legend{ display:flex; gap:16px; padding:12px 28px; font-size:0.78rem; color:var(--sub); align-items:center; }
-    .cal-legend-dot{ width:10px; height:10px; border-radius:2px; display:inline-block; margin-right:4px; }
+    .cal-day.other{ background:#fafafe; }
+    .cal-daynum{ font-size:0.72rem; font-weight:700; color:var(--ink); }
+    .cal-day.other .cal-daynum{ color:#cfd1da; }
+    .cal-day.today .cal-daynum{ background:var(--accent); color:#fff; width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.66rem; }
+    .cal-dot{ height:5px; border-radius:3px; margin:2px 1px 0; }
+    .cal-more{ font-size:0.56rem; color:var(--sub); margin-top:1px; }
+    .cd-res{ background:#9fc0ee; } .cd-cancel{ background:#e6a8a0; } .cd-event{ background:#eaa6c6; }
+    .cd-special{ background:#8fd3b2; } .cd-sched{ background:#eac08c; } .cd-off{ background:#d99a90; }
 
-    /* ── MUSIC ── */
-    .music-toolbar{ background:var(--card); padding:14px 28px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; }
-    .music-toolbar h2{ font-size:1.05rem; font-weight:800; color:var(--navy); }
-    .music-main{ padding:20px 28px; }
-    .playlist-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px; }
-    .spotify-embed{ margin-bottom:20px; border-radius:var(--r); overflow:hidden; border:1px solid var(--line); }
-    .spotify-embed iframe{ display:block; width:100%; border:none; }
-    .playlist-card{ background:var(--card); border:1px solid var(--line); border-left:4px solid #1db954; border-radius:var(--r); padding:14px 16px; display:flex; align-items:center; gap:14px; text-decoration:none; color:inherit; transition:transform 0.1s; cursor:pointer; }
-    .playlist-card:hover{ transform:translateY(-1px); }
-    .playlist-card.active{ border-left-color:var(--cheddar); background:#fff7e2; }
-    .playlist-icon{ font-size:1.6rem; flex-shrink:0; }
-    .playlist-info .pl-name{ font-size:0.9rem; font-weight:800; color:var(--rind); }
-    .playlist-info .pl-desc{ font-size:0.75rem; color:var(--sub); margin-top:2px; }
-    .pl-open{ margin-left:auto; font-size:0.72rem; font-weight:800; color:#1db954; white-space:nowrap; }
+    /* time off form */
+    .form-card{ background:var(--surface); border-radius:18px; box-shadow:var(--shadow); padding:18px; margin-bottom:16px; }
+    .form-card h3{ font-size:1.0rem; font-weight:800; margin-bottom:14px; }
+    .field{ margin-bottom:12px; }
+    .field label{ font-size:0.7rem; font-weight:700; color:var(--sub); text-transform:uppercase; letter-spacing:0.3px; display:block; margin-bottom:5px; }
+    .field input{ width:100%; padding:12px 13px; border:1px solid var(--line); border-radius:13px; font-size:0.92rem; font-family:inherit; background:#fbfbfe; color:var(--ink); }
+    .field input:focus{ outline:none; border-color:var(--accent); }
+    .row2{ display:flex; gap:10px; } .row2 .field{ flex:1; }
+    .to-msg{ font-size:0.84rem; font-weight:700; margin-top:8px; display:none; }
+    .req-item{ display:flex; align-items:flex-start; gap:12px; background:var(--surface); border-radius:16px; box-shadow:var(--shadow); padding:13px 15px; margin-bottom:10px; }
+    .req-info{ flex:1; min-width:0; }
+    .req-name{ font-weight:700; font-size:0.95rem; }
+    .req-meta{ font-size:0.78rem; color:var(--sub); margin-top:2px; }
+    .req-reason{ font-size:0.76rem; color:var(--sub); font-style:italic; margin-top:2px; }
+    .st-badge{ font-size:0.6rem; font-weight:800; text-transform:uppercase; padding:4px 9px; border-radius:20px; }
+    .st-pending{ background:var(--butter); color:var(--butter-i); }
+    .st-approved{ background:var(--mint); color:var(--mint-i); }
+    .st-denied{ background:#fae3e0; color:var(--wax); }
 
-    /* ── CONTENT TILES (notes & specials) ── */
-    .notes-grid,.specials-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
-    .note-empty{ color:var(--sub); font-style:italic; font-size:0.88rem; padding:4px 0; }
-    .note-tile{ background:#fff; border:1px solid var(--line); border-left:4px solid var(--cheddar); border-radius:var(--r); padding:12px 14px; }
-    .note-title{ font-weight:800; font-size:0.9rem; color:var(--rind); font-family:'Archivo',sans-serif; }
-    .note-body{ font-size:0.85rem; color:var(--ink); line-height:1.5; margin-top:4px; white-space:pre-wrap; }
-    .special-tile{ background:#fff; border:1px solid var(--line); border-left:4px solid var(--wax); border-radius:var(--r); padding:12px 14px; }
-    .special-title{ font-weight:800; font-size:0.92rem; color:var(--wax); font-family:'Archivo',sans-serif; }
-    .special-body{ font-size:0.85rem; color:var(--ink); line-height:1.5; margin-top:4px; white-space:pre-wrap; }
-    .special-time{ font-size:0.78rem; color:var(--sub); margin-top:4px; font-weight:600; }
-    .special-day{ font-size:0.66rem; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:var(--sub); font-family:'Archivo',sans-serif; margin-bottom:3px; }
-    .special-tile.today{ background:#fff7e2; border-left-color:var(--cheddar); }
-    .special-tile.today .special-day{ color:var(--wax); }
-    .rep-badge{ font-size:0.6rem; font-weight:800; text-transform:uppercase; letter-spacing:0.4px; color:var(--navy2); background:var(--gold); padding:1px 6px; border-radius:var(--r); vertical-align:middle; }
-    .special-tile.clickable, .event-item-dash.clickable, .note-tile.clickable{ cursor:pointer; }
-    .special-tile.clickable:hover, .event-item-dash.clickable:hover, .note-tile.clickable:hover{ box-shadow:0 2px 8px rgba(11,33,56,0.13); }
-    .note-tile .note-body{ display:none; }
-    .note-tile.open .note-body{ display:block; }
-    .tile-more{ font-size:0.7rem; color:var(--sub); font-weight:600; }
-    .special-card{ border-left:4px solid var(--wax) !important; }
-    .special-card .ev-date-badge{ color:var(--wax); }
-    @keyframes flashpulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(224,162,28,0);} 30%{ box-shadow:0 0 0 3px rgba(224,162,28,0.95);} }
-    .flash{ animation:flashpulse 1.8s ease; }
+    .section-label{ font-size:0.74rem; font-weight:800; color:var(--sub); text-transform:uppercase; letter-spacing:0.4px; margin:6px 2px 10px; }
+
+    /* bottom bar */
+    .botbar{ position:fixed; left:0; right:0; bottom:0; z-index:40; display:flex; justify-content:center; padding:12px 0 calc(12px + env(safe-area-inset-bottom)); pointer-events:none; }
+    .botbar .home-btn{ pointer-events:auto; width:60px; height:60px; border-radius:50%; border:none; background:var(--ink); color:#fff; box-shadow:0 8px 24px rgba(28,29,34,0.28); font-size:1.4rem; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+    .botbar .home-btn:active{ transform:scale(0.94); }
+
+    /* loading spinner */
+    .spin{ display:inline-block; width:18px; height:18px; border:3px solid var(--line); border-top-color:var(--accent); border-radius:50%; animation:sp .7s linear infinite; vertical-align:middle; }
+    @keyframes sp{ to{ transform:rotate(360deg);} }
   </style>
 </head>
 <body>
+<div class="app">
 
-<!-- ── HEADER ── -->
-<header>
-  <div>
-    <h1>GREYS Memphis · Staff Portal</h1>
-    <div class="subtitle">Memphis Location · Live Service Board</div>
-  </div>
-  <div style="display:flex;align-items:center;gap:18px;">
-    <a href="manager.html" style="color:#cfe0ef;font-size:0.78rem;font-weight:700;text-decoration:none;border:1px solid rgba(255,255,255,0.25);padding:7px 13px;border-radius:2px;">🔐 Manager</a>
-    <div class="header-time">
-      <div class="time" id="clockTime">--:--</div>
-      <div id="clockDate" style="font-size:0.78rem;opacity:0.7;"></div>
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div>
+      <div class="brand">GREYS</div>
+      <div class="loc">Memphis · Staff</div>
     </div>
-  </div>
-</header>
-
-<!-- ── TABS ── -->
-<div class="tabs">
-  <div class="tab active" onclick="switchTab('dashboard')">Main</div>
-  <div class="tab" onclick="switchTab('reservations')">Resys</div>
-  <div class="tab" onclick="switchTab('events')">Events</div>
-  <div class="tab" onclick="switchTab('scheduling')">Scheduling</div>
-  <div class="tab" onclick="switchTab('calendar')">Calendar</div>
-  <div class="tab" onclick="switchTab('specials')">Specials</div>
-</div>
-
-<!-- ── STAFF NOTES ── -->
-<div class="notes-section">
-  <div class="notes-top">
-    <span class="notes-label">📌 Staff Notes</span>
-  </div>
-  <div id="notesGrid" class="notes-grid"><div class="note-empty">No notes posted.</div></div>
-</div>
-
-<!-- ══ DASHBOARD ══ -->
-<div id="panel-dashboard" class="panel active">
-  <div class="dash-grid">
-    <div class="dash-card accent-blue">
-      <div class="label">Today's Reservations</div>
-      <div class="value" id="dash-today-count">–</div>
-      <div class="sub" id="dash-today-guests"></div>
-    </div>
-    <div class="dash-card accent-amber">
-      <div class="label">Upcoming Events</div>
-      <div class="value" id="dash-event-count">–</div>
-      <div class="sub" id="dash-next-event">–</div>
-    </div>
+    <div class="spacer"></div>
+    <a class="icon-btn" href="manager.html" title="Manager" aria-label="Manager">🔐</a>
   </div>
 
-  <div class="specials-card">
-    <div class="specials-top">
-      <span class="specials-label">🍽️ Specials This Week</span>
-    </div>
-    <div id="specialsGrid" class="specials-grid"><div class="note-empty">No specials this week.</div></div>
-  </div>
-
-  <div class="dash-events-col">
-    <div class="dash-card-tall">
-      <div class="dash-section-title">Today's Schedule</div>
-      <ul class="today-res-list" id="dash-today-list">
-        <li class="empty-state-small">Loading…</li>
-      </ul>
-    </div>
-    <div class="dash-card-tall">
-      <div class="dash-section-title">Upcoming Events</div>
-      <ul class="upcoming-events-list" id="dash-events-list">
-        <li class="empty-state-small">No upcoming events.</li>
-      </ul>
-    </div>
-    <div class="dash-card-tall">
-      <div class="dash-section-title">Upcoming Schedule</div>
-      <ul class="upcoming-events-list" id="dash-sched-list">
-        <li class="empty-state-small">No upcoming schedule.</li>
-      </ul>
-    </div>
-  </div>
-</div>
-
-<!-- ══ RESERVATIONS ══ -->
-<div id="panel-reservations" class="panel">
-  <div class="filters">
-    <div class="filter-group">
-      <label>From Date</label>
-      <input type="date" id="dateFrom" />
-    </div>
-    <div class="filter-group">
-      <label>To Date</label>
-      <input type="date" id="dateTo" />
-    </div>
-    <div class="filter-group">
-      <label>Status</label>
-      <select id="statusFilter">
-        <option value="">All Statuses</option>
-        <option value="RESERVED">Reserved</option>
-        <option value="HELD">Held</option>
-        <option value="SEATED">Seated</option>
-        <option value="FINISHED">Finished</option>
-        <option value="CANCELLED">Cancelled</option>
-        <option value="NO_SHOW">No Show</option>
-      </select>
-    </div>
-    <div class="filter-group">
-      <label>Show</label>
-      <select id="limitSelect">
-        <option value="20">20 results</option>
-        <option value="50">50 results</option>
-        <option value="100" selected>100 results</option>
-      </select>
-    </div>
-    <button class="btn btn-primary" onclick="loadReservations()">Apply Filters</button>
-    <button class="btn btn-refresh" onclick="loadReservations()">⟳ Refresh</button>
-  </div>
-  <div class="stats" id="statsBar" style="display:none;">
-    <span id="statsText"></span>
-    <span class="timestamp" id="statsTime"></span>
-  </div>
-  <div class="main">
-    <div class="table-card">
-      <div class="state-box" id="stateBox">
-        <div class="icon">📋</div>
-        <p>Loading reservations…</p>
-      </div>
-      <table id="resTable" style="display:none;">
-        <thead>
-          <tr>
-            <th>#</th><th>Date</th><th>Time</th><th>Guest Name</th>
-            <th>Party</th><th>Status</th><th>Notes</th>
-          </tr>
-        </thead>
-        <tbody id="tableBody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- ══ EVENTS ══ -->
-<div id="panel-events" class="panel">
-  <div class="events-toolbar">
-    <h2>🎉 Upcoming Events</h2>
-  </div>
-  <div class="events-main">
-    <div class="events-grid" id="eventsGrid">
-      <div class="no-events"><div class="icon">🎉</div><p>No events yet. Add one!</p></div>
-    </div>
-  </div>
-</div>
-
-<!-- ══ SCHEDULING ══ -->
-<div id="panel-scheduling" class="panel">
-  <div class="events-toolbar">
-    <h2>📆 Scheduling</h2>
-  </div>
-  <div class="events-main">
-    <div class="events-grid" id="schedGrid">
-      <div class="no-events"><div class="icon">📆</div><p>No schedules yet. Add one!</p></div>
+  <!-- ══ HOME ══ -->
+  <div id="view-home" class="view active">
+    <div class="home-head">
+      <h1 id="greeting">Hi, team 👋</h1>
+      <div class="when" id="homeWhen"></div>
     </div>
 
-    <div class="to-divider">🗓️ Time Off Requests</div>
-    <div class="to-widget">
-      <div class="to-form-card">
-        <div class="to-form-header">🗓️ Submit a Request</div>
-        <div class="to-form-body">
-          <div class="filter-group">
-            <label>Your Name</label>
-            <input type="text" id="toName" placeholder="First & Last Name" />
-          </div>
-          <div class="to-form-row">
-            <div class="filter-group">
-              <label>Start Date</label>
-              <input type="date" id="toStart" />
-            </div>
-            <div class="filter-group">
-              <label>End Date <span style="font-weight:400;text-transform:none;">(optional)</span></label>
-              <input type="date" id="toEnd" />
-            </div>
-          </div>
-          <div class="filter-group">
-            <label>Reason <span style="font-weight:400;text-transform:none;">(optional)</span></label>
-            <input type="text" id="toReason" placeholder="e.g. Family event, vacation…" />
-          </div>
-          <div class="to-submit-row">
-            <button class="to-submit-btn" onclick="submitTimeOff()">Submit Request</button>
-            <span id="toMsg" class="to-msg"></span>
-          </div>
+    <div class="notes-banner" id="notesGrid"></div>
+
+    <div class="tiles">
+      <button class="tile" onclick="showView('specials')">
+        <div class="ic ic-mint">🍽️</div>
+        <div><div class="tl">Specials</div><div class="ts">This week's menu</div></div>
+      </button>
+      <button class="tile" onclick="showView('resys')">
+        <div class="ic ic-sky">📋</div>
+        <div><div class="tl">Resys</div><div class="ts">Reservations</div></div>
+      </button>
+      <button class="tile" onclick="showView('calendar')">
+        <div class="ic ic-lav">📅</div>
+        <div><div class="tl">Calendar</div><div class="ts">Everything dated</div></div>
+      </button>
+      <button class="tile" onclick="showView('schedule')">
+        <div class="ic ic-peach">📆</div>
+        <div><div class="tl">Schedule</div><div class="ts">Shifts &amp; time off</div></div>
+      </button>
+      <button class="tile" onclick="showView('events')">
+        <div class="ic ic-pink">🎉</div>
+        <div><div class="tl">Events</div><div class="ts">What's coming up</div></div>
+      </button>
+      <button class="tile" onclick="showView('requestoff')">
+        <div class="ic ic-butter">🌴</div>
+        <div><div class="tl">Request Off</div><div class="ts">Submit time off</div></div>
+      </button>
+      <button class="tile full soon" onclick="showView('onboarding')">
+        <div class="ic ic-gray">🎓</div>
+        <div class="tl">Onboarding</div>
+        <span class="badge-soon">Coming soon</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ══ SPECIALS ══ -->
+  <div id="view-specials" class="view">
+    <div class="sec-head"><button class="back-btn" onclick="showView('home')">‹</button><h2>Specials</h2></div>
+    <div class="sec-body">
+      <div class="section-label">This week · Mon–Sun</div>
+      <div id="specialsFullGrid"></div>
+    </div>
+  </div>
+
+  <!-- ══ RESYS ══ -->
+  <div id="view-resys" class="view">
+    <div class="sec-head"><button class="back-btn" onclick="showView('home')">‹</button><h2>Reservations</h2></div>
+    <div class="sec-body">
+      <div class="res-filters">
+        <div class="fg"><label>From</label><input type="date" id="dateFrom" /></div>
+        <div class="fg"><label>To</label><input type="date" id="dateTo" /></div>
+        <div class="fg"><label>Status</label>
+          <select id="statusFilter">
+            <option value="">All</option><option value="RESERVED">Reserved</option>
+            <option value="SEATED">Seated</option><option value="FINISHED">Finished</option>
+            <option value="CANCELLED">Cancelled</option><option value="NO_SHOW">No Show</option>
+          </select>
         </div>
+        <button class="btn btn-primary" onclick="loadReservations()">Apply</button>
+        <input type="hidden" id="limitSelect" value="100" />
       </div>
+      <div class="res-stats" id="resStats"></div>
+      <div id="resState" class="empty"><span class="spin"></span> Loading reservations…</div>
+      <div id="resList"></div>
+    </div>
+  </div>
 
-      <div class="to-requests-card">
-        <div class="to-requests-header">
-          <span class="to-requests-label">All Requests</span>
+  <!-- ══ CALENDAR ══ -->
+  <div id="view-calendar" class="view">
+    <div class="sec-head"><button class="back-btn" onclick="showView('home')">‹</button><h2>Calendar</h2></div>
+    <div class="sec-body">
+      <div class="cal-bar">
+        <button class="cal-nav" onclick="calNav(-1)">‹</button>
+        <h3 id="calMonthLabel">Month Year</h3>
+        <button class="cal-nav" onclick="calNav(1)">›</button>
+        <button class="cal-today" onclick="calGoToday()">Today</button>
+      </div>
+      <div class="cal-legend">
+        <span><span class="dot cd-res"></span>Reserved</span>
+        <span><span class="dot cd-cancel"></span>Cancelled</span>
+        <span><span class="dot cd-event"></span>Event</span>
+        <span><span class="dot cd-special"></span>Special</span>
+        <span><span class="dot cd-sched"></span>Schedule</span>
+        <span><span class="dot cd-off"></span>Time Off</span>
+      </div>
+      <div class="cal-grid">
+        <div class="cal-hrow">
+          <div class="cal-hcell">S</div><div class="cal-hcell">M</div><div class="cal-hcell">T</div>
+          <div class="cal-hcell">W</div><div class="cal-hcell">T</div><div class="cal-hcell">F</div><div class="cal-hcell">S</div>
         </div>
-        <div id="toList"><div class="to-empty">No requests yet.</div></div>
+        <div class="cal-body" id="calBody"></div>
       </div>
     </div>
   </div>
-</div>
 
-<!-- ══ CALENDAR ══ -->
-<div id="panel-calendar" class="panel">
-  <div class="cal-toolbar">
-    <button class="btn-cal-nav" onclick="calNav(-1)">‹</button>
-    <h2 id="calMonthLabel">Month Year</h2>
-    <button class="btn-cal-nav" onclick="calNav(1)">›</button>
-    <button class="btn-cal-today" onclick="calGoToday()">Today</button>
+  <!-- ══ SCHEDULE ══ -->
+  <div id="view-schedule" class="view">
+    <div class="sec-head"><button class="back-btn" onclick="showView('home')">‹</button><h2>Schedule</h2></div>
+    <div class="sec-body">
+      <div id="schedGrid"></div>
+    </div>
   </div>
-  <div class="cal-legend">
-    <span><span class="cal-legend-dot" style="background:#a9c7e8;"></span>Reserved</span>
-    <span><span class="cal-legend-dot" style="background:#e0a3a3;"></span>Cancelled</span>
-    <span><span class="cal-legend-dot" style="background:var(--cheddar);"></span>Event</span>
-    <span><span class="cal-legend-dot" style="background:#c8a24a;"></span>Special</span>
-    <span><span class="cal-legend-dot" style="background:#13314f;"></span>Schedule</span>
-    <span><span class="cal-legend-dot" style="background:var(--wax);"></span>Time Off</span>
+
+  <!-- ══ EVENTS ══ -->
+  <div id="view-events" class="view">
+    <div class="sec-head"><button class="back-btn" onclick="showView('home')">‹</button><h2>Events</h2></div>
+    <div class="sec-body">
+      <div id="eventsGrid"></div>
+    </div>
   </div>
-  <div class="cal-main">
-    <div class="cal-grid">
-      <div class="cal-header-row">
-        <div class="cal-header-cell">Sun</div>
-        <div class="cal-header-cell">Mon</div>
-        <div class="cal-header-cell">Tue</div>
-        <div class="cal-header-cell">Wed</div>
-        <div class="cal-header-cell">Thu</div>
-        <div class="cal-header-cell">Fri</div>
-        <div class="cal-header-cell">Sat</div>
+
+  <!-- ══ REQUEST OFF ══ -->
+  <div id="view-requestoff" class="view">
+    <div class="sec-head"><button class="back-btn" onclick="showView('home')">‹</button><h2>Request Off</h2></div>
+    <div class="sec-body">
+      <div class="form-card">
+        <h3>🌴 Submit a request</h3>
+        <div class="field"><label>Your name</label><input type="text" id="toName" placeholder="First & last name" /></div>
+        <div class="row2">
+          <div class="field"><label>Start date</label><input type="date" id="toStart" /></div>
+          <div class="field"><label>End date (optional)</label><input type="date" id="toEnd" /></div>
+        </div>
+        <div class="field"><label>Reason (optional)</label><input type="text" id="toReason" placeholder="e.g. vacation" /></div>
+        <button class="btn btn-primary btn-block" onclick="submitTimeOff()">Submit request</button>
+        <div class="to-msg" id="toMsg"></div>
       </div>
-      <div class="cal-body" id="calBody"></div>
+      <div class="section-label">All requests</div>
+      <div id="toList"><div class="empty">No requests yet.</div></div>
     </div>
   </div>
-</div>
 
-<!-- ══ SPECIALS ══ -->
-<div id="panel-specials" class="panel">
-  <div class="events-toolbar">
-    <h2>🍽️ Specials This Week</h2>
-  </div>
-  <div class="events-main">
-    <div class="events-grid" id="specialsFullGrid">
-      <div class="no-events"><div class="icon">🍽️</div><p>No specials this week.</p></div>
+  <!-- ══ ONBOARDING (placeholder) ══ -->
+  <div id="view-onboarding" class="view">
+    <div class="sec-head"><button class="back-btn" onclick="showView('home')">‹</button><h2>Onboarding</h2></div>
+    <div class="sec-body">
+      <div class="empty"><span class="ic">🎓</span>Onboarding is coming soon.<br>New-hire checklists, training, and docs will live here.</div>
     </div>
   </div>
+
+  <!-- BOTTOM BAR -->
+  <div class="botbar"><button class="home-btn" onclick="showView('home')" aria-label="Home">⌂</button></div>
 </div>
 
-<!-- ════ Supabase client ════ -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-// ─────────────────────────────────────────
-//  CONFIG  (Supabase — static, no app server)
-// ─────────────────────────────────────────
 const SB_URL = 'https://vdvtrevhqalmjwhjhjug.supabase.co';
 const SB_KEY = 'sb_publishable_LnlevWReed7K8cFk_f_Mxg_UywktQ5_';
 const FN_URL = SB_URL + '/functions/v1/portal-api';
 const sb = window.supabase.createClient(SB_URL, SB_KEY);
+function wixFetch(params){ return fetch(FN_URL + '?action=reservations&' + params.toString(), { headers:{ apikey:SB_KEY, Authorization:'Bearer '+SB_KEY } }); }
 
-// Read-only Wix reservations proxy (editing lives in manager.html).
-function wixFetch(params) {
-  return fetch(FN_URL + '?action=reservations&' + params.toString(), {
-    headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }
-  });
-}
+function fmt(d){ return d.toISOString().split('T')[0]; }
+function fmtDisplay(s){ if(!s) return ''; return new Date(s+'T12:00:00').toLocaleDateString('en-US',{ weekday:'short', month:'short', day:'numeric' }); }
+function fmtTime(t){ if(!t) return ''; const [h,m]=t.split(':').map(Number); const ap=h>=12?'PM':'AM'; return ((h%12)||12)+':'+String(m).padStart(2,'0')+' '+ap; }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-// ─────────────────────────────────────────
-//  CLOCK + MUSIC
-// ─────────────────────────────────────────
-function updateClock() {
-  const now = new Date();
-  document.getElementById('clockTime').textContent =
-    now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  document.getElementById('clockDate').textContent =
-    now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
-}
-updateClock();
-setInterval(updateClock, 1000);
-
-// ─────────────────────────────────────────
-//  TABS
-// ─────────────────────────────────────────
-const TAB_ORDER = ['dashboard','reservations','events','scheduling','calendar','specials'];
-function switchTab(name) {
-  document.querySelectorAll('.tab').forEach((t,i) => {
-    t.classList.toggle('active', TAB_ORDER[i] === name);
-  });
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.getElementById('panel-' + name).classList.add('active');
+// ── NAVIGATION ──
+function showView(name){
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const el = document.getElementById('view-' + name);
+  if (el) el.classList.add('active');
+  window.scrollTo(0,0);
   if (name === 'calendar') renderCalendar();
   if (name === 'specials') renderSpecialsFull();
-}
-// Jump to a tab and highlight a specific card.
-function openOnTab(tab, cardId){
-  switchTab(tab);
-  setTimeout(() => {
-    const el = document.getElementById(cardId);
-    if (el){ el.scrollIntoView({ behavior:'smooth', block:'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1800); }
-  }, 120);
-}
-// Monday–Sunday of the current week.
-function currentWeek(){
-  const d = new Date(); d.setHours(0,0,0,0);
-  const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-  return { start: fmt(mon), end: fmt(sun) };
+  if (name === 'resys' && !_resLoaded){ _resLoaded = true; loadReservations(); }
 }
 
-// ─────────────────────────────────────────
-//  DATE HELPERS
-// ─────────────────────────────────────────
-function fmt(d) { return d.toISOString().split('T')[0]; }
-function fmtDisplay(dateStr) {
-  const d = new Date(dateStr + 'T12:00:00');
-  return d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+// ── CLOCK / GREETING ──
+function updateWhen(){
+  const now = new Date();
+  const h = now.getHours();
+  const g = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  const el = document.getElementById('greeting'); if (el) el.textContent = g + ' 👋';
+  const w = document.getElementById('homeWhen');
+  if (w) w.textContent = now.toLocaleDateString('en-US',{ weekday:'long', month:'long', day:'numeric' }) + ' · ' + now.toLocaleTimeString('en-US',{ hour:'2-digit', minute:'2-digit' });
 }
-function fmtTime(t) {
-  if (!t) return '';
-  const [h,m] = t.split(':').map(Number);
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  return ((h % 12) || 12) + ':' + String(m).padStart(2,'0') + ' ' + ampm;
-}
-function esc(str) {
-  return String(str==null?'':str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+updateWhen(); setInterval(updateWhen, 30000);
 
-// ─────────────────────────────────────────
-//  INIT
-// ─────────────────────────────────────────
-(function() {
-  const today = new Date();
-  const from = new Date(); from.setDate(today.getDate() - 30);
-  const to = new Date(); to.setDate(today.getDate() + 60);
-  document.getElementById('dateFrom').value = fmt(from);
-  document.getElementById('dateTo').value   = fmt(to);
-  const ts = document.getElementById('toStart'); if (ts) ts.value = fmt(today);
+// ── INIT ──
+(function(){
+  const today=new Date(); const from=new Date(); from.setDate(today.getDate()-30); const to=new Date(); to.setDate(today.getDate()+60);
+  const f=document.getElementById('dateFrom'); if(f) f.value=fmt(from);
+  const t=document.getElementById('dateTo'); if(t) t.value=fmt(to);
+  const ts=document.getElementById('toStart'); if(ts) ts.value=fmt(today);
 })();
+window.addEventListener('DOMContentLoaded', () => { loadItems(); loadSchedules(); loadTimeOff(); });
 
-window.addEventListener('DOMContentLoaded', () => {
-  loadItems();
-  loadReservations();
-  loadDashboard();
-  loadSchedules();
-  loadTimeOff();
-});
-
-// ─────────────────────────────────────────
-//  CONTENT ITEMS (notes · specials · events)
-// ─────────────────────────────────────────
-let _notes = [], _specials = [], _events = [];
-function mapItem(r){
-  return { id:r.id, type:r.type||'note', title:r.title||'', body:r.body||'', date:r.date||'', time:r.time||'', endDate:r.end_date||'', repeat:r.repeat||'none', repeatUntil:r.repeat_until||'' };
-}
+// ═══ CONTENT ITEMS (notes · specials · events) ═══
+let _notes=[], _specials=[], _events=[];
+function mapItem(r){ return { id:r.id, type:r.type||'note', title:r.title||'', body:r.body||'', date:r.date||'', time:r.time||'', endDate:r.end_date||'', repeat:r.repeat||'none', repeatUntil:r.repeat_until||'' }; }
 async function loadItems(){
-  try {
+  try{
     const { data } = await sb.from('portal_items').select('*');
     const items = (data||[]).map(mapItem);
-    _notes    = items.filter(i => i.type === 'note');
-    _specials = items.filter(i => i.type === 'special');
-    _events   = items.filter(i => i.type === 'event')
-      .map(e => ({ id:e.id, name:e.title, date:e.date, time:e.time, endDate:e.endDate, desc:e.body, repeat:e.repeat, repeatUntil:e.repeatUntil }));
-  } catch(e){ _notes=[]; _specials=[]; _events=[]; }
+    _notes = items.filter(i=>i.type==='note');
+    _specials = items.filter(i=>i.type==='special');
+    _events = items.filter(i=>i.type==='event').map(e=>({ id:e.id, name:e.title, date:e.date, time:e.time, endDate:e.endDate, desc:e.body, repeat:e.repeat, repeatUntil:e.repeatUntil }));
+  }catch(e){ _notes=[]; _specials=[]; _events=[]; }
   renderNotes();
-  renderSpecials();
   renderEventCards();
-  renderDashEvents();
-  const cal = document.getElementById('panel-calendar');
-  if (cal && cal.classList.contains('active')) renderCalendar();
-  const sp = document.getElementById('panel-specials');
-  if (sp && sp.classList.contains('active')) renderSpecialsFull();
+  if (document.getElementById('view-specials').classList.contains('active')) renderSpecialsFull();
+  if (document.getElementById('view-calendar').classList.contains('active')) renderCalendar();
 }
 
-// recurrence -> array of YYYY-MM-DD occurrences within [winStart, winEnd]
 function occurrences(item, winStart, winEnd){
-  const out = []; if (!item.date) return out;
-  const rep = item.repeat || 'none';
-  const start = new Date(item.date + 'T12:00:00');
-  const winS = new Date(winStart + 'T12:00:00'), winE = new Date(winEnd + 'T12:00:00');
-  const until = item.repeatUntil ? new Date(item.repeatUntil + 'T12:00:00') : winE;
-  const hardEnd = until < winE ? until : winE;
-  if (rep === 'none'){ if (start >= winS && start <= winE) out.push(fmt(start)); return out; }
-  let d = new Date(start), i = 0;
-  while (d <= hardEnd && i < 600){
-    if (d >= winS) out.push(fmt(d));
-    if (rep === 'weekly') d.setDate(d.getDate() + 7);
-    else if (rep === 'biweekly') d.setDate(d.getDate() + 14);
-    else if (rep === 'monthly') d.setMonth(d.getMonth() + 1);
-    else break;
-    i++;
-  }
+  const out=[]; if(!item.date) return out;
+  const rep=item.repeat||'none';
+  const start=new Date(item.date+'T12:00:00');
+  const winS=new Date(winStart+'T12:00:00'), winE=new Date(winEnd+'T12:00:00');
+  const until=item.repeatUntil?new Date(item.repeatUntil+'T12:00:00'):winE;
+  const hardEnd=until<winE?until:winE;
+  if(rep==='none'){ if(start>=winS && start<=winE) out.push(fmt(start)); return out; }
+  let d=new Date(start), i=0;
+  while(d<=hardEnd && i<600){ if(d>=winS) out.push(fmt(d));
+    if(rep==='weekly') d.setDate(d.getDate()+7); else if(rep==='biweekly') d.setDate(d.getDate()+14); else if(rep==='monthly') d.setMonth(d.getMonth()+1); else break; i++; }
   return out;
 }
-function repeatLabel(rep){ return rep === 'weekly' ? 'Weekly' : rep === 'biweekly' ? 'Every 2 wks' : rep === 'monthly' ? 'Monthly' : ''; }
+function repeatLabel(r){ return r==='weekly'?'Weekly':r==='biweekly'?'Every 2 wks':r==='monthly'?'Monthly':''; }
+function currentWeek(){ const d=new Date(); d.setHours(0,0,0,0); const mon=new Date(d); mon.setDate(d.getDate()-((d.getDay()+6)%7)); const sun=new Date(mon); sun.setDate(mon.getDate()+6); return { start:fmt(mon), end:fmt(sun) }; }
 
-// NOTES -> tiles (title; click to reveal the full note)
+// NOTES -> home banner cards (title; tap to expand)
 function renderNotes(){
-  const grid = document.getElementById('notesGrid');
-  if (!grid) return;
-  if (!_notes.length){ grid.innerHTML = '<div class="note-empty">No notes posted.</div>'; return; }
-  grid.innerHTML = _notes.map(n => `<div class="note-tile${n.body?' clickable':''}"${n.body?` onclick="this.classList.toggle('open')"`:''}>
-    <div class="note-title">📌 ${esc(n.title)}${n.body?' <span class="tile-more">▾</span>':''}</div>
-    ${n.body ? `<div class="note-body">${esc(n.body)}</div>` : ''}
+  const grid=document.getElementById('notesGrid'); if(!grid) return;
+  if(!_notes.length){ grid.innerHTML=''; return; }
+  grid.innerHTML = _notes.map(n => `<div class="note-card${n.body?'':' nobody'}"${n.body?` onclick="this.classList.toggle('open')"`:''}>
+    <div class="nt">📌 ${esc(n.title)}${n.body?'<span class="chev">▾</span>':''}</div>
+    ${n.body?`<div class="nb">${esc(n.body)}</div>`:''}
   </div>`).join('');
 }
 
-// Specials shown this week (Mon–Sun): a continuous run (end_date) is ONE entry
-// with a date range; a recurring special is one entry per occurrence.
+// SPECIALS (week Mon–Sun): range special = one entry; recurring = per occurrence
 function weekSpecialEntries(){
-  const wk = currentWeek();
-  const entries = [];
-  _specials.forEach(s => {
-    const rep = s.repeat || 'none';
-    if (rep === 'none' && s.endDate && s.endDate > s.date) {
-      if (s.date <= wk.end && s.endDate >= wk.start) entries.push({ s, start:s.date, end:s.endDate, range:true });
-    } else {
-      occurrences(s, wk.start, wk.end).forEach(d => entries.push({ s, start:d, end:d, range:false }));
-    }
+  const wk=currentWeek(); const entries=[];
+  _specials.forEach(s=>{ const rep=s.repeat||'none';
+    if(rep==='none' && s.endDate && s.endDate>s.date){ if(s.date<=wk.end && s.endDate>=wk.start) entries.push({s,start:s.date,end:s.endDate,range:true}); }
+    else { occurrences(s, wk.start, wk.end).forEach(d=>entries.push({s,start:d,end:d,range:false})); }
   });
-  return entries.sort((a,b) => a.start.localeCompare(b.start) || (a.s.time||'').localeCompare(b.s.time||''));
+  return entries.sort((a,b)=>a.start.localeCompare(b.start)||(a.s.time||'').localeCompare(b.s.time||''));
 }
-function specialDayLabel(e){
-  const today = fmt(new Date());
-  if (e.range) {
-    const now = (today >= e.start && today <= e.end) ? '⭐ Now · ' : '';
-    return now + fmtDisplay(e.start) + ' – ' + fmtDisplay(e.end);
-  }
-  return e.start === today ? '⭐ Today' : fmtDisplay(e.start);
+function specialDayLabel(e){ const today=fmt(new Date());
+  if(e.range){ const now=(today>=e.start&&today<=e.end)?'⭐ Now · ':''; return now+fmtDisplay(e.start)+' – '+fmtDisplay(e.end); }
+  return e.start===today?'⭐ Today':fmtDisplay(e.start);
 }
-function specialActive(e){
-  const today = fmt(new Date());
-  return e.range ? (today >= e.start && today <= e.end) : (e.start === today);
-}
-
-// SPECIALS (dashboard summary) -> minimal tiles, click opens the Specials tab
-function renderSpecials(){
-  const grid = document.getElementById('specialsGrid');
-  if (!grid) return;
-  const entries = weekSpecialEntries();
-  if (!entries.length){ grid.innerHTML = '<div class="note-empty">No specials this week.</div>'; return; }
-  grid.innerHTML = entries.map(e => {
-    const s = e.s;
-    const timeStr = s.time ? ' · ' + fmtTime(s.time) : '';
-    return `<div class="special-tile clickable${specialActive(e)?' today':''}" onclick="openOnTab('specials','spec-${s.id}-${e.start}')">
-      <div class="special-day">${specialDayLabel(e)}${timeStr}</div>
-      <div class="special-title">🍽️ ${esc(s.title)}</div>
-    </div>`;
-  }).join('');
-}
-
-// SPECIALS (full tab) -> this week's cards with full details
 function renderSpecialsFull(){
-  const grid = document.getElementById('specialsFullGrid');
-  if (!grid) return;
-  const entries = weekSpecialEntries();
-  if (!entries.length){ grid.innerHTML = '<div class="no-events"><div class="icon">🍽️</div><p>No specials this week.</p></div>'; return; }
-  grid.innerHTML = entries.map(e => {
-    const s = e.s;
-    const rl = repeatLabel(s.repeat);
-    const timeStr = s.time ? fmtTime(s.time) : '';
-    return `<div class="event-card special-card" id="spec-${s.id}-${e.start}">
-      <div class="ev-date-badge">${specialDayLabel(e)}${timeStr?' · '+timeStr:''}${rl?` · ↻ ${rl}`:''}</div>
-      <div class="ev-name">🍽️ ${esc(s.title)}</div>
-      ${s.body ? `<div class="ev-desc">${esc(s.body)}</div>` : ''}
-    </div>`;
-  }).join('');
+  const grid=document.getElementById('specialsFullGrid'); if(!grid) return;
+  const entries=weekSpecialEntries();
+  if(!entries.length){ grid.innerHTML='<div class="empty"><span class="ic">🍽️</span>No specials this week.</div>'; return; }
+  grid.innerHTML = entries.map(e=>{ const s=e.s; const rl=repeatLabel(s.repeat); const tm=s.time?fmtTime(s.time):'';
+    return `<div class="card special" id="spec-${s.id}-${e.start}">
+      <div class="c-day">${specialDayLabel(e)}${tm?' · '+tm:''}${rl?' · ↻ '+rl:''}</div>
+      <div class="c-title">${esc(s.title)}</div>
+      ${s.body?`<div class="c-body">${esc(s.body)}</div>`:''}
+    </div>`; }).join('');
 }
 
-// EVENTS -> expand recurrence
-function eventInstances(winStart, winEnd){
-  const out = [];
-  _events.forEach(ev => {
-    occurrences(ev, winStart, winEnd).forEach(d => out.push(Object.assign({}, ev, { date:d, endDate:'', _repeat:ev.repeat })));
-  });
-  return out.sort((a,b) => (a.date||'').localeCompare(b.date||'') || (a.time||'').localeCompare(b.time||''));
-}
+// EVENTS
+function eventInstances(winStart, winEnd){ const out=[]; _events.forEach(ev=>{ occurrences(ev, winStart, winEnd).forEach(d=>out.push(Object.assign({},ev,{date:d,_repeat:ev.repeat}))); }); return out.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.time||'').localeCompare(b.time||'')); }
 function renderEventCards(){
-  const grid = document.getElementById('eventsGrid');
-  const today = fmt(new Date());
-  const horizon = fmt(new Date(Date.now() + 150*864e5));
-  const singles = _events.filter(e => (e.repeat||'none') === 'none');
-  const recurring = [];
-  _events.filter(e => (e.repeat||'none') !== 'none').forEach(ev => {
-    occurrences(ev, today, horizon).forEach(d => recurring.push(Object.assign({}, ev, { date:d, endDate:'', _repeat:ev.repeat })));
-  });
-  const all = singles.concat(recurring).sort((a,b) => (a.date||'').localeCompare(b.date||'') || (a.time||'').localeCompare(b.time||''));
-  const upcoming = all.filter(e => e.date >= today);
-  document.getElementById('dash-event-count').textContent = upcoming.length;
-  document.getElementById('dash-next-event').textContent = upcoming.length ? 'next: ' + fmtDisplay(upcoming[0].date) : 'no upcoming events';
-  if (!all.length){ grid.innerHTML = '<div class="no-events"><div class="icon">🎉</div><p>No events yet.</p></div>'; return; }
-  grid.innerHTML = all.map(ev => {
-    const isPast = ev.date < today;
-    const timeStr = ev.time ? ' · ' + fmtTime(ev.time) : '';
-    const rangeStr = (ev.endDate && ev.endDate !== ev.date) ? fmtDisplay(ev.date) + ' – ' + fmtDisplay(ev.endDate) : fmtDisplay(ev.date);
-    const rl = (ev._repeat && ev._repeat !== 'none') ? ` <span class="rep-badge">↻ ${repeatLabel(ev._repeat)}</span>` : '';
-    return `<div class="event-card${isPast?' past':''}" id="ev-${ev.id}-${ev.date}">
-      <div class="ev-date-badge">${isPast?'Past · ':''}${rangeStr}${timeStr}</div>
-      <div class="ev-name">${esc(ev.name)}${rl}</div>
-      ${ev.desc ? `<div class="ev-desc">${esc(ev.desc)}</div>` : ''}
-    </div>`;
-  }).join('');
-}
-function renderDashEvents(){
-  const list = document.getElementById('dash-events-list');
-  const today = fmt(new Date());
-  const horizon = fmt(new Date(Date.now() + 150*864e5));
-  const inst = eventInstances(today, horizon).slice(0, 6);
-  if (!inst.length){ list.innerHTML = '<li class="empty-state-small">No upcoming events.</li>'; return; }
-  list.innerHTML = inst.map(ev => {
-    const timeStr = ev.time ? ' · ' + fmtTime(ev.time) : '';
-    return `<li class="event-item-dash clickable" onclick="openOnTab('events','ev-${ev.id}-${ev.date}')"><div class="ev-title">${esc(ev.name)}</div><div class="ev-meta">${fmtDisplay(ev.date)}${timeStr}</div></li>`;
-  }).join('');
+  const grid=document.getElementById('eventsGrid'); if(!grid) return;
+  const today=fmt(new Date()); const horizon=fmt(new Date(Date.now()+150*864e5));
+  const singles=_events.filter(e=>(e.repeat||'none')==='none');
+  const recurring=[]; _events.filter(e=>(e.repeat||'none')!=='none').forEach(ev=>{ occurrences(ev,today,horizon).forEach(d=>recurring.push(Object.assign({},ev,{date:d,endDate:'',_repeat:ev.repeat}))); });
+  const all=singles.concat(recurring).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.time||'').localeCompare(b.time||''));
+  if(!all.length){ grid.innerHTML='<div class="empty"><span class="ic">🎉</span>No events yet.</div>'; return; }
+  grid.innerHTML = all.map(ev=>{ const isPast=ev.date<today; const tm=ev.time?' · '+fmtTime(ev.time):'';
+    const range=(ev.endDate&&ev.endDate!==ev.date)?fmtDisplay(ev.date)+' – '+fmtDisplay(ev.endDate):fmtDisplay(ev.date);
+    const rl=(ev._repeat&&ev._repeat!=='none')?' · ↻ '+repeatLabel(ev._repeat):'';
+    return `<div class="card event${isPast?' past':''}" id="ev-${ev.id}-${ev.date}">
+      <div class="c-day">${isPast?'Past · ':''}${range}${tm}${rl}</div>
+      <div class="c-title">${esc(ev.name)}</div>
+      ${ev.desc?`<div class="c-body">${esc(ev.desc)}</div>`:''}
+    </div>`; }).join('');
 }
 
-// ─────────────────────────────────────────
-//  SCHEDULES
-// ─────────────────────────────────────────
-let _schedules = [];
-function mapSched(r) { return { id:r.id, name:r.name, date:r.date, endDate:r.end_date||'', note:r.note||'' }; }
-async function loadSchedules() {
-  try {
-    const { data } = await sb.from('portal_schedules').select('*').order('date');
-    _schedules = (data||[]).map(mapSched);
-  } catch(e) { _schedules = []; }
+// ═══ SCHEDULES ═══
+let _schedules=[];
+function mapSched(r){ return { id:r.id, name:r.name, date:r.date, endDate:r.end_date||'', note:r.note||'' }; }
+async function loadSchedules(){
+  try{ const { data } = await sb.from('portal_schedules').select('*').order('date'); _schedules=(data||[]).map(mapSched); }catch(e){ _schedules=[]; }
   renderSchedCards();
-  const cal = document.getElementById('panel-calendar');
-  if (cal && cal.classList.contains('active')) renderCalendar();
+  if (document.getElementById('view-calendar').classList.contains('active')) renderCalendar();
 }
-// Approved time-off rendered as schedule items (kept in sync from portal_time_off).
-function approvedTimeOff() {
-  return (_timeOffRequests || [])
-    .filter(r => r.status === 'approved')
-    .map(r => ({ id:r.id, name:r.name, date:r.startDate, endDate:r.endDate||'', note:r.reason||'', timeoff:true }));
-}
-function combinedSchedule() {
-  const sched = _schedules.map(s => Object.assign({ timeoff:false }, s));
-  return sched.concat(approvedTimeOff()).sort((a,b) => (a.date||'').localeCompare(b.date||''));
-}
-function renderSchedCards() {
-  const grid = document.getElementById('schedGrid');
-  if (!grid) return;
-  const today = fmt(new Date());
-  const items = combinedSchedule();
-  if (!items.length) {
-    grid.innerHTML = '<div class="no-events"><div class="icon">📆</div><p>No schedules yet. Add one, or approve a time-off request below.</p></div>';
-    renderDashSchedules(); return;
-  }
-  grid.innerHTML = items.map(s => {
-    const isPast = (s.endDate || s.date) < today;
-    const rangeStr = (s.endDate && s.endDate !== s.date) ? fmtDisplay(s.date) + ' – ' + fmtDisplay(s.endDate) : fmtDisplay(s.date);
-    if (s.timeoff) {
-      return `<div class="event-card timeoff${isPast?' past':''}">
-        <span class="ev-tag">🌴 Time Off</span>
-        <div class="ev-date-badge">${isPast?'Past · ':''}${rangeStr}</div>
-        <div class="ev-name">${esc(s.name)}</div>
-        ${s.note ? `<div class="ev-desc">"${esc(s.note)}"</div>` : ''}
-      </div>`;
-    }
-    return `<div class="event-card${isPast?' past':''}">
-      <div class="ev-date-badge">${isPast?'Past · ':''}${rangeStr}</div>
-      <div class="ev-name">${esc(s.name)}</div>
-      ${s.note ? `<div class="ev-desc">${esc(s.note)}</div>` : ''}
-    </div>`;
-  }).join('');
-  renderDashSchedules();
-}
-function renderDashSchedules() {
-  const el = document.getElementById('dash-sched-list');
-  if (!el) return;
-  const today = new Date(); today.setHours(0,0,0,0);
-  const list = combinedSchedule().filter(s => {
-    const end = s.endDate || s.date;
-    return end && new Date(end + 'T00:00:00') >= today;
-  }).slice(0, 6);
-  if (!list.length) { el.innerHTML = '<li class="empty-state-small">No upcoming schedule.</li>'; return; }
-  el.innerHTML = list.map(s => {
-    const rangeStr = (s.endDate && s.endDate !== s.date) ? fmtDisplay(s.date) + ' – ' + fmtDisplay(s.endDate) : fmtDisplay(s.date);
-    const label = (s.timeoff ? '🌴 ' : '') + esc(s.name) + (s.timeoff ? ' — Time Off' : '');
-    return '<li class="event-item-dash"><div class="ev-title">' + label + '</div><div class="ev-meta">' + rangeStr + '</div></li>';
-  }).join('');
+function approvedTimeOff(){ return (_timeOff||[]).filter(r=>r.status==='approved').map(r=>({ id:r.id, name:r.name, date:r.startDate, endDate:r.endDate||'', note:r.reason||'', timeoff:true })); }
+function combinedSchedule(){ return _schedules.map(s=>Object.assign({timeoff:false},s)).concat(approvedTimeOff()).sort((a,b)=>(a.date||'').localeCompare(b.date||'')); }
+function renderSchedCards(){
+  const grid=document.getElementById('schedGrid'); if(!grid) return;
+  const today=fmt(new Date()); const items=combinedSchedule();
+  if(!items.length){ grid.innerHTML='<div class="empty"><span class="ic">📆</span>No schedules yet.</div>'; return; }
+  grid.innerHTML = items.map(s=>{ const isPast=(s.endDate||s.date)<today;
+    const range=(s.endDate&&s.endDate!==s.date)?fmtDisplay(s.date)+' – '+fmtDisplay(s.endDate):fmtDisplay(s.date);
+    if(s.timeoff){ return `<div class="card timeoff${isPast?' past':''}">
+      <div class="c-day">🌴 ${isPast?'Past · ':''}${range} · Time Off</div>
+      <div class="c-title">${esc(s.name)}</div>
+      ${s.note?`<div class="c-body">"${esc(s.note)}"</div>`:''}</div>`; }
+    return `<div class="card sched${isPast?' past':''}">
+      <div class="c-day">${isPast?'Past · ':''}${range}</div>
+      <div class="c-title">${esc(s.name)}</div>
+      ${s.note?`<div class="c-body">${esc(s.note)}</div>`:''}</div>`; }).join('');
 }
 
-// ─────────────────────────────────────────
-//  TIME-OFF REQUESTS
-// ─────────────────────────────────────────
-let _timeOffRequests = [];
-function mapTimeOff(r) {
-  return { id:r.id, name:r.name, startDate:r.start_date, endDate:r.end_date||'', reason:r.reason||'', status:r.status||'pending', submittedAt:r.submitted_at };
+// ═══ TIME OFF ═══
+let _timeOff=[];
+function mapTimeOff(r){ return { id:r.id, name:r.name, startDate:r.start_date, endDate:r.end_date||'', reason:r.reason||'', status:r.status||'pending', submittedAt:r.submitted_at }; }
+async function loadTimeOff(){
+  try{ const { data } = await sb.from('portal_time_off').select('*').order('start_date'); _timeOff=(data||[]).map(mapTimeOff); }catch(e){ _timeOff=[]; }
+  renderTimeOffList(); renderSchedCards();
+  if (document.getElementById('view-calendar').classList.contains('active')) renderCalendar();
 }
-async function loadTimeOff() {
-  try {
-    const { data } = await sb.from('portal_time_off').select('*').order('start_date');
-    _timeOffRequests = (data||[]).map(mapTimeOff);
-  } catch(e) { _timeOffRequests = []; }
-  renderTimeOffList();
-  renderSchedCards();
-  const calPanel = document.getElementById('panel-calendar');
-  if (calPanel && calPanel.classList.contains('active')) renderCalendar();
-}
-async function submitTimeOff() {
-  const name = (document.getElementById('toName').value || '').trim();
-  const startDate = document.getElementById('toStart').value;
-  const endDate = document.getElementById('toEnd').value;
-  const reason = (document.getElementById('toReason').value || '').trim();
-  if (!name) { showToMsg('❌ Please enter your name.', 'error'); return; }
-  if (!startDate) { showToMsg('❌ Please select a start date.', 'error'); return; }
-  try {
-    const { error } = await sb.from('portal_time_off').insert({
-      name, start_date: startDate, end_date: endDate || null, reason
-    });
-    if (error) throw error;
+async function submitTimeOff(){
+  const name=(document.getElementById('toName').value||'').trim();
+  const startDate=document.getElementById('toStart').value;
+  const endDate=document.getElementById('toEnd').value;
+  const reason=(document.getElementById('toReason').value||'').trim();
+  if(!name){ showToMsg('Please enter your name.', false); return; }
+  if(!startDate){ showToMsg('Please pick a start date.', false); return; }
+  try{
+    const { error } = await sb.from('portal_time_off').insert({ name, start_date:startDate, end_date:endDate||null, reason });
+    if(error) throw error;
     await loadTimeOff();
-    document.getElementById('toName').value = '';
-    document.getElementById('toEnd').value = '';
-    document.getElementById('toReason').value = '';
-    showToMsg('✅ Request submitted!', 'ok');
-  } catch(e) { showToMsg('❌ Failed to submit.', 'error'); }
+    document.getElementById('toName').value=''; document.getElementById('toEnd').value=''; document.getElementById('toReason').value='';
+    showToMsg('✅ Request submitted!', true);
+  }catch(e){ showToMsg('Could not submit. Try again.', false); }
 }
-function showToMsg(text, type) {
-  const msg = document.getElementById('toMsg');
-  msg.textContent = text;
-  msg.style.color = type === 'ok' ? '#065f46' : '#A52B1E';
-  msg.style.display = 'inline';
-  setTimeout(() => { msg.style.display = 'none'; }, 4000);
-}
-function renderTimeOffList() {
-  const el = document.getElementById('toList');
-  if (!el) return;
-  if (!_timeOffRequests.length) { el.innerHTML = '<div class="to-empty">No requests yet.</div>'; return; }
-  el.innerHTML = _timeOffRequests.map(r => {
-    const rangeStr = (r.endDate && r.endDate !== r.startDate)
-      ? fmtDisplay(r.startDate) + ' – ' + fmtDisplay(r.endDate) : fmtDisplay(r.startDate);
-    const submitted = r.submittedAt ? new Date(r.submittedAt).toLocaleDateString('en-US', { month:'short', day:'numeric' }) : '';
-    const statusLabel = r.status.charAt(0).toUpperCase() + r.status.slice(1);
-    return `<div class="to-req-item">
-      <div class="to-req-info">
-        <div class="to-req-name">${esc(r.name)}</div>
-        <div class="to-req-meta">📅 ${rangeStr}</div>
-        ${r.reason ? `<div class="to-req-reason">"${esc(r.reason)}"</div>` : ''}
-        <div class="to-req-submitted">${submitted}</div>
-      </div>
-      <div class="to-req-right">
-        <span class="badge badge-${r.status}">${statusLabel}</span>
-      </div>
-    </div>`;
-  }).join('');
+function showToMsg(t, ok){ const m=document.getElementById('toMsg'); m.textContent=t; m.style.color=ok?'#1f9c6b':'#c0392b'; m.style.display='block'; setTimeout(()=>m.style.display='none',4000); }
+function renderTimeOffList(){
+  const el=document.getElementById('toList'); if(!el) return;
+  if(!_timeOff.length){ el.innerHTML='<div class="empty">No requests yet.</div>'; return; }
+  el.innerHTML = _timeOff.map(r=>{ const range=(r.endDate&&r.endDate!==r.startDate)?fmtDisplay(r.startDate)+' – '+fmtDisplay(r.endDate):fmtDisplay(r.startDate);
+    const lbl=r.status.charAt(0).toUpperCase()+r.status.slice(1);
+    return `<div class="req-item"><div class="req-info">
+      <div class="req-name">${esc(r.name)}</div>
+      <div class="req-meta">📅 ${range}</div>
+      ${r.reason?`<div class="req-reason">"${esc(r.reason)}"</div>`:''}
+    </div><span class="st-badge st-${r.status}">${lbl}</span></div>`; }).join('');
 }
 
-// ─────────────────────────────────────────
-//  RESERVATIONS (Wix via edge function)
-// ─────────────────────────────────────────
-let _allReservations = [];
-async function loadReservations() {
-  const dateFrom = document.getElementById('dateFrom').value;
-  const dateTo   = document.getElementById('dateTo').value;
-  const status   = document.getElementById('statusFilter').value;
-  const limit    = document.getElementById('limitSelect').value;
-  showLoading();
-  try {
-    const params = new URLSearchParams();
-    params.set('paging.limit', limit);
-    params.set('sort.fieldName', 'details.startDate');
-    params.set('sort.order', 'ASC');
-    if (dateFrom) params.set('startDateFrom', new Date(dateFrom + 'T00:00:00').toISOString());
-    if (dateTo)   params.set('startDateTo',   new Date(dateTo   + 'T23:59:59').toISOString());
-    if (status)   params.set('status', status);
-    const response = await wixFetch(params);
-    if (!response.ok) throw new Error('HTTP ' + response.status + ' — ' + await response.text());
-    const data = await response.json();
-    _allReservations = data.reservations || [];
-    renderTable(_allReservations);
-  } catch (err) {
-    showError(err.message);
-  }
+// ═══ RESERVATIONS (Memphis, via edge function) ═══
+let _resLoaded=false;
+async function loadReservations(){
+  const state=document.getElementById('resState'), list=document.getElementById('resList'), stats=document.getElementById('resStats');
+  state.style.display='block'; state.innerHTML='<span class="spin"></span> Loading reservations…'; list.innerHTML=''; stats.textContent='';
+  try{
+    const dateFrom=document.getElementById('dateFrom').value, dateTo=document.getElementById('dateTo').value, status=document.getElementById('statusFilter').value;
+    const p=new URLSearchParams(); p.set('paging.limit','100');
+    if(dateFrom) p.set('startDateFrom', new Date(dateFrom+'T00:00:00').toISOString());
+    if(dateTo) p.set('startDateTo', new Date(dateTo+'T23:59:59').toISOString());
+    if(status) p.set('status', status);
+    const res=await wixFetch(p);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    const recs=(data.reservations||[]).sort((a,b)=>((a.details&&a.details.startDate)||'').localeCompare((b.details&&b.details.startDate)||''));
+    renderReservations(recs);
+  }catch(err){ state.style.display='block'; state.innerHTML='⚠️ Could not load reservations.'; }
+}
+function renderReservations(recs){
+  const state=document.getElementById('resState'), list=document.getElementById('resList'), stats=document.getElementById('resStats');
+  if(!recs.length){ state.style.display='block'; state.innerHTML='<span class="ic">🗓️</span>No reservations in this range.'; list.innerHTML=''; stats.textContent=''; return; }
+  state.style.display='none';
+  let guests=0;
+  const cancel=['CANCELLED','DECLINED','NO_SHOW'];
+  list.innerHTML = recs.map(r=>{
+    const det=r.details||{}, who=r.reservee||{};
+    const dt=det.startDate?new Date(det.startDate):null;
+    const tm=dt?dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):'—';
+    const dd=dt?dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+    const name=[who.firstName,who.lastName].filter(Boolean).join(' ')||'Guest';
+    const party=det.partySize||'?'; guests+=det.partySize||0;
+    const st=r.status||'UNKNOWN'; const isCancel=cancel.includes(st);
+    const bcls=isCancel?'b-cancel':(st==='RESERVED'||st==='SEATED'||st==='FINISHED'?'b-ok':'b-other');
+    return `<div class="res-card${isCancel?' cancel':''}">
+      <div class="res-when"><div class="t">${esc(tm)}</div><div class="d">${esc(dd)}</div></div>
+      <div class="res-main"><div class="res-name">${esc(name)}</div><div class="res-meta">👥 Party of ${esc(party)}</div></div>
+      <span class="res-badge ${bcls}">${st.replace(/_/g,' ')}</span>
+    </div>`; }).join('');
+  stats.textContent = recs.length+' reservation'+(recs.length!==1?'s':'')+' · '+guests+' guests';
 }
 
-// ─────────────────────────────────────────
-//  DASHBOARD
-// ─────────────────────────────────────────
-async function loadDashboard() {
-  const today = new Date();
-  const todayStr = fmt(today);
-  try {
-    const p1 = new URLSearchParams();
-    p1.set('paging.limit','100');
-    p1.set('startDateFrom', new Date(todayStr + 'T00:00:00').toISOString());
-    p1.set('startDateTo',   new Date(todayStr + 'T23:59:59').toISOString());
-    const r1 = await wixFetch(p1);
-    if (r1.ok) {
-      const d1 = await r1.json();
-      const recs = d1.reservations || [];
-      const guests = recs.reduce((s,r) => s + ((r.details && r.details.partySize)||0), 0);
-      document.getElementById('dash-today-count').textContent = recs.length;
-      document.getElementById('dash-today-guests').textContent = guests + ' guest' + (guests!==1?'s':'');
-      renderTodayList(recs);
-    }
-  } catch(e) {}
+// ═══ CALENDAR ═══
+let _calYear=new Date().getFullYear(), _calMonth=new Date().getMonth(), _calRes={};
+async function loadCalMonth(y,m){
+  try{
+    const start=new Date(y,m,1), end=new Date(y,m+1,0,23,59,59);
+    const p=new URLSearchParams(); p.set('paging.limit','100'); p.set('startDateFrom',start.toISOString()); p.set('startDateTo',end.toISOString());
+    const res=await wixFetch(p); if(!res.ok){ _calRes={}; return; }
+    const data=await res.json(); _calRes={};
+    (data.reservations||[]).forEach(r=>{ if(!r.details||!r.details.startDate) return; const d=fmt(new Date(r.details.startDate)); (_calRes[d]=_calRes[d]||[]).push({ status:r.status||'UNKNOWN' }); });
+  }catch(e){ _calRes={}; }
 }
-function renderTodayList(reservations) {
-  const list = document.getElementById('dash-today-list');
-  if (!reservations.length) { list.innerHTML = '<li class="empty-state-small">No reservations today.</li>'; return; }
-  list.innerHTML = reservations.map(r => {
-    const details  = r.details  || {};
-    const reservee = r.reservee || {};
-    const startDt  = details.startDate ? new Date(details.startDate) : null;
-    const timeStr  = startDt ? startDt.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' }) : '—';
-    const name     = [reservee.firstName, reservee.lastName].filter(Boolean).join(' ') || 'Guest';
-    return `<li class="today-res-item">
-      <span class="today-res-time">${esc(timeStr)}</span>
-      <span class="today-res-name">${esc(name)}</span>
-      <span class="today-res-party">👥 ${details.partySize||'?'}</span>
-    </li>`;
-  }).join('');
+async function renderCalendar(){
+  const y=_calYear, m=_calMonth;
+  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('calMonthLabel').textContent=months[m]+' '+y;
+  await loadCalMonth(y,m);
+  const mS=fmt(new Date(y,m,1)), mE=fmt(new Date(y,m+1,0));
+  const evBy={}; _events.forEach(ev=>occurrences(ev,mS,mE).forEach(d=>{(evBy[d]=evBy[d]||0); evBy[d]++;}));
+  const spBy={}; _specials.forEach(s=>{ if((s.repeat||'none')==='none'&&s.endDate&&s.endDate>s.date){ let d=new Date((s.date<mS?mS:s.date)+'T00:00:00'); const e=new Date((s.endDate>mE?mE:s.endDate)+'T00:00:00'); for(;d<=e;d.setDate(d.getDate()+1)){const k=fmt(d); spBy[k]=(spBy[k]||0)+1;} } else { occurrences(s,mS,mE).forEach(d=>spBy[d]=(spBy[d]||0)+1); } });
+  const schBy={}; _schedules.forEach(s=>{ if(!s.date) return; let d=new Date(s.date+'T00:00:00'); const e=new Date((s.endDate||s.date)+'T00:00:00'); for(;d<=e;d.setDate(d.getDate()+1)){const k=fmt(d); if(k>=mS&&k<=mE) schBy[k]=(schBy[k]||0)+1;} });
+  const offBy={}; approvedTimeOff().forEach(r=>{ if(!r.date) return; let d=new Date(r.date+'T00:00:00'); const e=new Date((r.endDate||r.date)+'T00:00:00'); for(;d<=e;d.setDate(d.getDate()+1)){const k=fmt(d); if(k>=mS&&k<=mE) offBy[k]=(offBy[k]||0)+1;} });
+  const today=fmt(new Date()), first=new Date(y,m,1).getDay(), dim=new Date(y,m+1,0).getDate(), prev=new Date(y,m,0).getDate();
+  let html='', n=0;
+  for(let i=first-1;i>=0;i--){ html+=cell(fmt(new Date(y,m-1,prev-i)),prev-i,true,today,evBy,spBy,schBy,offBy); n++; }
+  for(let d=1;d<=dim;d++){ html+=cell(fmt(new Date(y,m,d)),d,false,today,evBy,spBy,schBy,offBy); n++; }
+  let tr=1; while(n%7!==0){ html+=cell(fmt(new Date(y,m+1,tr)),tr,true,today,evBy,spBy,schBy,offBy); tr++; n++; }
+  document.getElementById('calBody').innerHTML=html;
 }
-
-// ─────────────────────────────────────────
-//  CALENDAR
-// ─────────────────────────────────────────
-let _calYear = new Date().getFullYear();
-let _calMonth = new Date().getMonth();
-let _calReservations = {};
-async function loadCalendarMonth(year, month) {
-  try {
-    const start = new Date(year, month, 1);
-    const end   = new Date(year, month + 1, 0, 23, 59, 59);
-    const params = new URLSearchParams();
-    params.set('paging.limit','500');
-    params.set('startDateFrom', start.toISOString());
-    params.set('startDateTo',   end.toISOString());
-    const res = await wixFetch(params);
-    if (!res.ok) { _calReservations = {}; return; }
-    const data = await res.json();
-    _calReservations = {};
-    (data.reservations||[]).forEach(r => {
-      if (!r.details || !r.details.startDate) return;
-      const dt = new Date(r.details.startDate);
-      const d = fmt(dt);
-      const reservee = r.reservee || {};
-      const name = [reservee.firstName, reservee.lastName].filter(Boolean).join(' ').trim() || 'Guest';
-      const party = r.details.partySize || '?';
-      const time = dt.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-      (_calReservations[d] = _calReservations[d] || []).push({ name, party, time, status: r.status || 'UNKNOWN', t: dt.getTime() });
-    });
-    Object.values(_calReservations).forEach(arr => arr.sort((a,b) => a.t - b.t));
-  } catch(e) { _calReservations = {}; }
+function cell(dateStr,num,other,today,evBy,spBy,schBy,offBy){
+  let cls='cal-day'; if(other) cls+=' other'; if(dateStr===today) cls+=' today';
+  const numEl=`<div class="cal-daynum">${num}</div>`;
+  let dots='';
+  const res=_calRes[dateStr]||[]; const can=['CANCELLED','DECLINED','NO_SHOW'];
+  const okRes=res.filter(r=>!can.includes(r.status)).length, canRes=res.filter(r=>can.includes(r.status)).length;
+  if(okRes) dots+='<div class="cal-dot cd-res"></div>';
+  if(canRes) dots+='<div class="cal-dot cd-cancel"></div>';
+  if(evBy[dateStr]) dots+='<div class="cal-dot cd-event"></div>';
+  if(spBy[dateStr]) dots+='<div class="cal-dot cd-special"></div>';
+  if(schBy[dateStr]) dots+='<div class="cal-dot cd-sched"></div>';
+  if(offBy[dateStr]) dots+='<div class="cal-dot cd-off"></div>';
+  return `<div class="${cls}">${numEl}${dots}</div>`;
 }
-async function renderCalendar() {
-  const year = _calYear, month = _calMonth;
-  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  document.getElementById('calMonthLabel').textContent = months[month] + ' ' + year;
-  await loadCalendarMonth(year, month);
-  const monthStartStr = fmt(new Date(year, month, 1));
-  const monthEndStr = fmt(new Date(year, month + 1, 0));
-  const evByDate = {};
-  _events.forEach(ev => {
-    occurrences(ev, monthStartStr, monthEndStr).forEach(d => { (evByDate[d] = evByDate[d] || []).push(ev.name); });
-  });
-  // Approved time off — spread the name across every day in its range.
-  const toByDate = {};
-  approvedTimeOff().forEach(r => {
-    if (!r.date) return;
-    const start = new Date(r.date + 'T00:00:00');
-    const end = new Date((r.endDate || r.date) + 'T00:00:00');
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const key = fmt(d);
-      (toByDate[key] = toByDate[key] || []).push(r.name);
-    }
-  });
-  // Specials — recurrence expanded across the month.
-  const spByDate = {};
-  _specials.forEach(s => {
-    occurrences(s, monthStartStr, monthEndStr).forEach(d => { (spByDate[d] = spByDate[d] || []).push(s.title); });
-  });
-  // Schedules — spread across each schedule's date range.
-  const schByDate = {};
-  _schedules.forEach(s => {
-    if (!s.date) return;
-    const start = new Date(s.date + 'T00:00:00');
-    const end = new Date((s.endDate || s.date) + 'T00:00:00');
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const key = fmt(d);
-      if (key >= monthStartStr && key <= monthEndStr) (schByDate[key] = schByDate[key] || []).push(s.name);
-    }
-  });
-  const today = fmt(new Date());
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const prevDays = new Date(year, month, 0).getDate();
-  let html = '', dayCount = 0;
-  for (let i = firstDay - 1; i >= 0; i--) {
-    const d = fmt(new Date(year, month - 1, prevDays - i));
-    html += dayCell(d, prevDays - i, true, today, _calReservations, evByDate, toByDate, spByDate, schByDate); dayCount++;
-  }
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = fmt(new Date(year, month, d));
-    html += dayCell(dateStr, d, false, today, _calReservations, evByDate, toByDate, spByDate, schByDate); dayCount++;
-  }
-  let trailing = 1;
-  while (dayCount % 7 !== 0) {
-    const d = fmt(new Date(year, month + 1, trailing));
-    html += dayCell(d, trailing, true, today, _calReservations, evByDate, toByDate, spByDate, schByDate); trailing++; dayCount++;
-  }
-  document.getElementById('calBody').innerHTML = html;
-}
-function dayCell(dateStr, dayNum, otherMonth, today, resByDate, evByDate, toByDate, spByDate, schByDate) {
-  const isToday = dateStr === today;
-  let cls = 'cal-day';
-  if (otherMonth) cls += ' other-month';
-  if (isToday) cls += ' today';
-  const numEl = isToday ? `<div class="cal-day-num"><span>${dayNum}</span></div>` : `<div class="cal-day-num">${dayNum}</div>`;
-  let pills = '';
-  const cancelledSet = ['CANCELLED','DECLINED','NO_SHOW'];
-  const resv = resByDate[dateStr] || [];
-  resv.slice(0,4).forEach(r => {
-    const cls = cancelledSet.includes(r.status) ? 'reservation cancelled' : 'reservation';
-    const st = (r.status||'').replace(/_/g,' ').toLowerCase();
-    pills += `<div class="cal-pill ${cls}" title="${esc(r.time + ' · ' + r.name + ' · party of ' + r.party + ' · ' + st)}">${esc(r.time)} · ${esc(r.name)} · 👥${esc(r.party)}</div>`;
-  });
-  if (resv.length > 4) pills += `<div class="cal-more">+${resv.length-4} more reservations</div>`;
-  const evs = evByDate[dateStr] || [];
-  evs.slice(0,2).forEach(name => { pills += `<div class="cal-pill event">🎉 ${esc(name)}</div>`; });
-  if (evs.length > 2) pills += `<div class="cal-more">+${evs.length-2} more</div>`;
-  const sps = (spByDate && spByDate[dateStr]) || [];
-  sps.slice(0,2).forEach(name => { pills += `<div class="cal-pill special">🍷 ${esc(name)}</div>`; });
-  if (sps.length > 2) pills += `<div class="cal-more">+${sps.length-2} specials</div>`;
-  const schs = (schByDate && schByDate[dateStr]) || [];
-  schs.slice(0,2).forEach(name => { pills += `<div class="cal-pill schedule">📆 ${esc(name)}</div>`; });
-  if (schs.length > 2) pills += `<div class="cal-more">+${schs.length-2} shifts</div>`;
-  const offs = (toByDate && toByDate[dateStr]) || [];
-  offs.slice(0,2).forEach(name => { pills += `<div class="cal-pill timeoff">🌴 ${esc(name)}</div>`; });
-  if (offs.length > 2) pills += `<div class="cal-more">+${offs.length-2} off</div>`;
-  return `<div class="${cls}">${numEl}${pills}</div>`;
-}
-function calNav(dir) {
-  _calMonth += dir;
-  if (_calMonth > 11) { _calMonth = 0; _calYear++; }
-  if (_calMonth < 0)  { _calMonth = 11; _calYear--; }
-  renderCalendar();
-}
-function calGoToday() {
-  _calYear = new Date().getFullYear();
-  _calMonth = new Date().getMonth();
-  renderCalendar();
-}
-
-// ─────────────────────────────────────────
-//  RESERVATIONS TABLE
-// ─────────────────────────────────────────
-function renderTable(reservations) {
-  const tbody = document.getElementById('tableBody');
-  const table = document.getElementById('resTable');
-  tbody.innerHTML = '';
-  if (!reservations.length) { showState('🗓️', 'No reservations found for the selected filters.'); return; }
-  let totalGuests = 0;
-  reservations.forEach((r, i) => {
-    const details  = r.details  || {};
-    const reservee = r.reservee || {};
-    const startDt  = details.startDate ? new Date(details.startDate) : null;
-    const dateStr  = startDt ? startDt.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' }) : '—';
-    const timeStr  = startDt ? startDt.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' }) : '—';
-    const name     = [reservee.firstName, reservee.lastName].filter(Boolean).join(' ') || '—';
-    const status   = r.status || 'UNKNOWN';
-    totalGuests   += details.partySize || 0;
-    const tr = document.createElement('tr');
-    tr.innerHTML =
-      '<td class="row-num">' + (i+1) + '</td>' +
-      '<td><strong>' + esc(dateStr) + '</strong></td>' +
-      '<td>' + esc(timeStr) + '</td>' +
-      '<td>' + esc(name) + '</td>' +
-      '<td style="text-align:center;font-weight:600;">' + (details.partySize||'—') + '</td>' +
-      '<td><span class="badge badge-' + status + '">' + status.replace(/_/g,' ') + '</span></td>' +
-      '<td class="note-cell" title="' + esc(r.guestNote||'') + '">' + esc(r.guestNote||'') + '</td>';
-    tbody.appendChild(tr);
-  });
-  document.getElementById('stateBox').style.display = 'none';
-  table.style.display = 'table';
-  document.getElementById('statsBar').style.display  = 'flex';
-  document.getElementById('statsText').innerHTML     = '<strong>' + reservations.length + '</strong> reservation' + (reservations.length!==1?'s':'') + ' &nbsp;·&nbsp; <strong>' + totalGuests + '</strong> total guests';
-  document.getElementById('statsTime').textContent   = 'Last updated: ' + new Date().toLocaleTimeString();
-}
-function showLoading() {
-  document.getElementById('resTable').style.display = 'none';
-  document.getElementById('statsBar').style.display = 'none';
-  const box = document.getElementById('stateBox');
-  box.className = 'state-box';
-  box.innerHTML = '<div><span class="spinner"></span> Loading reservations…</div>';
-  box.style.display = 'block';
-}
-function showState(icon, msg) {
-  document.getElementById('resTable').style.display = 'none';
-  const box = document.getElementById('stateBox');
-  box.className = 'state-box';
-  box.innerHTML = '<div class="icon">' + icon + '</div><p>' + esc(msg) + '</p>';
-  box.style.display = 'block';
-}
-function showError(msg) {
-  document.getElementById('resTable').style.display = 'none';
-  document.getElementById('statsBar').style.display = 'none';
-  const box = document.getElementById('stateBox');
-  box.className = 'state-box error';
-  box.innerHTML = '<div class="icon">⚠️</div><p><strong>Failed to load reservations</strong><br><br>' + esc(msg) + '</p>';
-  box.style.display = 'block';
-}
+function calNav(dir){ _calMonth+=dir; if(_calMonth>11){_calMonth=0;_calYear++;} if(_calMonth<0){_calMonth=11;_calYear--;} renderCalendar(); }
+function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().getMonth(); renderCalendar(); }
 </script>
 </body>
 </html>
