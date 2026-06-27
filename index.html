@@ -48,21 +48,20 @@
     .note-card.open .nb{ display:block; }
     .notes-empty{ display:none; }
 
-    .tiles{ display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:14px 20px 4px; }
-    .tile{ background:var(--surface); border-radius:var(--r); box-shadow:var(--shadow); padding:18px 16px 16px; cursor:pointer; border:none; text-align:left; transition:transform .08s; min-height:118px; display:flex; flex-direction:column; gap:12px; }
+    .tiles{ display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:14px 20px 2px; }
+    .tile{ background:var(--surface); border-radius:14px; box-shadow:var(--shadow); padding:14px 15px; cursor:pointer; border:none; text-align:left; font-family:inherit; font-weight:700; font-size:0.96rem; letter-spacing:-0.2px; color:var(--ink); transition:transform .08s; }
     .tile:active{ transform:scale(0.97); }
-    .tile .ic{ width:46px; height:46px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:1.4rem; }
-    .tile .tl{ font-weight:700; font-size:1.02rem; letter-spacing:-0.2px; }
-    .tile .ts{ font-size:0.76rem; color:var(--sub); font-weight:500; margin-top:2px; }
-    .tile > div:last-child{ display:flex; flex-direction:column; gap:1px; }
-    .tile.full{ grid-column:1 / -1; flex-direction:row; align-items:center; min-height:0; padding:16px; gap:14px; }
-    .tile.full .tl{ font-size:1.0rem; }
-    .tile.soon{ opacity:0.85; }
-    .badge-soon{ margin-left:auto; font-size:0.66rem; font-weight:700; color:var(--gray-i); background:var(--gray); padding:4px 9px; border-radius:20px; }
-    .ic-lav{ background:var(--lav); color:var(--lav-i);} .ic-mint{ background:var(--mint); color:var(--mint-i);}
-    .ic-sky{ background:var(--sky); color:var(--sky-i);} .ic-peach{ background:var(--peach); color:var(--peach-i);}
-    .ic-pink{ background:var(--pink); color:var(--pink-i);} .ic-butter{ background:var(--butter); color:var(--butter-i);}
-    .ic-gray{ background:var(--gray); color:var(--gray-i);}
+    .tile.on{ box-shadow:0 0 0 2px var(--accent); }
+    .tile.full{ grid-column:1 / -1; display:flex; align-items:center; gap:10px; }
+    .badge-soon{ margin-left:auto; font-size:0.64rem; font-weight:700; color:var(--gray-i); background:var(--gray); padding:4px 9px; border-radius:20px; }
+    .home-preview{ margin:12px 20px 4px; background:var(--surface); border-radius:18px; box-shadow:var(--shadow); padding:14px 16px; }
+    .pv-head{ display:flex; align-items:center; margin-bottom:6px; }
+    .pv-title{ font-weight:800; font-size:0.95rem; }
+    .pv-all{ margin-left:auto; border:none; background:none; color:var(--accent); font-weight:700; font-size:0.82rem; cursor:pointer; font-family:inherit; }
+    .pv-row{ padding:9px 2px; border-top:1px solid var(--line); font-size:0.9rem; cursor:pointer; }
+    .pv-row:first-of-type{ border-top:none; }
+    .pv-day{ color:var(--accent); font-weight:700; font-size:0.72rem; text-transform:uppercase; margin-right:6px; }
+    .pv-empty{ color:var(--sub); font-size:0.86rem; padding:6px 2px; }
 
     /* section header */
     .sec-head{ position:sticky; top:0; z-index:20; background:var(--bg); display:flex; align-items:center; gap:12px; padding:16px 18px 10px; }
@@ -192,36 +191,15 @@
     <div class="notes-banner" id="notesGrid"></div>
 
     <div class="tiles">
-      <button class="tile" onclick="showView('specials')">
-        <div class="ic ic-mint">🍽️</div>
-        <div><div class="tl">Specials</div><div class="ts">This week's menu</div></div>
-      </button>
-      <button class="tile" onclick="showView('resys')">
-        <div class="ic ic-sky">📋</div>
-        <div><div class="tl">Resys</div><div class="ts">Reservations</div></div>
-      </button>
-      <button class="tile" onclick="showView('calendar')">
-        <div class="ic ic-lav">📅</div>
-        <div><div class="tl">Calendar</div><div class="ts">Everything dated</div></div>
-      </button>
-      <button class="tile" onclick="showView('schedule')">
-        <div class="ic ic-peach">📆</div>
-        <div><div class="tl">Schedule</div><div class="ts">Shifts &amp; time off</div></div>
-      </button>
-      <button class="tile" onclick="showView('events')">
-        <div class="ic ic-pink">🎉</div>
-        <div><div class="tl">Events</div><div class="ts">What's coming up</div></div>
-      </button>
-      <button class="tile" onclick="showView('requestoff')">
-        <div class="ic ic-butter">🌴</div>
-        <div><div class="tl">Request Off</div><div class="ts">Submit time off</div></div>
-      </button>
-      <button class="tile full soon" onclick="showView('onboarding')">
-        <div class="ic ic-gray">🎓</div>
-        <div class="tl">Onboarding</div>
-        <span class="badge-soon">Coming soon</span>
-      </button>
+      <button class="tile" id="tile-specials" onclick="tileTap('specials')">Specials</button>
+      <button class="tile" id="tile-resys" onclick="tileTap('resys')">Resys</button>
+      <button class="tile" id="tile-calendar" onclick="tileTap('calendar')">Calendar</button>
+      <button class="tile" id="tile-schedule" onclick="tileTap('schedule')">Schedule</button>
+      <button class="tile" id="tile-events" onclick="tileTap('events')">Events</button>
+      <button class="tile" id="tile-requestoff" onclick="tileTap('requestoff')">Request Off</button>
+      <button class="tile full" id="tile-onboarding" onclick="tileTap('onboarding')">Onboarding <span class="badge-soon">Coming soon</span></button>
     </div>
+    <div id="homePreview" class="home-preview" style="display:none;"></div>
   </div>
 
   <!-- ══ SPECIALS ══ -->
@@ -347,6 +325,7 @@ function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,
 
 // ── NAVIGATION ──
 function showView(name){
+  if (name === 'home') closePreview();
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   const el = document.getElementById('view-' + name);
   if (el) el.classList.add('active');
@@ -354,6 +333,56 @@ function showView(name){
   if (name === 'calendar') renderCalendar();
   if (name === 'specials') renderSpecialsFull();
   if (name === 'resys' && !_resLoaded){ _resLoaded = true; loadReservations(); }
+}
+
+// ── HOME TILE → inline preview (tap again opens the full section) ──
+let _openTile = null;
+function closePreview(){
+  _openTile = null;
+  const p = document.getElementById('homePreview'); if (p) p.style.display = 'none';
+  document.querySelectorAll('.tile').forEach(t => t.classList.remove('on'));
+}
+function tileTap(section){
+  if (_openTile === section){ showView(section); return; }   // second tap → full section
+  _openTile = section;
+  document.querySelectorAll('.tile').forEach(t => t.classList.remove('on'));
+  const tb = document.getElementById('tile-' + section); if (tb) tb.classList.add('on');
+  renderPreview(section);
+  const p = document.getElementById('homePreview'); p.style.display = 'block';
+  p.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+function pvHead(title, section){
+  return `<div class="pv-head"><span class="pv-title">${title}</span><button class="pv-all" onclick="showView('${section}')">View all →</button></div>`;
+}
+function renderPreview(section){
+  const p = document.getElementById('homePreview');
+  if (section === 'specials'){
+    const e = weekSpecialEntries();
+    p.innerHTML = pvHead('🍽️ Specials this week','specials') + (e.length
+      ? e.map(o => `<div class="pv-row" onclick="showView('specials')"><span class="pv-day">${specialDayLabel(o)}</span>${esc(o.s.title)}</div>`).join('')
+      : '<div class="pv-empty">No specials this week.</div>');
+  } else if (section === 'events'){
+    const today = fmt(new Date()), horizon = fmt(new Date(Date.now()+150*864e5));
+    const inst = eventInstances(today, horizon).slice(0,6);
+    p.innerHTML = pvHead('🎉 Upcoming events','events') + (inst.length
+      ? inst.map(ev => `<div class="pv-row" onclick="showView('events')"><span class="pv-day">${fmtDisplay(ev.date)}${ev.time?' · '+fmtTime(ev.time):''}</span>${esc(ev.name)}</div>`).join('')
+      : '<div class="pv-empty">No upcoming events.</div>');
+  } else if (section === 'schedule'){
+    const td = new Date(); td.setHours(0,0,0,0);
+    const up = combinedSchedule().filter(s => { const end = s.endDate||s.date; return end && new Date(end+'T00:00:00') >= td; }).slice(0,6);
+    p.innerHTML = pvHead('📆 Schedule','schedule') + (up.length
+      ? up.map(s => { const range = (s.endDate && s.endDate!==s.date) ? fmtDisplay(s.date)+' – '+fmtDisplay(s.endDate) : fmtDisplay(s.date);
+          return `<div class="pv-row" onclick="showView('schedule')"><span class="pv-day">${range}</span>${s.timeoff?'🌴 ':''}${esc(s.name)}${s.timeoff?' — Time Off':''}</div>`; }).join('')
+      : '<div class="pv-empty">Nothing scheduled.</div>');
+  } else if (section === 'resys'){
+    p.innerHTML = pvHead('📋 Reservations','resys') + '<div class="pv-empty">Tap “View all” to see Memphis reservations.</div>';
+  } else if (section === 'calendar'){
+    p.innerHTML = pvHead('📅 Calendar','calendar') + '<div class="pv-empty">Tap “View all” for the month view.</div>';
+  } else if (section === 'requestoff'){
+    p.innerHTML = pvHead('🌴 Request off','requestoff') + '<div class="pv-empty">Tap “View all” to submit a time-off request.</div>';
+  } else if (section === 'onboarding'){
+    p.innerHTML = pvHead('🎓 Onboarding','onboarding') + '<div class="pv-empty">Coming soon.</div>';
+  }
 }
 
 // ── CLOCK / GREETING ──
