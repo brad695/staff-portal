@@ -50,13 +50,13 @@
     .notes-empty{ display:none; }
 
     .tiles{ display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:14px 20px 2px; }
-    .tile{ background:var(--surface); border-radius:20px; box-shadow:var(--shadow); padding:16px 16px 18px; cursor:pointer; border:none; text-align:left; transition:transform .08s; display:flex; flex-direction:column; gap:13px; min-height:106px; }
+    .tile{ background:var(--surface); border-radius:20px; box-shadow:var(--shadow); padding:18px 16px; cursor:pointer; border:none; text-align:left; transition:transform .08s; display:flex; flex-direction:row; align-items:center; gap:14px; }
     .tile:active{ transform:scale(0.97); }
     .tile.on{ box-shadow:0 0 0 2px var(--accent), var(--shadow); }
-    .tile .ic{ width:46px; height:46px; border-radius:14px; display:flex; align-items:center; justify-content:center; }
-    .tile .ic i{ font-size:25px; line-height:1; }
-    .tile .tl{ font-weight:700; font-size:1.0rem; letter-spacing:-0.2px; color:var(--ink); }
-    .tile.full{ grid-column:1 / -1; flex-direction:row; align-items:center; min-height:0; padding:15px 16px; gap:13px; }
+    .tile .ic{ width:48px; height:48px; border-radius:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .tile .ic i{ font-size:26px; line-height:1; }
+    .tile .tl{ font-weight:700; font-size:1.18rem; letter-spacing:-0.3px; color:var(--ink); line-height:1.15; }
+    .tile.full{ grid-column:1 / -1; }
     .badge-soon{ margin-left:auto; font-size:0.64rem; font-weight:700; color:var(--gray-i); background:var(--gray); padding:5px 11px; border-radius:20px; }
     .ic-mint{ background:var(--mint); color:var(--mint-i);} .ic-sky{ background:var(--sky); color:var(--sky-i);}
     .ic-lav{ background:var(--lav); color:var(--lav-i);} .ic-peach{ background:var(--peach); color:var(--peach-i);}
