@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
   <style>
     :root{
       --bg:#f3f4f8; --surface:#ffffff; --ink:#1c1d22; --sub:#7b7e8a; --line:#ecedf2;
@@ -48,15 +49,24 @@
     .note-card.open .nb{ display:block; }
     .notes-empty{ display:none; }
 
-    .tiles{ display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:14px 20px 2px; }
-    .tile{ background:var(--surface); border-radius:14px; box-shadow:var(--shadow); padding:14px 15px; cursor:pointer; border:none; text-align:left; font-family:inherit; font-weight:700; font-size:0.96rem; letter-spacing:-0.2px; color:var(--ink); transition:transform .08s; }
+    .tiles{ display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:14px 20px 2px; }
+    .tile{ background:var(--surface); border-radius:20px; box-shadow:var(--shadow); padding:16px 16px 18px; cursor:pointer; border:none; text-align:left; transition:transform .08s; display:flex; flex-direction:column; gap:13px; min-height:106px; }
     .tile:active{ transform:scale(0.97); }
-    .tile.on{ box-shadow:0 0 0 2px var(--accent); }
-    .tile.full{ grid-column:1 / -1; display:flex; align-items:center; gap:10px; }
-    .badge-soon{ margin-left:auto; font-size:0.64rem; font-weight:700; color:var(--gray-i); background:var(--gray); padding:4px 9px; border-radius:20px; }
+    .tile.on{ box-shadow:0 0 0 2px var(--accent), var(--shadow); }
+    .tile .ic{ width:46px; height:46px; border-radius:14px; display:flex; align-items:center; justify-content:center; }
+    .tile .ic i{ font-size:25px; line-height:1; }
+    .tile .tl{ font-weight:700; font-size:1.0rem; letter-spacing:-0.2px; color:var(--ink); }
+    .tile.full{ grid-column:1 / -1; flex-direction:row; align-items:center; min-height:0; padding:15px 16px; gap:13px; }
+    .badge-soon{ margin-left:auto; font-size:0.64rem; font-weight:700; color:var(--gray-i); background:var(--gray); padding:5px 11px; border-radius:20px; }
+    .ic-mint{ background:var(--mint); color:var(--mint-i);} .ic-sky{ background:var(--sky); color:var(--sky-i);}
+    .ic-lav{ background:var(--lav); color:var(--lav-i);} .ic-peach{ background:var(--peach); color:var(--peach-i);}
+    .ic-pink{ background:var(--pink); color:var(--pink-i);} .ic-butter{ background:var(--butter); color:var(--butter-i);}
+    .ic-gray{ background:var(--gray); color:var(--gray-i);}
+    .icon-btn i{ font-size:20px; line-height:1; } .home-btn i{ font-size:26px; line-height:1; }
     .home-preview{ margin:12px 20px 4px; background:var(--surface); border-radius:18px; box-shadow:var(--shadow); padding:14px 16px; }
     .pv-head{ display:flex; align-items:center; margin-bottom:6px; }
     .pv-title{ font-weight:800; font-size:0.95rem; }
+    .pv-title i{ font-size:17px; vertical-align:-2px; margin-right:5px; color:var(--accent); }
     .pv-all{ margin-left:auto; border:none; background:none; color:var(--accent); font-weight:700; font-size:0.82rem; cursor:pointer; font-family:inherit; }
     .pv-row{ padding:9px 2px; border-top:1px solid var(--line); font-size:0.9rem; cursor:pointer; }
     .pv-row:first-of-type{ border-top:none; }
@@ -194,26 +204,26 @@
       <div class="loc">Memphis · Staff</div>
     </div>
     <div class="spacer"></div>
-    <a class="icon-btn" href="manager.html" title="Manager" aria-label="Manager">🔐</a>
+    <a class="icon-btn" href="manager.html" title="Manager" aria-label="Manager"><i class="ti ti-lock"></i></a>
   </div>
 
   <!-- ══ HOME ══ -->
   <div id="view-home" class="view active">
     <div class="home-head">
-      <h1 id="greeting">Hi, team 👋</h1>
+      <h1 id="greeting">Hi, team</h1>
       <div class="when" id="homeWhen"></div>
     </div>
 
     <div class="notes-banner" id="notesGrid"></div>
 
     <div class="tiles">
-      <button class="tile" id="tile-specials" onclick="tileTap('specials')">Specials</button>
-      <button class="tile" id="tile-resys" onclick="tileTap('resys')">Resys</button>
-      <button class="tile" id="tile-calendar" onclick="tileTap('calendar')">Calendar</button>
-      <button class="tile" id="tile-schedule" onclick="tileTap('schedule')">Schedule</button>
-      <button class="tile" id="tile-events" onclick="tileTap('events')">Events</button>
-      <button class="tile" id="tile-requestoff" onclick="tileTap('requestoff')">Request Off</button>
-      <button class="tile full" id="tile-onboarding" onclick="tileTap('onboarding')">Onboarding <span class="badge-soon">Coming soon</span></button>
+      <button class="tile" id="tile-specials" onclick="tileTap('specials')"><span class="ic ic-mint"><i class="ti ti-tools-kitchen-2"></i></span><span class="tl">Specials</span></button>
+      <button class="tile" id="tile-resys" onclick="tileTap('resys')"><span class="ic ic-sky"><i class="ti ti-clipboard-list"></i></span><span class="tl">Resys</span></button>
+      <button class="tile" id="tile-calendar" onclick="tileTap('calendar')"><span class="ic ic-lav"><i class="ti ti-calendar-month"></i></span><span class="tl">Calendar</span></button>
+      <button class="tile" id="tile-schedule" onclick="tileTap('schedule')"><span class="ic ic-peach"><i class="ti ti-clock-hour-4"></i></span><span class="tl">Schedule</span></button>
+      <button class="tile" id="tile-events" onclick="tileTap('events')"><span class="ic ic-pink"><i class="ti ti-confetti"></i></span><span class="tl">Events</span></button>
+      <button class="tile" id="tile-requestoff" onclick="tileTap('requestoff')"><span class="ic ic-butter"><i class="ti ti-beach"></i></span><span class="tl">Request Off</span></button>
+      <button class="tile full" id="tile-onboarding" onclick="tileTap('onboarding')"><span class="ic ic-gray"><i class="ti ti-user-plus"></i></span><span class="tl">Onboarding</span><span class="badge-soon">Coming soon</span></button>
     </div>
     <div id="homePreview" class="home-preview" style="display:none;"></div>
   </div>
@@ -289,7 +299,7 @@
   </div>
 
   <!-- BOTTOM BAR -->
-  <div class="botbar"><button class="home-btn" onclick="showView('home')" aria-label="Home">⌂</button></div>
+  <div class="botbar"><button class="home-btn" onclick="showView('home')" aria-label="Home"><i class="ti ti-home"></i></button></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -341,28 +351,28 @@ function renderPreview(section){
   const p = document.getElementById('homePreview');
   if (section === 'specials'){
     const e = weekSpecialEntries();
-    p.innerHTML = pvHead('🍽️ Specials this week','specials') + (e.length
+    p.innerHTML = pvHead('<i class="ti ti-tools-kitchen-2"></i> Specials this week','specials') + (e.length
       ? e.map(o => `<div class="pv-row" onclick="showView('specials')"><span class="pv-day">${specialDayLabel(o)}</span>${esc(o.s.title)}</div>`).join('')
       : '<div class="pv-empty">No specials this week.</div>');
   } else if (section === 'events'){
     const today = fmt(new Date()), horizon = fmt(new Date(Date.now()+150*864e5));
     const inst = eventInstances(today, horizon).slice(0,6);
-    p.innerHTML = pvHead('🎉 Upcoming events','events') + (inst.length
+    p.innerHTML = pvHead('<i class="ti ti-confetti"></i> Upcoming events','events') + (inst.length
       ? inst.map(ev => `<div class="pv-row" onclick="showView('events')"><span class="pv-day">${fmtDisplay(ev.date)}${ev.time?' · '+fmtTime(ev.time):''}</span>${esc(ev.name)}</div>`).join('')
       : '<div class="pv-empty">No upcoming events.</div>');
   } else if (section === 'schedule'){
     const td = new Date(); td.setHours(0,0,0,0);
     const up = combinedSchedule().filter(s => { const end = s.endDate||s.date; return end && new Date(end+'T00:00:00') >= td; }).slice(0,6);
-    p.innerHTML = pvHead('📆 Schedule','schedule') + (up.length
+    p.innerHTML = pvHead('<i class="ti ti-clock-hour-4"></i> Schedule','schedule') + (up.length
       ? up.map(s => { const range = (s.endDate && s.endDate!==s.date) ? fmtDisplay(s.date)+' – '+fmtDisplay(s.endDate) : fmtDisplay(s.date);
           return `<div class="pv-row" onclick="showView('schedule')"><span class="pv-day">${range}</span>${s.timeoff?'🌴 ':''}${esc(s.name)}${s.timeoff?' — Time Off':''}</div>`; }).join('')
       : '<div class="pv-empty">Nothing scheduled.</div>');
   } else if (section === 'resys'){
-    p.innerHTML = pvHead('📋 Reservations','resys') + '<div class="pv-empty">Tap “View all” to see Memphis reservations.</div>';
+    p.innerHTML = pvHead('<i class="ti ti-clipboard-list"></i> Reservations','resys') + '<div class="pv-empty">Tap “View all” to see Memphis reservations.</div>';
   } else if (section === 'calendar'){
     p.innerHTML = pvHead('📅 Calendar','calendar') + '<div class="pv-empty">Tap “View all” for the month view.</div>';
   } else if (section === 'requestoff'){
-    p.innerHTML = '<div class="pv-head"><span class="pv-title">🌴 Request off</span></div>'
+    p.innerHTML = '<div class="pv-head"><span class="pv-title"><i class="ti ti-beach"></i> Request off</span></div>'
       + '<div class="field"><label>Your name</label><input type="text" id="toName" placeholder="First & last name" /></div>'
       + '<div class="row2"><div class="field"><label>Start date</label><input type="date" id="toStart" /></div>'
       + '<div class="field"><label>End date (optional)</label><input type="date" id="toEnd" /></div></div>'
@@ -373,7 +383,7 @@ function renderPreview(section){
     const ts = document.getElementById('toStart'); if (ts) ts.value = fmt(new Date());
     renderTimeOffList();
   } else if (section === 'onboarding'){
-    p.innerHTML = pvHead('🎓 Onboarding','onboarding') + '<div class="pv-empty">Coming soon.</div>';
+    p.innerHTML = pvHead('<i class="ti ti-user-plus"></i> Onboarding','onboarding') + '<div class="pv-empty">Coming soon.</div>';
   }
 }
 
@@ -382,7 +392,7 @@ function updateWhen(){
   const now = new Date();
   const h = now.getHours();
   const g = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-  const el = document.getElementById('greeting'); if (el) el.textContent = g + ' 👋';
+  const el = document.getElementById('greeting'); if (el) el.textContent = g;
   const w = document.getElementById('homeWhen');
   if (w) w.textContent = now.toLocaleDateString('en-US',{ weekday:'long', month:'long', day:'numeric' }) + ' · ' + now.toLocaleTimeString('en-US',{ hour:'2-digit', minute:'2-digit' });
 }
