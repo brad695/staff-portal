@@ -1,0 +1,9 @@
+{
+  "name": "greys-staff-portal",
+  "version": "2.0.0",
+  "description": "GREYS Memphis staff portal — static site backed by Supabase (no app server).",
+  "scripts": {
+    "start": "npx serve -s . -l 3000",
+    "preview": "npx serve -s . -l 3000"
+  }
+}
