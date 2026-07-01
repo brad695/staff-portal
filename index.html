@@ -131,6 +131,7 @@
     .res-group{ margin-top:24px; }
     .res-group-title{ font-size:1.05rem; font-weight:800; letter-spacing:-0.3px; color:#ffffff; margin-bottom:10px; }
     .res-group-empty{ font-size:0.86rem; color:#b9c5d1; padding:4px 2px 2px; }
+    .home-preview .res-group-empty{ color:var(--sub); }
 
     /* calendar */
     .cal-bar{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
@@ -336,7 +337,7 @@ function showView(name){
   const el = document.getElementById('view-' + name);
   if (el) el.classList.add('active');
   window.scrollTo(0,0);
-  if (name === 'calendar') renderCalendar();
+  if (name === 'calendar'){ _calTarget = { label:'calMonthLabel', list:'agendaList' }; renderCalendar(); }
   if (name === 'specials') renderSpecialsFull();
   if (name === 'resys' && !_resLoaded){ _resLoaded = true; loadReservations(); }
 }
@@ -349,7 +350,6 @@ function closePreview(){
   document.querySelectorAll('.tile').forEach(t => t.classList.remove('on'));
 }
 function tileTap(section){
-  if (section === 'calendar'){ showView('calendar'); return; }   // calendar opens directly
   if (_openTile === section){ if (section === 'requestoff'){ closePreview(); return; } showView(section); return; }   // second tap → full section (requestoff just collapses)
   _openTile = section;
   document.querySelectorAll('.tile').forEach(t => t.classList.remove('on'));
@@ -382,9 +382,17 @@ function renderPreview(section){
           return `<div class="pv-row" onclick="showView('schedule')"><span class="pv-day">${range}</span>${s.timeoff?'🌴 ':''}${esc(s.name)}${s.timeoff?' — Time Off':''}</div>`; }).join('')
       : '<div class="pv-empty">Nothing scheduled.</div>');
   } else if (section === 'resys'){
-    p.innerHTML = pvHead('<i class="ti ti-clipboard-list"></i> Reservations','resys') + '<div class="pv-empty">Tap “View all” to see Memphis reservations.</div>';
+    p.innerHTML = pvHead('<i class="ti ti-clipboard-list"></i> Reservations','resys')
+      + '<div id="pvResState" class="res-group-empty">Loading reservations…</div>'
+      + '<div id="pvResWeekGroup" style="display:none"><div class="pv-title" style="margin-top:12px">This Week</div><div id="pvResWeekList"></div></div>'
+      + '<div id="pvResFutureGroup" style="display:none"><div class="pv-title" style="margin-top:12px">Future</div><div id="pvResFutureList"></div></div>';
+    loadResysPreview();
   } else if (section === 'calendar'){
-    p.innerHTML = pvHead('📅 Calendar','calendar') + '<div class="pv-empty">Tap “View all” for the month view.</div>';
+    p.innerHTML = pvHead('<i class="ti ti-calendar-month"></i> Calendar','calendar')
+      + '<div class="cal-bar" style="margin-top:10px"><button class="cal-nav" onclick="calNav(-1)">‹</button><h3 id="pvCalMonthLabel">Month Year</h3><button class="cal-nav" onclick="calNav(1)">›</button><button class="cal-today" onclick="calGoToday()">Today</button></div>'
+      + '<div id="pvAgendaList" class="agenda"></div>';
+    _calTarget = { label:'pvCalMonthLabel', list:'pvAgendaList' };
+    renderCalendar();
   } else if (section === 'requestoff'){
     p.innerHTML = '<div class="pv-head"><span class="pv-title"><i class="ti ti-beach"></i> Request off</span></div>'
       + '<div class="field"><label>Your name</label><input type="text" id="toName" placeholder="First & last name" /></div>'
@@ -609,9 +617,11 @@ function resCardHTML(r){
 function resStartMs(r){ const s=r&&r.details&&r.details.startDate; const d=s?new Date(s):null; return (d&&!isNaN(d.getTime()))?d.getTime():null; }
 // "This Week" = Monday 00:00 (local) of the current week → the following Monday 00:00 (exclusive),
 // i.e. Mon–Sun. "Future" = anything on/after next Monday 00:00. Past reservations appear only in the main list.
-function renderResGroups(recs){
-  const weekGroup=document.getElementById('resWeekGroup'), futureGroup=document.getElementById('resFutureGroup');
-  const weekList=document.getElementById('resWeekList'), futureList=document.getElementById('resFutureList');
+// Renders into whichever container ids are passed, so both the Resys view and the Home page can reuse it.
+function renderResGroupsInto(recs, weekGroupId, weekListId, futureGroupId, futureListId){
+  const weekGroup=document.getElementById(weekGroupId), futureGroup=document.getElementById(futureGroupId);
+  const weekList=document.getElementById(weekListId), futureList=document.getElementById(futureListId);
+  if(!weekGroup||!futureGroup||!weekList||!futureList) return;
   const now=new Date();
   const dow=(now.getDay()+6)%7;                                                     // 0=Mon … 6=Sun
   const weekStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()-dow).getTime();
@@ -626,6 +636,30 @@ function renderResGroups(recs){
   weekList.innerHTML   = week.length   ? week.map(resCardHTML).join('')   : '<div class="res-group-empty">No reservations this week.</div>';
   futureList.innerHTML = future.length ? future.map(resCardHTML).join('') : '<div class="res-group-empty">No upcoming reservations.</div>';
   weekGroup.style.display='block'; futureGroup.style.display='block';
+}
+// Resys view containers
+function renderResGroups(recs){
+  renderResGroupsInto(recs,'resWeekGroup','resWeekList','resFutureGroup','resFutureList');
+}
+// Home "Resys" tile → inline preview. Fetch from Monday of the current week through a wide future
+// horizon, so "This Week" is complete (incl. earlier days this week) and "Future" isn't truncated.
+async function loadResysPreview(){
+  const state=document.getElementById('pvResState');
+  try{
+    const now=new Date();
+    const dow=(now.getDay()+6)%7;                                                   // 0=Mon … 6=Sun
+    const weekStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()-dow);
+    const horizonEnd=new Date(now.getFullYear(),now.getMonth(),now.getDate()+180,23,59,59);
+    const p=new URLSearchParams(); p.set('paging.limit','100');
+    p.set('startDateFrom', weekStart.toISOString());
+    p.set('startDateTo', horizonEnd.toISOString());
+    const res=await wixFetch(p);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    const recs=(data.reservations||[]).sort((a,b)=>((a.details&&a.details.startDate)||'').localeCompare((b.details&&b.details.startDate)||''));
+    if(state) state.style.display='none';
+    renderResGroupsInto(recs,'pvResWeekGroup','pvResWeekList','pvResFutureGroup','pvResFutureList');
+  }catch(e){ if(state){ state.style.display='block'; state.textContent='⚠️ Could not load reservations.'; } }
 }
 function renderReservations(recs){
   const state=document.getElementById('resState'), list=document.getElementById('resList'), stats=document.getElementById('resStats');
@@ -646,6 +680,7 @@ function renderReservations(recs){
 // ═══ CALENDAR ═══
 let _calYear=new Date().getFullYear(), _calMonth=new Date().getMonth(), _selDay=null;
 let _calData={ res:{}, ev:{}, sp:{}, sch:{}, off:{} };
+let _calTarget={ label:'calMonthLabel', list:'agendaList' };   // where the calendar renders: full view or inline home preview
 async function loadCalMonth(y,m){
   _calData.res={};
   try{
@@ -665,7 +700,7 @@ function spanDays(startDate,endDate,mS,mE,cb){ let d=new Date((startDate<mS?mS:s
 async function renderCalendar(){
   const y=_calYear, m=_calMonth;
   const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
-  document.getElementById('calMonthLabel').textContent=months[m]+' '+y;
+  const labelEl=document.getElementById(_calTarget.label); if(labelEl) labelEl.textContent=months[m]+' '+y;
   await loadCalMonth(y,m);
   const mS=fmt(new Date(y,m,1)), mE=fmt(new Date(y,m+1,0));
   _calData.ev={}; _events.forEach(ev=>occurrences(ev,mS,mE).forEach(d=>{(_calData.ev[d]=_calData.ev[d]||[]).push({name:ev.name,time:ev.time});}));
@@ -676,7 +711,7 @@ async function renderCalendar(){
 }
 function agRow(tag,label,text){ return '<div class="ag-row"><span class="ag-tag '+tag+'">'+label+'</span><span>'+text+'</span></div>'; }
 function renderAgenda(y,m){
-  const list=document.getElementById('agendaList'); if(!list) return;
+  const list=document.getElementById(_calTarget.list); if(!list) return;
   const dim=new Date(y,m+1,0).getDate(), today=fmt(new Date()), can=['CANCELLED','DECLINED','NO_SHOW'];
   const now=new Date(); const startDay=(y===now.getFullYear() && m===now.getMonth()) ? now.getDate() : 1;
   let html='', any=false;
