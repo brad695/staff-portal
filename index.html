@@ -128,6 +128,9 @@
     .b-other{ background:var(--gray); color:var(--gray-i); }
     .res-stats{ font-size:0.8rem; color:var(--sub); font-weight:600; margin-bottom:10px; }
     .res-card.cancel .res-name{ text-decoration:line-through; color:var(--sub); }
+    .res-group{ margin-top:24px; }
+    .res-group-title{ font-size:1.05rem; font-weight:800; letter-spacing:-0.3px; color:#ffffff; margin-bottom:10px; }
+    .res-group-empty{ font-size:0.86rem; color:#b9c5d1; padding:4px 2px 2px; }
 
     /* calendar */
     .cal-bar{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
@@ -260,6 +263,14 @@
       <div class="res-stats" id="resStats"></div>
       <div id="resState" class="empty"><span class="spin"></span> Loading reservations…</div>
       <div id="resList"></div>
+      <div id="resWeekGroup" class="res-group" style="display:none">
+        <div class="res-group-title">This Week</div>
+        <div id="resWeekList"></div>
+      </div>
+      <div id="resFutureGroup" class="res-group" style="display:none">
+        <div class="res-group-title">Future</div>
+        <div id="resFutureList"></div>
+      </div>
     </div>
   </div>
 
@@ -577,27 +588,59 @@ async function loadReservations(){
     renderReservations(recs);
   }catch(err){ state.style.display='block'; state.innerHTML='⚠️ Could not load reservations.'; }
 }
-function renderReservations(recs){
-  const state=document.getElementById('resState'), list=document.getElementById('resList'), stats=document.getElementById('resStats');
-  if(!recs.length){ state.style.display='block'; state.innerHTML='<span class="ic">🗓️</span>No reservations in this range.'; list.innerHTML=''; stats.textContent=''; return; }
-  state.style.display='none';
-  let guests=0;
+// Shared card markup so the main list and the grouped lists render identically.
+function resCardHTML(r){
   const cancel=['CANCELLED','DECLINED','NO_SHOW'];
-  list.innerHTML = recs.map(r=>{
-    const det=r.details||{}, who=r.reservee||{};
-    const dt=det.startDate?new Date(det.startDate):null;
-    const tm=dt?dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):'—';
-    const dd=dt?dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
-    const name=[who.firstName,who.lastName].filter(Boolean).join(' ')||'Guest';
-    const party=det.partySize||'?'; guests+=det.partySize||0;
-    const st=r.status||'UNKNOWN'; const isCancel=cancel.includes(st);
-    const bcls=isCancel?'b-cancel':(st==='RESERVED'||st==='SEATED'||st==='FINISHED'?'b-ok':'b-other');
-    return `<div class="res-card${isCancel?' cancel':''}">
+  const det=r.details||{}, who=r.reservee||{};
+  const dt=det.startDate?new Date(det.startDate):null;
+  const tm=dt?dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):'—';
+  const dd=dt?dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+  const name=[who.firstName,who.lastName].filter(Boolean).join(' ')||'Guest';
+  const party=det.partySize||'?';
+  const st=r.status||'UNKNOWN'; const isCancel=cancel.includes(st);
+  const bcls=isCancel?'b-cancel':(st==='RESERVED'||st==='SEATED'||st==='FINISHED'?'b-ok':'b-other');
+  return `<div class="res-card${isCancel?' cancel':''}">
       <div class="res-when"><div class="t">${esc(tm)}</div><div class="d">${esc(dd)}</div></div>
       <div class="res-main"><div class="res-name">${esc(name)}</div><div class="res-meta">👥 Party of ${esc(party)}</div></div>
       <span class="res-badge ${bcls}">${st.replace(/_/g,' ')}</span>
-    </div>`; }).join('');
+    </div>`;
+}
+// millisecond timestamp of a reservation's start, or null when unparseable
+function resStartMs(r){ const s=r&&r.details&&r.details.startDate; const d=s?new Date(s):null; return (d&&!isNaN(d.getTime()))?d.getTime():null; }
+// "This Week" = Monday 00:00 (local) of the current week → the following Monday 00:00 (exclusive),
+// i.e. Mon–Sun. "Future" = anything on/after next Monday 00:00. Past reservations appear only in the main list.
+function renderResGroups(recs){
+  const weekGroup=document.getElementById('resWeekGroup'), futureGroup=document.getElementById('resFutureGroup');
+  const weekList=document.getElementById('resWeekList'), futureList=document.getElementById('resFutureList');
+  const now=new Date();
+  const dow=(now.getDay()+6)%7;                                                     // 0=Mon … 6=Sun
+  const weekStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()-dow).getTime();
+  const weekEnd=new Date(now.getFullYear(),now.getMonth(),now.getDate()-dow+7).getTime();
+  const week=[], future=[];
+  for(const r of recs){ const t=resStartMs(r); if(t==null) continue;
+    if(t>=weekStart && t<weekEnd) week.push(r);
+    else if(t>=weekEnd) future.push(r);
+  }
+  const byStart=(a,b)=>resStartMs(a)-resStartMs(b);
+  week.sort(byStart); future.sort(byStart);
+  weekList.innerHTML   = week.length   ? week.map(resCardHTML).join('')   : '<div class="res-group-empty">No reservations this week.</div>';
+  futureList.innerHTML = future.length ? future.map(resCardHTML).join('') : '<div class="res-group-empty">No upcoming reservations.</div>';
+  weekGroup.style.display='block'; futureGroup.style.display='block';
+}
+function renderReservations(recs){
+  const state=document.getElementById('resState'), list=document.getElementById('resList'), stats=document.getElementById('resStats');
+  if(!recs.length){
+    state.style.display='block'; state.innerHTML='<span class="ic">🗓️</span>No reservations in this range.'; list.innerHTML=''; stats.textContent='';
+    document.getElementById('resWeekGroup').style.display='none';
+    document.getElementById('resFutureGroup').style.display='none';
+    return;
+  }
+  state.style.display='none';
+  let guests=0;
+  for(const r of recs){ guests+=(r.details&&r.details.partySize)||0; }
+  list.innerHTML = recs.map(resCardHTML).join('');
   stats.textContent = recs.length+' reservation'+(recs.length!==1?'s':'')+' · '+guests+' guests';
+  renderResGroups(recs);
 }
 
 // ═══ CALENDAR ═══
