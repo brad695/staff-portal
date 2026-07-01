@@ -27,9 +27,9 @@
     body{ font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--ink); }
     .app{ max-width:520px; margin:0 auto; min-height:100vh; background:var(--bg); position:relative; padding-bottom:84px; }
 
-    /* top bar */
-    .topbar{ display:flex; align-items:center; gap:10px; padding:18px 20px 6px; }
-    .topbar .brand{ font-weight:800; font-size:1.05rem; letter-spacing:-0.3px; color:#ffffff; }
+    /* top bar / header */
+    .topbar{ display:flex; align-items:center; gap:10px; padding:16px 20px 14px; border-bottom:1px solid rgba(255,255,255,0.12); margin-bottom:4px; }
+    .topbar .brand{ font-weight:800; font-size:1.35rem; letter-spacing:-0.3px; color:#ffffff; }
     .topbar .loc{ font-size:0.74rem; color:#b9c5d1; font-weight:600; }
     .topbar .spacer{ flex:1; }
     .icon-btn{ width:40px; height:40px; border-radius:50%; border:none; background:var(--surface); box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; font-size:1.05rem; cursor:pointer; color:var(--ink); text-decoration:none; }
@@ -53,11 +53,11 @@
     .notes-empty{ display:none; }
 
     .tiles{ display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:14px 20px 2px; }
-    .tile{ background:var(--surface); border-radius:20px; box-shadow:var(--shadow); padding:18px 16px; cursor:pointer; border:none; text-align:left; transition:transform .08s; display:flex; flex-direction:row; align-items:center; gap:14px; }
+    .tile{ background:var(--surface); border-radius:8px; box-shadow:var(--shadow); padding:10px 16px; cursor:pointer; border:none; text-align:left; transition:transform .08s; display:flex; flex-direction:row; align-items:center; gap:14px; }
     .tile:active{ transform:scale(0.97); }
     .tile.on{ box-shadow:0 0 0 2px var(--accent), var(--shadow); }
-    .tile .ic{ width:48px; height:48px; border-radius:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-    .tile .ic i{ font-size:26px; line-height:1; }
+    .tile .ic{ width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .tile .ic i{ font-size:19px; line-height:1; }
     .tile .tl{ font-weight:700; font-size:1.18rem; letter-spacing:-0.3px; color:var(--ink); line-height:1.15; }
     .tile.full{ grid-column:1 / -1; }
     .badge-soon{ margin-left:auto; font-size:0.64rem; font-weight:700; color:var(--gray-i); background:var(--gray); padding:5px 11px; border-radius:20px; }
@@ -207,8 +207,8 @@
   <!-- TOP BAR -->
   <div class="topbar">
     <div>
-      <div class="brand">GREYS</div>
-      <div class="loc">Memphis · Staff</div>
+      <div class="brand">GREYS Memphis</div>
+      <div class="loc">Staff Portal</div>
     </div>
     <div class="spacer"></div>
     <a class="icon-btn" href="manager.html" title="Manager" aria-label="Manager"><i class="ti ti-lock"></i></a>
