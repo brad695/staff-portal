@@ -136,13 +136,17 @@
         One place for everything that shows on the staff portal. Pick a <strong>Type</strong> for each row:
         <strong>note</strong> = a tile that stays up (no date needed) ·
         <strong>special</strong> = shows on its day; set <strong>Repeat</strong> (e.g. weekly) for "every Tuesday" ·
-        <strong>event</strong> = dated, shows on the calendar.
+        <strong>event</strong> = dated, shows on the calendar ·
+        <strong>onboard</strong> = a new-hire step (Title = the step, Details = what to read; shows in order added, staff check it off) ·
+        <strong>info</strong> = a "Stuff to Know" card (Title = label, Details = the info). Onboard &amp; info need no date.
         Edit any cell, add rows, or import a CSV. Changed rows highlight — nothing saves until you click Save all changes.
       </div>
       <div class="toolbar">
         <button class="btn btn-ghost btn-sm" onclick="addTyped('note')">＋ Note</button>
         <button class="btn btn-ghost btn-sm" onclick="addTyped('special')">＋ Special</button>
         <button class="btn btn-ghost btn-sm" onclick="addTyped('event')">＋ Event</button>
+        <button class="btn btn-ghost btn-sm" onclick="addTyped('onboard')">＋ Onboarding step</button>
+        <button class="btn btn-ghost btn-sm" onclick="addTyped('info')">＋ Stuff to Know</button>
         <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('items')">⬇ CSV template</button>
         <div class="spacer"></div>
         <button class="btn btn-gold" onclick="saveAll('items')">Save all changes</button>
@@ -256,7 +260,7 @@ const SCHEMA = {
   items: {
     body:'itemsBody', msg:'itemsMsg', csvStatus:'itemsCsvStatus', table:'portal_items',
     cols:[
-      {k:'type', type:'select', options:['note','special','event']},
+      {k:'type', type:'select', options:['note','special','event','onboard','info']},
       {k:'title', type:'text', ph:'Title'},
       {k:'date', type:'date'},
       {k:'time', type:'time'},
@@ -265,7 +269,7 @@ const SCHEMA = {
       {k:'repeatUntil', type:'date'},
       {k:'body', type:'text', ph:'Details'}
     ],
-    valid:r=> !!r.title && (r.type==='note' || !!r.date),
+    valid:r=> !!r.title && (r.type==='special' || r.type==='event' ? !!r.date : true),
     map:r=>({ id:r.id, type:r.type||'note', title:r.title, date:r.date||'', time:r.time||'', endDate:r.end_date||'', repeat:r.repeat||'none', repeatUntil:r.repeat_until||'', body:r.body||'' }),
     csvHeader:['type','title','date','time','end_date','repeat','repeat_until','details'],
     csvRowToObj:c=>({ type:(c[0]||'note').toLowerCase().trim(), title:c[1]||'', date:c[2]||'', time:c[3]||'', endDate:c[4]||'', repeat:(c[5]||'none').toLowerCase().trim(), repeatUntil:c[6]||'', body:c[7]||'' }),
@@ -273,7 +277,11 @@ const SCHEMA = {
       ['note','Door code changed','','','','none','','New back-door code is 4417'],
       ['special','Taco Tuesday','2026-07-07','17:00','','weekly','2026-12-29','Half-price street tacos all night'],
       ['special','Wine Down Wednesday','2026-07-08','','','weekly','2026-12-30','$5 off every bottle'],
-      ['event','Wine & Cheese Tasting','2026-07-18','18:30','','none','','Six wines paired with our cheese flight']
+      ['event','Wine & Cheese Tasting','2026-07-18','18:30','','none','','Six wines paired with our cheese flight'],
+      ['onboard','Complete new-hire paperwork','','','','none','','Fill out W-4 and direct deposit forms with the manager on day one'],
+      ['onboard','POS & register training','','','','none','','Shadow a lead for one shift, then run the register with supervision'],
+      ['info','Back-door code','','','','none','','4417 — do not share outside staff'],
+      ['info','Manager on call','','','','none','','Text Sam at 901-555-0142 for anything urgent']
     ],
     addAction:'add-item', updateAction:'update-item', deleteAction:'delete-item', bulkAction:'bulk-add-items'
   },
