@@ -53,10 +53,10 @@
     .notes-empty{ display:none; }
 
     .tiles{ display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:14px 20px 2px; }
-    .tile{ background:var(--surface); border-radius:8px; box-shadow:var(--shadow); padding:10px 16px; cursor:pointer; border:none; text-align:left; transition:transform .08s; display:flex; flex-direction:row; align-items:center; gap:14px; }
+    .tile{ background:var(--surface); border-radius:4px; box-shadow:0 3px 12px rgba(0,0,0,0.20); padding:10px 16px; cursor:pointer; border:1px solid #d9dce6; text-align:left; transition:transform .08s, box-shadow .08s; display:flex; flex-direction:row; align-items:center; gap:14px; }
     .tile:active{ transform:scale(0.97); }
-    .tile.on{ box-shadow:0 0 0 2px var(--accent), var(--shadow); }
-    .tile .ic{ width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .tile.on{ border-color:var(--accent); box-shadow:0 0 0 2px var(--accent), 0 3px 12px rgba(0,0,0,0.20); }
+    .tile .ic{ width:34px; height:34px; border-radius:4px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
     .tile .ic i{ font-size:19px; line-height:1; }
     .tile .tl{ font-weight:700; font-size:1.18rem; letter-spacing:-0.3px; color:var(--ink); line-height:1.15; }
     .tile.full{ grid-column:1 / -1; }
