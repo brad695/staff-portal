@@ -222,6 +222,23 @@
     .info-card{ background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:13px 15px; margin-bottom:10px; }
     .info-card .il{ font-size:0.7rem; font-weight:800; text-transform:uppercase; letter-spacing:0.4px; color:var(--accent); margin-bottom:4px; }
     .info-card .iv{ font-size:0.95rem; color:var(--ink); line-height:1.55; white-space:pre-wrap; }
+
+    /* onboarding intake form */
+    .ob-intro{ font-size:0.9rem; color:var(--sub); line-height:1.55; margin-bottom:14px; }
+    .ob-form .form-card h3{ display:flex; align-items:center; gap:8px; }
+    .ob-form .form-card h3 i{ color:var(--accent); font-size:19px; }
+    .req{ color:var(--accent); }
+    .field select, .field textarea{ width:100%; padding:12px 13px; border:1px solid var(--line); border-radius:13px; font-size:0.92rem; font-family:inherit; background:rgba(0,0,0,0.22); color:var(--ink); }
+    .field textarea{ resize:vertical; min-height:60px; }
+    .ob-note{ font-size:0.78rem; color:#f0a274; background:rgba(236,138,94,0.10); border:1px solid rgba(236,138,94,0.35); border-radius:8px; padding:9px 11px; margin-bottom:13px; line-height:1.5; }
+    .ob-days{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:4px; }
+    .ob-day{ padding:8px 13px; border:1px solid var(--line); border-radius:8px; background:rgba(0,0,0,0.18); color:var(--ink); font-size:0.82rem; font-weight:700; cursor:pointer; user-select:none; }
+    .ob-day.sel{ background:var(--accent); border-color:var(--accent); color:#fff; }
+    .ob-ack{ display:flex; gap:11px; align-items:flex-start; margin-bottom:12px; cursor:pointer; font-size:0.9rem; color:var(--ink); line-height:1.4; }
+    .ob-ack input{ width:20px; height:20px; margin-top:1px; accent-color:var(--accent); flex-shrink:0; }
+    .ob-file{ display:block; width:100%; font-size:0.84rem; color:var(--sub); padding:11px; border:1px dashed var(--line); border-radius:12px; background:rgba(0,0,0,0.18); cursor:pointer; }
+    .ob-file::file-selector-button{ background:var(--accent); color:#fff; border:none; border-radius:8px; padding:7px 12px; font-family:inherit; font-weight:700; margin-right:10px; cursor:pointer; }
+    .to-msg.err{ color:#f0897c; } .to-msg.ok{ color:var(--mint-i); }
   </style>
 </head>
 <body>
@@ -329,11 +346,76 @@
     </div>
   </div>
 
-  <!-- ══ ONBOARDING ══ -->
+  <!-- ══ ONBOARDING (new-hire intake form) ══ -->
   <div id="view-onboarding" class="view">
     <div class="sec-head"><button class="back-btn" onclick="showView('home')">‹</button><h2>Onboarding</h2></div>
     <div class="sec-body">
-      <div id="onboardBody"></div>
+      <div id="obThanks" style="display:none"></div>
+      <form id="obForm" class="ob-form" onsubmit="submitOnboarding(event)">
+        <div class="ob-intro">Welcome to Grey's! Please fill this out before your first shift. Your information is private and goes only to management.</div>
+
+        <div class="form-card">
+          <h3><i class="ti ti-user"></i> Personal &amp; contact</h3>
+          <div class="field"><label>Full legal name <span class="req">*</span></label><input type="text" id="obName" placeholder="First & last name" required></div>
+          <div class="row2"><div class="field"><label>Preferred name</label><input type="text" id="obPreferred" placeholder="What you go by"></div>
+            <div class="field"><label>Date of birth</label><input type="date" id="obDob"></div></div>
+          <div class="row2"><div class="field"><label>Phone</label><input type="tel" id="obPhone" placeholder="(901) 555-0123"></div>
+            <div class="field"><label>Email</label><input type="email" id="obEmail" placeholder="you@email.com"></div></div>
+          <div class="field"><label>Home address</label><input type="text" id="obAddress" placeholder="Street, city, state, ZIP"></div>
+          <div class="row2"><div class="field"><label>Emergency contact</label><input type="text" id="obEmName" placeholder="Name"></div>
+            <div class="field"><label>Emergency phone</label><input type="tel" id="obEmPhone" placeholder="(901) 555-0123"></div></div>
+        </div>
+
+        <div class="form-card">
+          <h3><i class="ti ti-calendar-week"></i> Availability</h3>
+          <div class="field"><label>Days you can work</label>
+            <div class="ob-days">
+              <span class="ob-day" data-day="Mon" onclick="this.classList.toggle('sel')">Mon</span>
+              <span class="ob-day" data-day="Tue" onclick="this.classList.toggle('sel')">Tue</span>
+              <span class="ob-day" data-day="Wed" onclick="this.classList.toggle('sel')">Wed</span>
+              <span class="ob-day" data-day="Thu" onclick="this.classList.toggle('sel')">Thu</span>
+              <span class="ob-day" data-day="Fri" onclick="this.classList.toggle('sel')">Fri</span>
+              <span class="ob-day" data-day="Sat" onclick="this.classList.toggle('sel')">Sat</span>
+              <span class="ob-day" data-day="Sun" onclick="this.classList.toggle('sel')">Sun</span>
+            </div>
+          </div>
+          <div class="field"><label>Typical hours you're available</label><input type="text" id="obHours" placeholder="e.g. weekdays 4pm–close, weekends open"></div>
+        </div>
+
+        <div class="form-card">
+          <h3><i class="ti ti-briefcase"></i> Start details</h3>
+          <div class="row2"><div class="field"><label>Available start date</label><input type="date" id="obStart"></div>
+            <div class="field"><label>Shirt size</label><select id="obShirt"><option value="">—</option><option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option></select></div></div>
+        </div>
+
+        <div class="form-card">
+          <h3><i class="ti ti-building-bank"></i> Direct deposit</h3>
+          <div class="ob-note">For payroll only. Stored securely and visible only to management.</div>
+          <div class="field"><label>Bank name</label><input type="text" id="obBank" placeholder="e.g. Regions Bank"></div>
+          <div class="row2"><div class="field"><label>Routing number</label><input type="text" id="obRouting" inputmode="numeric" placeholder="9 digits"></div>
+            <div class="field"><label>Account number</label><input type="text" id="obAccount" inputmode="numeric" placeholder="Account #"></div></div>
+          <div class="field"><label>Account type</label><select id="obAcctType"><option value="">—</option><option>Checking</option><option>Savings</option></select></div>
+        </div>
+
+        <div class="form-card">
+          <h3><i class="ti ti-id"></i> Tax &amp; ID</h3>
+          <div class="ob-note">Your SSN is needed for tax forms (W-4). Bring your <strong>original</strong> ID on day one — federal I-9 law requires a manager to inspect it in person; the photo below is just to get a head start.</div>
+          <div class="field"><label>Social Security number</label><input type="text" id="obSsn" inputmode="numeric" placeholder="XXX-XX-XXXX"></div>
+          <div class="field"><label>Photo of your government ID (license or passport)</label><input type="file" id="obId" class="ob-file" accept="image/*" capture="environment"></div>
+        </div>
+
+        <div class="form-card">
+          <h3><i class="ti ti-file-check"></i> Acknowledgements</h3>
+          <label class="ob-ack"><input type="checkbox" id="obAckHandbook"> I have read and agree to the Employee Handbook.</label>
+          <label class="ob-ack"><input type="checkbox" id="obAckSafety"> I have read and agree to the Safety &amp; Food-Handling guidelines.</label>
+          <label class="ob-ack"><input type="checkbox" id="obAckAccurate"> I confirm the information above is accurate and complete.</label>
+          <div class="field"><label>Signature — type your full name <span class="req">*</span></label><input type="text" id="obSign" placeholder="Your full name"></div>
+          <div style="font-size:0.76rem;color:var(--sub);margin-top:-4px;">Typing your name acts as your signature, dated today.</div>
+        </div>
+
+        <button type="submit" id="obSubmit" class="btn btn-primary btn-block">Submit onboarding</button>
+        <div class="to-msg" id="obMsg"></div>
+      </form>
     </div>
   </div>
 
@@ -371,7 +453,6 @@ function showView(name){
   window.scrollTo(0,0);
   if (name === 'calendar'){ _calTarget = { label:'calMonthLabel', list:'agendaList' }; renderCalendar(); }
   if (name === 'specials') renderSpecialsFull();
-  if (name === 'onboarding') renderOnboarding();
   if (name === 'stuff') renderStuff();
   if (name === 'resys' && !_resLoaded){ _resLoaded = true; loadReservations(); }
 }
@@ -465,7 +546,7 @@ updateWhen(); setInterval(updateWhen, 30000);
 window.addEventListener('DOMContentLoaded', () => { loadItems(); loadSchedules(); loadTimeOff(); });
 
 // ═══ CONTENT ITEMS (notes · specials · events) ═══
-let _notes=[], _specials=[], _events=[], _onboard=[], _info=[];
+let _notes=[], _specials=[], _events=[], _info=[];
 function mapItem(r){ return { id:r.id, type:r.type||'note', title:r.title||'', body:r.body||'', date:r.date||'', time:r.time||'', endDate:r.end_date||'', repeat:r.repeat||'none', repeatUntil:r.repeat_until||'' }; }
 async function loadItems(){
   try{
@@ -474,38 +555,69 @@ async function loadItems(){
     _notes = items.filter(i=>i.type==='note');
     _specials = items.filter(i=>i.type==='special');
     _events = items.filter(i=>i.type==='event').map(e=>({ id:e.id, name:e.title, date:e.date, time:e.time, endDate:e.endDate, desc:e.body, repeat:e.repeat, repeatUntil:e.repeatUntil }));
-    _onboard = items.filter(i=>i.type==='onboard');
     _info = items.filter(i=>i.type==='info');
-  }catch(e){ _notes=[]; _specials=[]; _events=[]; _onboard=[]; _info=[]; }
+  }catch(e){ _notes=[]; _specials=[]; _events=[]; _info=[]; }
   renderNotes();
   renderEventCards();
-  renderOnboarding();
   renderStuff();
   if (document.getElementById('view-specials').classList.contains('active')) renderSpecialsFull();
   if (document.getElementById('view-calendar').classList.contains('active')) renderCalendar();
 }
 
-// ── ONBOARDING (read + checklist; progress saved per-device) ──
-function obDone(){ try{ return JSON.parse(localStorage.getItem('greys_onboard_done')||'[]'); }catch(e){ return []; } }
-function toggleOnboard(id){ id=String(id); let a=obDone(); a = a.includes(id) ? a.filter(x=>x!==id) : a.concat(id); localStorage.setItem('greys_onboard_done', JSON.stringify(a)); renderOnboarding(); }
-function renderOnboarding(){
-  const el = document.getElementById('onboardBody'); if(!el) return;
-  if(!_onboard.length){ el.innerHTML = '<div class="empty"><span class="ic"><i class="ti ti-user-plus"></i></span>No onboarding steps yet.<br>A manager can add them in the console.</div>'; return; }
-  const done = obDone();
-  const total = _onboard.length;
-  const doneCount = _onboard.filter(s=>done.includes(String(s.id))).length;
-  const pct = total ? Math.round(doneCount/total*100) : 0;
-  let html = '<div class="ob-progress"><div class="lbl">Your progress<span class="pct">'+doneCount+' of '+total+' done</span></div><div class="ob-bar"><span style="width:'+pct+'%"></span></div></div>';
-  html += _onboard.map(s=>{
-    const isDone = done.includes(String(s.id));
-    return '<div class="ob-step'+(isDone?' done':'')+'" id="ob-'+s.id+'">'
-      + '<button class="ob-check" onclick="event.stopPropagation();toggleOnboard(\''+s.id+'\')" aria-label="Mark done"><i class="ti ti-check"></i></button>'
-      + '<div class="ob-main" onclick="document.getElementById(\'ob-'+s.id+'\').classList.toggle(\'open\')">'
-      + '<div class="ob-title">'+esc(s.title)+(s.body?'<i class="ti ti-chevron-down chev"></i>':'')+'</div>'
-      + (s.body?'<div class="ob-body">'+esc(s.body)+'</div>':'')
-      + '</div></div>';
-  }).join('');
-  el.innerHTML = html;
+// ── ONBOARDING (new-hire intake form → secure submit via Edge Function) ──
+function obResizeImage(file, maxDim, quality){
+  return new Promise((res, rej)=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      let w=img.naturalWidth, h=img.naturalHeight;
+      if(Math.max(w,h) > maxDim){ const s=maxDim/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); }
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      try{ res(c.toDataURL('image/jpeg', quality)); }catch(err){ rej(err); }
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); rej(new Error('image')); };
+    img.src = url;
+  });
+}
+async function submitOnboarding(e){
+  e.preventDefault();
+  const g = id => document.getElementById(id);
+  const msg = g('obMsg');
+  const fail = t => { msg.textContent = t; msg.className='to-msg err'; msg.style.display='block'; window.scrollTo(0, document.body.scrollHeight); };
+  const name = g('obName').value.trim();
+  if(!name) return fail('Please enter your full legal name.');
+  if(!g('obSign').value.trim()) return fail('Please type your name as a signature at the bottom.');
+  const btn = g('obSubmit'); const orig = btn.textContent;
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Submitting…'; msg.style.display='none';
+  let idImage = '';
+  const f = g('obId').files[0];
+  if(f){ try{ idImage = await obResizeImage(f, 1400, 0.7); }catch(_){ /* submit without image if it fails */ } }
+  const days = Array.from(document.querySelectorAll('.ob-day.sel')).map(d=>d.dataset.day);
+  const hours = g('obHours').value.trim();
+  const availability = [days.join(', '), hours].filter(Boolean).join(days.length && hours ? ' — ' : '');
+  const payload = {
+    full_name:name, preferred_name:g('obPreferred').value.trim(), dob:g('obDob').value||null,
+    email:g('obEmail').value.trim(), phone:g('obPhone').value.trim(), address:g('obAddress').value.trim(),
+    emergency_name:g('obEmName').value.trim(), emergency_phone:g('obEmPhone').value.trim(),
+    ssn:g('obSsn').value.trim(), bank_name:g('obBank').value.trim(), routing:g('obRouting').value.trim(),
+    account:g('obAccount').value.trim(), account_type:g('obAcctType').value,
+    availability, start_date:g('obStart').value||null, shirt_size:g('obShirt').value,
+    ack_handbook:g('obAckHandbook').checked, ack_safety:g('obAckSafety').checked, ack_policies:g('obAckAccurate').checked,
+    ack_signature:g('obSign').value.trim(), idImage
+  };
+  try{
+    const r = await fetch(FN_URL+'?action=submit-onboarding', { method:'POST', headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_KEY }, body:JSON.stringify(payload) });
+    const d = await r.json().catch(()=>({}));
+    if(r.ok && d.ok){
+      g('obForm').style.display='none';
+      const t = g('obThanks');
+      t.style.display='block';
+      t.innerHTML = '<div class="empty"><span class="ic"><i class="ti ti-circle-check"></i></span><strong>Thanks, '+esc(name)+'!</strong><br>Your onboarding info was submitted to management.<br>Remember to bring your original ID for your first shift.</div>';
+      window.scrollTo(0,0);
+    } else { btn.disabled=false; btn.textContent=orig; fail('❌ '+(d.error||'Something went wrong. Please try again.')); }
+  }catch(err){ btn.disabled=false; btn.textContent=orig; fail('❌ Network error. Please try again.'); }
 }
 
 // ── STUFF TO KNOW (quick reference) ──

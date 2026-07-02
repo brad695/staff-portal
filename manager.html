@@ -95,6 +95,20 @@
     .badge-approved{ background:#d1fae5; color:#065f46; }
     .badge-denied{ background:#f6dad4; color:var(--wax); }
     .to-empty{ padding:28px; text-align:center; color:var(--sub); font-style:italic; }
+    .ob-sub{ border:1px solid var(--line); border-radius:10px; margin-bottom:10px; background:#fff; overflow:hidden; }
+    .ob-sub.reviewed{ opacity:0.7; }
+    .ob-sub-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; cursor:pointer; }
+    .ob-sub-when{ font-size:0.75rem; color:var(--sub); margin-top:3px; }
+    .ob-chev{ color:var(--sub); transition:transform .2s; }
+    .ob-sub.open .ob-chev{ transform:rotate(180deg); }
+    .ob-sub-body{ display:none; padding:2px 14px 14px; border-top:1px solid var(--line-soft); }
+    .ob-sub.open .ob-sub-body{ display:block; }
+    .ob-fields{ display:grid; grid-template-columns:1fr 1fr; gap:0 18px; margin:10px 0 12px; }
+    .ob-f{ display:flex; flex-direction:column; padding:6px 0; border-bottom:1px solid var(--line-soft); }
+    .ob-fl{ font-size:0.62rem; text-transform:uppercase; letter-spacing:0.3px; color:var(--sub); font-weight:700; }
+    .ob-fv{ font-size:0.86rem; color:var(--ink); word-break:break-word; }
+    .ob-sub-actions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .pill-ok{ background:#d1fae5; color:#065f46; }
     .hide{ display:none; }
   </style>
 </head>
@@ -126,6 +140,7 @@
     <div class="tab active" onclick="mtab('content')">Notes · Specials · Events</div>
     <div class="tab" onclick="mtab('schedules')">Schedules</div>
     <div class="tab" onclick="mtab('timeoff')">Time Off</div>
+    <div class="tab" onclick="mtab('onboarding')">Onboarding</div>
   </div>
 
   <!-- UNIFIED CONTENT EDITOR -->
@@ -137,15 +152,13 @@
         <strong>note</strong> = a tile that stays up (no date needed) ·
         <strong>special</strong> = shows on its day; set <strong>Repeat</strong> (e.g. weekly) for "every Tuesday" ·
         <strong>event</strong> = dated, shows on the calendar ·
-        <strong>onboard</strong> = a new-hire step (Title = the step, Details = what to read; shows in order added, staff check it off) ·
-        <strong>info</strong> = a "Stuff to Know" card (Title = label, Details = the info). Onboard &amp; info need no date.
+        <strong>info</strong> = a "Stuff to Know" card (Title = label, Details = the info; no date needed).
         Edit any cell, add rows, or import a CSV. Changed rows highlight — nothing saves until you click Save all changes.
       </div>
       <div class="toolbar">
         <button class="btn btn-ghost btn-sm" onclick="addTyped('note')">＋ Note</button>
         <button class="btn btn-ghost btn-sm" onclick="addTyped('special')">＋ Special</button>
         <button class="btn btn-ghost btn-sm" onclick="addTyped('event')">＋ Event</button>
-        <button class="btn btn-ghost btn-sm" onclick="addTyped('onboard')">＋ Onboarding step</button>
         <button class="btn btn-ghost btn-sm" onclick="addTyped('info')">＋ Stuff to Know</button>
         <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('items')">⬇ CSV template</button>
         <div class="spacer"></div>
@@ -206,6 +219,16 @@
       <div id="toList"><div class="to-empty">Loading…</div></div>
     </div>
   </div>
+
+  <!-- ONBOARDING SUBMISSIONS -->
+  <div id="panel-onboarding" class="panel">
+    <div class="section-card">
+      <h2>🧑‍💼 New-Hire Onboarding</h2>
+      <div class="hint"><strong>Contains sensitive data (SSN, bank, ID photo).</strong> After you enter a submission into payroll, delete it here. The ID photo does <em>not</em> satisfy federal I-9 — you must inspect the original document in person.</div>
+      <div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" onclick="loadOnboarding()">↻ Refresh</button></div>
+      <div id="obSubs"><div class="to-empty">Loading…</div></div>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -251,7 +274,51 @@ function mtab(name){
   document.querySelector('.tab[onclick*="'+name+'"]').classList.add('active');
   document.getElementById('panel-'+name).classList.add('active');
 }
-function loadAll(){ loadKind('items'); loadKind('schedules'); loadTimeOff(); }
+function loadAll(){ loadKind('items'); loadKind('schedules'); loadTimeOff(); loadOnboarding(); }
+
+/* ---- Onboarding submissions ---- */
+let OB_SUBS=[];
+function fmtDT(s){ if(!s) return ''; const d=new Date(s); return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+' · '+d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}); }
+async function loadOnboarding(){
+  const el=document.getElementById('obSubs'); if(!el) return;
+  el.innerHTML='<div class="to-empty">Loading…</div>';
+  const r=await fn('list-onboarding');
+  if(!r.ok){ el.innerHTML='<div class="to-empty">❌ '+esc(r.data.error||'Could not load')+'</div>'; return; }
+  OB_SUBS=r.data.rows||[];
+  renderOnboardingSubs();
+}
+function obField(label,val){ if(val===''||val==null) return ''; return '<div class="ob-f"><span class="ob-fl">'+label+'</span><span class="ob-fv">'+esc(val)+'</span></div>'; }
+function renderOnboardingSubs(){
+  const el=document.getElementById('obSubs');
+  if(!OB_SUBS.length){ el.innerHTML='<div class="to-empty">No submissions yet.</div>'; return; }
+  el.innerHTML=OB_SUBS.map(s=>{
+    const acks=[s.ack_handbook?'Handbook':'',s.ack_safety?'Safety':'',s.ack_policies?'Accuracy':''].filter(Boolean).join(', ')||'none';
+    const details=[
+      obField('Preferred name',s.preferred_name), obField('Date of birth',s.dob),
+      obField('Phone',s.phone), obField('Email',s.email), obField('Address',s.address),
+      obField('Emergency contact',[s.emergency_name,s.emergency_phone].filter(Boolean).join(' · ')),
+      obField('Availability',s.availability), obField('Start date',s.start_date), obField('Shirt size',s.shirt_size),
+      obField('SSN',s.ssn), obField('Bank',s.bank_name), obField('Routing #',s.routing),
+      obField('Account',[s.account,s.account_type].filter(Boolean).join(' · ')),
+      obField('Acknowledged',acks), obField('Signature',s.ack_signature)
+    ].join('');
+    const idLink = s.id_url ? '<a class="btn btn-ghost btn-sm" href="'+esc(s.id_url)+'" target="_blank" rel="noopener">🪪 View ID photo</a>' : '<span class="ob-fv" style="color:var(--sub)">No ID uploaded</span>';
+    const reviewed = s.status==='reviewed';
+    return '<div class="ob-sub'+(reviewed?' reviewed':'')+'">'
+      +'<div class="ob-sub-head" onclick="this.parentNode.classList.toggle(\'open\')">'
+        +'<div><strong>'+esc(s.full_name||'(no name)')+'</strong> '+(reviewed?'<span class="pill pill-ok">reviewed</span>':'<span class="pill pill-new">new</span>')+'<div class="ob-sub-when">'+fmtDT(s.created_at)+'</div></div>'
+        +'<span class="ob-chev">▾</span>'
+      +'</div>'
+      +'<div class="ob-sub-body"><div class="ob-fields">'+details+'</div>'
+        +'<div class="ob-sub-actions">'+idLink
+          +'<button class="btn btn-ghost btn-sm" onclick="obReviewed('+s.id+','+(reviewed?'false':'true')+')">'+(reviewed?'Mark new':'Mark reviewed')+'</button>'
+          +'<button class="btn btn-wax btn-sm" onclick="obDel('+s.id+')">🗑 Delete</button>'
+        +'</div></div>'
+    +'</div>';
+  }).join('');
+}
+async function obReviewed(id,val){ const r=await fn('set-onboarding',{id,status:val?'reviewed':'new'}); if(r.ok) loadOnboarding(); else alert('❌ '+(r.data.error||'Failed')); }
+async function obDel(id){ if(!confirm('Delete this submission permanently? Do this only after entering it into payroll.')) return; const r=await fn('delete-onboarding',{id}); if(r.ok) loadOnboarding(); else alert('❌ '+(r.data.error||'Failed')); }
 
 /* ===================================================================
    GENERIC BULK EDITOR
@@ -260,7 +327,7 @@ const SCHEMA = {
   items: {
     body:'itemsBody', msg:'itemsMsg', csvStatus:'itemsCsvStatus', table:'portal_items',
     cols:[
-      {k:'type', type:'select', options:['note','special','event','onboard','info']},
+      {k:'type', type:'select', options:['note','special','event','info']},
       {k:'title', type:'text', ph:'Title'},
       {k:'date', type:'date'},
       {k:'time', type:'time'},
@@ -278,8 +345,6 @@ const SCHEMA = {
       ['special','Taco Tuesday','2026-07-07','17:00','','weekly','2026-12-29','Half-price street tacos all night'],
       ['special','Wine Down Wednesday','2026-07-08','','','weekly','2026-12-30','$5 off every bottle'],
       ['event','Wine & Cheese Tasting','2026-07-18','18:30','','none','','Six wines paired with our cheese flight'],
-      ['onboard','Complete new-hire paperwork','','','','none','','Fill out W-4 and direct deposit forms with the manager on day one'],
-      ['onboard','POS & register training','','','','none','','Shadow a lead for one shift, then run the register with supervision'],
       ['info','Back-door code','','','','none','','4417 — do not share outside staff'],
       ['info','Manager on call','','','','none','','Text Sam at 901-555-0142 for anything urgent']
     ],
