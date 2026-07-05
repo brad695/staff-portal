@@ -14,12 +14,15 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
   <style>
     :root{
-      --bg:#0c2637; --surface:#16303f; --ink:#eaf1f6; --sub:#8ca0b0; --line:#2c4759;
-      --accent:#ec8a5e; --wax:#e0685b; --shadow:0 4px 14px rgba(0,0,0,0.30);
+      /* ── light cards/content on the deep-blue app background. Home tiles stay dark via --tile* below ── */
+      --bg:#0c2637; --surface:#ffffff; --ink:#1a3140; --sub:#5f7688; --line:#dce3ea;
+      --accent:#ec8a5e; --wax:#d75a4b; --shadow:0 2px 10px rgba(20,40,60,0.08),0 0 0 1px rgba(20,40,60,0.05);
       --lav:rgba(139,127,232,0.18); --lav-i:#ab9dff; --mint:rgba(46,196,150,0.16); --mint-i:#4fd6a0;
       --sky:rgba(70,140,230,0.18); --sky-i:#6cabff; --peach:rgba(236,138,94,0.20); --peach-i:#f0a274;
       --pink:rgba(230,90,150,0.18); --pink-i:#f27cb1; --butter:rgba(214,170,50,0.20); --butter-i:#e8c765;
       --gray:rgba(255,255,255,0.08); --gray-i:#b9c5d1;
+      /* dark home tiles (the primary-action buttons stay dark on purpose) */
+      --tile:#16303f; --tile-line:#294455; --tile-ink:#eaf1f6;
       --r:20px;
     }
     *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
@@ -53,12 +56,12 @@
     .notes-empty{ display:none; }
 
     .tiles{ display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:14px 20px 2px; }
-    .tile{ background:var(--surface); border-radius:4px; box-shadow:0 3px 12px rgba(0,0,0,0.28); padding:10px 16px; cursor:pointer; border:1px solid var(--line); text-align:left; transition:transform .08s, box-shadow .08s; display:flex; flex-direction:row; align-items:center; gap:14px; }
+    .tile{ background:var(--tile); border-radius:4px; box-shadow:0 3px 12px rgba(20,40,60,0.16); padding:10px 16px; cursor:pointer; border:1px solid var(--tile-line); text-align:left; transition:transform .08s, box-shadow .08s; display:flex; flex-direction:row; align-items:center; gap:14px; }
     .tile:active{ transform:scale(0.97); }
     .tile.on{ border-color:var(--accent); box-shadow:0 0 0 2px var(--accent), 0 3px 12px rgba(0,0,0,0.20); }
     .tile .ic{ width:34px; height:34px; border-radius:4px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
     .tile .ic i{ font-size:19px; line-height:1; }
-    .tile .tl{ font-weight:700; font-size:1.18rem; letter-spacing:-0.3px; color:var(--ink); line-height:1.15; }
+    .tile .tl{ font-weight:700; font-size:1.18rem; letter-spacing:-0.3px; color:var(--tile-ink); line-height:1.15; }
     .tile.full{ grid-column:1 / -1; }
     .badge-soon{ margin-left:auto; font-size:0.64rem; font-weight:700; color:var(--gray-i); background:var(--gray); padding:5px 11px; border-radius:20px; }
     .ic-mint{ background:var(--mint); color:var(--mint-i);} .ic-sky{ background:var(--sky); color:var(--sky-i);}
@@ -125,7 +128,7 @@
     .res-badge{ font-size:0.62rem; font-weight:800; text-transform:uppercase; padding:4px 9px; border-radius:20px; white-space:nowrap; }
     .b-ok{ background:var(--mint); color:var(--mint-i); }
     .b-cancel{ background:rgba(224,104,91,0.18); color:#f0897c; }
-    .b-other{ background:var(--gray); color:var(--gray-i); }
+    .b-other{ background:rgba(20,40,60,0.06); color:#5f7688; }
     .res-stats{ font-size:0.8rem; color:var(--sub); font-weight:600; margin-bottom:10px; }
     .res-card.cancel .res-name{ text-decoration:line-through; color:var(--sub); }
     .res-group{ margin-top:24px; }
@@ -152,7 +155,7 @@
     .cd-item{ font-size:0.9rem; padding:4px 0; line-height:1.35; }
     .cd-x{ color:var(--wax); font-weight:700; }
     .cal-day:nth-child(7n){ border-right:none; }
-    .cal-day.other{ background:rgba(255,255,255,0.03); }
+    .cal-day.other{ background:rgba(20,40,60,0.035); }
     .cal-daynum{ font-size:0.72rem; font-weight:700; color:var(--ink); }
     .cal-day.other .cal-daynum{ color:#5f7488; }
     .cal-day.today .cal-daynum{ background:var(--accent); color:#fff; width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.66rem; }
@@ -175,7 +178,7 @@
     .form-card h3{ font-size:1.0rem; font-weight:800; margin-bottom:14px; }
     .field{ margin-bottom:12px; }
     .field label{ font-size:0.7rem; font-weight:700; color:var(--sub); text-transform:uppercase; letter-spacing:0.3px; display:block; margin-bottom:5px; }
-    .field input{ width:100%; padding:12px 13px; border:1px solid var(--line); border-radius:13px; font-size:0.92rem; font-family:inherit; background:rgba(0,0,0,0.22); color:var(--ink); }
+    .field input{ width:100%; padding:12px 13px; border:1px solid var(--line); border-radius:13px; font-size:0.92rem; font-family:inherit; background:#f5f8fb; color:var(--ink); }
     .field input:focus{ outline:none; border-color:var(--accent); }
     .row2{ display:flex; gap:10px; } .row2 .field{ flex:1; }
     .to-msg{ font-size:0.84rem; font-weight:700; margin-top:8px; display:none; }
@@ -204,7 +207,7 @@
     .ob-progress{ background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:14px; }
     .ob-progress .lbl{ display:flex; font-size:0.82rem; font-weight:700; color:var(--sub); margin-bottom:9px; }
     .ob-progress .lbl .pct{ margin-left:auto; color:var(--accent); }
-    .ob-bar{ height:8px; background:rgba(255,255,255,0.09); border-radius:6px; overflow:hidden; }
+    .ob-bar{ height:8px; background:rgba(20,40,60,0.09); border-radius:6px; overflow:hidden; }
     .ob-bar > span{ display:block; height:100%; background:var(--accent); border-radius:6px; transition:width .3s ease; }
     .ob-step{ display:flex; gap:12px; align-items:flex-start; background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-bottom:10px; }
     .ob-step.done{ border-color:var(--accent); }
@@ -228,17 +231,49 @@
     .ob-form .form-card h3{ display:flex; align-items:center; gap:8px; }
     .ob-form .form-card h3 i{ color:var(--accent); font-size:19px; }
     .req{ color:var(--accent); }
-    .field select, .field textarea{ width:100%; padding:12px 13px; border:1px solid var(--line); border-radius:13px; font-size:0.92rem; font-family:inherit; background:rgba(0,0,0,0.22); color:var(--ink); }
+    .field select, .field textarea{ width:100%; padding:12px 13px; border:1px solid var(--line); border-radius:13px; font-size:0.92rem; font-family:inherit; background:#f5f8fb; color:var(--ink); }
     .field textarea{ resize:vertical; min-height:60px; }
     .ob-note{ font-size:0.78rem; color:#f0a274; background:rgba(236,138,94,0.10); border:1px solid rgba(236,138,94,0.35); border-radius:8px; padding:9px 11px; margin-bottom:13px; line-height:1.5; }
     .ob-days{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:4px; }
-    .ob-day{ padding:8px 13px; border:1px solid var(--line); border-radius:8px; background:rgba(0,0,0,0.18); color:var(--ink); font-size:0.82rem; font-weight:700; cursor:pointer; user-select:none; }
+    .ob-day{ padding:8px 13px; border:1px solid var(--line); border-radius:8px; background:#f0f4f8; color:var(--ink); font-size:0.82rem; font-weight:700; cursor:pointer; user-select:none; }
     .ob-day.sel{ background:var(--accent); border-color:var(--accent); color:#fff; }
     .ob-ack{ display:flex; gap:11px; align-items:flex-start; margin-bottom:12px; cursor:pointer; font-size:0.9rem; color:var(--ink); line-height:1.4; }
     .ob-ack input{ width:20px; height:20px; margin-top:1px; accent-color:var(--accent); flex-shrink:0; }
-    .ob-file{ display:block; width:100%; font-size:0.84rem; color:var(--sub); padding:11px; border:1px dashed var(--line); border-radius:12px; background:rgba(0,0,0,0.18); cursor:pointer; }
+    .ob-file{ display:block; width:100%; font-size:0.84rem; color:var(--sub); padding:11px; border:1px dashed var(--line); border-radius:12px; background:#f5f8fb; cursor:pointer; }
     .ob-file::file-selector-button{ background:var(--accent); color:#fff; border:none; border-radius:8px; padding:7px 12px; font-family:inherit; font-weight:700; margin-right:10px; cursor:pointer; }
     .to-msg.err{ color:#f0897c; } .to-msg.ok{ color:var(--mint-i); }
+
+    /* ── deep-blue app background: keep labels that sit directly on it light (white cards keep their dark text) ── */
+    .section-label, .res-stats, .cal-legend, .empty, .fg label, .ob-intro{ color:#8ca0b0; }
+    #view-calendar .cal-bar h3{ color:#eaf1f6; }
+    .home-preview .section-label{ color:var(--sub); }
+
+    /* ═══ DESKTOP / WIDE SCREENS — phone layout is untouched below 640px ═══ */
+    @media(min-width:640px){
+      .app{ max-width:760px; }
+      .tiles{ grid-template-columns:repeat(3,1fr); }
+    }
+    @media(min-width:1000px){
+      .app{ max-width:960px; padding-bottom:96px; }
+      .topbar{ padding:18px 28px 16px; }
+      .home-head{ padding:14px 28px 6px; }
+      .home-head h1{ font-size:2.1rem; }
+      .home-head .when{ font-size:0.92rem; }
+      .notes-banner{ margin:16px 28px 4px; }
+      /* home tiles: 4 across, a touch taller for a balanced desktop grid */
+      .tiles{ grid-template-columns:repeat(4,1fr); gap:16px; padding:16px 28px 4px; }
+      .tile{ padding:16px 18px; }
+      .tile .ic{ width:38px; height:38px; } .tile .ic i{ font-size:21px; }
+      .tile .tl{ font-size:1.12rem; }
+      .home-preview{ margin:16px 28px 6px; padding:16px 20px; }
+      /* section views share the wider frame */
+      .sec-head{ padding:18px 28px 12px; }
+      .sec-body{ padding:8px 28px 24px; }
+      /* forms & the onboarding intake read better capped and centered, not stretched */
+      .ob-form, #obThanks, #view-onboarding .ob-intro{ max-width:680px; margin-left:auto; margin-right:auto; }
+      /* keep the floating home button aligned with the app column, not the whole window */
+      .botbar{ left:50%; right:auto; transform:translateX(-50%); }
+    }
   </style>
 </head>
 <body>
