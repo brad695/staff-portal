@@ -37,6 +37,19 @@
     .topbar .spacer{ flex:1; }
     .icon-btn{ width:40px; height:40px; border-radius:50%; border:none; background:var(--surface); box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; font-size:1.05rem; cursor:pointer; color:var(--ink); text-decoration:none; }
 
+    /* location switcher */
+    .loc-switch{ position:relative; }
+    .loc-btn{ display:flex; align-items:center; gap:6px; border:1px solid rgba(255,255,255,0.25); background:rgba(255,255,255,0.06); color:#fff; border-radius:20px; padding:9px 14px; font-family:inherit; font-size:0.84rem; font-weight:700; cursor:pointer; }
+    .loc-btn i{ font-size:16px; line-height:1; }
+    .loc-btn .chev{ font-size:14px; color:#b9c5d1; transition:transform .15s; }
+    .loc-switch.open .loc-btn .chev{ transform:rotate(180deg); }
+    .loc-menu{ display:none; position:absolute; right:0; top:calc(100% + 8px); background:var(--surface); border-radius:14px; box-shadow:0 8px 28px rgba(0,0,0,0.35); overflow:hidden; z-index:60; min-width:170px; }
+    .loc-switch.open .loc-menu{ display:block; }
+    .loc-item{ display:flex; align-items:center; gap:9px; width:100%; padding:12px 16px; border:none; background:none; font-family:inherit; font-size:0.9rem; font-weight:700; color:var(--ink); cursor:pointer; text-align:left; }
+    .loc-item:hover{ background:#f2f6fa; }
+    .loc-item.cur{ color:var(--accent); }
+    .loc-item .ti-check{ margin-left:auto; }
+
     /* views */
     .view{ display:none; }
     .view.active{ display:block; }
@@ -282,10 +295,14 @@
   <!-- TOP BAR -->
   <div class="topbar">
     <div>
-      <div class="brand">GREYS Memphis</div>
+      <div class="brand">GREYS <span id="brandLoc">Memphis</span></div>
       <div class="loc">Staff Portal</div>
     </div>
     <div class="spacer"></div>
+    <div class="loc-switch" id="locSwitch">
+      <button class="loc-btn" onclick="toggleLocMenu(event)" aria-label="Switch location"><i class="ti ti-map-pin"></i><span id="locBtnLabel">Memphis</span><i class="ti ti-chevron-down chev"></i></button>
+      <div class="loc-menu" id="locMenu"></div>
+    </div>
     <a class="icon-btn" href="manager.html" title="Manager" aria-label="Manager"><i class="ti ti-lock"></i></a>
   </div>
 
@@ -305,7 +322,7 @@
       <button class="tile" id="tile-schedule" onclick="tileTap('schedule')"><span class="ic ic-peach"><i class="ti ti-clock-hour-4"></i></span><span class="tl">Schedule</span></button>
       <button class="tile" id="tile-events" onclick="tileTap('events')"><span class="ic ic-pink"><i class="ti ti-confetti"></i></span><span class="tl">Events</span></button>
       <button class="tile" id="tile-requestoff" onclick="tileTap('requestoff')"><span class="ic ic-butter"><i class="ti ti-beach"></i></span><span class="tl">Request Off</span></button>
-      <button class="tile" id="tile-onboarding" onclick="tileTap('onboarding')"><span class="ic ic-lav"><i class="ti ti-user-plus"></i></span><span class="tl">Onboarding</span></button>
+      <button class="tile" id="tile-onboarding" onclick="tileTap('onboarding')"><span class="ic ic-gray"><i class="ti ti-user-plus"></i></span><span class="tl" style="color:var(--gray-i);">Onboarding</span><span class="badge-soon">Soon</span></button>
       <button class="tile" id="tile-stuff" onclick="tileTap('stuff')"><span class="ic ic-sky"><i class="ti ti-info-circle"></i></span><span class="tl">Stuff to Know</span></button>
     </div>
     <div id="homePreview" class="home-preview" style="display:none;"></div>
@@ -472,7 +489,31 @@ const SB_URL = 'https://vdvtrevhqalmjwhjhjug.supabase.co';
 const SB_KEY = 'sb_publishable_LnlevWReed7K8cFk_f_Mxg_UywktQ5_';
 const FN_URL = SB_URL + '/functions/v1/portal-api';
 const sb = window.supabase.createClient(SB_URL, SB_KEY);
-function wixFetch(params){ return fetch(FN_URL + '?action=reservations&' + params.toString(), { headers:{ apikey:SB_KEY, Authorization:'Bearer '+SB_KEY } }); }
+
+// ── LOCATIONS (default: Memphis) ──
+const LOCATIONS = {
+  memphis:  { label:'Memphis',   wix:'908a32b3-cd51-490f-b1cb-635321094200' },
+  nashville:{ label:'Nashville', wix:'825c5be0-25d3-4d7e-9418-b062b387f448' },
+  franklin: { label:'Franklin',  wix:'10119bc0-206a-415b-8423-660b05f56dec' }
+};
+const LOC = (function(){ const v = localStorage.getItem('greys_loc'); return LOCATIONS[v] ? v : 'memphis'; })();
+function setLoc(slug){
+  if (slug === LOC || !LOCATIONS[slug]){ document.getElementById('locSwitch').classList.remove('open'); return; }
+  localStorage.setItem('greys_loc', slug);
+  location.reload();
+}
+function toggleLocMenu(e){ e.stopPropagation(); document.getElementById('locSwitch').classList.toggle('open'); }
+document.addEventListener('click', () => { const s = document.getElementById('locSwitch'); if (s) s.classList.remove('open'); });
+(function(){
+  const l = LOCATIONS[LOC].label;
+  document.getElementById('brandLoc').textContent = l;
+  document.getElementById('locBtnLabel').textContent = l;
+  document.title = 'GREYS ' + l + ' · Staff';
+  document.getElementById('locMenu').innerHTML = Object.keys(LOCATIONS).map(k =>
+    `<button class="loc-item${k===LOC?' cur':''}" onclick="setLoc('${k}')"><i class="ti ti-map-pin"></i>${LOCATIONS[k].label}${k===LOC?'<i class="ti ti-check"></i>':''}</button>`).join('');
+})();
+
+function wixFetch(params){ params.set('location_id', LOCATIONS[LOC].wix); return fetch(FN_URL + '?action=reservations&' + params.toString(), { headers:{ apikey:SB_KEY, Authorization:'Bearer '+SB_KEY } }); }
 
 function fmt(d){ return d.toISOString().split('T')[0]; }
 function fmtDisplay(s){ if(!s) return ''; return new Date(s+'T12:00:00').toLocaleDateString('en-US',{ weekday:'short', month:'short', day:'numeric' }); }
@@ -500,8 +541,8 @@ function closePreview(){
   document.querySelectorAll('.tile').forEach(t => t.classList.remove('on'));
 }
 function tileTap(section){
-  if (section === 'onboarding' || section === 'stuff'){ closePreview(); showView(section); return; }   // content sections open directly
-  if (_openTile === section){ if (section === 'requestoff'){ closePreview(); return; } showView(section); return; }   // second tap → full section (requestoff just collapses)
+  if (section === 'stuff'){ closePreview(); showView(section); return; }   // content sections open directly
+  if (_openTile === section){ if (section === 'requestoff' || section === 'onboarding'){ closePreview(); return; } showView(section); return; }   // second tap → full section (requestoff/onboarding just collapse)
   _openTile = section;
   document.querySelectorAll('.tile').forEach(t => t.classList.remove('on'));
   const tb = document.getElementById('tile-' + section); if (tb) tb.classList.add('on');
@@ -556,7 +597,8 @@ function renderPreview(section){
     const ts = document.getElementById('toStart'); if (ts) ts.value = fmt(new Date());
     renderTimeOffList();
   } else if (section === 'onboarding'){
-    p.innerHTML = pvHead('<i class="ti ti-user-plus"></i> Onboarding','onboarding') + '<div class="pv-empty">Coming soon.</div>';
+    p.innerHTML = '<div class="pv-head"><span class="pv-title"><i class="ti ti-user-plus"></i> Onboarding</span></div>'
+      + '<div class="pv-empty">Coming soon — new-hire onboarding will live here.</div>';
   }
 }
 
@@ -585,7 +627,7 @@ let _notes=[], _specials=[], _events=[], _info=[];
 function mapItem(r){ return { id:r.id, type:r.type||'note', title:r.title||'', body:r.body||'', date:r.date||'', time:r.time||'', endDate:r.end_date||'', repeat:r.repeat||'none', repeatUntil:r.repeat_until||'' }; }
 async function loadItems(){
   try{
-    const { data } = await sb.from('portal_items').select('*').order('id');
+    const { data } = await sb.from('portal_items').select('*').eq('location', LOC).order('id');
     const items = (data||[]).map(mapItem);
     _notes = items.filter(i=>i.type==='note');
     _specials = items.filter(i=>i.type==='special');
@@ -736,7 +778,7 @@ function renderEventCards(){
 let _schedules=[];
 function mapSched(r){ return { id:r.id, name:r.name, date:r.date, endDate:r.end_date||'', note:r.note||'' }; }
 async function loadSchedules(){
-  try{ const { data } = await sb.from('portal_schedules').select('*').order('date'); _schedules=(data||[]).map(mapSched); }catch(e){ _schedules=[]; }
+  try{ const { data } = await sb.from('portal_schedules').select('*').eq('location', LOC).order('date'); _schedules=(data||[]).map(mapSched); }catch(e){ _schedules=[]; }
   renderSchedCards();
   if (document.getElementById('view-calendar').classList.contains('active')) renderCalendar();
 }
@@ -762,7 +804,7 @@ function renderSchedCards(){
 let _timeOff=[];
 function mapTimeOff(r){ return { id:r.id, name:r.name, startDate:r.start_date, endDate:r.end_date||'', reason:r.reason||'', status:r.status||'pending', submittedAt:r.submitted_at }; }
 async function loadTimeOff(){
-  try{ const { data } = await sb.from('portal_time_off').select('*').order('start_date'); _timeOff=(data||[]).map(mapTimeOff); }catch(e){ _timeOff=[]; }
+  try{ const { data } = await sb.from('portal_time_off').select('*').eq('location', LOC).order('start_date'); _timeOff=(data||[]).map(mapTimeOff); }catch(e){ _timeOff=[]; }
   renderTimeOffList(); renderSchedCards();
   if (document.getElementById('view-calendar').classList.contains('active')) renderCalendar();
 }
@@ -774,7 +816,7 @@ async function submitTimeOff(){
   if(!name){ showToMsg('Please enter your name.', false); return; }
   if(!startDate){ showToMsg('Please pick a start date.', false); return; }
   try{
-    const { error } = await sb.from('portal_time_off').insert({ name, start_date:startDate, end_date:endDate||null, reason });
+    const { error } = await sb.from('portal_time_off').insert({ name, start_date:startDate, end_date:endDate||null, reason, location:LOC });
     if(error) throw error;
     await loadTimeOff();
     document.getElementById('toName').value=''; document.getElementById('toEnd').value=''; document.getElementById('toReason').value='';
