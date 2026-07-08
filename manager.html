@@ -28,6 +28,9 @@
     .head-actions{ display:flex; gap:10px; align-items:center; }
     .head-link{ color:#cfe0ef; font-size:0.8rem; font-weight:600; text-decoration:none; border:1px solid rgba(255,255,255,0.25); padding:6px 12px; border-radius:var(--r); }
     .head-link:hover{ background:rgba(255,255,255,0.08); }
+    .loc-btns{ display:flex; gap:6px; }
+    .loc-btn{ background:none; cursor:pointer; font-family:inherit; }
+    .loc-btn.on{ background:var(--cheddar); border-color:var(--cheddar); color:var(--navy2); font-weight:800; }
 
     .login-wrap{ display:flex; align-items:center; justify-content:center; padding:70px 16px; }
     .login-card{ background:var(--card); border:1px solid var(--line); border-top:4px solid var(--cheddar); border-radius:var(--r); padding:30px; width:360px; max-width:100%; }
@@ -116,10 +119,15 @@
 
 <header>
   <div>
-    <h1>GREYS Memphis · Manager Console</h1>
+    <h1>GREYS <span id="hdrLoc">Memphis</span> · Manager Console</h1>
     <div class="subtitle">Manage everything the staff portal shows</div>
   </div>
   <div class="head-actions">
+    <div class="loc-btns" id="locBtns">
+      <button class="head-link loc-btn" data-loc="memphis" onclick="setLoc('memphis')">Memphis</button>
+      <button class="head-link loc-btn" data-loc="nashville" onclick="setLoc('nashville')">Nashville</button>
+      <button class="head-link loc-btn" data-loc="franklin" onclick="setLoc('franklin')">Franklin</button>
+    </div>
     <a class="head-link" href="index.html">↗ Staff portal</a>
     <button class="head-link" id="logoutBtn" style="background:none;cursor:pointer;display:none;" onclick="logout()">Log out</button>
   </div>
@@ -239,11 +247,27 @@ const FN_URL = SB_URL + '/functions/v1/portal-api';
 const sb = window.supabase.createClient(SB_URL, SB_KEY);
 let MGR_PASS = null;
 
+// ── LOCATIONS (default: Memphis) ──
+const LOC_LABELS = { memphis:'Memphis', nashville:'Nashville', franklin:'Franklin' };
+let LOC = (function(){ const v = localStorage.getItem('greys_loc'); return LOC_LABELS[v] ? v : 'memphis'; })();
+function applyLocHeader(){
+  document.getElementById('hdrLoc').textContent = LOC_LABELS[LOC];
+  document.querySelectorAll('#locBtns .loc-btn').forEach(b => b.classList.toggle('on', b.dataset.loc === LOC));
+  document.title = 'GREYS ' + LOC_LABELS[LOC] + ' · Manager Console';
+}
+function setLoc(slug){
+  if (!LOC_LABELS[slug]) return;
+  LOC = slug;
+  localStorage.setItem('greys_loc', slug);
+  applyLocHeader();
+  if (MGR_PASS) loadAll();
+}
+
 async function fn(action, payload) {
   const res = await fetch(FN_URL + '?action=' + encodeURIComponent(action), {
     method:'POST',
     headers:{ 'Content-Type':'application/json', 'apikey':SB_KEY, 'Authorization':'Bearer '+SB_KEY },
-    body: JSON.stringify(Object.assign({ password: MGR_PASS }, payload || {}))
+    body: JSON.stringify(Object.assign({ password: MGR_PASS, location: LOC }, payload || {}))
   });
   let data={}; try{ data=await res.json(); }catch(_){}
   return { ok:res.ok, status:res.status, data };
@@ -375,7 +399,7 @@ const PENDING_CSV = { items:null, schedules:null };
 async function loadKind(kind){
   const S = SCHEMA[kind];
   try{
-    let q = sb.from(S.table).select('*');
+    let q = sb.from(S.table).select('*').eq('location', LOC);
     q = kind==='items' ? q.order('type').order('date',{nullsFirst:true}) : q.order('date');
     const { data } = await q;
     ROWS[kind] = (data||[]).map(r=>{ const o=S.map(r); o._dirty=false; o._new=false; return o; });
@@ -517,7 +541,7 @@ async function csvImport(kind){
 /* ---- TIME OFF ---- */
 let _to = [];
 async function loadTimeOff(){
-  try{ const { data } = await sb.from('portal_time_off').select('*').order('start_date'); _to = data||[]; }
+  try{ const { data } = await sb.from('portal_time_off').select('*').eq('location', LOC).order('start_date'); _to = data||[]; }
   catch(e){ _to=[]; }
   renderTimeOff();
 }
@@ -541,7 +565,7 @@ function renderTimeOff(){
 async function toSet(id,status){ const r = await fn('set-timeoff', { id, status }); if(r.ok) loadTimeOff(); else alert('❌ '+(r.data.error||'Failed')); }
 async function toDel(id){ if(!confirm('Delete this request?')) return; const r = await fn('delete-timeoff', { id }); if(r.ok) loadTimeOff(); else alert('❌ '+(r.data.error||'Failed')); }
 
-window.addEventListener('DOMContentLoaded', ()=>{ document.getElementById('loginPass').focus(); });
+window.addEventListener('DOMContentLoaded', ()=>{ applyLocHeader(); document.getElementById('loginPass').focus(); });
 </script>
 </body>
 </html>

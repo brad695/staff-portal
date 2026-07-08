@@ -37,18 +37,11 @@
     .topbar .spacer{ flex:1; }
     .icon-btn{ width:40px; height:40px; border-radius:50%; border:none; background:var(--surface); box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; font-size:1.05rem; cursor:pointer; color:var(--ink); text-decoration:none; }
 
-    /* location switcher */
-    .loc-switch{ position:relative; }
-    .loc-btn{ display:flex; align-items:center; gap:6px; border:1px solid rgba(255,255,255,0.25); background:rgba(255,255,255,0.06); color:#fff; border-radius:20px; padding:9px 14px; font-family:inherit; font-size:0.84rem; font-weight:700; cursor:pointer; }
-    .loc-btn i{ font-size:16px; line-height:1; }
-    .loc-btn .chev{ font-size:14px; color:#b9c5d1; transition:transform .15s; }
-    .loc-switch.open .loc-btn .chev{ transform:rotate(180deg); }
-    .loc-menu{ display:none; position:absolute; right:0; top:calc(100% + 8px); background:var(--surface); border-radius:14px; box-shadow:0 8px 28px rgba(0,0,0,0.35); overflow:hidden; z-index:60; min-width:170px; }
-    .loc-switch.open .loc-menu{ display:block; }
-    .loc-item{ display:flex; align-items:center; gap:9px; width:100%; padding:12px 16px; border:none; background:none; font-family:inherit; font-size:0.9rem; font-weight:700; color:var(--ink); cursor:pointer; text-align:left; }
-    .loc-item:hover{ background:#f2f6fa; }
-    .loc-item.cur{ color:var(--accent); }
-    .loc-item .ti-check{ margin-left:auto; }
+    /* location switcher — three segmented buttons under the header */
+    .loc-bar{ display:flex; gap:8px; padding:12px 20px 0; }
+    .loc-tab{ flex:1; padding:10px 0; border-radius:12px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#b9c5d1; font-weight:700; font-size:0.86rem; cursor:pointer; font-family:inherit; }
+    .loc-tab.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+    @media(min-width:1000px){ .loc-bar{ padding:14px 28px 0; } }
 
     /* views */
     .view{ display:none; }
@@ -142,6 +135,12 @@
     .b-ok{ background:var(--mint); color:var(--mint-i); }
     .b-cancel{ background:rgba(224,104,91,0.18); color:#f0897c; }
     .b-req{ background:var(--butter); color:var(--butter-i); }
+    .res-card.req{ flex-wrap:wrap; border-left:4px solid var(--butter-i); }
+    .res-actions{ flex-basis:100%; display:flex; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
+    .res-actions .btn{ padding:9px 16px; font-size:0.82rem; flex:1; }
+    .btn-approve{ background:var(--accent); color:#fff; }
+    .btn-decline{ background:none; border:1px solid #e6a8a0; color:var(--wax); }
+    .res-actions .btn:disabled{ opacity:0.5; }
     .b-other{ background:rgba(20,40,60,0.06); color:#5f7688; }
     .res-stats{ font-size:0.8rem; color:var(--sub); font-weight:600; margin-bottom:10px; }
     .res-card.cancel .res-name{ text-decoration:line-through; color:var(--sub); }
@@ -301,11 +300,14 @@
       <div class="loc">Staff Portal</div>
     </div>
     <div class="spacer"></div>
-    <div class="loc-switch" id="locSwitch">
-      <button class="loc-btn" onclick="toggleLocMenu(event)" aria-label="Switch location"><i class="ti ti-map-pin"></i><span id="locBtnLabel">Memphis</span><i class="ti ti-chevron-down chev"></i></button>
-      <div class="loc-menu" id="locMenu"></div>
-    </div>
     <a class="icon-btn" href="manager.html" title="Manager" aria-label="Manager"><i class="ti ti-lock"></i></a>
+  </div>
+
+  <!-- LOCATION BUTTONS -->
+  <div class="loc-bar" id="locBar">
+    <button class="loc-tab" data-loc="memphis" onclick="setLoc('memphis')">Memphis</button>
+    <button class="loc-tab" data-loc="nashville" onclick="setLoc('nashville')">Nashville</button>
+    <button class="loc-tab" data-loc="franklin" onclick="setLoc('franklin')">Franklin</button>
   </div>
 
   <!-- ══ HOME ══ -->
@@ -500,19 +502,15 @@ const LOCATIONS = {
 };
 const LOC = (function(){ const v = localStorage.getItem('greys_loc'); return LOCATIONS[v] ? v : 'memphis'; })();
 function setLoc(slug){
-  if (slug === LOC || !LOCATIONS[slug]){ document.getElementById('locSwitch').classList.remove('open'); return; }
+  if (slug === LOC || !LOCATIONS[slug]) return;
   localStorage.setItem('greys_loc', slug);
   location.reload();
 }
-function toggleLocMenu(e){ e.stopPropagation(); document.getElementById('locSwitch').classList.toggle('open'); }
-document.addEventListener('click', () => { const s = document.getElementById('locSwitch'); if (s) s.classList.remove('open'); });
 (function(){
   const l = LOCATIONS[LOC].label;
   document.getElementById('brandLoc').textContent = l;
-  document.getElementById('locBtnLabel').textContent = l;
   document.title = 'GREYS ' + l + ' · Staff';
-  document.getElementById('locMenu').innerHTML = Object.keys(LOCATIONS).map(k =>
-    `<button class="loc-item${k===LOC?' cur':''}" onclick="setLoc('${k}')"><i class="ti ti-map-pin"></i>${LOCATIONS[k].label}${k===LOC?'<i class="ti ti-check"></i>':''}</button>`).join('');
+  document.querySelectorAll('#locBar .loc-tab').forEach(b => b.classList.toggle('on', b.dataset.loc === LOC));
 })();
 
 function wixFetch(params){ params.set('location_id', LOCATIONS[LOC].wix); return fetch(FN_URL + '?action=reservations&' + params.toString(), { headers:{ apikey:SB_KEY, Authorization:'Bearer '+SB_KEY } }); }
@@ -856,6 +854,34 @@ async function loadReservations(){
     renderReservations(recs);
   }catch(err){ state.style.display='block'; state.innerHTML='⚠️ Could not load reservations.'; }
 }
+// Approve / decline a REQUESTED reservation (Nashville & Franklin take manual-approval requests).
+// The edge function only allows REQUESTED → RESERVED/DECLINED, and Wix notifies the guest.
+async function resDecide(id, approve, btn){
+  let reason='';
+  if(approve){
+    if(!confirm('Approve this reservation? The guest will get their confirmation.')) return;
+  } else {
+    reason=prompt('Decline this reservation request?\nOptional reason (the guest may see it):');
+    if(reason===null) return;
+  }
+  const cardBtns=btn?btn.parentNode.querySelectorAll('.btn'):[];
+  cardBtns.forEach(b=>b.disabled=true);
+  try{
+    const res=await fetch(FN_URL+'?action=set-reservation', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_KEY },
+      body:JSON.stringify({ id, status:approve?'RESERVED':'DECLINED', reason:(reason||'').trim() })
+    });
+    const d=await res.json().catch(()=>({}));
+    if(!res.ok || !d.ok) throw new Error(d.error||'Update failed');
+    if(_resLoaded && document.getElementById('view-resys').classList.contains('active')) loadReservations();
+    else if(_openTile==='resys') loadResysPreview();
+    else if(_resLoaded) loadReservations();
+  }catch(e){
+    cardBtns.forEach(b=>b.disabled=false);
+    alert('❌ '+(e.message||'Could not update the reservation. Try again.'));
+  }
+}
 // Shared card markup so the main list and the grouped lists render identically.
 function resCardHTML(r){
   const cancel=['CANCELLED','CANCELED','DECLINED','NO_SHOW'];
@@ -868,10 +894,17 @@ function resCardHTML(r){
   const st=r.status||'UNKNOWN'; const isCancel=cancel.includes(st);
   const isReq=st==='REQUESTED';
   const bcls=isCancel?'b-cancel':(isReq?'b-req':(st==='RESERVED'||st==='SEATED'||st==='FINISHED'?'b-ok':'b-other'));
-  return `<div class="res-card${isCancel?' cancel':''}">
+  const actions=isReq
+    ? `<div class="res-actions">
+        <button class="btn btn-approve" onclick="resDecide('${esc(r.id)}',true,this)">✓ Approve</button>
+        <button class="btn btn-decline" onclick="resDecide('${esc(r.id)}',false,this)">✕ Decline</button>
+      </div>`
+    : '';
+  return `<div class="res-card${isCancel?' cancel':''}${isReq?' req':''}">
       <div class="res-when"><div class="t">${esc(tm)}</div><div class="d">${esc(dd)}</div></div>
       <div class="res-main"><div class="res-name">${esc(name)}</div><div class="res-meta">👥 Party of ${esc(party)}</div></div>
       <span class="res-badge ${bcls}">${isReq?'NEEDS APPROVAL':st.replace(/_/g,' ')}</span>
+      ${actions}
     </div>`;
 }
 // millisecond timestamp of a reservation's start, or null when unparseable
