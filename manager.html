@@ -137,10 +137,10 @@
 <div id="loginView" class="login-wrap">
   <div class="login-card">
     <h2>🔒 Manager Login</h2>
-    <p>Enter your admin email and we'll send you a sign-in link. Access is limited to approved admin emails.</p>
-    <input type="email" id="loginEmail" placeholder="you@greyscheese.com" autocomplete="email" onkeydown="if(event.key==='Enter') doLogin()" />
+    <p>Enter the manager password to manage content, schedules and time-off.</p>
+    <input type="password" id="loginPass" placeholder="Manager password" autocomplete="current-password" onkeydown="if(event.key==='Enter') doLogin()" />
     <div class="login-err" id="loginErr"></div>
-    <button class="btn btn-navy" style="width:100%;" id="loginBtn" onclick="doLogin()">Email me a sign-in link</button>
+    <button class="btn btn-navy" style="width:100%;" id="loginBtn" onclick="doLogin()">Unlock</button>
   </div>
 </div>
 
@@ -277,20 +277,18 @@ async function fn(action, payload) {
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtDisplay(d){ if(!d) return ''; return new Date(d+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}); }
 
-/* ── Sign-in: Supabase magic link + shared admin allow-list (app_users) ── */
+/* ── Sign-in: one master password (hidden shared manager account) ── */
+const MANAGER_EMAIL = 'manager@greyscheese.com';
 async function doLogin(){
-  const email = (document.getElementById('loginEmail').value || '').trim();
+  const pw = document.getElementById('loginPass').value;
   const err = document.getElementById('loginErr');
   err.className = 'login-err'; err.textContent = '';
-  if(!email || !email.includes('@')){ err.textContent='Enter your admin email.'; return; }
+  if(!pw){ err.textContent='Enter the manager password.'; return; }
   const btn = document.getElementById('loginBtn'); btn.disabled = true;
-  const { error } = await sb.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: window.location.origin + window.location.pathname }
-  });
+  const { data, error } = await sb.auth.signInWithPassword({ email: MANAGER_EMAIL, password: pw });
   btn.disabled = false;
-  if(error){ err.textContent = '❌ ' + error.message; }
-  else { err.className = 'login-err ok'; err.textContent = '✓ Check your inbox — we sent you a sign-in link.'; }
+  if(error){ err.textContent = '❌ Incorrect password'; return; }
+  enterConsole(data.session);
 }
 async function enterConsole(session){
   SESSION = session;
@@ -587,7 +585,7 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   applyLocHeader();
   const { data } = await sb.auth.getSession();
   if(data && data.session){ enterConsole(data.session); }
-  else { const el = document.getElementById('loginEmail'); if(el) el.focus(); }
+  else { const el = document.getElementById('loginPass'); if(el) el.focus(); }
   sb.auth.onAuthStateChange((_event, session)=>{
     if(session && !SESSION) enterConsole(session);
   });
