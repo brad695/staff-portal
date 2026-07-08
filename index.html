@@ -131,6 +131,9 @@
     .res-main{ flex:1; min-width:0; }
     .res-name{ font-weight:700; font-size:0.98rem; }
     .res-meta{ font-size:0.78rem; color:var(--sub); margin-top:2px; }
+    .res-contact{ display:flex; flex-wrap:wrap; gap:3px 14px; margin-top:4px; font-size:0.78rem; }
+    .res-contact a{ color:var(--accent); text-decoration:none; font-weight:600; word-break:break-all; }
+    .res-note{ font-size:0.78rem; color:var(--sub); margin-top:4px; font-style:italic; }
     .res-badge{ font-size:0.62rem; font-weight:800; text-transform:uppercase; padding:4px 9px; border-radius:20px; white-space:nowrap; }
     .b-ok{ background:var(--mint); color:var(--mint-i); }
     .b-cancel{ background:rgba(224,104,91,0.18); color:#f0897c; }
@@ -891,6 +894,15 @@ function resCardHTML(r){
   const dd=dt?dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
   const name=[who.firstName,who.lastName].filter(Boolean).join(' ')||'Guest';
   const party=det.partySize||'?';
+  const phone=who.phone||'';
+  const email=who.email||'';
+  const srcMap={ ONLINE:'Online', OFFLINE:'Staff-entered', WALK_IN:'Walk-in', UNKNOWN:'' };
+  const src=srcMap[r.source]!==undefined?srcMap[r.source]:(r.source||'');
+  const note=r.teamMessage||det.teamMessage||'';
+  const contact=[
+    phone?`<a href="tel:${esc(phone)}">📞 ${esc(phone)}</a>`:'',
+    email?`<a href="mailto:${esc(email)}">✉️ ${esc(email)}</a>`:''
+  ].filter(Boolean).join('');
   const st=r.status||'UNKNOWN'; const isCancel=cancel.includes(st);
   const isReq=st==='REQUESTED';
   const bcls=isCancel?'b-cancel':(isReq?'b-req':(st==='RESERVED'||st==='SEATED'||st==='FINISHED'?'b-ok':'b-other'));
@@ -902,7 +914,12 @@ function resCardHTML(r){
     : '';
   return `<div class="res-card${isCancel?' cancel':''}${isReq?' req':''}">
       <div class="res-when"><div class="t">${esc(tm)}</div><div class="d">${esc(dd)}</div></div>
-      <div class="res-main"><div class="res-name">${esc(name)}</div><div class="res-meta">👥 Party of ${esc(party)}</div></div>
+      <div class="res-main">
+        <div class="res-name">${esc(name)}</div>
+        <div class="res-meta">👥 Party of ${esc(party)}${src?' · '+esc(src):''}</div>
+        ${contact?`<div class="res-contact">${contact}</div>`:''}
+        ${note?`<div class="res-note">"${esc(note)}"</div>`:''}
+      </div>
       <span class="res-badge ${bcls}">${isReq?'NEEDS APPROVAL':st.replace(/_/g,' ')}</span>
       ${actions}
     </div>`;
