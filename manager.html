@@ -39,6 +39,7 @@
     .login-card input{ width:100%; padding:11px 13px; border:1px solid var(--line); border-radius:var(--r); font-size:0.95rem; background:#fff; margin-bottom:12px; font-family:inherit; }
     .login-card input:focus{ outline:none; border-color:var(--cheddar); }
     .login-err{ font-size:0.8rem; color:var(--wax); min-height:18px; margin-bottom:8px; }
+    .login-err.ok{ color:#0a7a52; }
 
     .tabs{ background:var(--navy2); display:flex; overflow-x:auto; scrollbar-width:none; }
     .tabs::-webkit-scrollbar{ display:none; }
@@ -136,10 +137,10 @@
 <div id="loginView" class="login-wrap">
   <div class="login-card">
     <h2>🔒 Manager Login</h2>
-    <p>Enter the manager password to manage content, schedules and time-off.</p>
-    <input type="password" id="loginPass" placeholder="Password" onkeydown="if(event.key==='Enter') doLogin()" />
+    <p>Enter your admin email and we'll send you a sign-in link. Access is limited to approved admin emails.</p>
+    <input type="email" id="loginEmail" placeholder="you@greyscheese.com" autocomplete="email" onkeydown="if(event.key==='Enter') doLogin()" />
     <div class="login-err" id="loginErr"></div>
-    <button class="btn btn-navy" style="width:100%;" onclick="doLogin()">Unlock</button>
+    <button class="btn btn-navy" style="width:100%;" id="loginBtn" onclick="doLogin()">Email me a sign-in link</button>
   </div>
 </div>
 
@@ -245,7 +246,7 @@ const SB_URL = 'https://vdvtrevhqalmjwhjhjug.supabase.co';
 const SB_KEY = 'sb_publishable_LnlevWReed7K8cFk_f_Mxg_UywktQ5_';
 const FN_URL = SB_URL + '/functions/v1/portal-api';
 const sb = window.supabase.createClient(SB_URL, SB_KEY);
-let MGR_PASS = null;
+let SESSION = null; // Supabase auth session for the signed-in admin
 
 // ── LOCATIONS (default: Memphis) ──
 const LOC_LABELS = { memphis:'Memphis', nashville:'Nashville', franklin:'Franklin' };
@@ -260,14 +261,15 @@ function setLoc(slug){
   LOC = slug;
   localStorage.setItem('greys_loc', slug);
   applyLocHeader();
-  if (MGR_PASS) loadAll();
+  if (SESSION) loadAll();
 }
 
 async function fn(action, payload) {
+  const token = SESSION ? SESSION.access_token : SB_KEY;
   const res = await fetch(FN_URL + '?action=' + encodeURIComponent(action), {
     method:'POST',
-    headers:{ 'Content-Type':'application/json', 'apikey':SB_KEY, 'Authorization':'Bearer '+SB_KEY },
-    body: JSON.stringify(Object.assign({ password: MGR_PASS, location: LOC }, payload || {}))
+    headers:{ 'Content-Type':'application/json', 'apikey':SB_KEY, 'Authorization':'Bearer '+token },
+    body: JSON.stringify(Object.assign({ location: LOC }, payload || {}))
   });
   let data={}; try{ data=await res.json(); }catch(_){}
   return { ok:res.ok, status:res.status, data };
@@ -275,22 +277,38 @@ async function fn(action, payload) {
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtDisplay(d){ if(!d) return ''; return new Date(d+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}); }
 
+/* ── Sign-in: Supabase magic link + shared admin allow-list (app_users) ── */
 async function doLogin(){
-  const p = document.getElementById('loginPass').value;
-  const err = document.getElementById('loginErr'); err.textContent = '';
-  if(!p){ err.textContent='Enter the password.'; return; }
-  const r = await fn('verify', { password:p });
-  if(r.ok){
-    MGR_PASS = p;
-    document.getElementById('loginView').classList.add('hide');
-    document.getElementById('consoleView').classList.remove('hide');
-    document.getElementById('logoutBtn').style.display='inline-block';
-    loadAll();
-  } else {
-    err.textContent = r.status===403 ? '❌ Incorrect password' : '❌ Could not connect';
-  }
+  const email = (document.getElementById('loginEmail').value || '').trim();
+  const err = document.getElementById('loginErr');
+  err.className = 'login-err'; err.textContent = '';
+  if(!email || !email.includes('@')){ err.textContent='Enter your admin email.'; return; }
+  const btn = document.getElementById('loginBtn'); btn.disabled = true;
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.origin + window.location.pathname }
+  });
+  btn.disabled = false;
+  if(error){ err.textContent = '❌ ' + error.message; }
+  else { err.className = 'login-err ok'; err.textContent = '✓ Check your inbox — we sent you a sign-in link.'; }
 }
-function logout(){ MGR_PASS=null; location.reload(); }
+async function enterConsole(session){
+  SESSION = session;
+  const { data: isAdmin, error } = await sb.rpc('is_app_admin');
+  if(error || isAdmin !== true){
+    const err = document.getElementById('loginErr');
+    err.className = 'login-err';
+    err.textContent = '❌ ' + esc(session.user && session.user.email || 'This email') + ' is not an approved admin.';
+    SESSION = null;
+    await sb.auth.signOut();
+    return;
+  }
+  document.getElementById('loginView').classList.add('hide');
+  document.getElementById('consoleView').classList.remove('hide');
+  document.getElementById('logoutBtn').style.display='inline-block';
+  loadAll();
+}
+async function logout(){ SESSION=null; await sb.auth.signOut(); location.reload(); }
 
 function mtab(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -565,7 +583,15 @@ function renderTimeOff(){
 async function toSet(id,status){ const r = await fn('set-timeoff', { id, status }); if(r.ok) loadTimeOff(); else alert('❌ '+(r.data.error||'Failed')); }
 async function toDel(id){ if(!confirm('Delete this request?')) return; const r = await fn('delete-timeoff', { id }); if(r.ok) loadTimeOff(); else alert('❌ '+(r.data.error||'Failed')); }
 
-window.addEventListener('DOMContentLoaded', ()=>{ applyLocHeader(); document.getElementById('loginPass').focus(); });
+window.addEventListener('DOMContentLoaded', async ()=>{
+  applyLocHeader();
+  const { data } = await sb.auth.getSession();
+  if(data && data.session){ enterConsole(data.session); }
+  else { const el = document.getElementById('loginEmail'); if(el) el.focus(); }
+  sb.auth.onAuthStateChange((_event, session)=>{
+    if(session && !SESSION) enterConsole(session);
+  });
+});
 </script>
 </body>
 </html>
