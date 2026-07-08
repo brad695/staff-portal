@@ -183,6 +183,7 @@
     .ag-tag{ font-size:0.58rem; font-weight:800; text-transform:uppercase; letter-spacing:0.2px; padding:3px 8px; border-radius:20px; white-space:nowrap; flex-shrink:0; margin-top:1px; }
     .t-res{ background:rgba(70,140,230,0.18); color:#6cabff; } .t-cancel{ background:rgba(224,104,91,0.18); color:#f0897c; }
     .t-event{ background:rgba(230,90,150,0.18); color:#f27cb1; } .t-special{ background:rgba(46,196,150,0.16); color:#4fd6a0; }
+    .t-class{ background:rgba(214,170,50,0.20); color:#e8c765; }
     .t-sched{ background:rgba(236,138,94,0.20); color:#f0a274; } .t-off{ background:rgba(224,104,91,0.18); color:#f0897c; }
     .ag-strike{ text-decoration:line-through; color:var(--sub); }
 
@@ -856,7 +857,7 @@ async function loadReservations(){
 }
 // Shared card markup so the main list and the grouped lists render identically.
 function resCardHTML(r){
-  const cancel=['CANCELLED','DECLINED','NO_SHOW'];
+  const cancel=['CANCELLED','CANCELED','DECLINED','NO_SHOW'];
   const det=r.details||{}, who=r.reservee||{};
   const dt=det.startDate?new Date(det.startDate):null;
   const tm=dt?dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):'—';
@@ -937,7 +938,7 @@ function renderReservations(recs){
 
 // ═══ CALENDAR ═══
 let _calYear=new Date().getFullYear(), _calMonth=new Date().getMonth(), _selDay=null;
-let _calData={ res:{}, ev:{}, sp:{}, sch:{}, off:{} };
+let _calData={ res:{}, ev:{}, sp:{}, sch:{}, off:{}, cls:{} };
 let _calTarget={ label:'calMonthLabel', list:'agendaList' };   // where the calendar renders: full view or inline home preview
 async function loadCalMonth(y,m){
   _calData.res={};
@@ -955,12 +956,31 @@ async function loadCalMonth(y,m){
   }catch(e){}
 }
 function spanDays(startDate,endDate,mS,mE,cb){ let d=new Date((startDate<mS?mS:startDate)+'T00:00:00'); const lim=((endDate||startDate)>mE?mE:(endDate||startDate)); const e=new Date(lim+'T00:00:00'); for(;d<=e;d.setDate(d.getDate()+1)) cb(fmt(d)); }
+// ── TICKET-SITE CLASSES FEED (public `events` table; location values are capitalized labels) ──
+async function loadCalClasses(mS,mE){
+  _calData.cls={};
+  try{
+    const { data } = await sb.from('events').select('id,title,date,time,kind,capacity')
+      .gte('date',mS).lte('date',mE).ilike('location', LOC).order('date');
+    const evs = data||[];
+    const booked = {};
+    if(evs.length){
+      const { data: regs } = await sb.from('registrations').select('event_id,qty,refunded').in('event_id', evs.map(e=>e.id));
+      (regs||[]).forEach(r=>{ if(!r.refunded) booked[r.event_id]=(booked[r.event_id]||0)+(r.qty||0); });
+    }
+    evs.forEach(e=>{ if(!e.date) return;
+      (_calData.cls[e.date]=_calData.cls[e.date]||[]).push({ title:e.title, time:e.time||'', kind:e.kind||'class', booked:booked[e.id]||0, capacity:e.capacity||0 });
+    });
+    Object.values(_calData.cls).forEach(a=>a.sort((x,y)=>(x.time||'').localeCompare(y.time||'')));
+  }catch(e){ _calData.cls={}; }
+}
 async function renderCalendar(){
   const y=_calYear, m=_calMonth;
   const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const labelEl=document.getElementById(_calTarget.label); if(labelEl) labelEl.textContent=months[m]+' '+y;
   await loadCalMonth(y,m);
   const mS=fmt(new Date(y,m,1)), mE=fmt(new Date(y,m+1,0));
+  await loadCalClasses(mS,mE);
   _calData.ev={}; _events.forEach(ev=>occurrences(ev,mS,mE).forEach(d=>{(_calData.ev[d]=_calData.ev[d]||[]).push({name:ev.name,time:ev.time});}));
   _calData.sp={}; _specials.forEach(s=>{ if((s.repeat||'none')==='none'&&s.endDate&&s.endDate>s.date){ spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sp[k]=_calData.sp[k]||[]).push(s.title);}); } else { occurrences(s,mS,mE).forEach(d=>{(_calData.sp[d]=_calData.sp[d]||[]).push(s.title);}); } });
   _calData.sch={}; _schedules.forEach(s=>{ if(!s.date) return; spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sch[k]=_calData.sch[k]||[]).push(s.name);}); });
@@ -970,18 +990,20 @@ async function renderCalendar(){
 function agRow(tag,label,text){ return '<div class="ag-row"><span class="ag-tag '+tag+'">'+label+'</span><span>'+text+'</span></div>'; }
 function renderAgenda(y,m){
   const list=document.getElementById(_calTarget.list); if(!list) return;
-  const dim=new Date(y,m+1,0).getDate(), today=fmt(new Date()), can=['CANCELLED','DECLINED','NO_SHOW'];
+  const dim=new Date(y,m+1,0).getDate(), today=fmt(new Date()), can=['CANCELLED','CANCELED','DECLINED','NO_SHOW'];
   const now=new Date(); const startDay=(y===now.getFullYear() && m===now.getMonth()) ? now.getDate() : 1;
   let html='', any=false;
   for(let d=startDay; d<=dim; d++){
     const date=fmt(new Date(y,m,d));
-    const res=_calData.res[date]||[], ev=_calData.ev[date]||[], sp=_calData.sp[date]||[], sch=_calData.sch[date]||[], off=_calData.off[date]||[];
-    if(!(res.length||ev.length||sp.length||sch.length||off.length)) continue;
+    const res=_calData.res[date]||[], ev=_calData.ev[date]||[], sp=_calData.sp[date]||[], sch=_calData.sch[date]||[], off=_calData.off[date]||[], cls=_calData.cls[date]||[];
+    if(!(res.length||ev.length||sp.length||sch.length||off.length||cls.length)) continue;
     any=true;
     const dl=new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
     let rows='';
     sp.forEach(t=>rows+=agRow('t-special','Special',esc(t)));
     ev.forEach(e=>rows+=agRow('t-event','Event',esc(e.name)+(e.time?' · '+fmtTime(e.time):'')));
+    cls.forEach(c=>rows+=agRow('t-class', c.kind==='class'?'Class':'Ticketed',
+      (c.time?fmtTime(c.time)+' · ':'')+esc(c.title)+(c.capacity?' · 🎟 '+c.booked+'/'+c.capacity+' booked':'')));
     res.forEach(r=>{ const c=can.includes(r.status); const txt=esc(r.time)+' · '+esc(r.name)+' · 👥'+esc(r.party); rows+=agRow(c?'t-cancel':'t-res', c?'Cancelled':'Reserved', c?'<span class="ag-strike">'+txt+'</span>':txt); });
     sch.forEach(n=>rows+=agRow('t-sched','Schedule',esc(n)));
     off.forEach(n=>rows+=agRow('t-off','Time Off',esc(n)));
