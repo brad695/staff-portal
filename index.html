@@ -141,6 +141,7 @@
     .res-badge{ font-size:0.62rem; font-weight:800; text-transform:uppercase; padding:4px 9px; border-radius:20px; white-space:nowrap; }
     .b-ok{ background:var(--mint); color:var(--mint-i); }
     .b-cancel{ background:rgba(224,104,91,0.18); color:#f0897c; }
+    .b-req{ background:var(--butter); color:var(--butter-i); }
     .b-other{ background:rgba(20,40,60,0.06); color:#5f7688; }
     .res-stats{ font-size:0.8rem; color:var(--sub); font-weight:600; margin-bottom:10px; }
     .res-card.cancel .res-name{ text-decoration:line-through; color:var(--sub); }
@@ -865,11 +866,12 @@ function resCardHTML(r){
   const name=[who.firstName,who.lastName].filter(Boolean).join(' ')||'Guest';
   const party=det.partySize||'?';
   const st=r.status||'UNKNOWN'; const isCancel=cancel.includes(st);
-  const bcls=isCancel?'b-cancel':(st==='RESERVED'||st==='SEATED'||st==='FINISHED'?'b-ok':'b-other');
+  const isReq=st==='REQUESTED';
+  const bcls=isCancel?'b-cancel':(isReq?'b-req':(st==='RESERVED'||st==='SEATED'||st==='FINISHED'?'b-ok':'b-other'));
   return `<div class="res-card${isCancel?' cancel':''}">
       <div class="res-when"><div class="t">${esc(tm)}</div><div class="d">${esc(dd)}</div></div>
       <div class="res-main"><div class="res-name">${esc(name)}</div><div class="res-meta">👥 Party of ${esc(party)}</div></div>
-      <span class="res-badge ${bcls}">${st.replace(/_/g,' ')}</span>
+      <span class="res-badge ${bcls}">${isReq?'NEEDS APPROVAL':st.replace(/_/g,' ')}</span>
     </div>`;
 }
 // millisecond timestamp of a reservation's start, or null when unparseable
