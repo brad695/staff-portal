@@ -11,7 +11,8 @@ Three static pages, no app server (nothing to cold-start):
 ## Staff scheduling
 
 - **Roster:** Manager console → Staff Scheduling → Employees. Name, email (the staff login), role, active/inactive. Per location. CSV import supported (`name, email, role, active`).
-- **Weekly grid:** click any cell to add a shift (start, end, role, note); click a shift chip to edit or delete. The editor's **Copy this shift to…** row duplicates it to any employee/day of the week (defaults to the next day; repeat for multiple copies). **⧉ Copy previous week** clones last week's shifts into the current week. Week starts Monday.
+- **Weekly grids:** the Staff Scheduling tab shows all three locations at once (shared week navigation), each with its own **🖨 Print** (opens a printer-friendly landscape sheet) and **⧉ Copy previous week** buttons. Click any cell to add a shift (start, end, role, note); click a shift chip to edit or delete. The editor's **Copy this shift to…** row duplicates it to any employee/day of the week. Week starts Monday.
+- **Locations:** the console has no global location switch — each editor (Content, Schedules, Employees, Time Off) has its own location dropdown. The manager console is desktop-first; the staff pages are phone-first.
 - **Time off:** approved requests (Time Off tab) automatically show as red **OFF** badges on both the manager grid and schedule.html, matched by employee **name** (case-insensitive) — keep roster names identical to the names staff use on the request form. The shift editor warns if you schedule someone on an approved off day.
 - **Employee login:** schedule.html looks the email up in `portal_employees` (active only) — no password, no signup. Remembered in the browser; "Not you?" switches user.
 
