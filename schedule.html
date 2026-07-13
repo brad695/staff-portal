@@ -88,6 +88,21 @@
     .grid-empty{ text-align:center; color:var(--sub); padding:30px 10px; font-size:0.88rem; }
     .foot-note{ color:#b9c5d1; font-size:0.78rem; padding:2px 22px 16px; }
     .foot-note a{ color:var(--accent); font-weight:700; text-decoration:none; }
+
+    /* request time off */
+    .ro-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+    .ro-f{ font-size:0.68rem; font-weight:800; color:var(--sub); text-transform:uppercase; letter-spacing:0.3px; }
+    .ro-f input{ width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:12px; font-family:inherit; font-size:0.95rem; margin-top:5px; display:block; background:var(--surface); color:var(--ink); }
+    .ro-f input:focus{ outline:none; border-color:var(--accent); }
+    .ro-msg{ font-size:0.84rem; font-weight:600; margin-top:10px; min-height:18px; }
+    .ro-req{ display:flex; align-items:center; gap:10px; padding:9px 2px; border-top:1px solid var(--line); font-size:0.86rem; }
+    .ro-req:first-of-type{ margin-top:8px; }
+    .ro-req .r-when{ flex:1; font-weight:600; }
+    .ro-req .r-why{ color:var(--sub); font-size:0.78rem; }
+    .ro-badge{ font-size:0.62rem; font-weight:800; text-transform:uppercase; padding:3px 9px; border-radius:20px; }
+    .ro-pending{ background:var(--butter); color:var(--butter-i); }
+    .ro-approved{ background:var(--mint); color:var(--mint-i); }
+    .ro-denied{ background:var(--offbg); color:var(--offink); }
     .hide{ display:none; }
   </style>
 </head>
@@ -146,8 +161,20 @@
           </table>
         </div>
       </div>
+
+      <div class="card">
+        <h3><i class="ti ti-beach"></i> Request time off</h3>
+        <div class="ro-grid">
+          <label class="ro-f">Start<input type="date" id="roStart"></label>
+          <label class="ro-f">End (optional)<input type="date" id="roEnd"></label>
+        </div>
+        <label class="ro-f" style="display:block;margin-bottom:12px;">Reason (optional)<input type="text" id="roReason" placeholder="e.g. vacation"></label>
+        <button class="btn btn-primary btn-block" onclick="roSubmit()">Submit request</button>
+        <div class="ro-msg" id="roMsg"></div>
+        <div id="roList"></div>
+      </div>
     </div>
-    <div class="foot-note">Need a day off? <a href="index.html">Request time off on the portal</a> — approved days show here automatically.</div>
+    <div class="foot-note">Approved days show on the schedule automatically.</div>
   </div>
 
 </div>
@@ -215,7 +242,43 @@ function enter(emp){
   document.getElementById('schedView').classList.remove('hide');
   document.getElementById('logoutBtn').classList.remove('hide');
   loadWeek();
+  const rs = document.getElementById('roStart'); if(rs && !rs.value) rs.value = iso(new Date());
+  roLoad();
 }
+
+/* ── request time off (name comes from the logged-in employee) ── */
+async function roSubmit(){
+  if(!ME) return;
+  const start = document.getElementById('roStart').value;
+  const end = document.getElementById('roEnd').value;
+  const reason = document.getElementById('roReason').value.trim();
+  const m = document.getElementById('roMsg');
+  if(!start){ m.style.color='var(--wax)'; m.textContent='Pick a start date.'; return; }
+  if(end && end < start){ m.style.color='var(--wax)'; m.textContent='End date is before the start date.'; return; }
+  const { error } = await sb.from('portal_time_off').insert({
+    name: ME.name, start_date: start, end_date: end || null, reason, location: LOC
+  });
+  if(error){ m.style.color='var(--wax)'; m.textContent='Could not submit — try again.'; return; }
+  m.style.color='var(--mint-i)'; m.textContent='✅ Request sent — your manager will review it.';
+  document.getElementById('roEnd').value=''; document.getElementById('roReason').value='';
+  roLoad();
+}
+async function roLoad(){
+  if(!ME) return;
+  const el = document.getElementById('roList'); if(!el) return;
+  const { data } = await sb.from('portal_time_off').select('*')
+    .eq('location', LOC).ilike('name', idPat(ME.name))
+    .order('start_date', {ascending:false}).limit(8);
+  const rows = data||[];
+  el.innerHTML = rows.map(r=>{
+    const range = fmtShort(r.start_date) + (r.end_date && r.end_date!==r.start_date ? ' – '+fmtShort(r.end_date) : '');
+    const st = r.status||'pending';
+    return '<div class="ro-req"><div class="r-when">'+range
+      +(r.reason?'<div class="r-why">"'+esc(r.reason)+'"</div>':'')+'</div>'
+      +'<span class="ro-badge ro-'+st+'">'+st+'</span></div>';
+  }).join('');
+}
+function fmtShort(d){ return new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
 function logout(){
   localStorage.removeItem('greys_emp_id');
   localStorage.removeItem('greys_emp_email');
