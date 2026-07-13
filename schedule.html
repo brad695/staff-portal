@@ -114,8 +114,8 @@
   <div id="loginView" class="login-wrap">
     <div class="login-card">
       <h2>👋 Who are you?</h2>
-      <p>Enter the email your manager has on file and we'll pull up your schedule. No password needed.</p>
-      <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email"
+      <p>Enter the employee ID your manager gave you and we'll pull up your schedule. No password needed.</p>
+      <input type="text" id="loginEmail" placeholder="Your employee ID" autocomplete="off" autocapitalize="off"
              onkeydown="if(event.key==='Enter') doLogin()" />
       <div class="login-err" id="loginErr"></div>
       <button class="btn btn-primary btn-block" id="loginBtn" onclick="doLogin()">View my schedule</button>
@@ -171,6 +171,7 @@ function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; 
 function fmtTime(t){ if(!t) return ''; const [h,m]=t.split(':').map(Number); const ap=h>=12?'p':'a'; const hh=((h+11)%12)+1; return hh+(m?':'+String(m).padStart(2,'0'):'')+ap; }
 function shiftHours(s){ const [h1,m1]=s.start_time.split(':').map(Number); const [h2,m2]=s.end_time.split(':').map(Number); let hrs=(h2+m2/60)-(h1+m1/60); if(hrs<=0) hrs+=24; return hrs; }
 function normName(s){ return String(s||'').trim().toLowerCase(); }
+function idPat(s){ return String(s).replace(/([\\%_])/g, '\\$1'); } // literal match for ilike
 
 function applyLoc(){
   document.getElementById('hdrLoc').textContent = LOC_LABELS[LOC];
@@ -185,24 +186,24 @@ function setLoc(slug){
   relogin();
 }
 
-/* ── login by email (no password — internal tool) ── */
+/* ── login by employee ID (no password — internal tool) ── */
 async function doLogin(){
-  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const empId = document.getElementById('loginEmail').value.trim();
   const err = document.getElementById('loginErr'); err.textContent='';
-  if(!email || !email.includes('@')){ err.textContent='Enter your email address.'; return; }
+  if(!empId){ err.textContent='Enter your employee ID.'; return; }
   const btn = document.getElementById('loginBtn'); btn.disabled = true;
-  const { data, error } = await sb.from('portal_employees').select('*').ilike('email', email).eq('active', true);
+  const { data, error } = await sb.from('portal_employees').select('*').ilike('login_id', idPat(empId)).eq('active', true);
   btn.disabled = false;
   if(error){ err.textContent='Could not check right now — try again.'; return; }
-  if(!data || !data.length){ err.textContent='No employee found with that email. Ask your manager to add you.'; return; }
+  if(!data || !data.length){ err.textContent='No employee found with that ID. Ask your manager to add you.'; return; }
   const match = data.find(e=>e.location===LOC) || data[0];
-  localStorage.setItem('greys_emp_email', email);
+  localStorage.setItem('greys_emp_id', empId);
   enter(match);
 }
 async function relogin(){
-  const email = localStorage.getItem('greys_emp_email');
-  if(!email) return logout();
-  const { data } = await sb.from('portal_employees').select('*').ilike('email', email).eq('active', true);
+  const empId = localStorage.getItem('greys_emp_id');
+  if(!empId) return logout();
+  const { data } = await sb.from('portal_employees').select('*').ilike('login_id', idPat(empId)).eq('active', true);
   if(!data || !data.length) return logout();
   enter(data.find(e=>e.location===LOC) || data[0]);
 }
@@ -216,6 +217,7 @@ function enter(emp){
   loadWeek();
 }
 function logout(){
+  localStorage.removeItem('greys_emp_id');
   localStorage.removeItem('greys_emp_email');
   ME = null;
   document.getElementById('schedView').classList.add('hide');
@@ -308,9 +310,9 @@ function render(){
 
 window.addEventListener('DOMContentLoaded', async ()=>{
   applyLoc();
-  const saved = localStorage.getItem('greys_emp_email');
+  const saved = localStorage.getItem('greys_emp_id');
   if(saved){
-    const { data } = await sb.from('portal_employees').select('*').ilike('email', saved).eq('active', true);
+    const { data } = await sb.from('portal_employees').select('*').ilike('login_id', idPat(saved)).eq('active', true);
     if(data && data.length){ enter(data.find(e=>e.location===LOC) || data[0]); return; }
   }
   document.getElementById('loginEmail').focus();

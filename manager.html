@@ -244,7 +244,7 @@
 
     <div class="section-card">
       <h2>🧑‍🍳 Employees</h2>
-      <div class="hint">The roster per location. <strong>Email</strong> is how staff log in to their schedule (no password). Set someone <strong>inactive</strong> to hide them from the grid without deleting their history.</div>
+      <div class="hint">The roster per location. <strong>Employee ID</strong> is what staff type to open their schedule (no password) — it can be anything: a number, initials, a nickname. Set someone <strong>inactive</strong> to hide them from the grid without deleting their history.</div>
       <div class="toolbar">
         <select class="loc-sel" id="employeesLoc" onchange="kindLoc('employees',this.value)"><option value="memphis">Memphis</option><option value="nashville">Nashville</option><option value="franklin">Franklin</option></select>
         <button class="btn btn-ghost btn-sm" onclick="addTyped(null,'employees')">＋ Add employee</button>
@@ -255,7 +255,7 @@
       <div class="bulk-wrap">
         <table class="bulk">
           <thead><tr>
-            <th style="width:26%;">Name</th><th style="width:30%;">Email (login)</th><th style="width:22%;">Role</th><th>Status</th><th></th>
+            <th style="width:26%;">Name</th><th style="width:30%;">Employee ID (login)</th><th style="width:22%;">Role</th><th>Status</th><th></th>
           </tr></thead>
           <tbody id="employeesBody"></tbody>
         </table>
@@ -264,7 +264,7 @@
         <strong style="font-size:0.82rem;">Import CSV:</strong>
         <input type="file" id="employeesCsv" accept=".csv,text/csv" onchange="csvPick('employees')" />
         <button class="btn btn-navy btn-sm" onclick="csvImport('employees')">Import rows</button>
-        <span class="csv-status" id="employeesCsvStatus">Columns: name, email, role, active</span>
+        <span class="csv-status" id="employeesCsvStatus">Columns: name, employee_id, role, active</span>
       </div>
       <div class="row-actions"><span class="save-msg" id="employeesMsg"></span></div>
     </div>
@@ -495,17 +495,17 @@ const SCHEMA = {
     body:'employeesBody', msg:'employeesMsg', csvStatus:'employeesCsvStatus', table:'portal_employees',
     cols:[
       {k:'name', type:'text', ph:'Full name'},
-      {k:'email', type:'text', ph:'email — used to log in'},
+      {k:'login_id', type:'text', ph:'ID staff type to log in (anything)'},
       {k:'role', type:'text', ph:'Server / Kitchen / Bar'},
       {k:'active', type:'select', options:['active','inactive']}
     ],
     valid:r=> !!r.name,
-    map:r=>({ id:r.id, name:r.name, email:r.email||'', role:r.role||'', active:(r.active===false||r.active==='inactive')?'inactive':'active' }),
-    csvHeader:['name','email','role','active'],
-    csvRowToObj:c=>({ name:c[0]||'', email:c[1]||'', role:c[2]||'', active:(c[3]||'active').toLowerCase().trim()==='inactive'?'inactive':'active' }),
+    map:r=>({ id:r.id, name:r.name, login_id:r.login_id||'', role:r.role||'', active:(r.active===false||r.active==='inactive')?'inactive':'active' }),
+    csvHeader:['name','employee_id','role','active'],
+    csvRowToObj:c=>({ name:c[0]||'', login_id:c[1]||'', role:c[2]||'', active:(c[3]||'active').toLowerCase().trim()==='inactive'?'inactive':'active' }),
     sample:[
-      ['Maya Johnson','maya@example.com','Server','active'],
-      ['Sam Lee','sam@example.com','Kitchen','active']
+      ['Maya Johnson','maya01','Server','active'],
+      ['Sam Lee','sam22','Kitchen','active']
     ],
     addAction:'add-employee', updateAction:'update-employee', deleteAction:'delete-employee', bulkAction:'bulk-add-employees'
   }
