@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="theme-color" content="#0c2637"/>
+  <title>Schedule - GREYS</title>
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+  <style>
+    :root{
+      --bg:#0c2637; --surface:#ffffff; --ink:#1a3140; --sub:#5f7688; --line:#dce3ea;
+      --accent:#ec8a5e; --wax:#d75a4b; --shadow:0 2px 10px rgba(20,40,60,0.08),0 0 0 1px rgba(20,40,60,0.05);
+      --mint:rgba(46,196,150,0.16); --mint-i:#2a9d76;
+      --butter:rgba(214,170,50,0.20); --butter-i:#a37f19;
+      --offbg:#fdeceb; --offink:#c04537;
+    }
+    *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    body{ font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; }
+    .app{ max-width:960px; margin:0 auto; min-height:100vh; padding-bottom:40px; }
+
+    .topbar{ display:flex; align-items:center; gap:10px; padding:16px 20px 14px; border-bottom:1px solid rgba(255,255,255,0.12); }
+    .topbar .brand{ font-weight:800; font-size:1.35rem; letter-spacing:-0.3px; color:#fff; }
+    .topbar .loc{ font-size:0.74rem; color:#b9c5d1; font-weight:600; }
+    .topbar .spacer{ flex:1; }
+    .top-link{ color:#b9c5d1; font-size:0.8rem; font-weight:700; text-decoration:none; border:1px solid rgba(255,255,255,0.2); padding:7px 13px; border-radius:12px; background:none; cursor:pointer; font-family:inherit; }
+    .top-link:hover{ color:#fff; }
+
+    .loc-bar{ display:flex; gap:8px; padding:12px 20px 0; }
+    .loc-tab{ flex:1; padding:10px 0; border-radius:12px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#b9c5d1; font-weight:700; font-size:0.86rem; cursor:pointer; font-family:inherit; }
+    .loc-tab.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+
+    /* login */
+    .login-wrap{ display:flex; justify-content:center; padding:56px 20px; }
+    .login-card{ background:var(--surface); border-radius:18px; box-shadow:var(--shadow); padding:26px; width:380px; max-width:100%; }
+    .login-card h2{ font-size:1.2rem; font-weight:800; letter-spacing:-0.3px; }
+    .login-card p{ font-size:0.86rem; color:var(--sub); margin:6px 0 16px; line-height:1.5; }
+    .login-card input{ width:100%; padding:12px 14px; border:1px solid var(--line); border-radius:12px; font-size:1rem; font-family:inherit; margin-bottom:12px; }
+    .login-card input:focus{ outline:none; border-color:var(--accent); }
+    .login-err{ font-size:0.8rem; color:var(--wax); min-height:18px; margin-bottom:6px; }
+    .btn{ border:none; border-radius:14px; padding:12px 18px; font-size:0.92rem; font-weight:700; cursor:pointer; font-family:inherit; }
+    .btn-primary{ background:var(--accent); color:#fff; }
+    .btn-block{ width:100%; }
+
+    /* week nav */
+    .wk-nav{ display:flex; align-items:center; gap:10px; padding:18px 20px 6px; color:#fff; }
+    .wk-btn{ width:38px; height:38px; border-radius:50%; border:none; background:var(--surface); box-shadow:var(--shadow); font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--ink); }
+    .wk-label{ font-weight:800; font-size:1.05rem; letter-spacing:-0.3px; flex:1; text-align:center; }
+    .wk-today{ border:1px solid rgba(255,255,255,0.25); background:none; color:#b9c5d1; border-radius:12px; padding:8px 13px; font-weight:700; font-size:0.78rem; cursor:pointer; font-family:inherit; }
+
+    .sec{ padding:10px 18px 0; }
+    .card{ background:var(--surface); border-radius:18px; box-shadow:var(--shadow); padding:16px; margin-bottom:14px; }
+    .card h3{ font-size:0.95rem; font-weight:800; margin-bottom:10px; display:flex; align-items:center; gap:7px; }
+    .card h3 i{ color:var(--accent); font-size:18px; }
+    .card h3 .hours{ margin-left:auto; font-size:0.76rem; color:var(--sub); font-weight:700; }
+
+    .my-row{ display:flex; align-items:center; gap:12px; padding:10px 2px; border-top:1px solid var(--line); }
+    .my-row:first-of-type{ border-top:none; }
+    .my-day{ min-width:64px; text-align:center; }
+    .my-day .dw{ font-size:0.68rem; font-weight:800; text-transform:uppercase; color:var(--accent); }
+    .my-day .dn{ font-weight:800; font-size:1.05rem; }
+    .my-main{ flex:1; }
+    .my-time{ font-weight:700; font-size:0.95rem; }
+    .my-role{ font-size:0.78rem; color:var(--sub); margin-top:1px; }
+    .my-note{ font-size:0.78rem; color:var(--sub); font-style:italic; margin-top:1px; }
+    .off-pill{ display:inline-block; background:var(--offbg); color:var(--offink); font-size:0.66rem; font-weight:800; text-transform:uppercase; padding:3px 9px; border-radius:20px; }
+    .my-empty{ color:var(--sub); font-size:0.88rem; padding:8px 2px; }
+
+    /* full grid */
+    .grid-wrap{ overflow-x:auto; border-radius:12px; border:1px solid var(--line); }
+    table.grid{ border-collapse:collapse; width:100%; min-width:760px; font-size:0.78rem; }
+    table.grid th{ background:#f4f7f9; padding:8px 6px; text-align:center; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.3px; color:var(--sub); border-bottom:1px solid var(--line); white-space:nowrap; }
+    table.grid th.today, table.grid td.today{ background:#fdf3ee; }
+    table.grid th:first-child{ text-align:left; padding-left:10px; }
+    table.grid td{ border-bottom:1px solid var(--line); border-right:1px solid #eef2f5; padding:6px; vertical-align:top; min-width:92px; }
+    table.grid td.emp{ font-weight:700; white-space:nowrap; padding:8px 10px; min-width:120px; position:sticky; left:0; background:var(--surface); border-right:1px solid var(--line); }
+    table.grid td.emp .er{ display:block; font-weight:500; font-size:0.68rem; color:var(--sub); }
+    tr.me td{ background:#fff8e9; }
+    tr.me td.emp{ background:#fff4d9; }
+    .sh{ background:var(--mint); color:var(--mint-i); border-radius:8px; padding:4px 6px; margin-bottom:4px; font-weight:700; line-height:1.3; }
+    .sh .r{ display:block; font-weight:600; font-size:0.68rem; opacity:0.85; }
+    .cell-off{ background:var(--offbg); color:var(--offink); border-radius:8px; padding:4px 6px; font-weight:800; text-transform:uppercase; font-size:0.66rem; text-align:center; }
+    .grid-empty{ text-align:center; color:var(--sub); padding:30px 10px; font-size:0.88rem; }
+    .foot-note{ color:#b9c5d1; font-size:0.78rem; padding:2px 22px 16px; }
+    .foot-note a{ color:var(--accent); font-weight:700; text-decoration:none; }
+    .hide{ display:none; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div>
+      <div class="brand">GREYS <span style="color:var(--accent)">Schedule</span></div>
+      <div class="loc" id="hdrLoc">Memphis</div>
+    </div>
+    <div class="spacer"></div>
+    <a class="top-link" href="index.html">Portal</a>
+    <button class="top-link hide" id="logoutBtn" onclick="logout()">Not you?</button>
+  </div>
+
+  <div class="loc-bar" id="locBar">
+    <button class="loc-tab" data-loc="memphis" onclick="setLoc('memphis')">Memphis</button>
+    <button class="loc-tab" data-loc="nashville" onclick="setLoc('nashville')">Nashville</button>
+    <button class="loc-tab" data-loc="franklin" onclick="setLoc('franklin')">Franklin</button>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="loginView" class="login-wrap">
+    <div class="login-card">
+      <h2>👋 Who are you?</h2>
+      <p>Enter the email your manager has on file and we'll pull up your schedule. No password needed.</p>
+      <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email"
+             onkeydown="if(event.key==='Enter') doLogin()" />
+      <div class="login-err" id="loginErr"></div>
+      <button class="btn btn-primary btn-block" id="loginBtn" onclick="doLogin()">View my schedule</button>
+    </div>
+  </div>
+
+  <!-- SCHEDULE -->
+  <div id="schedView" class="hide">
+    <div class="wk-nav">
+      <button class="wk-btn" onclick="moveWeek(-1)" aria-label="Previous week">‹</button>
+      <div class="wk-label" id="wkLabel"></div>
+      <button class="wk-btn" onclick="moveWeek(1)" aria-label="Next week">›</button>
+      <button class="wk-today" onclick="goToday()">Today</button>
+    </div>
+
+    <div class="sec">
+      <div class="card">
+        <h3><i class="ti ti-user"></i> <span id="myName">My week</span> <span class="hours" id="myHours"></span></h3>
+        <div id="myWeek"></div>
+      </div>
+
+      <div class="card">
+        <h3><i class="ti ti-users"></i> Full schedule</h3>
+        <div class="grid-wrap">
+          <table class="grid">
+            <thead><tr id="gridHead"></tr></thead>
+            <tbody id="gridBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="foot-note">Need a day off? <a href="index.html">Request time off on the portal</a> — approved days show here automatically.</div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SB_URL = 'https://vdvtrevhqalmjwhjhjug.supabase.co';
+const SB_KEY = 'sb_publishable_LnlevWReed7K8cFk_f_Mxg_UywktQ5_';
+const sb = window.supabase.createClient(SB_URL, SB_KEY);
+
+const LOC_LABELS = { memphis:'Memphis', nashville:'Nashville', franklin:'Franklin' };
+let LOC = (function(){ const v = localStorage.getItem('greys_loc'); return LOC_LABELS[v] ? v : 'memphis'; })();
+let ME = null;            // my employee row
+let weekStart = mondayOf(new Date());
+let EMPLOYEES = [], SHIFTS = [], TIMEOFF = [];
+
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function mondayOf(d){ const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); const dow=(x.getDay()+6)%7; x.setDate(x.getDate()-dow); return x; }
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function fmtTime(t){ if(!t) return ''; const [h,m]=t.split(':').map(Number); const ap=h>=12?'p':'a'; const hh=((h+11)%12)+1; return hh+(m?':'+String(m).padStart(2,'0'):'')+ap; }
+function shiftHours(s){ const [h1,m1]=s.start_time.split(':').map(Number); const [h2,m2]=s.end_time.split(':').map(Number); let hrs=(h2+m2/60)-(h1+m1/60); if(hrs<=0) hrs+=24; return hrs; }
+function normName(s){ return String(s||'').trim().toLowerCase(); }
+
+function applyLoc(){
+  document.getElementById('hdrLoc').textContent = LOC_LABELS[LOC];
+  document.querySelectorAll('#locBar .loc-tab').forEach(b=>b.classList.toggle('on', b.dataset.loc===LOC));
+}
+function setLoc(slug){
+  if(!LOC_LABELS[slug]) return;
+  LOC = slug; localStorage.setItem('greys_loc', slug);
+  applyLoc();
+  if(document.getElementById('schedView').classList.contains('hide')) return;
+  // my record may not exist at this location — re-check quietly
+  relogin();
+}
+
+/* ── login by email (no password — internal tool) ── */
+async function doLogin(){
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const err = document.getElementById('loginErr'); err.textContent='';
+  if(!email || !email.includes('@')){ err.textContent='Enter your email address.'; return; }
+  const btn = document.getElementById('loginBtn'); btn.disabled = true;
+  const { data, error } = await sb.from('portal_employees').select('*').ilike('email', email).eq('active', true);
+  btn.disabled = false;
+  if(error){ err.textContent='Could not check right now — try again.'; return; }
+  if(!data || !data.length){ err.textContent='No employee found with that email. Ask your manager to add you.'; return; }
+  const match = data.find(e=>e.location===LOC) || data[0];
+  localStorage.setItem('greys_emp_email', email);
+  enter(match);
+}
+async function relogin(){
+  const email = localStorage.getItem('greys_emp_email');
+  if(!email) return logout();
+  const { data } = await sb.from('portal_employees').select('*').ilike('email', email).eq('active', true);
+  if(!data || !data.length) return logout();
+  enter(data.find(e=>e.location===LOC) || data[0]);
+}
+function enter(emp){
+  ME = emp;
+  if(emp.location !== LOC){ LOC = emp.location; localStorage.setItem('greys_loc', LOC); }
+  applyLoc();
+  document.getElementById('loginView').classList.add('hide');
+  document.getElementById('schedView').classList.remove('hide');
+  document.getElementById('logoutBtn').classList.remove('hide');
+  loadWeek();
+}
+function logout(){
+  localStorage.removeItem('greys_emp_email');
+  ME = null;
+  document.getElementById('schedView').classList.add('hide');
+  document.getElementById('logoutBtn').classList.add('hide');
+  document.getElementById('loginView').classList.remove('hide');
+  const el=document.getElementById('loginEmail'); el.value=''; el.focus();
+}
+
+/* ── week data ── */
+function moveWeek(n){ weekStart = addDays(weekStart, n*7); loadWeek(); }
+function goToday(){ weekStart = mondayOf(new Date()); loadWeek(); }
+
+async function loadWeek(){
+  const from = iso(weekStart), to = iso(addDays(weekStart,6));
+  const s = weekStart, e = addDays(weekStart,6);
+  const sameMonth = s.getMonth()===e.getMonth();
+  document.getElementById('wkLabel').textContent =
+    s.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' – ' +
+    e.toLocaleDateString('en-US', sameMonth?{day:'numeric'}:{month:'short',day:'numeric'});
+  const [emps, shifts, toff] = await Promise.all([
+    sb.from('portal_employees').select('*').eq('location', LOC).eq('active', true).order('name'),
+    sb.from('portal_shifts').select('*').eq('location', LOC).gte('date', from).lte('date', to).order('start_time'),
+    sb.from('portal_time_off').select('*').eq('location', LOC).eq('status','approved').lte('start_date', to)
+  ]);
+  EMPLOYEES = emps.data||[];
+  SHIFTS = shifts.data||[];
+  TIMEOFF = (toff.data||[]).filter(r => (r.end_date||r.start_date) >= from);
+  render();
+}
+
+function offFor(emp, dateIso){
+  const n = normName(emp.name);
+  return TIMEOFF.some(r => normName(r.name)===n && r.start_date<=dateIso && (r.end_date||r.start_date)>=dateIso);
+}
+
+function render(){
+  const days = []; for(let i=0;i<7;i++) days.push(addDays(weekStart,i));
+  const todayIso = iso(new Date());
+
+  /* my week */
+  document.getElementById('myName').textContent = ME ? ME.name.split(' ')[0] + "'s week" : 'My week';
+  const mine = SHIFTS.filter(s=>s.employee_id===(ME&&ME.id));
+  let total = 0; mine.forEach(s=>total+=shiftHours(s));
+  document.getElementById('myHours').textContent = mine.length ? (Math.round(total*10)/10)+' hrs · '+mine.length+' shift'+(mine.length>1?'s':'') : '';
+  const rows = [];
+  days.forEach(d=>{
+    const di = iso(d);
+    const dayShifts = mine.filter(s=>s.date===di);
+    const isOff = ME && offFor(ME, di);
+    if(!dayShifts.length && !isOff) return;
+    const dayCell = '<div class="my-day"><div class="dw">'+d.toLocaleDateString('en-US',{weekday:'short'})+'</div><div class="dn">'+d.getDate()+'</div></div>';
+    if(isOff && !dayShifts.length){
+      rows.push('<div class="my-row">'+dayCell+'<div class="my-main"><span class="off-pill">Approved off</span></div></div>');
+    }
+    dayShifts.forEach(s=>{
+      rows.push('<div class="my-row">'+dayCell+'<div class="my-main">'+
+        '<div class="my-time">'+fmtTime(s.start_time)+' – '+fmtTime(s.end_time)+'</div>'+
+        (s.role?'<div class="my-role">'+esc(s.role)+'</div>':'')+
+        (s.note?'<div class="my-note">'+esc(s.note)+'</div>':'')+
+        '</div>'+(isOff?'<span class="off-pill">off?</span>':'')+'</div>');
+    });
+  });
+  document.getElementById('myWeek').innerHTML = rows.length ? rows.join('') : '<div class="my-empty">No shifts scheduled this week. 🎉</div>';
+
+  /* full grid */
+  document.getElementById('gridHead').innerHTML = '<th>Employee</th>' + days.map(d=>{
+    const cls = iso(d)===todayIso ? ' class="today"' : '';
+    return '<th'+cls+'>'+d.toLocaleDateString('en-US',{weekday:'short'})+'<br>'+d.toLocaleDateString('en-US',{month:'numeric',day:'numeric'})+'</th>';
+  }).join('');
+  const body = document.getElementById('gridBody');
+  if(!EMPLOYEES.length){
+    body.innerHTML = '<tr><td colspan="8"><div class="grid-empty">No employees set up for '+LOC_LABELS[LOC]+' yet.</div></td></tr>';
+    return;
+  }
+  body.innerHTML = EMPLOYEES.map(emp=>{
+    const me = ME && emp.id===ME.id;
+    const cells = days.map(d=>{
+      const di = iso(d);
+      const cls = di===todayIso ? ' class="today"' : '';
+      const bits = [];
+      if(offFor(emp, di)) bits.push('<div class="cell-off">Off</div>');
+      SHIFTS.filter(s=>s.employee_id===emp.id && s.date===di).forEach(s=>{
+        bits.push('<div class="sh">'+fmtTime(s.start_time)+'–'+fmtTime(s.end_time)+(s.role?'<span class="r">'+esc(s.role)+'</span>':'')+'</div>');
+      });
+      return '<td'+cls+'>'+bits.join('')+'</td>';
+    }).join('');
+    return '<tr'+(me?' class="me"':'')+'><td class="emp">'+esc(emp.name)+(emp.role?'<span class="er">'+esc(emp.role)+'</span>':'')+'</td>'+cells+'</tr>';
+  }).join('');
+}
+
+window.addEventListener('DOMContentLoaded', async ()=>{
+  applyLoc();
+  const saved = localStorage.getItem('greys_emp_email');
+  if(saved){
+    const { data } = await sb.from('portal_employees').select('*').ilike('email', saved).eq('active', true);
+    if(data && data.length){ enter(data.find(e=>e.location===LOC) || data[0]); return; }
+  }
+  document.getElementById('loginEmail').focus();
+});
+</script>
+</body>
+</html>

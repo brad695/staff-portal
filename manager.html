@@ -148,6 +148,7 @@
   <div class="tabs">
     <div class="tab active" onclick="mtab('content')">Notes · Specials · Events</div>
     <div class="tab" onclick="mtab('schedules')">Schedules</div>
+    <div class="tab" onclick="mtab('scheduling')">Staff Scheduling</div>
     <div class="tab" onclick="mtab('timeoff')">Time Off</div>
     <div class="tab" onclick="mtab('onboarding')">Onboarding</div>
   </div>
@@ -217,6 +218,80 @@
         <span class="csv-status" id="schedulesCsvStatus">Columns: name, date, end_date, note</span>
       </div>
       <div class="row-actions"><span class="save-msg" id="schedulesMsg"></span></div>
+    </div>
+  </div>
+
+  <!-- STAFF SCHEDULING -->
+  <div id="panel-scheduling" class="panel">
+    <div class="section-card">
+      <h2>🗓️ Weekly Schedule</h2>
+      <div class="hint">Click any cell to add a shift; click an existing shift to edit or delete it. Approved time off shows as a red <strong>OFF</strong> badge — you'll be warned if you schedule over it. Staff see this at <strong>schedule.html</strong> by entering their email.</div>
+      <div class="toolbar">
+        <button class="btn btn-ghost btn-sm" onclick="sgMove(-1)">‹ Prev</button>
+        <strong id="sgLabel" style="min-width:170px;text-align:center;"></strong>
+        <button class="btn btn-ghost btn-sm" onclick="sgMove(1)">Next ›</button>
+        <button class="btn btn-ghost btn-sm" onclick="sgToday()">Today</button>
+        <div class="spacer"></div>
+        <button class="btn btn-navy btn-sm" onclick="sgCopyPrev()">⧉ Copy previous week</button>
+      </div>
+      <div class="bulk-wrap">
+        <table class="bulk" id="sgTable" style="min-width:980px;">
+          <thead><tr id="sgHead"></tr></thead>
+          <tbody id="sgBody"></tbody>
+        </table>
+      </div>
+      <div class="row-actions"><span class="save-msg" id="sgMsg"></span></div>
+    </div>
+
+    <div class="section-card">
+      <h2>🧑‍🍳 Employees</h2>
+      <div class="hint">The roster for this location. <strong>Email</strong> is how staff log in to their schedule (no password). Set someone <strong>inactive</strong> to hide them from the grid without deleting their history.</div>
+      <div class="toolbar">
+        <button class="btn btn-ghost btn-sm" onclick="addTyped(null,'employees')">＋ Add employee</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('employees')">⬇ CSV template</button>
+        <div class="spacer"></div>
+        <button class="btn btn-gold" onclick="saveAll('employees')">Save all changes</button>
+      </div>
+      <div class="bulk-wrap">
+        <table class="bulk">
+          <thead><tr>
+            <th style="width:26%;">Name</th><th style="width:30%;">Email (login)</th><th style="width:22%;">Role</th><th>Status</th><th></th>
+          </tr></thead>
+          <tbody id="employeesBody"></tbody>
+        </table>
+      </div>
+      <div class="csv-box">
+        <strong style="font-size:0.82rem;">Import CSV:</strong>
+        <input type="file" id="employeesCsv" accept=".csv,text/csv" onchange="csvPick('employees')" />
+        <button class="btn btn-navy btn-sm" onclick="csvImport('employees')">Import rows</button>
+        <span class="csv-status" id="employeesCsvStatus">Columns: name, email, role, active</span>
+      </div>
+      <div class="row-actions"><span class="save-msg" id="employeesMsg"></span></div>
+    </div>
+  </div>
+
+  <!-- shift editor modal -->
+  <div id="shiftModal" style="display:none;position:fixed;inset:0;background:rgba(11,33,56,0.55);z-index:100;align-items:center;justify-content:center;padding:16px;">
+    <div style="background:var(--card);border-radius:var(--r);border-top:4px solid var(--cheddar);padding:24px;width:380px;max-width:100%;">
+      <h2 style="font-size:1rem;color:var(--navy);margin-bottom:2px;" id="shTitle">Add shift</h2>
+      <div class="hint" id="shSub" style="margin-bottom:12px;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <label style="font-size:0.72rem;font-weight:700;color:var(--sub);">START
+          <input type="time" id="shStart" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r);font-family:inherit;margin-top:3px;"></label>
+        <label style="font-size:0.72rem;font-weight:700;color:var(--sub);">END
+          <input type="time" id="shEnd" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r);font-family:inherit;margin-top:3px;"></label>
+      </div>
+      <label style="font-size:0.72rem;font-weight:700;color:var(--sub);display:block;margin-bottom:10px;">ROLE / POSITION
+        <input type="text" id="shRole" placeholder="Server, Kitchen, Bar…" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r);font-family:inherit;margin-top:3px;"></label>
+      <label style="font-size:0.72rem;font-weight:700;color:var(--sub);display:block;margin-bottom:14px;">NOTE (optional)
+        <input type="text" id="shNote" placeholder="e.g. training Maya" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r);font-family:inherit;margin-top:3px;"></label>
+      <div class="login-err" id="shErr"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-gold" onclick="shSave()">Save shift</button>
+        <button class="btn btn-wax" id="shDelBtn" style="display:none;" onclick="shDelete()">🗑 Delete</button>
+        <div style="flex:1;"></div>
+        <button class="btn btn-ghost" onclick="shClose()">Cancel</button>
+      </div>
     </div>
   </div>
 
@@ -314,7 +389,7 @@ function mtab(name){
   document.querySelector('.tab[onclick*="'+name+'"]').classList.add('active');
   document.getElementById('panel-'+name).classList.add('active');
 }
-function loadAll(){ loadKind('items'); loadKind('schedules'); loadTimeOff(); loadOnboarding(); }
+function loadAll(){ loadKind('items'); loadKind('schedules'); loadKind('employees'); sgLoad(); loadTimeOff(); loadOnboarding(); }
 
 /* ---- Onboarding submissions ---- */
 let OB_SUBS=[];
@@ -407,16 +482,34 @@ const SCHEMA = {
       ['Kitchen — Jul 14','2026-07-14','','Prep team in at 7am']
     ],
     addAction:'add-schedule', updateAction:'update-schedule', deleteAction:'delete-schedule', bulkAction:'bulk-add-schedules'
+  },
+  employees: {
+    body:'employeesBody', msg:'employeesMsg', csvStatus:'employeesCsvStatus', table:'portal_employees',
+    cols:[
+      {k:'name', type:'text', ph:'Full name'},
+      {k:'email', type:'text', ph:'email — used to log in'},
+      {k:'role', type:'text', ph:'Server / Kitchen / Bar'},
+      {k:'active', type:'select', options:['active','inactive']}
+    ],
+    valid:r=> !!r.name,
+    map:r=>({ id:r.id, name:r.name, email:r.email||'', role:r.role||'', active:(r.active===false||r.active==='inactive')?'inactive':'active' }),
+    csvHeader:['name','email','role','active'],
+    csvRowToObj:c=>({ name:c[0]||'', email:c[1]||'', role:c[2]||'', active:(c[3]||'active').toLowerCase().trim()==='inactive'?'inactive':'active' }),
+    sample:[
+      ['Maya Johnson','maya@example.com','Server','active'],
+      ['Sam Lee','sam@example.com','Kitchen','active']
+    ],
+    addAction:'add-employee', updateAction:'update-employee', deleteAction:'delete-employee', bulkAction:'bulk-add-employees'
   }
 };
-const ROWS = { items:[], schedules:[] };
-const PENDING_CSV = { items:null, schedules:null };
+const ROWS = { items:[], schedules:[], employees:[] };
+const PENDING_CSV = { items:null, schedules:null, employees:null };
 
 async function loadKind(kind){
   const S = SCHEMA[kind];
   try{
     let q = sb.from(S.table).select('*').eq('location', LOC);
-    q = kind==='items' ? q.order('type').order('date',{nullsFirst:true}) : q.order('date');
+    q = kind==='items' ? q.order('type').order('date',{nullsFirst:true}) : kind==='employees' ? q.order('name') : q.order('date');
     const { data } = await q;
     ROWS[kind] = (data||[]).map(r=>{ const o=S.map(r); o._dirty=false; o._new=false; return o; });
   }catch(e){ ROWS[kind]=[]; }
@@ -474,7 +567,7 @@ async function rowDelete(kind,i){
   if(row._new){ ROWS[kind].splice(i,1); renderKind(kind); return; }
   if(!confirm('Delete this row? This removes it immediately.')) return;
   const r = await fn(SCHEMA[kind].deleteAction, { id: row.id });
-  if(r.ok){ ROWS[kind].splice(i,1); renderKind(kind); }
+  if(r.ok){ ROWS[kind].splice(i,1); renderKind(kind); if(kind==='employees') sgLoad(); }
   else msg(kind, '❌ '+(r.data.error||'Delete failed'), true);
 }
 async function saveAll(kind){
@@ -491,6 +584,7 @@ async function saveAll(kind){
   if(errs){ msg(kind, '❌ '+errs+' change(s) failed to save.', true); }
   else { msg(kind, '✅ Saved '+(dirty.length+news.length)+' change(s).', false); }
   await loadKind(kind);
+  if(kind==='employees') sgLoad();
 }
 function msg(kind, text, isErr){
   const el = document.getElementById(SCHEMA[kind].msg);
@@ -578,8 +672,115 @@ function renderTimeOff(){
       '</div></div></div>';
   }).join('');
 }
-async function toSet(id,status){ const r = await fn('set-timeoff', { id, status }); if(r.ok) loadTimeOff(); else alert('❌ '+(r.data.error||'Failed')); }
-async function toDel(id){ if(!confirm('Delete this request?')) return; const r = await fn('delete-timeoff', { id }); if(r.ok) loadTimeOff(); else alert('❌ '+(r.data.error||'Failed')); }
+async function toSet(id,status){ const r = await fn('set-timeoff', { id, status }); if(r.ok){ loadTimeOff(); sgLoad(); } else alert('❌ '+(r.data.error||'Failed')); }
+async function toDel(id){ if(!confirm('Delete this request?')) return; const r = await fn('delete-timeoff', { id }); if(r.ok){ loadTimeOff(); sgLoad(); } else alert('❌ '+(r.data.error||'Failed')); }
+
+/* ===================================================================
+   STAFF SCHEDULING — weekly shift grid
+   =================================================================== */
+let sgWeek = sgMonday(new Date());
+let SG_EMPS = [], SG_SHIFTS = [], SG_TO = [];
+let SH_CTX = null; // { empId, date, shiftId }
+
+function sgMonday(d){ const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); x.setDate(x.getDate()-((x.getDay()+6)%7)); return x; }
+function sgIso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function sgAdd(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function sgFmtT(t){ if(!t) return ''; const p=t.split(':').map(Number); const ap=p[0]>=12?'p':'a'; return (((p[0]+11)%12)+1)+(p[1]?':'+String(p[1]).padStart(2,'0'):'')+ap; }
+function sgHours(s){ const a=s.start_time.split(':').map(Number), b=s.end_time.split(':').map(Number); let h=(b[0]+b[1]/60)-(a[0]+a[1]/60); if(h<=0) h+=24; return h; }
+function sgOff(name,di){ const n=String(name||'').trim().toLowerCase(); return SG_TO.some(r=>String(r.name||'').trim().toLowerCase()===n && r.start_date<=di && (r.end_date||r.start_date)>=di); }
+function sgMove(n){ sgWeek=sgAdd(sgWeek,n*7); sgLoad(); }
+function sgToday(){ sgWeek=sgMonday(new Date()); sgLoad(); }
+
+async function sgLoad(){
+  if(!SESSION) return;
+  const from=sgIso(sgWeek), to=sgIso(sgAdd(sgWeek,6));
+  document.getElementById('sgLabel').textContent =
+    sgWeek.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+sgAdd(sgWeek,6).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  try{
+    const [emps, shifts, toff] = await Promise.all([
+      sb.from('portal_employees').select('*').eq('location',LOC).eq('active',true).order('name'),
+      sb.from('portal_shifts').select('*').eq('location',LOC).gte('date',from).lte('date',to).order('start_time'),
+      sb.from('portal_time_off').select('*').eq('location',LOC).eq('status','approved').lte('start_date',to)
+    ]);
+    SG_EMPS=emps.data||[]; SG_SHIFTS=shifts.data||[];
+    SG_TO=(toff.data||[]).filter(r=>(r.end_date||r.start_date)>=from);
+  }catch(e){ SG_EMPS=[]; SG_SHIFTS=[]; SG_TO=[]; }
+  sgRender();
+}
+
+function sgRender(){
+  const days=[]; for(let i=0;i<7;i++) days.push(sgAdd(sgWeek,i));
+  const todayIso = sgIso(new Date());
+  document.getElementById('sgHead').innerHTML = '<th style="min-width:150px;">Employee</th>'+days.map(d=>{
+    const hl = sgIso(d)===todayIso ? ' style="background:var(--wax);"' : '';
+    return '<th'+hl+'>'+d.toLocaleDateString('en-US',{weekday:'short'})+' '+d.toLocaleDateString('en-US',{month:'numeric',day:'numeric'})+'</th>';
+  }).join('');
+  const body=document.getElementById('sgBody');
+  if(!SG_EMPS.length){
+    body.innerHTML='<tr><td class="empty-row" colspan="8">No active employees for this location yet — add them below.</td></tr>';
+    return;
+  }
+  body.innerHTML = SG_EMPS.map(emp=>{
+    let hrs=0;
+    const cells = days.map(d=>{
+      const di=sgIso(d);
+      const bits=[];
+      if(sgOff(emp.name,di)) bits.push('<div style="background:#f6dad4;color:var(--wax);border-radius:2px;padding:2px 6px;margin:2px 0;font-size:0.62rem;font-weight:800;text-transform:uppercase;text-align:center;">Off</div>');
+      SG_SHIFTS.filter(s=>s.employee_id===emp.id && s.date===di).forEach(s=>{
+        hrs+=sgHours(s);
+        bits.push('<div onclick="event.stopPropagation();openShift('+emp.id+',\''+di+'\','+s.id+')" style="background:#d1fae5;color:#065f46;border-radius:2px;padding:3px 6px;margin:2px 0;font-size:0.74rem;font-weight:700;cursor:pointer;line-height:1.3;">'
+          +sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time)
+          +(s.role?'<span style="display:block;font-weight:600;font-size:0.64rem;opacity:0.85;">'+esc(s.role)+'</span>':'')+'</div>');
+      });
+      return '<td onclick="openShift('+emp.id+',\''+di+'\')" style="cursor:pointer;min-width:104px;" title="Click to add a shift">'+bits.join('')+'</td>';
+    }).join('');
+    return '<tr><td style="font-weight:700;white-space:nowrap;">'+esc(emp.name)
+      +'<span style="display:block;font-weight:500;font-size:0.7rem;color:var(--sub);">'+esc(emp.role||'')+(hrs?' · '+(Math.round(hrs*10)/10)+' hrs':'')+'</span></td>'+cells+'</tr>';
+  }).join('');
+}
+
+function openShift(empId, date, shiftId){
+  const emp = SG_EMPS.find(e=>e.id===empId); if(!emp) return;
+  SH_CTX = { empId, date, shiftId: shiftId||null };
+  const sh = shiftId ? SG_SHIFTS.find(s=>s.id===shiftId) : null;
+  document.getElementById('shTitle').textContent = (sh?'Edit':'Add')+' shift';
+  document.getElementById('shSub').textContent = emp.name+' · '
+    +new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})
+    +(sgOff(emp.name,date)?' — ⚠️ has approved time off this day':'');
+  document.getElementById('shStart').value = sh?String(sh.start_time).slice(0,5):'16:00';
+  document.getElementById('shEnd').value = sh?String(sh.end_time).slice(0,5):'22:00';
+  document.getElementById('shRole').value = sh?(sh.role||''):(emp.role||'');
+  document.getElementById('shNote').value = sh?(sh.note||''):'';
+  document.getElementById('shErr').textContent='';
+  document.getElementById('shDelBtn').style.display = sh?'inline-block':'none';
+  document.getElementById('shiftModal').style.display='flex';
+}
+function shClose(){ document.getElementById('shiftModal').style.display='none'; SH_CTX=null; }
+async function shSave(){
+  if(!SH_CTX) return;
+  const start=document.getElementById('shStart').value, end=document.getElementById('shEnd').value;
+  const err=document.getElementById('shErr');
+  if(!start||!end){ err.textContent='Start and end times are required.'; return; }
+  const payload={ employee_id:SH_CTX.empId, date:SH_CTX.date, start_time:start, end_time:end,
+    role:document.getElementById('shRole').value, note:document.getElementById('shNote').value };
+  const r = SH_CTX.shiftId ? await fn('update-shift', Object.assign({id:SH_CTX.shiftId},payload)) : await fn('add-shift', payload);
+  if(!r.ok){ err.textContent='❌ '+(r.data.error||'Save failed'); return; }
+  shClose(); sgLoad();
+}
+async function shDelete(){
+  if(!SH_CTX||!SH_CTX.shiftId) return;
+  const r=await fn('delete-shift',{id:SH_CTX.shiftId});
+  if(!r.ok){ document.getElementById('shErr').textContent='❌ '+(r.data.error||'Delete failed'); return; }
+  shClose(); sgLoad();
+}
+async function sgCopyPrev(){
+  if(!confirm('Copy every shift from the previous week into this week?')) return;
+  const r=await fn('copy-week',{ from: sgIso(sgAdd(sgWeek,-7)), to: sgIso(sgWeek) });
+  const el=document.getElementById('sgMsg');
+  if(r.ok){ el.className='save-msg'; el.textContent='✅ Copied '+(r.data.inserted||0)+' shift(s).'; sgLoad(); }
+  else { el.className='save-msg err'; el.textContent='❌ '+(r.data.error||'Copy failed'); }
+  setTimeout(()=>{ el.textContent=''; },4500);
+}
 
 window.addEventListener('DOMContentLoaded', async ()=>{
   applyLocHeader();
