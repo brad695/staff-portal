@@ -69,7 +69,10 @@
     .my-role{ font-size:0.78rem; color:var(--sub); margin-top:1px; }
     .my-note{ font-size:0.78rem; color:var(--sub); font-style:italic; margin-top:1px; }
     .off-pill{ display:inline-block; background:var(--offbg); color:var(--offink); font-size:0.66rem; font-weight:800; text-transform:uppercase; padding:3px 9px; border-radius:20px; }
-    .loc-tag{ display:inline-block; background:rgba(70,140,230,0.14); color:#3d76c2; font-size:0.6rem; font-weight:800; padding:1px 6px; border-radius:10px; vertical-align:1px; }
+    .loc-tag{ display:inline-block; font-size:0.6rem; font-weight:800; padding:1px 6px; border-radius:10px; vertical-align:1px; }
+    .loc-tag.nashville{ background:rgba(70,140,230,0.16); color:#3d76c2; }   /* NSH — blue */
+    .loc-tag.franklin{ background:rgba(236,138,94,0.20); color:#c96a3e; }    /* FRK — orange */
+    .loc-tag.memphis{ background:rgba(139,127,232,0.18); color:#7a6bd6; }    /* MEM — purple */
     .my-empty{ color:var(--sub); font-size:0.88rem; padding:8px 2px; }
 
     /* full grid */
@@ -341,7 +344,7 @@ function render(){
       rows.push('<div class="my-row">'+dayCell+'<div class="my-main"><span class="off-pill">Approved off</span></div></div>');
     }
     dayShifts.forEach(s=>{
-      const locTag = LOC_GROUPS[LOC].length>1 ? ' <span class="loc-tag">'+LOC_SHORT[s.location]+'</span>' : '';
+      const locTag = LOC_GROUPS[LOC].length>1 ? ' <span class="loc-tag '+s.location+'">'+LOC_SHORT[s.location]+'</span>' : '';
       rows.push('<div class="my-row">'+dayCell+'<div class="my-main">'+
         '<div class="my-time">'+fmtTime(s.start_time)+' – '+fmtTime(s.end_time)+locTag+'</div>'+
         (s.role?'<div class="my-role">'+esc(s.role)+'</div>':'')+
@@ -369,7 +372,7 @@ function render(){
       const bits = [];
       if(offFor(emp, di)) bits.push('<div class="cell-off">Off</div>');
       SHIFTS.filter(s=>s.employee_id===emp.id && s.date===di).forEach(s=>{
-        const locTag = LOC_GROUPS[LOC].length>1 ? ' <span class="loc-tag">'+LOC_SHORT[s.location]+'</span>' : '';
+        const locTag = LOC_GROUPS[LOC].length>1 ? ' <span class="loc-tag '+s.location+'">'+LOC_SHORT[s.location]+'</span>' : '';
         bits.push('<div class="sh">'+fmtTime(s.start_time)+'–'+fmtTime(s.end_time)+locTag+(s.role?'<span class="r">'+esc(s.role)+'</span>':'')+'</div>');
       });
       return '<td'+cls+'>'+bits.join('')+'</td>';
