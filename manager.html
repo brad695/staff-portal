@@ -285,6 +285,15 @@
         <input type="text" id="shRole" placeholder="Server, Kitchen, Bar…" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r);font-family:inherit;margin-top:3px;"></label>
       <label style="font-size:0.72rem;font-weight:700;color:var(--sub);display:block;margin-bottom:14px;">NOTE (optional)
         <input type="text" id="shNote" placeholder="e.g. training Maya" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r);font-family:inherit;margin-top:3px;"></label>
+      <div id="shCopyWrap" style="display:none;border-top:1px solid var(--line);margin:4px 0 14px;padding-top:12px;">
+        <div style="font-size:0.72rem;font-weight:700;color:var(--sub);margin-bottom:6px;">COPY THIS SHIFT TO…</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="shCopyEmp" style="flex:1.2;min-width:0;padding:9px;border:1px solid var(--line);border-radius:var(--r);font-family:inherit;background:#fff;"></select>
+          <select id="shCopyDay" style="flex:1;min-width:0;padding:9px;border:1px solid var(--line);border-radius:var(--r);font-family:inherit;background:#fff;"></select>
+          <button class="btn btn-navy btn-sm" onclick="shCopy()">⧉ Copy</button>
+        </div>
+        <div style="font-size:0.76rem;color:var(--sub);margin-top:6px;min-height:16px;" id="shCopyMsg"></div>
+      </div>
       <div class="login-err" id="shErr"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-gold" onclick="shSave()">Save shift</button>
@@ -753,7 +762,42 @@ function openShift(empId, date, shiftId){
   document.getElementById('shNote').value = sh?(sh.note||''):'';
   document.getElementById('shErr').textContent='';
   document.getElementById('shDelBtn').style.display = sh?'inline-block':'none';
+  // copy-to controls (only when editing an existing shift)
+  const wrap = document.getElementById('shCopyWrap');
+  wrap.style.display = sh?'block':'none';
+  document.getElementById('shCopyMsg').textContent='';
+  if(sh){
+    document.getElementById('shCopyEmp').innerHTML = SG_EMPS.map(e=>
+      '<option value="'+e.id+'"'+(e.id===empId?' selected':'')+'>'+esc(e.name)+'</option>').join('');
+    const dayOpts=[];
+    for(let i=0;i<7;i++){
+      const d=sgAdd(sgWeek,i), di=sgIso(d);
+      dayOpts.push('<option value="'+di+'">'+d.toLocaleDateString('en-US',{weekday:'short',month:'numeric',day:'numeric'})+'</option>');
+    }
+    document.getElementById('shCopyDay').innerHTML = dayOpts.join('');
+    // default target: the next day (stays in this week; Sunday defaults to itself for an employee-copy)
+    const next = sgIso(sgAdd(new Date(date+'T12:00:00'),1));
+    const sel = document.getElementById('shCopyDay');
+    sel.value = next; if(sel.value!==next) sel.value = date;
+  }
   document.getElementById('shiftModal').style.display='flex';
+}
+async function shCopy(){
+  if(!SH_CTX || !SH_CTX.shiftId) return;
+  const m = document.getElementById('shCopyMsg');
+  const empId = Number(document.getElementById('shCopyEmp').value);
+  const date = document.getElementById('shCopyDay').value;
+  const start = document.getElementById('shStart').value, end = document.getElementById('shEnd').value;
+  if(!start||!end){ m.textContent='❌ Set start and end times first.'; return; }
+  if(empId===SH_CTX.empId && date===SH_CTX.date){ m.textContent='That’s this shift’s own slot — pick another day or employee.'; return; }
+  const emp = SG_EMPS.find(e=>e.id===empId);
+  const r = await fn('add-shift', { employee_id:empId, date, start_time:start, end_time:end,
+    role:document.getElementById('shRole').value, note:document.getElementById('shNote').value });
+  if(!r.ok){ m.textContent='❌ '+(r.data.error||'Copy failed'); return; }
+  const when = new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'numeric',day:'numeric'});
+  m.textContent = '✅ Copied to '+(emp?emp.name:'employee')+' · '+when
+    +(emp && sgOff(emp.name,date)?' — ⚠️ they have approved time off that day':'');
+  sgLoad(); // refresh the grid behind the modal; keep it open for more copies
 }
 function shClose(){ document.getElementById('shiftModal').style.display='none'; SH_CTX=null; }
 async function shSave(){
