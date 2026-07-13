@@ -69,6 +69,7 @@
     .my-role{ font-size:0.78rem; color:var(--sub); margin-top:1px; }
     .my-note{ font-size:0.78rem; color:var(--sub); font-style:italic; margin-top:1px; }
     .off-pill{ display:inline-block; background:var(--offbg); color:var(--offink); font-size:0.66rem; font-weight:800; text-transform:uppercase; padding:3px 9px; border-radius:20px; }
+    .loc-tag{ display:inline-block; background:rgba(70,140,230,0.14); color:#3d76c2; font-size:0.6rem; font-weight:800; padding:1px 6px; border-radius:10px; vertical-align:1px; }
     .my-empty{ color:var(--sub); font-size:0.88rem; padding:8px 2px; }
 
     /* full grid */
@@ -186,6 +187,9 @@ const SB_KEY = 'sb_publishable_LnlevWReed7K8cFk_f_Mxg_UywktQ5_';
 const sb = window.supabase.createClient(SB_URL, SB_KEY);
 
 const LOC_LABELS = { memphis:'Memphis', nashville:'Nashville', franklin:'Franklin' };
+// Nashville & Franklin share one staff pool — staff there see both sites' shifts together.
+const LOC_GROUPS = { memphis:['memphis'], nashville:['nashville','franklin'], franklin:['nashville','franklin'] };
+const LOC_SHORT = { memphis:'MEM', nashville:'NSH', franklin:'FRK' };
 let LOC = (function(){ const v = localStorage.getItem('greys_loc'); return LOC_LABELS[v] ? v : 'memphis'; })();
 let ME = null;            // my employee row
 let weekStart = mondayOf(new Date());
@@ -201,8 +205,8 @@ function normName(s){ return String(s||'').trim().toLowerCase(); }
 function idPat(s){ return String(s).replace(/([\\%_])/g, '\\$1'); } // literal match for ilike
 
 function applyLoc(){
-  document.getElementById('hdrLoc').textContent = LOC_LABELS[LOC];
-  document.querySelectorAll('#locBar .loc-tab').forEach(b=>b.classList.toggle('on', b.dataset.loc===LOC));
+  document.getElementById('hdrLoc').textContent = LOC_GROUPS[LOC].map(l=>LOC_LABELS[l]).join(' · ');
+  document.querySelectorAll('#locBar .loc-tab').forEach(b=>b.classList.toggle('on', LOC_GROUPS[LOC].includes(b.dataset.loc)));
 }
 function setLoc(slug){
   if(!LOC_LABELS[slug]) return;
@@ -267,7 +271,7 @@ async function roLoad(){
   if(!ME) return;
   const el = document.getElementById('roList'); if(!el) return;
   const { data } = await sb.from('portal_time_off').select('*')
-    .eq('location', LOC).ilike('name', idPat(ME.name))
+    .in('location', LOC_GROUPS[LOC]).ilike('name', idPat(ME.name))
     .order('start_date', {ascending:false}).limit(8);
   const rows = data||[];
   el.innerHTML = rows.map(r=>{
@@ -300,10 +304,11 @@ async function loadWeek(){
   document.getElementById('wkLabel').textContent =
     s.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' – ' +
     e.toLocaleDateString('en-US', sameMonth?{day:'numeric'}:{month:'short',day:'numeric'});
+  const GROUP = LOC_GROUPS[LOC];
   const [emps, shifts, toff] = await Promise.all([
-    sb.from('portal_employees').select('*').eq('location', LOC).eq('active', true).order('name'),
-    sb.from('portal_shifts').select('*').eq('location', LOC).gte('date', from).lte('date', to).order('start_time'),
-    sb.from('portal_time_off').select('*').eq('location', LOC).eq('status','approved').lte('start_date', to)
+    sb.from('portal_employees').select('*').in('location', GROUP).eq('active', true).order('name'),
+    sb.from('portal_shifts').select('*').in('location', GROUP).gte('date', from).lte('date', to).order('start_time'),
+    sb.from('portal_time_off').select('*').in('location', GROUP).eq('status','approved').lte('start_date', to)
   ]);
   EMPLOYEES = emps.data||[];
   SHIFTS = shifts.data||[];
@@ -336,8 +341,9 @@ function render(){
       rows.push('<div class="my-row">'+dayCell+'<div class="my-main"><span class="off-pill">Approved off</span></div></div>');
     }
     dayShifts.forEach(s=>{
+      const locTag = LOC_GROUPS[LOC].length>1 ? ' <span class="loc-tag">'+LOC_SHORT[s.location]+'</span>' : '';
       rows.push('<div class="my-row">'+dayCell+'<div class="my-main">'+
-        '<div class="my-time">'+fmtTime(s.start_time)+' – '+fmtTime(s.end_time)+'</div>'+
+        '<div class="my-time">'+fmtTime(s.start_time)+' – '+fmtTime(s.end_time)+locTag+'</div>'+
         (s.role?'<div class="my-role">'+esc(s.role)+'</div>':'')+
         (s.note?'<div class="my-note">'+esc(s.note)+'</div>':'')+
         '</div>'+(isOff?'<span class="off-pill">off?</span>':'')+'</div>');
@@ -363,7 +369,8 @@ function render(){
       const bits = [];
       if(offFor(emp, di)) bits.push('<div class="cell-off">Off</div>');
       SHIFTS.filter(s=>s.employee_id===emp.id && s.date===di).forEach(s=>{
-        bits.push('<div class="sh">'+fmtTime(s.start_time)+'–'+fmtTime(s.end_time)+(s.role?'<span class="r">'+esc(s.role)+'</span>':'')+'</div>');
+        const locTag = LOC_GROUPS[LOC].length>1 ? ' <span class="loc-tag">'+LOC_SHORT[s.location]+'</span>' : '';
+        bits.push('<div class="sh">'+fmtTime(s.start_time)+'–'+fmtTime(s.end_time)+locTag+(s.role?'<span class="r">'+esc(s.role)+'</span>':'')+'</div>');
       });
       return '<td'+cls+'>'+bits.join('')+'</td>';
     }).join('');

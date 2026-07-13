@@ -244,7 +244,7 @@
   <div id="panel-scheduling" class="panel">
     <div class="section-card">
       <h2>🗓️ Weekly Schedule — all locations</h2>
-      <div class="hint">All three schedules for the week below. Click any cell to add a shift; click an existing shift to edit, delete or copy it. Approved time off shows as a red <strong>OFF</strong> badge — you'll be warned if you schedule over it. Staff see their location's schedule at <strong>schedule.html</strong> by entering their email.</div>
+      <div class="hint">All three schedules for the week below. <strong>Nashville and Franklin share one staff pool</strong> — both grids show the combined roster, and a shift belongs to the grid you add it on. Click any cell to add a shift; click an existing shift to edit, delete or copy it. Approved time off shows as a red <strong>OFF</strong> badge — you'll be warned if you schedule over it. Staff open their schedule at <strong>schedule.html</strong> with their employee ID.</div>
       <div class="toolbar">
         <button class="btn btn-ghost btn-sm" onclick="sgMove(-1)">‹ Prev</button>
         <strong id="sgLabel" style="min-width:190px;text-align:center;"></strong>
@@ -361,6 +361,8 @@ let SESSION = null; // Supabase auth session for the signed-in admin
 // ── LOCATIONS — each editor has its own selector ──
 const LOC_LABELS = { memphis:'Memphis', nashville:'Nashville', franklin:'Franklin' };
 const LOC_KEYS = ['memphis','nashville','franklin'];
+// Nashville & Franklin share one staff pool — their grids both show the combined roster.
+const LOC_GROUPS = { memphis:['memphis'], nashville:['nashville','franklin'], franklin:['nashville','franklin'] };
 const DEF_LOC = (function(){ const v = localStorage.getItem('greys_loc'); return LOC_LABELS[v] ? v : 'memphis'; })();
 const LOCS = { items: DEF_LOC, schedules: DEF_LOC, employees: DEF_LOC, timeoff: DEF_LOC };
 function kindLoc(kind, v){
@@ -785,9 +787,9 @@ async function sgLoad(){
     ]);
     LOC_KEYS.forEach(l=>{
       SG[l] = {
-        emps:(emps.data||[]).filter(e=>e.location===l),
+        emps:(emps.data||[]).filter(e=>LOC_GROUPS[l].includes(e.location)),
         shifts:(shifts.data||[]).filter(s=>s.location===l),
-        to:(toff.data||[]).filter(r=>r.location===l && (r.end_date||r.start_date)>=from)
+        to:(toff.data||[]).filter(r=>LOC_GROUPS[l].includes(r.location) && (r.end_date||r.start_date)>=from)
       };
     });
   }catch(e){ LOC_KEYS.forEach(l=>{ SG[l]={emps:[],shifts:[],to:[]}; }); }
