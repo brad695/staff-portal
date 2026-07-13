@@ -92,8 +92,37 @@
     .pill-new{ background:#d1fae5; color:#065f46; }
     .pill-dirty{ background:#fdebc4; color:#92400e; }
 
-    .csv-box{ border:1px dashed var(--line); border-radius:var(--r); padding:14px 16px; background:#fffdf6; display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+    .csv-box{ border:1px dashed var(--line); border-radius:var(--r); padding:14px 16px; background:#fffdf6; display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:14px; }
     .csv-box .csv-status{ font-size:0.8rem; color:var(--sub); }
+
+    /* clean record lists (replaces the old bulk tables) */
+    .chips{ display:flex; gap:6px; flex-wrap:wrap; }
+    .chip{ border:1px solid var(--line); background:#fff; border-radius:20px; padding:7px 15px; font-size:0.78rem; font-weight:700; cursor:pointer; color:var(--sub); font-family:inherit; }
+    .chip:hover{ border-color:var(--cheddar); }
+    .chip.on{ background:var(--navy); color:#fff; border-color:var(--navy); }
+    .rec-list{ border:1px solid var(--line); border-radius:var(--r); background:#fff; overflow:hidden; }
+    .rec-row{ display:flex; align-items:center; gap:14px; padding:13px 16px; border-bottom:1px solid var(--line-soft); cursor:pointer; }
+    .rec-row:hover{ background:#fffcf2; }
+    .rec-row:last-child{ border-bottom:none; }
+    .rec-main{ flex:1; min-width:0; }
+    .rec-title{ font-weight:700; font-size:0.95rem; color:var(--rind); line-height:1.5; }
+    .rec-meta{ font-size:0.8rem; color:var(--sub); margin-top:3px; line-height:1.5; overflow-wrap:anywhere; }
+    .rec-actions{ display:flex; gap:8px; flex-shrink:0; }
+    .rec-empty{ padding:34px; text-align:center; color:var(--sub); font-style:italic; }
+    .tag{ display:inline-block; font-size:0.62rem; font-weight:800; text-transform:uppercase; letter-spacing:0.4px; padding:3px 9px; border-radius:20px; margin-right:7px; vertical-align:2px; }
+    .tag-note{ background:#e2ecf7; color:#26507c; }
+    .tag-special{ background:#d1fae5; color:#065f46; }
+    .tag-event{ background:#fbdaf0; color:#9d2f72; }
+    .tag-info{ background:#fdebc4; color:#92400e; }
+    .tag-loc{ background:#f1ead6; color:#6E6353; }
+    .tag-off2{ background:#e8e8e8; color:#777; }
+    .rec-fields{ display:grid; grid-template-columns:1fr 1fr; gap:12px 14px; margin:14px 0; }
+    .rf{ display:flex; flex-direction:column; gap:5px; }
+    .rf.full{ grid-column:1 / -1; }
+    .rf label{ font-size:0.68rem; font-weight:800; color:var(--sub); text-transform:uppercase; letter-spacing:0.3px; }
+    .rf input, .rf select, .rf textarea{ padding:10px 11px; border:1px solid var(--line); border-radius:var(--r); font-family:inherit; font-size:0.92rem; background:#fff; }
+    .rf input:focus, .rf select:focus, .rf textarea:focus{ outline:none; border-color:var(--cheddar); }
+    .rf textarea{ min-height:76px; resize:vertical; }
 
     .to-item{ display:flex; align-items:flex-start; gap:14px; padding:14px 0; border-bottom:1px solid var(--line-soft); }
     .to-item:last-child{ border-bottom:none; }
@@ -160,70 +189,54 @@
   <!-- UNIFIED CONTENT EDITOR -->
   <div id="panel-content" class="panel active">
     <div class="section-card">
-      <h2>📋 Content — Bulk Editor</h2>
+      <h2>📋 Content</h2>
       <div class="hint">
-        One place for everything that shows on the staff portal. Pick a <strong>Type</strong> for each row:
-        <strong>note</strong> = a tile that stays up (no date needed) ·
-        <strong>special</strong> = shows on its day; set <strong>Repeat</strong> (e.g. weekly) for "every Tuesday" ·
+        Everything that shows on the staff portal: <strong>note</strong> = a tile that stays up ·
+        <strong>special</strong> = shows on its day (set Repeat for "every Tuesday") ·
         <strong>event</strong> = dated, shows on the calendar ·
-        <strong>info</strong> = a "Stuff to Know" card (Title = label, Details = the info; no date needed).
-        Edit any cell, add rows, or import a CSV. Changed rows highlight — nothing saves until you click Save all changes.
+        <strong>info</strong> = a "Stuff to Know" card.
+        Click a row to edit it — each item has its own location.
       </div>
       <div class="toolbar">
-        <select class="loc-sel" id="itemsLoc" onchange="kindLoc('items',this.value)"><option value="memphis">Memphis</option><option value="nashville">Nashville</option><option value="franklin">Franklin</option></select>
-        <button class="btn btn-ghost btn-sm" onclick="addTyped('note')">＋ Note</button>
-        <button class="btn btn-ghost btn-sm" onclick="addTyped('special')">＋ Special</button>
-        <button class="btn btn-ghost btn-sm" onclick="addTyped('event')">＋ Event</button>
-        <button class="btn btn-ghost btn-sm" onclick="addTyped('info')">＋ Stuff to Know</button>
-        <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('items')">⬇ CSV template</button>
+        <div class="chips" id="itemsChips"></div>
         <div class="spacer"></div>
-        <button class="btn btn-gold" onclick="saveAll('items')">Save all changes</button>
+        <span class="save-msg" id="itemsMsg"></span>
+        <button class="btn btn-gold" onclick="recNew('items')">＋ Add content</button>
       </div>
-      <div class="bulk-wrap">
-        <table class="bulk">
-          <thead><tr>
-            <th>Type</th><th style="width:18%;">Title</th><th>Date</th><th>Time</th><th>End date</th><th>Repeat</th><th>Repeat until</th><th style="width:24%;">Details</th><th></th>
-          </tr></thead>
-          <tbody id="itemsBody"></tbody>
-        </table>
-      </div>
+      <div class="rec-list" id="itemsList"><div class="rec-empty">Loading…</div></div>
       <div class="csv-box">
         <strong style="font-size:0.82rem;">Import CSV:</strong>
         <input type="file" id="itemsCsv" accept=".csv,text/csv" onchange="csvPick('items')" />
+        <span style="font-size:0.8rem;color:var(--sub);">into</span>
+        <select class="loc-sel" id="itemsCsvLoc"><option value="memphis">Memphis</option><option value="nashville">Nashville</option><option value="franklin">Franklin</option></select>
         <button class="btn btn-navy btn-sm" onclick="csvImport('items')">Import rows</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('items')">⬇ Template</button>
         <span class="csv-status" id="itemsCsvStatus">Columns: type, title, date, time, end_date, repeat, repeat_until, details</span>
       </div>
-      <div class="row-actions"><span class="save-msg" id="itemsMsg"></span></div>
     </div>
   </div>
 
   <!-- SCHEDULES -->
   <div id="panel-schedules" class="panel">
     <div class="section-card">
-      <h2>📆 Schedules — Bulk Editor</h2>
-      <div class="hint">Edit any cell, add rows, or import a CSV. Changed rows highlight; nothing saves until you click Save all changes.</div>
+      <h2>📆 Schedules</h2>
+      <div class="hint">Dated schedule notices shown on the staff portal. Click a row to edit it — each entry has its own location.</div>
       <div class="toolbar">
-        <select class="loc-sel" id="schedulesLoc" onchange="kindLoc('schedules',this.value)"><option value="memphis">Memphis</option><option value="nashville">Nashville</option><option value="franklin">Franklin</option></select>
-        <button class="btn btn-ghost btn-sm" onclick="addTyped(null,'schedules')">＋ Add row</button>
-        <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('schedules')">⬇ CSV template</button>
+        <div class="chips" id="schedulesChips"></div>
         <div class="spacer"></div>
-        <button class="btn btn-gold" onclick="saveAll('schedules')">Save all changes</button>
+        <span class="save-msg" id="schedulesMsg"></span>
+        <button class="btn btn-gold" onclick="recNew('schedules')">＋ Add entry</button>
       </div>
-      <div class="bulk-wrap">
-        <table class="bulk">
-          <thead><tr>
-            <th style="width:30%;">Title</th><th>Date</th><th>End date</th><th style="width:34%;">Note</th><th></th>
-          </tr></thead>
-          <tbody id="schedulesBody"></tbody>
-        </table>
-      </div>
+      <div class="rec-list" id="schedulesList"><div class="rec-empty">Loading…</div></div>
       <div class="csv-box">
         <strong style="font-size:0.82rem;">Import CSV:</strong>
         <input type="file" id="schedulesCsv" accept=".csv,text/csv" onchange="csvPick('schedules')" />
+        <span style="font-size:0.8rem;color:var(--sub);">into</span>
+        <select class="loc-sel" id="schedulesCsvLoc"><option value="memphis">Memphis</option><option value="nashville">Nashville</option><option value="franklin">Franklin</option></select>
         <button class="btn btn-navy btn-sm" onclick="csvImport('schedules')">Import rows</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('schedules')">⬇ Template</button>
         <span class="csv-status" id="schedulesCsvStatus">Columns: name, date, end_date, note</span>
       </div>
-      <div class="row-actions"><span class="save-msg" id="schedulesMsg"></span></div>
     </div>
   </div>
 
@@ -244,29 +257,38 @@
 
     <div class="section-card">
       <h2>🧑‍🍳 Employees</h2>
-      <div class="hint">The roster per location. <strong>Employee ID</strong> is what staff type to open their schedule (no password) — it can be anything: a number, initials, a nickname. Set someone <strong>inactive</strong> to hide them from the grid without deleting their history.</div>
+      <div class="hint"><strong>Employee ID</strong> is what staff type to open their schedule (no password) — it can be anything: a number, initials, a nickname. Set someone <strong>inactive</strong> to hide them from the grid without deleting their history. Click a row to edit.</div>
       <div class="toolbar">
-        <select class="loc-sel" id="employeesLoc" onchange="kindLoc('employees',this.value)"><option value="memphis">Memphis</option><option value="nashville">Nashville</option><option value="franklin">Franklin</option></select>
-        <button class="btn btn-ghost btn-sm" onclick="addTyped(null,'employees')">＋ Add employee</button>
-        <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('employees')">⬇ CSV template</button>
+        <div class="chips" id="employeesChips"></div>
         <div class="spacer"></div>
-        <button class="btn btn-gold" onclick="saveAll('employees')">Save all changes</button>
+        <span class="save-msg" id="employeesMsg"></span>
+        <button class="btn btn-gold" onclick="recNew('employees')">＋ Add employee</button>
       </div>
-      <div class="bulk-wrap">
-        <table class="bulk">
-          <thead><tr>
-            <th style="width:26%;">Name</th><th style="width:30%;">Employee ID (login)</th><th style="width:22%;">Role</th><th>Status</th><th></th>
-          </tr></thead>
-          <tbody id="employeesBody"></tbody>
-        </table>
-      </div>
+      <div class="rec-list" id="employeesList"><div class="rec-empty">Loading…</div></div>
       <div class="csv-box">
         <strong style="font-size:0.82rem;">Import CSV:</strong>
         <input type="file" id="employeesCsv" accept=".csv,text/csv" onchange="csvPick('employees')" />
+        <span style="font-size:0.8rem;color:var(--sub);">into</span>
+        <select class="loc-sel" id="employeesCsvLoc"><option value="memphis">Memphis</option><option value="nashville">Nashville</option><option value="franklin">Franklin</option></select>
         <button class="btn btn-navy btn-sm" onclick="csvImport('employees')">Import rows</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('employees')">⬇ Template</button>
         <span class="csv-status" id="employeesCsvStatus">Columns: name, employee_id, role, active</span>
       </div>
-      <div class="row-actions"><span class="save-msg" id="employeesMsg"></span></div>
+    </div>
+  </div>
+
+  <!-- record editor modal -->
+  <div id="recModal" style="display:none;position:fixed;inset:0;background:rgba(11,33,56,0.55);z-index:100;align-items:flex-start;justify-content:center;padding:30px 16px;overflow:auto;">
+    <div style="background:var(--card);border-radius:var(--r);border-top:4px solid var(--cheddar);padding:24px;width:560px;max-width:100%;">
+      <h2 style="font-size:1rem;color:var(--navy);margin-bottom:10px;" id="recTitle">Edit</h2>
+      <div class="rec-fields" id="recFields"></div>
+      <div class="login-err" id="recErr"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-gold" onclick="recSave()">Save</button>
+        <button class="btn btn-wax" id="recDelBtn" style="display:none;" onclick="recDeleteCurrent()">🗑 Delete</button>
+        <div style="flex:1;"></div>
+        <button class="btn btn-ghost" onclick="recClose()">Cancel</button>
+      </div>
     </div>
   </div>
 
@@ -444,45 +466,66 @@ async function obReviewed(id,val){ const r=await fn('set-onboarding',{id,status:
 async function obDel(id){ if(!confirm('Delete this submission permanently? Do this only after entering it into payroll.')) return; const r=await fn('delete-onboarding',{id}); if(r.ok) loadOnboarding(); else alert('❌ '+(r.data.error||'Failed')); }
 
 /* ===================================================================
-   GENERIC BULK EDITOR
+   RECORD EDITORS — readable lists + a proper edit window per item
    =================================================================== */
 const SCHEMA = {
   items: {
-    body:'itemsBody', msg:'itemsMsg', csvStatus:'itemsCsvStatus', table:'portal_items',
-    cols:[
-      {k:'type', type:'select', options:['note','special','event','info']},
-      {k:'title', type:'text', ph:'Title'},
-      {k:'date', type:'date'},
-      {k:'time', type:'time'},
-      {k:'endDate', type:'date'},
-      {k:'repeat', type:'select', options:['none','weekly','biweekly','monthly']},
-      {k:'repeatUntil', type:'date'},
-      {k:'body', type:'text', ph:'Details'}
+    list:'itemsList', chips:'itemsChips', msg:'itemsMsg', csvStatus:'itemsCsvStatus', table:'portal_items',
+    label:'content',
+    fields:[
+      {k:'type', label:'Type', type:'select', options:['note','special','event','info']},
+      {k:'location', label:'Location', type:'select', options:['memphis','nashville','franklin'], names:LOC_LABELS},
+      {k:'title', label:'Title', type:'text', full:true, ph:'Title shown on the portal'},
+      {k:'date', label:'Date', type:'date'},
+      {k:'time', label:'Time', type:'time'},
+      {k:'endDate', label:'End date', type:'date'},
+      {k:'repeat', label:'Repeat', type:'select', options:['none','weekly','biweekly','monthly']},
+      {k:'repeatUntil', label:'Repeat until', type:'date'},
+      {k:'body', label:'Details', type:'textarea', full:true, ph:'Details shown on the portal'}
     ],
-    valid:r=> !!r.title && (r.type==='special' || r.type==='event' ? !!r.date : true),
-    map:r=>({ id:r.id, type:r.type||'note', title:r.title, date:r.date||'', time:r.time||'', endDate:r.end_date||'', repeat:r.repeat||'none', repeatUntil:r.repeat_until||'', body:r.body||'' }),
+    defaults:{ type:'note', repeat:'none' },
+    valid:r=> !r.title ? 'A title is required.' : ((r.type==='special'||r.type==='event') && !r.date ? 'Specials and events need a date.' : ''),
+    map:r=>({ id:r.id, type:r.type||'note', title:r.title, date:r.date||'', time:(r.time||'').slice(0,5), endDate:r.end_date||'', repeat:r.repeat||'none', repeatUntil:r.repeat_until||'', body:r.body||'', location:r.location||'memphis' }),
+    rowTitle:r=>r.title,
+    rowTags:r=>'<span class="tag tag-'+(r.type||'note')+'">'+(r.type||'note')+'</span>',
+    rowMeta:r=>{
+      const bits=[];
+      if(r.date) bits.push('📅 '+fmtDisplay(r.date)+(r.endDate?' – '+fmtDisplay(r.endDate):''));
+      if(r.time) bits.push('🕐 '+r.time);
+      if(r.repeat && r.repeat!=='none') bits.push('↻ '+r.repeat+(r.repeatUntil?' until '+fmtDisplay(r.repeatUntil):''));
+      if(r.body) bits.push(esc(r.body.length>100 ? r.body.slice(0,100)+'…' : r.body));
+      return bits.join(' &nbsp;·&nbsp; ');
+    },
     csvHeader:['type','title','date','time','end_date','repeat','repeat_until','details'],
     csvRowToObj:c=>({ type:(c[0]||'note').toLowerCase().trim(), title:c[1]||'', date:c[2]||'', time:c[3]||'', endDate:c[4]||'', repeat:(c[5]||'none').toLowerCase().trim(), repeatUntil:c[6]||'', body:c[7]||'' }),
     sample:[
       ['note','Door code changed','','','','none','','New back-door code is 4417'],
       ['special','Taco Tuesday','2026-07-07','17:00','','weekly','2026-12-29','Half-price street tacos all night'],
-      ['special','Wine Down Wednesday','2026-07-08','','','weekly','2026-12-30','$5 off every bottle'],
       ['event','Wine & Cheese Tasting','2026-07-18','18:30','','none','','Six wines paired with our cheese flight'],
-      ['info','Back-door code','','','','none','','4417 — do not share outside staff'],
       ['info','Manager on call','','','','none','','Text Sam at 901-555-0142 for anything urgent']
     ],
     addAction:'add-item', updateAction:'update-item', deleteAction:'delete-item', bulkAction:'bulk-add-items'
   },
   schedules: {
-    body:'schedulesBody', msg:'schedulesMsg', csvStatus:'schedulesCsvStatus', table:'portal_schedules',
-    cols:[
-      {k:'name', type:'text', ph:'Schedule title'},
-      {k:'date', type:'date'},
-      {k:'endDate', type:'date'},
-      {k:'note', type:'text', ph:'Note'}
+    list:'schedulesList', chips:'schedulesChips', msg:'schedulesMsg', csvStatus:'schedulesCsvStatus', table:'portal_schedules',
+    label:'schedule entry',
+    fields:[
+      {k:'name', label:'Title', type:'text', full:true, ph:'Schedule title'},
+      {k:'location', label:'Location', type:'select', options:['memphis','nashville','franklin'], names:LOC_LABELS},
+      {k:'date', label:'Date', type:'date'},
+      {k:'endDate', label:'End date (optional)', type:'date'},
+      {k:'note', label:'Note', type:'textarea', full:true, ph:'Note shown with the schedule'}
     ],
-    valid:r=> !!r.name && !!r.date,
-    map:r=>({ id:r.id, name:r.name, date:r.date, endDate:r.end_date||'', note:r.note||'' }),
+    defaults:{},
+    valid:r=> !r.name ? 'A title is required.' : (!r.date ? 'A date is required.' : ''),
+    map:r=>({ id:r.id, name:r.name, date:r.date, endDate:r.end_date||'', note:r.note||'', location:r.location||'memphis' }),
+    rowTitle:r=>r.name,
+    rowTags:null,
+    rowMeta:r=>{
+      const bits=['📅 '+fmtDisplay(r.date)+(r.endDate?' – '+fmtDisplay(r.endDate):'')];
+      if(r.note) bits.push(esc(r.note.length>100 ? r.note.slice(0,100)+'…' : r.note));
+      return bits.join(' &nbsp;·&nbsp; ');
+    },
     csvHeader:['name','date','end_date','note'],
     csvRowToObj:c=>({ name:c[0]||'', date:c[1]||'', endDate:c[2]||'', note:c[3]||'' }),
     sample:[
@@ -492,15 +535,26 @@ const SCHEMA = {
     addAction:'add-schedule', updateAction:'update-schedule', deleteAction:'delete-schedule', bulkAction:'bulk-add-schedules'
   },
   employees: {
-    body:'employeesBody', msg:'employeesMsg', csvStatus:'employeesCsvStatus', table:'portal_employees',
-    cols:[
-      {k:'name', type:'text', ph:'Full name'},
-      {k:'login_id', type:'text', ph:'ID staff type to log in (anything)'},
-      {k:'role', type:'text', ph:'Server / Kitchen / Bar'},
-      {k:'active', type:'select', options:['active','inactive']}
+    list:'employeesList', chips:'employeesChips', msg:'employeesMsg', csvStatus:'employeesCsvStatus', table:'portal_employees',
+    label:'employee',
+    fields:[
+      {k:'name', label:'Name', type:'text', ph:'Full name'},
+      {k:'login_id', label:'Employee ID (login)', type:'text', ph:'Anything — number, initials…'},
+      {k:'role', label:'Role', type:'text', ph:'Server / Kitchen / Bar'},
+      {k:'active', label:'Status', type:'select', options:['active','inactive']},
+      {k:'location', label:'Location', type:'select', options:['memphis','nashville','franklin'], names:LOC_LABELS}
     ],
-    valid:r=> !!r.name,
-    map:r=>({ id:r.id, name:r.name, login_id:r.login_id||'', role:r.role||'', active:(r.active===false||r.active==='inactive')?'inactive':'active' }),
+    defaults:{ active:'active' },
+    valid:r=> !r.name ? 'A name is required.' : '',
+    map:r=>({ id:r.id, name:r.name, login_id:r.login_id||'', role:r.role||'', active:(r.active===false||r.active==='inactive')?'inactive':'active', location:r.location||'memphis' }),
+    rowTitle:r=>r.name,
+    rowTags:r=> r.active==='inactive' ? '<span class="tag tag-off2">inactive</span>' : '',
+    rowMeta:r=>{
+      const bits=[];
+      bits.push(r.login_id ? 'ID: <strong>'+esc(r.login_id)+'</strong>' : '<span style="color:var(--wax);">no login ID yet</span>');
+      if(r.role) bits.push(esc(r.role));
+      return bits.join(' &nbsp;·&nbsp; ');
+    },
     csvHeader:['name','employee_id','role','active'],
     csvRowToObj:c=>({ name:c[0]||'', login_id:c[1]||'', role:c[2]||'', active:(c[3]||'active').toLowerCase().trim()==='inactive'?'inactive':'active' }),
     sample:[
@@ -511,86 +565,105 @@ const SCHEMA = {
   }
 };
 const ROWS = { items:[], schedules:[], employees:[] };
+const FILTER = { items:'all', schedules:'all', employees:'all' };
 const PENDING_CSV = { items:null, schedules:null, employees:null };
 
 async function loadKind(kind){
   const S = SCHEMA[kind];
   try{
-    let q = sb.from(S.table).select('*').eq('location', LOCS[kind]);
+    let q = sb.from(S.table).select('*');
     q = kind==='items' ? q.order('type').order('date',{nullsFirst:true}) : kind==='employees' ? q.order('name') : q.order('date');
     const { data } = await q;
-    ROWS[kind] = (data||[]).map(r=>{ const o=S.map(r); o._dirty=false; o._new=false; return o; });
+    ROWS[kind] = (data||[]).map(S.map);
   }catch(e){ ROWS[kind]=[]; }
   renderKind(kind);
 }
+function setFilter(kind, v){ FILTER[kind]=v; renderKind(kind); }
 
 function renderKind(kind){
   const S = SCHEMA[kind];
-  const body = document.getElementById(S.body);
-  const span = S.cols.length + 1;
-  if(!ROWS[kind].length){
-    body.innerHTML = '<tr><td class="empty-row" colspan="'+span+'">No rows yet. Add one or import a CSV.</td></tr>';
+  // location filter chips with counts
+  const counts = {};
+  ROWS[kind].forEach(r=>{ counts[r.location]=(counts[r.location]||0)+1; });
+  document.getElementById(S.chips).innerHTML = ['all'].concat(LOC_KEYS).map(l=>{
+    const label = l==='all' ? 'All · '+ROWS[kind].length : LOC_LABELS[l]+' · '+(counts[l]||0);
+    return '<button class="chip'+(FILTER[kind]===l?' on':'')+'" onclick="setFilter(\''+kind+'\',\''+l+'\')">'+label+'</button>';
+  }).join('');
+  // rows
+  const rows = ROWS[kind].filter(r=>FILTER[kind]==='all'||r.location===FILTER[kind]);
+  const el = document.getElementById(S.list);
+  if(!rows.length){
+    el.innerHTML = '<div class="rec-empty">Nothing here yet — click "＋ Add" above or import a CSV below.</div>';
     return;
   }
-  body.innerHTML = ROWS[kind].map((row,i)=>{
-    const cls = row._new ? 'newrow' : (row._dirty ? 'dirty' : '');
-    const cells = S.cols.map(c=>{
-      if(c.type==='select'){
-        const cur = row[c.k] || c.options[0];
-        const opts = c.options.map(o=>'<option value="'+o+'"'+(cur===o?' selected':'')+'>'+o+'</option>').join('');
-        return '<td><select onchange="cellEdit(\''+kind+'\','+i+',\''+c.k+'\',this.value)">'+opts+'</select></td>';
-      }
-      const v = esc(row[c.k]||'');
-      const ph = c.ph ? ' placeholder="'+c.ph+'"' : '';
-      return '<td><input type="'+c.type+'" value="'+v+'"'+ph+' oninput="cellEdit(\''+kind+'\','+i+',\''+c.k+'\',this.value)"></td>';
-    }).join('');
-    const tag = row._new ? '<span class="pill pill-new">new</span>' : (row._dirty ? '<span class="pill pill-dirty">edited</span>' : '');
-    return '<tr class="'+cls+'">'+cells+'<td class="td-actions">'+tag+' <button class="btn btn-wax btn-sm" onclick="rowDelete(\''+kind+'\','+i+')">🗑</button></td></tr>';
+  el.innerHTML = rows.map(r=>{
+    const meta = S.rowMeta(r);
+    return '<div class="rec-row" onclick="recEdit(\''+kind+'\','+r.id+')">'
+      +'<div class="rec-main">'
+        +'<div class="rec-title">'+(S.rowTags?(S.rowTags(r)||''):'')
+          +(FILTER[kind]==='all'?'<span class="tag tag-loc">'+LOC_LABELS[r.location]+'</span>':'')
+          +esc(S.rowTitle(r)||'(untitled)')+'</div>'
+        +(meta?'<div class="rec-meta">'+meta+'</div>':'')
+      +'</div>'
+      +'<div class="rec-actions">'
+        +'<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();recEdit(\''+kind+'\','+r.id+')">✏️ Edit</button>'
+        +'<button class="btn btn-wax btn-sm" onclick="event.stopPropagation();recDelete(\''+kind+'\','+r.id+')">🗑</button>'
+      +'</div>'
+    +'</div>';
   }).join('');
 }
-function cellEdit(kind,i,field,val){
-  const row = ROWS[kind][i];
-  row[field] = val;
-  if(!row._new) row._dirty = true;
-  const tr = document.getElementById(SCHEMA[kind].body).children[i];
-  if(tr && !row._new && !tr.classList.contains('dirty')){
-    tr.classList.add('dirty');
-    const cell = tr.querySelector('.td-actions');
-    if(cell && !cell.querySelector('.pill')) cell.insertAdjacentHTML('afterbegin','<span class="pill pill-dirty">edited</span> ');
-  }
-}
-function addTyped(type, kind){
-  kind = kind || 'items';
-  const blank = { _new:true, _dirty:false };
-  SCHEMA[kind].cols.forEach(c=>blank[c.k]='');
-  if(type) blank.type = type;
-  ROWS[kind].push(blank);
-  renderKind(kind);
-  const body = document.getElementById(SCHEMA[kind].body);
-  const last = body.querySelector('tr:last-child input, tr:last-child select');
-  if(last) last.focus();
-}
-async function rowDelete(kind,i){
-  const row = ROWS[kind][i];
-  if(row._new){ ROWS[kind].splice(i,1); renderKind(kind); return; }
-  if(!confirm('Delete this row? This removes it immediately.')) return;
-  const r = await fn(SCHEMA[kind].deleteAction, { id: row.id });
-  if(r.ok){ ROWS[kind].splice(i,1); renderKind(kind); if(kind==='employees') sgLoad(); }
-  else msg(kind, '❌ '+(r.data.error||'Delete failed'), true);
-}
-async function saveAll(kind){
+
+/* ── edit window ── */
+let REC_CTX = null; // { kind, id }
+function recNew(kind){ openRec(kind, null); }
+function recEdit(kind, id){ const row = ROWS[kind].find(r=>r.id===id); if(row) openRec(kind, row); }
+function openRec(kind, row){
   const S = SCHEMA[kind];
-  const rows = ROWS[kind];
-  const news = rows.filter(r=>r._new && S.valid(r));
-  const dirty = rows.filter(r=>!r._new && r._dirty);
-  const invalid = rows.filter(r=>(r._new||r._dirty) && !S.valid(r));
-  if(invalid.length){ msg(kind, '❌ Each changed row needs the required fields (title; specials/events also need a date).', true); return; }
-  if(!news.length && !dirty.length){ msg(kind, 'Nothing to save.', false); return; }
-  let errs = 0;
-  for(const r of dirty){ const res = await fn(S.updateAction, Object.assign({ location: LOCS[kind] }, r)); if(!res.ok) errs++; }
-  if(news.length){ const res = await fn(S.bulkAction, { rows: news, location: LOCS[kind] }); if(!res.ok) errs++; }
-  if(errs){ msg(kind, '❌ '+errs+' change(s) failed to save.', true); }
-  else { msg(kind, '✅ Saved '+(dirty.length+news.length)+' change(s).', false); }
+  REC_CTX = { kind, id: row ? row.id : null };
+  document.getElementById('recTitle').textContent = (row?'Edit ':'Add ')+S.label;
+  document.getElementById('recErr').textContent = '';
+  document.getElementById('recFields').innerHTML = S.fields.map(f=>{
+    let v = row ? (row[f.k]!=null ? row[f.k] : '') : (S.defaults[f.k]!=null ? S.defaults[f.k] : (f.k==='location' ? DEF_LOC : ''));
+    let input;
+    if(f.type==='select'){
+      input = '<select id="rec-f-'+f.k+'">'+f.options.map(o=>
+        '<option value="'+o+'"'+(String(v)===o?' selected':'')+'>'+((f.names&&f.names[o])||o)+'</option>').join('')+'</select>';
+    } else if(f.type==='textarea'){
+      input = '<textarea id="rec-f-'+f.k+'"'+(f.ph?' placeholder="'+esc(f.ph)+'"':'')+'>'+esc(v)+'</textarea>';
+    } else {
+      input = '<input type="'+f.type+'" id="rec-f-'+f.k+'" value="'+esc(v)+'"'+(f.ph?' placeholder="'+esc(f.ph)+'"':'')+'>';
+    }
+    return '<div class="rf'+(f.full?' full':'')+'"><label>'+f.label+'</label>'+input+'</div>';
+  }).join('');
+  document.getElementById('recDelBtn').style.display = row?'inline-block':'none';
+  document.getElementById('recModal').style.display='flex';
+  const first = document.querySelector('#recFields input, #recFields textarea'); if(first) first.focus();
+}
+function recClose(){ document.getElementById('recModal').style.display='none'; REC_CTX=null; }
+async function recSave(){
+  if(!REC_CTX) return;
+  const kind = REC_CTX.kind, S = SCHEMA[kind];
+  const payload = {};
+  S.fields.forEach(f=>{ payload[f.k] = document.getElementById('rec-f-'+f.k).value; });
+  const problem = S.valid(payload);
+  if(problem){ document.getElementById('recErr').textContent = '❌ '+problem; return; }
+  let r;
+  if(REC_CTX.id){ payload.id = REC_CTX.id; r = await fn(S.updateAction, payload); }
+  else { r = await fn(S.addAction, payload); }
+  if(!r.ok){ document.getElementById('recErr').textContent = '❌ '+(r.data.error||'Save failed'); return; }
+  recClose();
+  msg(kind, '✅ Saved.', false);
+  await loadKind(kind);
+  if(kind==='employees') sgLoad();
+}
+function recDeleteCurrent(){ if(REC_CTX) recDelete(REC_CTX.kind, REC_CTX.id, true); }
+async function recDelete(kind, id, fromModal){
+  if(!id) return;
+  if(!confirm('Delete this permanently?')) return;
+  const r = await fn(SCHEMA[kind].deleteAction, { id });
+  if(!r.ok){ msg(kind, '❌ '+(r.data.error||'Delete failed'), true); return; }
+  if(fromModal) recClose();
+  msg(kind, '🗑 Deleted.', false);
   await loadKind(kind);
   if(kind==='employees') sgLoad();
 }
@@ -636,7 +709,7 @@ function csvPick(kind){
       if(!rows.length){ status.textContent='⚠️ File looks empty.'; PENDING_CSV[kind]=null; return; }
       const first = (rows[0][0]||'').trim().toLowerCase();
       if(first === SCHEMA[kind].csvHeader[0]) rows = rows.slice(1);
-      const objs = rows.map(SCHEMA[kind].csvRowToObj).filter(SCHEMA[kind].valid);
+      const objs = rows.map(SCHEMA[kind].csvRowToObj).filter(o=>!SCHEMA[kind].valid(o));
       PENDING_CSV[kind] = objs;
       status.textContent = '✓ '+objs.length+' valid row(s) ready to import.';
     }catch(err){ status.textContent='❌ Could not read file.'; PENDING_CSV[kind]=null; }
@@ -647,7 +720,7 @@ async function csvImport(kind){
   const status = document.getElementById(SCHEMA[kind].csvStatus);
   const objs = PENDING_CSV[kind];
   if(!objs || !objs.length){ status.textContent='Pick a CSV first.'; return; }
-  const r = await fn(SCHEMA[kind].bulkAction, { rows: objs, location: LOCS[kind] });
+  const r = await fn(SCHEMA[kind].bulkAction, { rows: objs, location: document.getElementById(kind+'CsvLoc').value });
   if(r.ok){
     status.textContent = '✅ Imported '+(r.data.inserted||objs.length)+' row(s).';
     PENDING_CSV[kind]=null;
@@ -880,7 +953,7 @@ async function sgCopyPrev(loc){
 }
 
 window.addEventListener('DOMContentLoaded', async ()=>{
-  ['itemsLoc','schedulesLoc','employeesLoc','timeoffLoc'].forEach(id=>{
+  ['timeoffLoc','itemsCsvLoc','schedulesCsvLoc','employeesCsvLoc'].forEach(id=>{
     const el = document.getElementById(id); if(el) el.value = DEF_LOC;
   });
   const { data } = await sb.auth.getSession();
