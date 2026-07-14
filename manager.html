@@ -181,6 +181,8 @@
     <div class="tab active" onclick="mtab('content')">Notes · Specials · Events</div>
     <div class="tab" onclick="mtab('schedules')">Time Off</div>
     <div class="tab" onclick="mtab('scheduling')">Staff Scheduling</div>
+    <div class="tab" onclick="mtab('swaps')">Shift Swaps</div>
+    <div class="tab" onclick="mtab('announcements')">Announcements</div>
     <div class="tab" onclick="mtab('timeoff')">Time-Off Requests</div>
     <div class="tab" onclick="mtab('onboarding')">Onboarding</div>
   </div>
@@ -244,7 +246,7 @@
   <div id="panel-scheduling" class="panel">
     <div class="section-card">
       <h2>🗓️ Weekly Schedule — all locations</h2>
-      <div class="hint">All three schedules for the week below. <strong>Nashville and Franklin share one staff pool</strong> — both grids show the combined roster, and a shift belongs to the grid you add it on. Click any cell to add a shift; click an existing shift to edit, delete or copy it. Approved time off shows as a red <strong>OFF</strong> badge — you'll be warned if you schedule over it. Staff open their schedule at <strong>schedule.html</strong> with their employee ID.</div>
+      <div class="hint">All three schedules for the week below. <strong>Nashville and Franklin share one staff pool</strong> — both grids show the combined roster, and a shift belongs to the grid you add it on. Click any cell to add a shift; <strong>drag a shift</strong> to another day or employee to move it; click one to edit, delete or copy it. Approved time off shows as a red <strong>OFF</strong> badge, and staff availability shows as grey <strong>unavail</strong> / green <strong>★</strong> chips. Edits stay private until you hit <strong>📣 Publish &amp; notify</strong> — that emails everyone whose week changed. Staff open their schedule at <strong>schedule.html</strong> with their employee ID.</div>
       <div class="toolbar">
         <button class="btn btn-ghost btn-sm" onclick="sgMove(-1)">‹ Prev</button>
         <strong id="sgLabel" style="min-width:190px;text-align:center;"></strong>
@@ -323,6 +325,37 @@
         <div style="flex:1;"></div>
         <button class="btn btn-ghost" onclick="shClose()">Cancel</button>
       </div>
+    </div>
+  </div>
+
+  <!-- SHIFT SWAPS -->
+  <div id="panel-swaps" class="panel">
+    <div class="section-card">
+      <h2>🔁 Shift Swaps</h2>
+      <div class="hint">Staff request swaps from their schedule page. <strong>Waiting on coworker</strong> means the other person hasn't accepted yet — you can still approve directly. Approving reassigns the shift and emails both people.</div>
+      <div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" onclick="loadSwaps()">↻ Refresh</button></div>
+      <div id="swList"><div class="to-empty">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- ANNOUNCEMENTS -->
+  <div id="panel-announcements" class="panel">
+    <div class="section-card">
+      <h2>📣 New announcement</h2>
+      <div class="hint">Emails every active employee (with an email on file) at the chosen location, and shows on the staff schedule page.</div>
+      <div class="rec-fields">
+        <div class="rf full"><label>Title</label><input type="text" id="annTitle" placeholder="e.g. Holiday hours next week"></div>
+        <div class="rf full"><label>Message</label><textarea id="annBody" placeholder="Details…"></textarea></div>
+        <div class="rf"><label>Location</label><select id="annLoc"><option value="all">All locations</option><option value="memphis">Memphis</option><option value="nashville">Nashville + Franklin</option></select></div>
+      </div>
+      <div class="row-actions">
+        <button class="btn btn-gold" onclick="annSend()">Send announcement</button>
+        <span class="save-msg" id="annMsg"></span>
+      </div>
+    </div>
+    <div class="section-card">
+      <h2>Sent announcements</h2>
+      <div id="annList" class="rec-list"><div class="rec-empty">Loading…</div></div>
     </div>
   </div>
 
@@ -421,7 +454,7 @@ function mtab(name){
   document.querySelector('.tab[onclick*="'+name+'"]').classList.add('active');
   document.getElementById('panel-'+name).classList.add('active');
 }
-function loadAll(){ loadKind('items'); loadKind('schedules'); loadKind('employees'); sgLoad(); loadTimeOff(); loadOnboarding(); }
+function loadAll(){ loadKind('items'); loadKind('schedules'); loadKind('employees'); sgLoad(); loadTimeOff(); loadOnboarding(); loadSwaps(); loadAnnouncements(); }
 
 /* ---- Onboarding submissions ---- */
 let OB_SUBS=[];
@@ -542,19 +575,21 @@ const SCHEMA = {
     fields:[
       {k:'name', label:'Name', type:'text', ph:'Full name'},
       {k:'login_id', label:'Employee ID (login)', type:'text', ph:'Anything — number, initials…'},
+      {k:'contact_email', label:'Email (for notifications)', type:'text', ph:'name@example.com'},
       {k:'role', label:'Role', type:'text', ph:'Server / Kitchen / Bar'},
       {k:'active', label:'Status', type:'select', options:['active','inactive']},
       {k:'location', label:'Location', type:'select', options:['memphis','nashville','franklin'], names:LOC_LABELS}
     ],
     defaults:{ active:'active' },
     valid:r=> !r.name ? 'A name is required.' : '',
-    map:r=>({ id:r.id, name:r.name, login_id:r.login_id||'', role:r.role||'', active:(r.active===false||r.active==='inactive')?'inactive':'active', location:r.location||'memphis' }),
+    map:r=>({ id:r.id, name:r.name, login_id:r.login_id||'', contact_email:r.contact_email||'', role:r.role||'', active:(r.active===false||r.active==='inactive')?'inactive':'active', location:r.location||'memphis' }),
     rowTitle:r=>r.name,
     rowTags:r=> r.active==='inactive' ? '<span class="tag tag-off2">inactive</span>' : '',
     rowMeta:r=>{
       const bits=[];
       bits.push(r.login_id ? 'ID: <strong>'+esc(r.login_id)+'</strong>' : '<span style="color:var(--wax);">no login ID yet</span>');
       if(r.role) bits.push(esc(r.role));
+      bits.push(r.contact_email ? '✉ '+esc(r.contact_email) : '<span style="color:var(--wax);">no email — won\'t get notifications</span>');
       return bits.join(' &nbsp;·&nbsp; ');
     },
     csvHeader:['name','employee_id','role','active'],
@@ -576,7 +611,14 @@ async function loadKind(kind){
     let q = sb.from(S.table).select('*');
     q = kind==='items' ? q.order('type').order('date',{nullsFirst:true}) : kind==='employees' ? q.order('name') : q.order('date');
     const { data } = await q;
-    ROWS[kind] = (data||[]).map(S.map);
+    let rows = data||[];
+    if(kind==='employees'){
+      // emails live in a separate table only admins can read
+      const { data: contacts } = await sb.from('portal_employee_contacts').select('*');
+      const em = {}; (contacts||[]).forEach(c=>{ em[c.employee_id]=c.email||''; });
+      rows = rows.map(r=>Object.assign({}, r, { contact_email: em[r.id]||'' }));
+    }
+    ROWS[kind] = rows.map(S.map);
   }catch(e){ ROWS[kind]=[]; }
   renderKind(kind);
 }
@@ -780,20 +822,45 @@ async function sgLoad(){
   document.getElementById('sgLabel').textContent =
     sgWeek.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+sgAdd(sgWeek,6).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   try{
-    const [emps, shifts, toff] = await Promise.all([
+    const [emps, shifts, toff, avail, pubs] = await Promise.all([
       sb.from('portal_employees').select('*').eq('active',true).order('name'),
       sb.from('portal_shifts').select('*').gte('date',from).lte('date',to).order('start_time'),
-      sb.from('portal_time_off').select('*').eq('status','approved').lte('start_date',to)
+      sb.from('portal_time_off').select('*').eq('status','approved').lte('start_date',to),
+      sb.from('portal_availability').select('*'),
+      sb.from('portal_publishes').select('*').eq('week_start',from).order('published_at',{ascending:false})
     ]);
     LOC_KEYS.forEach(l=>{
+      const locEmps = (emps.data||[]).filter(e=>LOC_GROUPS[l].includes(e.location));
+      const empIds = locEmps.map(e=>e.id);
       SG[l] = {
-        emps:(emps.data||[]).filter(e=>LOC_GROUPS[l].includes(e.location)),
+        emps: locEmps,
         shifts:(shifts.data||[]).filter(s=>s.location===l),
-        to:(toff.data||[]).filter(r=>LOC_GROUPS[l].includes(r.location) && (r.end_date||r.start_date)>=from)
+        to:(toff.data||[]).filter(r=>LOC_GROUPS[l].includes(r.location) && (r.end_date||r.start_date)>=from),
+        avail:(avail.data||[]).filter(a=>empIds.includes(a.employee_id)),
+        pub:(pubs.data||[]).find(p=>p.location===l)||null
       };
     });
-  }catch(e){ LOC_KEYS.forEach(l=>{ SG[l]={emps:[],shifts:[],to:[]}; }); }
+  }catch(e){ LOC_KEYS.forEach(l=>{ SG[l]={emps:[],shifts:[],to:[],avail:[],pub:null}; }); }
   sgRender();
+}
+
+/* availability entries for one employee on one weekday (0 = Monday) */
+function sgAv(loc, empId, wd){ return (SG[loc].avail||[]).filter(a=>a.employee_id===empId && a.weekday===wd); }
+function sgAvLabel(a){
+  const t = (a.start_time&&a.end_time) ? sgFmtT(String(a.start_time).slice(0,5))+'–'+sgFmtT(String(a.end_time).slice(0,5)) : '';
+  return a.kind==='preferred' ? '★'+(t?' '+t:'') : 'unavail'+(t?' '+t:'');
+}
+/* has the week changed since it was last published? */
+function sgSerialize(rows){
+  return JSON.stringify(rows.map(s=>[s.employee_id,s.date,String(s.start_time).slice(0,5),String(s.end_time).slice(0,5),s.role||'',s.note||'']).sort());
+}
+function sgPubState(loc){
+  const g = SG[loc];
+  if(!g.pub) return g.shifts.length ? {label:'Not published yet', cls:'pill-dirty'} : null;
+  const snap = (g.pub.snapshot||[]).map(s=>({employee_id:s.employee_id,date:s.date,start_time:s.start_time,end_time:s.end_time,role:s.role,note:s.note}));
+  return sgSerialize(g.shifts)===sgSerialize(snap)
+    ? {label:'Published ✓', cls:'pill-ok'}
+    : {label:'Unpublished changes', cls:'pill-dirty'};
 }
 
 function sgRender(){
@@ -811,25 +878,32 @@ function sgRender(){
     } else {
       rows = g.emps.map(emp=>{
         let hrs=0;
-        const cells = days.map(d=>{
+        const cells = days.map((d,wd)=>{
           const di=sgIso(d);
           const bits=[];
           if(sgOff(loc,emp.name,di)) bits.push('<div style="background:#f6dad4;color:var(--wax);border-radius:2px;padding:2px 6px;margin:2px 0;font-size:0.62rem;font-weight:800;text-transform:uppercase;text-align:center;">Off</div>');
+          sgAv(loc,emp.id,wd).forEach(a=>{
+            bits.push(a.kind==='preferred'
+              ? '<div style="background:#e7f6ee;color:#0a7a52;border:1px dashed #9fd8bc;border-radius:2px;padding:1px 5px;margin:2px 0;font-size:0.6rem;font-weight:700;text-align:center;" title="Prefers to work'+(a.note?': '+esc(a.note):'')+'">'+sgAvLabel(a)+'</div>'
+              : '<div style="background:#eeeae0;color:#8a8070;border-radius:2px;padding:1px 5px;margin:2px 0;font-size:0.6rem;font-weight:700;text-transform:uppercase;text-align:center;" title="Unavailable'+(a.note?': '+esc(a.note):'')+'">'+sgAvLabel(a)+'</div>');
+          });
           g.shifts.filter(s=>s.employee_id===emp.id && s.date===di).forEach(s=>{
             hrs+=sgHours(s);
-            bits.push('<div onclick="event.stopPropagation();openShift(\''+loc+'\','+emp.id+',\''+di+'\','+s.id+')" style="background:#d1fae5;color:#065f46;border-radius:2px;padding:3px 6px;margin:2px 0;font-size:0.74rem;font-weight:700;cursor:pointer;line-height:1.3;">'
+            bits.push('<div draggable="true" ondragstart="sgDrag(event,\''+loc+'\','+s.id+')" onclick="event.stopPropagation();openShift(\''+loc+'\','+emp.id+',\''+di+'\','+s.id+')" style="background:#d1fae5;color:#065f46;border-radius:2px;padding:3px 6px;margin:2px 0;font-size:0.74rem;font-weight:700;cursor:grab;line-height:1.3;" title="Drag to move · click to edit">'
               +sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time)
               +(s.role?'<span style="display:block;font-weight:600;font-size:0.64rem;opacity:0.85;">'+esc(s.role)+'</span>':'')+'</div>');
           });
-          return '<td onclick="openShift(\''+loc+'\','+emp.id+',\''+di+'\')" style="cursor:pointer;min-width:104px;" title="Click to add a shift">'+bits.join('')+'</td>';
+          return '<td onclick="openShift(\''+loc+'\','+emp.id+',\''+di+'\')" ondragover="event.preventDefault()" ondrop="sgDrop(event,\''+loc+'\','+emp.id+',\''+di+'\')" style="cursor:pointer;min-width:104px;" title="Click to add a shift">'+bits.join('')+'</td>';
         }).join('');
         return '<tr><td style="font-weight:700;white-space:nowrap;">'+esc(emp.name)
           +'<span style="display:block;font-weight:500;font-size:0.7rem;color:var(--sub);">'+esc(emp.role||'')+(hrs?' · '+(Math.round(hrs*10)/10)+' hrs':'')+'</span></td>'+cells+'</tr>';
       }).join('');
     }
+    const pub = sgPubState(loc);
     return '<div class="section-card">'
-      +'<h2>📍 '+LOC_LABELS[loc]+'</h2>'
+      +'<h2>📍 '+LOC_LABELS[loc]+(pub?' <span class="pill '+pub.cls+'" style="vertical-align:3px;margin-left:6px;">'+pub.label+'</span>':'')+'</h2>'
       +'<div class="toolbar" style="margin-top:10px;">'
+        +'<button class="btn btn-gold btn-sm" onclick="publishWeek(\''+loc+'\')">📣 Publish &amp; notify</button>'
         +'<button class="btn btn-navy btn-sm" onclick="printGrid(\''+loc+'\')">🖨 Print</button>'
         +'<button class="btn btn-ghost btn-sm" onclick="sgCopyPrev(\''+loc+'\')">⧉ Copy previous week</button>'
         +'<span class="save-msg" id="sgMsg-'+loc+'"></span>'
@@ -881,9 +955,12 @@ function openShift(loc, empId, date, shiftId){
   SH_CTX = { loc, empId, date, shiftId: shiftId||null };
   const sh = shiftId ? SG[loc].shifts.find(s=>s.id===shiftId) : null;
   document.getElementById('shTitle').textContent = (sh?'Edit':'Add')+' shift';
+  const wd = (new Date(date+'T12:00:00').getDay()+6)%7;
+  const unav = sgAv(loc,empId,wd).find(a=>a.kind==='unavailable');
   document.getElementById('shSub').textContent = LOC_LABELS[loc]+' · '+emp.name+' · '
     +new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})
-    +(sgOff(loc,emp.name,date)?' — ⚠️ has approved time off this day':'');
+    +(sgOff(loc,emp.name,date)?' — ⚠️ has approved time off this day':'')
+    +(unav?' — ⚠️ marked unavailable '+(unav.start_time?sgFmtT(String(unav.start_time).slice(0,5))+'–'+sgFmtT(String(unav.end_time||'').slice(0,5)):'all day'):'');
   document.getElementById('shStart').value = sh?String(sh.start_time).slice(0,5):'16:00';
   document.getElementById('shEnd').value = sh?String(sh.end_time).slice(0,5):'22:00';
   document.getElementById('shRole').value = sh?(sh.role||''):(emp.role||'');
@@ -952,6 +1029,128 @@ async function sgCopyPrev(loc){
   if(r.ok){ el.className='save-msg'; el.textContent='✅ Copied '+(r.data.inserted||0)+' shift(s).'; sgLoad(); }
   else { el.className='save-msg err'; el.textContent='❌ '+(r.data.error||'Copy failed'); }
   setTimeout(()=>{ el.textContent=''; },4500);
+}
+
+/* ── drag & drop: move a shift to another day / employee ── */
+let SG_DRAG = null;
+function sgDrag(ev, loc, shiftId){
+  SG_DRAG = { loc, shiftId };
+  ev.dataTransfer.effectAllowed = 'move';
+  try{ ev.dataTransfer.setData('text/plain', String(shiftId)); }catch(_){}
+}
+async function sgDrop(ev, loc, empId, date){
+  ev.preventDefault(); ev.stopPropagation();
+  if(!SG_DRAG || SG_DRAG.loc !== loc){ SG_DRAG=null; return; } // shifts stay on their own grid
+  const s = SG[loc].shifts.find(x=>x.id===SG_DRAG.shiftId);
+  SG_DRAG = null;
+  if(!s || (s.employee_id===empId && s.date===date)) return;
+  const emp = SG[loc].emps.find(e=>e.id===empId);
+  const el = document.getElementById('sgMsg-'+loc);
+  const r = await fn('move-shift', { id:s.id, employee_id:empId, date });
+  if(r.ok){ el.className='save-msg'; el.textContent='✅ Moved to '+(emp?emp.name:'employee')+' · '+new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'numeric',day:'numeric'}); }
+  else { el.className='save-msg err'; el.textContent='❌ '+(r.data.error||'Move failed'); }
+  setTimeout(()=>{ el.textContent=''; },4500);
+  sgLoad();
+}
+
+/* ── publish & notify ── */
+async function publishWeek(loc){
+  if(!confirm('Publish the '+LOC_LABELS[loc]+' schedule for this week?\n\nEveryone whose week changed (and has an email on file) gets an email with their shifts.')) return;
+  const el = document.getElementById('sgMsg-'+loc);
+  el.className='save-msg'; el.textContent='Publishing…';
+  const r = await fn('publish-week', { location: loc, week_start: sgIso(sgWeek) });
+  if(r.ok){
+    let t = '✅ Published — emailed '+r.data.notified+' of '+r.data.changed+' affected employee(s).';
+    if(r.data.no_email && r.data.no_email.length) t += ' No email on file: '+r.data.no_email.join(', ')+'.';
+    el.textContent = t; sgLoad();
+  } else { el.className='save-msg err'; el.textContent='❌ '+(r.data.error||'Publish failed'); }
+  setTimeout(()=>{ el.textContent=''; },12000);
+}
+
+/* ===================================================================
+   SHIFT SWAPS — manager review
+   =================================================================== */
+const SW_LABELS = { pending_peer:'Waiting on coworker', accepted:'Accepted — needs approval', approved:'Approved', denied:'Denied', declined:'Declined by coworker', cancelled:'Cancelled' };
+const SW_BADGE = { pending_peer:'badge-pending', accepted:'badge-pending', approved:'badge-approved', denied:'badge-denied', declined:'badge-denied', cancelled:'badge-denied' };
+async function loadSwaps(){
+  const el = document.getElementById('swList'); if(!el) return;
+  try{
+    const { data: swaps } = await sb.from('portal_swaps').select('*').order('created_at',{ascending:false}).limit(60);
+    const rows = swaps||[];
+    if(!rows.length){ el.innerHTML='<div class="to-empty">No swap requests yet.</div>'; return; }
+    const shiftIds = [...new Set(rows.map(r=>r.shift_id))];
+    const [emps, shifts] = await Promise.all([
+      sb.from('portal_employees').select('id,name'),
+      sb.from('portal_shifts').select('*').in('id', shiftIds)
+    ]);
+    const nameOf = id => ((emps.data||[]).find(e=>e.id===id)||{}).name || '(deleted)';
+    const shiftOf = id => (shifts.data||[]).find(s=>s.id===id);
+    el.innerHTML = rows.map(r=>{
+      const sh = shiftOf(r.shift_id);
+      const when = sh ? fmtDisplay(sh.date)+' · '+sgFmtT(String(sh.start_time).slice(0,5))+'–'+sgFmtT(String(sh.end_time).slice(0,5))+(sh.role?' · '+esc(sh.role):'')+' · '+LOC_LABELS[sh.location] : '(shift deleted)';
+      const open = ['pending_peer','accepted'].includes(r.status);
+      return '<div class="to-item"><div class="to-info">'
+        +'<div class="to-name">'+esc(nameOf(r.from_employee_id))+' → '+esc(nameOf(r.to_employee_id))+'</div>'
+        +'<div class="to-meta">'+when+'</div>'
+        +(r.note?'<div class="to-reason">"'+esc(r.note)+'"</div>':'')
+        +'</div><div class="to-right"><span class="badge '+(SW_BADGE[r.status]||'badge-pending')+'">'+(SW_LABELS[r.status]||r.status)+'</span>'
+        +'<div style="display:flex;gap:6px;">'
+        +(open?'<button class="btn btn-gold btn-sm" onclick="swSet('+r.id+',\'approved\')">Approve</button>':'')
+        +(open?'<button class="btn btn-wax btn-sm" onclick="swSet('+r.id+',\'denied\')">Deny</button>':'')
+        +'<button class="btn btn-ghost btn-sm" onclick="swDel('+r.id+')">Delete</button>'
+        +'</div></div></div>';
+    }).join('');
+  }catch(e){ el.innerHTML='<div class="to-empty">❌ Could not load swaps.</div>'; }
+}
+async function swSet(id, status){
+  if(status==='approved' && !confirm('Approve this swap? The shift moves to the other employee and both get an email.')) return;
+  const r = await fn('set-swap', { id, status });
+  if(r.ok){ loadSwaps(); sgLoad(); } else alert('❌ '+(r.data.error||'Failed'));
+}
+async function swDel(id){
+  if(!confirm('Delete this swap request?')) return;
+  const r = await fn('delete-swap', { id });
+  if(r.ok) loadSwaps(); else alert('❌ '+(r.data.error||'Failed'));
+}
+
+/* ===================================================================
+   ANNOUNCEMENTS
+   =================================================================== */
+async function loadAnnouncements(){
+  const el = document.getElementById('annList'); if(!el) return;
+  try{
+    const { data } = await sb.from('portal_announcements').select('*').order('created_at',{ascending:false}).limit(30);
+    const rows = data||[];
+    if(!rows.length){ el.innerHTML='<div class="rec-empty">Nothing sent yet.</div>'; return; }
+    el.innerHTML = rows.map(r=>{
+      const locLabel = r.location==='all' ? 'All locations' : (r.location==='memphis' ? 'Memphis' : 'Nashville + Franklin');
+      return '<div class="rec-row" style="cursor:default;"><div class="rec-main">'
+        +'<div class="rec-title"><span class="tag tag-loc">'+locLabel+'</span>'+esc(r.title)+'</div>'
+        +'<div class="rec-meta">'+fmtDT(r.created_at)+' &nbsp;·&nbsp; ✉ sent to '+r.sent_count+' &nbsp;·&nbsp; '+esc((r.body||'').length>120?r.body.slice(0,120)+'…':(r.body||''))+'</div>'
+        +'</div><div class="rec-actions"><button class="btn btn-wax btn-sm" onclick="annDel('+r.id+')">🗑</button></div></div>';
+    }).join('');
+  }catch(e){ el.innerHTML='<div class="rec-empty">❌ Could not load.</div>'; }
+}
+async function annSend(){
+  const title = document.getElementById('annTitle').value.trim();
+  const body = document.getElementById('annBody').value.trim();
+  const loc = document.getElementById('annLoc').value;
+  const m = document.getElementById('annMsg');
+  if(!title){ m.className='save-msg err'; m.textContent='A title is required.'; return; }
+  if(!confirm('Send this announcement now? It emails every active employee'+(loc==='all'?' at all locations':'')+' with an email on file.')) return;
+  m.className='save-msg'; m.textContent='Sending…';
+  const r = await fn('send-announcement', { title, body, location: loc });
+  if(r.ok){
+    m.textContent='✅ Sent to '+r.data.sent+' of '+r.data.total+' employee(s).';
+    document.getElementById('annTitle').value=''; document.getElementById('annBody').value='';
+    loadAnnouncements();
+  } else { m.className='save-msg err'; m.textContent='❌ '+(r.data.error||'Send failed'); }
+  setTimeout(()=>{ m.textContent=''; },9000);
+}
+async function annDel(id){
+  if(!confirm('Delete this announcement from the staff page? (Emails already sent are unaffected.)')) return;
+  const r = await fn('delete-announcement', { id });
+  if(r.ok) loadAnnouncements(); else alert('❌ '+(r.data.error||'Failed'));
 }
 
 window.addEventListener('DOMContentLoaded', async ()=>{

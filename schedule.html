@@ -105,6 +105,36 @@
     .ro-approved{ background:var(--mint); color:var(--mint-i); }
     .ro-denied{ background:var(--offbg); color:var(--offink); }
     .hide{ display:none; }
+
+    /* swaps */
+    .sw-btn{ border:1px solid var(--line); background:#f4f7f9; color:var(--ink); border-radius:10px; padding:6px 11px; font-size:0.72rem; font-weight:700; cursor:pointer; font-family:inherit; flex-shrink:0; }
+    .sw-btn:hover{ border-color:var(--accent); color:var(--accent); }
+    .sw-row{ display:flex; align-items:center; gap:10px; padding:10px 2px; border-top:1px solid var(--line); font-size:0.86rem; }
+    .sw-row:first-of-type{ border-top:none; }
+    .sw-main{ flex:1; min-width:0; }
+    .sw-who{ font-weight:700; }
+    .sw-when{ font-size:0.78rem; color:var(--sub); margin-top:1px; }
+    .sw-note{ font-size:0.78rem; color:var(--sub); font-style:italic; margin-top:1px; }
+    .sw-actions{ display:flex; gap:6px; flex-shrink:0; }
+    .btn-mini{ border:none; border-radius:10px; padding:8px 12px; font-size:0.76rem; font-weight:700; cursor:pointer; font-family:inherit; }
+    .btn-yes{ background:var(--mint); color:var(--mint-i); }
+    .btn-no{ background:var(--offbg); color:var(--offink); }
+    .sw-sub{ font-size:0.72rem; font-weight:800; text-transform:uppercase; letter-spacing:0.4px; color:var(--sub); margin:12px 0 4px; }
+
+    /* availability editor */
+    .av-row{ display:flex; align-items:center; gap:8px; padding:7px 0; border-top:1px solid var(--line); }
+    .av-row:first-of-type{ border-top:none; }
+    .av-day{ width:44px; font-weight:800; font-size:0.8rem; }
+    .av-row select, .av-row input[type=time]{ padding:8px; border:1px solid var(--line); border-radius:10px; font-family:inherit; font-size:0.82rem; background:#fff; color:var(--ink); }
+    .av-row select{ flex:1; min-width:0; }
+    .av-row input[type=time]{ width:92px; }
+
+    /* announcements */
+    .ann-item{ padding:10px 2px; border-top:1px solid var(--line); }
+    .ann-item:first-of-type{ border-top:none; }
+    .ann-title{ font-weight:800; font-size:0.9rem; }
+    .ann-body{ font-size:0.84rem; color:var(--sub); margin-top:2px; white-space:pre-wrap; }
+    .ann-when{ font-size:0.72rem; color:var(--sub); margin-top:3px; }
   </style>
 </head>
 <body>
@@ -172,8 +202,59 @@
         <div class="ro-msg" id="roMsg"></div>
         <div id="roList"></div>
       </div>
+
+      <!-- shift swaps -->
+      <div class="card hide" id="swapCard">
+        <h3><i class="ti ti-switch-horizontal"></i> Shift swaps</h3>
+        <p style="font-size:0.84rem;color:var(--sub);margin:-2px 0 4px;">Tap <strong>Swap</strong> on one of your shifts above to offer it to a coworker. Swaps take effect once your manager approves.</p>
+        <div id="swapIncoming"></div>
+        <div id="swapMine"></div>
+      </div>
+
+      <!-- weekly availability -->
+      <div class="card hide" id="avCard">
+        <h3><i class="ti ti-calendar-time"></i> My weekly availability</h3>
+        <p style="font-size:0.84rem;color:var(--sub);margin:-2px 0 8px;">Tell your manager when you can't work (or when you'd love the hours). This repeats every week — leave times blank for all day.</p>
+        <div id="avRows"></div>
+        <button class="btn btn-primary btn-block" style="margin-top:10px;" onclick="avSave()">Save availability</button>
+        <div class="ro-msg" id="avMsg"></div>
+      </div>
+
+      <!-- notifications -->
+      <div class="card hide" id="notifyCard">
+        <h3><i class="ti ti-bell"></i> Notifications</h3>
+        <p style="font-size:0.84rem;color:var(--sub);margin:-2px 0 10px;">Add your email to get the schedule when it's published or changes, plus a reminder the day before you work.</p>
+        <input type="email" id="notifyEmail" placeholder="you@example.com" autocomplete="email"
+               style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;font-size:1rem;font-family:inherit;margin-bottom:10px;background:var(--surface);color:var(--ink);">
+        <button class="btn btn-primary btn-block" onclick="saveEmail()">Save</button>
+        <div class="ro-msg" id="notifyMsg"></div>
+      </div>
+
+      <!-- announcements (public) -->
+      <div class="card hide" id="annCard">
+        <h3><i class="ti ti-speakerphone"></i> Announcements</h3>
+        <div id="annList"></div>
+      </div>
     </div>
     <div class="foot-note">Approved days show on the schedule automatically.</div>
+  </div>
+
+  <!-- swap request modal -->
+  <div id="swapModal" style="display:none;position:fixed;inset:0;background:rgba(12,38,55,0.6);z-index:100;align-items:center;justify-content:center;padding:16px;">
+    <div style="background:#fff;border-radius:18px;padding:20px;width:340px;max-width:100%;">
+      <h3 style="font-size:1rem;font-weight:800;margin-bottom:4px;">Offer this shift</h3>
+      <p id="swapSub" style="font-size:0.82rem;color:var(--sub);margin-bottom:12px;"></p>
+      <label class="ro-f" style="display:block;margin-bottom:10px;">Offer to
+        <select id="swapTo" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:12px;font-family:inherit;font-size:0.95rem;margin-top:5px;background:#fff;color:var(--ink);"></select></label>
+      <label class="ro-f" style="display:block;margin-bottom:12px;">Note (optional)
+        <input type="text" id="swapNote" placeholder="e.g. family thing came up"
+               style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:12px;font-family:inherit;font-size:0.95rem;margin-top:5px;background:#fff;color:var(--ink);"></label>
+      <div class="ro-msg" id="swapErr" style="margin:0 0 8px;"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" style="flex:1;" onclick="swapSubmit()">Request swap</button>
+        <button class="btn" style="background:#eef2f5;color:var(--ink);" onclick="swapClose()">Cancel</button>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -183,6 +264,16 @@
 const SB_URL = 'https://vdvtrevhqalmjwhjhjug.supabase.co';
 const SB_KEY = 'sb_publishable_LnlevWReed7K8cFk_f_Mxg_UywktQ5_';
 const sb = window.supabase.createClient(SB_URL, SB_KEY);
+const FN_URL = SB_URL + '/functions/v1/portal-api';
+async function fn(action, payload){
+  const res = await fetch(FN_URL + '?action=' + encodeURIComponent(action), {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'apikey':SB_KEY, 'Authorization':'Bearer '+SB_KEY },
+    body: JSON.stringify(payload || {})
+  });
+  let data={}; try{ data=await res.json(); }catch(_){}
+  return { ok:res.ok, status:res.status, data };
+}
 
 const LOC_LABELS = { memphis:'Memphis', nashville:'Nashville', franklin:'Franklin' };
 // Nashville & Franklin share one staff pool — staff there see both sites' shifts together.
@@ -210,6 +301,7 @@ function setLoc(slug){
   if(!LOC_LABELS[slug]) return;
   LOC = slug; localStorage.setItem('greys_loc', slug);
   applyLoc();
+  annLoad();
   // my record may not exist at this location — re-check quietly
   if(localStorage.getItem('greys_emp_id')) relogin(); else loadWeek();
 }
@@ -242,10 +334,13 @@ function enter(emp){
   document.getElementById('loginCard').classList.add('hide');
   document.getElementById('myCard').classList.remove('hide');
   document.getElementById('roCard').classList.remove('hide');
+  document.getElementById('swapCard').classList.remove('hide');
+  document.getElementById('avCard').classList.remove('hide');
+  document.getElementById('notifyCard').classList.remove('hide');
   document.getElementById('logoutBtn').classList.remove('hide');
   loadWeek();
   const rs = document.getElementById('roStart'); if(rs && !rs.value) rs.value = iso(new Date());
-  roLoad();
+  roLoad(); swapLoad(); avLoad(); loadEmail(); annLoad();
 }
 
 /* ── request time off (name comes from the logged-in employee) ── */
@@ -285,8 +380,7 @@ function logout(){
   localStorage.removeItem('greys_emp_id');
   localStorage.removeItem('greys_emp_email');
   ME = null;
-  document.getElementById('myCard').classList.add('hide');
-  document.getElementById('roCard').classList.add('hide');
+  ['myCard','roCard','swapCard','avCard','notifyCard'].forEach(id=>document.getElementById(id).classList.add('hide'));
   document.getElementById('logoutBtn').classList.add('hide');
   document.getElementById('loginCard').classList.remove('hide');
   document.getElementById('loginEmail').value='';
@@ -342,11 +436,12 @@ function render(){
     }
     dayShifts.forEach(s=>{
       const locTag = LOC_GROUPS[LOC].length>1 ? ' <span class="loc-tag '+s.location+'">'+LOC_SHORT[s.location]+'</span>' : '';
+      const swapBtn = s.date>=todayIso ? '<button class="sw-btn" onclick="swapOpen('+s.id+')">Swap</button>' : '';
       rows.push('<div class="my-row">'+dayCell+'<div class="my-main">'+
         '<div class="my-time">'+fmtTime(s.start_time)+' – '+fmtTime(s.end_time)+locTag+'</div>'+
         (s.role?'<div class="my-role">'+esc(s.role)+'</div>':'')+
         (s.note?'<div class="my-note">'+esc(s.note)+'</div>':'')+
-        '</div>'+(isOff?'<span class="off-pill">off?</span>':'')+'</div>');
+        '</div>'+(isOff?'<span class="off-pill">off?</span>':'')+swapBtn+'</div>');
     });
   });
   document.getElementById('myWeek').innerHTML = rows.length ? rows.join('') : '<div class="my-empty">No shifts scheduled this week. 🎉</div>';
@@ -378,6 +473,167 @@ function render(){
   }).join('');
 }
 
+/* ── shift swaps ── */
+let SWAP_CTX = null;
+function swapOpen(shiftId){
+  if(!ME) return;
+  const s = SHIFTS.find(x=>x.id===shiftId); if(!s) return;
+  SWAP_CTX = shiftId;
+  document.getElementById('swapSub').textContent =
+    new Date(s.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})
+    +' · '+fmtTime(s.start_time)+' – '+fmtTime(s.end_time)+(s.role?' · '+s.role:'')+' · '+LOC_LABELS[s.location];
+  const others = EMPLOYEES.filter(e=>e.id!==ME.id);
+  document.getElementById('swapTo').innerHTML = others.length
+    ? others.map(e=>'<option value="'+e.id+'">'+esc(e.name)+(e.role?' — '+esc(e.role):'')+'</option>').join('')
+    : '<option value="">No coworkers found</option>';
+  document.getElementById('swapNote').value='';
+  document.getElementById('swapErr').textContent='';
+  document.getElementById('swapModal').style.display='flex';
+}
+function swapClose(){ document.getElementById('swapModal').style.display='none'; SWAP_CTX=null; }
+async function swapSubmit(){
+  if(!ME || !SWAP_CTX) return;
+  const toId = Number(document.getElementById('swapTo').value);
+  const err = document.getElementById('swapErr');
+  if(!toId){ err.style.color='var(--wax)'; err.textContent='Pick a coworker.'; return; }
+  err.style.color='var(--sub)'; err.textContent='Sending…';
+  const r = await fn('request-swap', { shift_id:SWAP_CTX, to_employee_id:toId, login_id:ME.login_id, note:document.getElementById('swapNote').value.trim() });
+  if(!r.ok){ err.style.color='var(--wax)'; err.textContent=r.data.error||'Could not send — try again.'; return; }
+  swapClose(); swapLoad();
+}
+const SW_LABEL = { pending_peer:'waiting on them', accepted:'accepted — awaiting manager', approved:'approved', denied:'denied by manager', declined:'declined', cancelled:'cancelled' };
+const SW_CLASS = { pending_peer:'ro-pending', accepted:'ro-pending', approved:'ro-approved', denied:'ro-denied', declined:'ro-denied', cancelled:'ro-denied' };
+async function swapLoad(){
+  if(!ME) return;
+  const inc = document.getElementById('swapIncoming'), mine = document.getElementById('swapMine');
+  const { data } = await sb.from('portal_swaps').select('*')
+    .or('from_employee_id.eq.'+ME.id+',to_employee_id.eq.'+ME.id)
+    .order('created_at',{ascending:false}).limit(15);
+  const rows = data||[];
+  const shiftIds = [...new Set(rows.map(r=>r.shift_id))];
+  let shMap = {};
+  if(shiftIds.length){
+    const { data: shs } = await sb.from('portal_shifts').select('*').in('id', shiftIds);
+    (shs||[]).forEach(s=>{ shMap[s.id]=s; });
+  }
+  const empName = id => (EMPLOYEES.find(e=>e.id===id)||{}).name || 'a coworker';
+  const when = r => { const s=shMap[r.shift_id]; return s ? fmtShort(s.date)+' · '+fmtTime(s.start_time)+'–'+fmtTime(s.end_time)+(s.role?' · '+esc(s.role):'') : '(shift removed)'; };
+  const incoming = rows.filter(r=>r.to_employee_id===ME.id && r.status==='pending_peer');
+  inc.innerHTML = incoming.length
+    ? '<div class="sw-sub">For you to answer</div>'+incoming.map(r=>
+        '<div class="sw-row"><div class="sw-main"><div class="sw-who">'+esc(empName(r.from_employee_id))+' offered you a shift</div>'
+        +'<div class="sw-when">'+when(r)+'</div>'
+        +(r.note?'<div class="sw-note">"'+esc(r.note)+'"</div>':'')
+        +'</div><div class="sw-actions">'
+        +'<button class="btn-mini btn-yes" onclick="swapRespond('+r.id+',true)">Accept</button>'
+        +'<button class="btn-mini btn-no" onclick="swapRespond('+r.id+',false)">Decline</button>'
+        +'</div></div>').join('')
+    : '';
+  const outgoing = rows.filter(r=>r.from_employee_id===ME.id);
+  mine.innerHTML = outgoing.length
+    ? '<div class="sw-sub">Your requests</div>'+outgoing.map(r=>
+        '<div class="sw-row"><div class="sw-main"><div class="sw-who">To '+esc(empName(r.to_employee_id))+'</div>'
+        +'<div class="sw-when">'+when(r)+'</div></div>'
+        +'<span class="ro-badge '+(SW_CLASS[r.status]||'ro-pending')+'">'+(SW_LABEL[r.status]||r.status)+'</span>'
+        +(['pending_peer','accepted'].includes(r.status)?'<button class="sw-btn" onclick="swapCancel('+r.id+')">Cancel</button>':'')
+        +'</div>').join('')
+    : '';
+  if(!incoming.length && !outgoing.length){
+    mine.innerHTML = '<div class="my-empty">No swap requests right now.</div>';
+  }
+}
+async function swapRespond(id, accept){
+  const r = await fn('respond-swap', { swap_id:id, login_id:ME.login_id, accept });
+  if(!r.ok) alert(r.data.error||'Could not respond — try again.');
+  swapLoad();
+}
+async function swapCancel(id){
+  const r = await fn('cancel-swap', { swap_id:id, login_id:ME.login_id });
+  if(!r.ok) alert(r.data.error||'Could not cancel — try again.');
+  swapLoad();
+}
+
+/* ── weekly availability ── */
+const AV_DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+function avBuild(existing){
+  const byDay = {};
+  (existing||[]).forEach(a=>{ if(byDay[a.weekday]==null) byDay[a.weekday]=a; });
+  document.getElementById('avRows').innerHTML = AV_DAYS.map((d,i)=>{
+    const a = byDay[i];
+    const kind = a ? a.kind : '';
+    const st = a && a.start_time ? String(a.start_time).slice(0,5) : '';
+    const en = a && a.end_time ? String(a.end_time).slice(0,5) : '';
+    const showT = kind ? '' : 'style="display:none;"';
+    return '<div class="av-row"><span class="av-day">'+d+'</span>'
+      +'<select id="av-k-'+i+'" onchange="avKind('+i+')">'
+        +'<option value=""'+(kind===''?' selected':'')+'>Available</option>'
+        +'<option value="unavailable"'+(kind==='unavailable'?' selected':'')+'>Can\'t work</option>'
+        +'<option value="preferred"'+(kind==='preferred'?' selected':'')+'>Prefer to work</option>'
+      +'</select>'
+      +'<input type="time" id="av-s-'+i+'" value="'+st+'" '+showT+' title="From (blank = all day)">'
+      +'<input type="time" id="av-e-'+i+'" value="'+en+'" '+showT+' title="To">'
+    +'</div>';
+  }).join('');
+}
+function avKind(i){
+  const show = document.getElementById('av-k-'+i).value !== '';
+  document.getElementById('av-s-'+i).style.display = show?'':'none';
+  document.getElementById('av-e-'+i).style.display = show?'':'none';
+}
+async function avLoad(){
+  if(!ME) return;
+  const { data } = await sb.from('portal_availability').select('*').eq('employee_id', ME.id).order('weekday');
+  avBuild(data||[]);
+}
+async function avSave(){
+  if(!ME) return;
+  const m = document.getElementById('avMsg');
+  const rows = [];
+  for(let i=0;i<7;i++){
+    const kind = document.getElementById('av-k-'+i).value;
+    if(!kind) continue;
+    const st = document.getElementById('av-s-'+i).value;
+    const en = document.getElementById('av-e-'+i).value;
+    if((st && !en) || (!st && en)){ m.style.color='var(--wax)'; m.textContent='Set both times for '+AV_DAYS[i]+' (or leave both blank for all day).'; return; }
+    rows.push({ weekday:i, kind, start_time:st||null, end_time:en||null });
+  }
+  m.style.color='var(--sub)'; m.textContent='Saving…';
+  const r = await fn('set-availability', { employee_id:ME.id, login_id:ME.login_id, rows });
+  if(!r.ok){ m.style.color='var(--wax)'; m.textContent=r.data.error||'Could not save — try again.'; return; }
+  m.style.color='var(--mint-i)'; m.textContent='✅ Saved — your manager sees this on the schedule builder.';
+  setTimeout(()=>{ m.textContent=''; },5000);
+}
+
+/* ── notification email ── */
+async function loadEmail(){
+  if(!ME) return;
+  const r = await fn('get-my-email', { employee_id:ME.id, login_id:ME.login_id });
+  if(r.ok) document.getElementById('notifyEmail').value = r.data.email||'';
+}
+async function saveEmail(){
+  if(!ME) return;
+  const m = document.getElementById('notifyMsg');
+  const email = document.getElementById('notifyEmail').value.trim();
+  m.style.color='var(--sub)'; m.textContent='Saving…';
+  const r = await fn('set-my-email', { employee_id:ME.id, login_id:ME.login_id, email });
+  if(!r.ok){ m.style.color='var(--wax)'; m.textContent=r.data.error||'Could not save — try again.'; return; }
+  m.style.color='var(--mint-i)'; m.textContent = email ? '✅ Saved — you\'ll get schedule emails here.' : 'Removed — no more schedule emails.';
+  setTimeout(()=>{ m.textContent=''; },5000);
+}
+
+/* ── announcements (public) ── */
+async function annLoad(){
+  const card = document.getElementById('annCard'), el = document.getElementById('annList');
+  const { data } = await sb.from('portal_announcements').select('*').order('created_at',{ascending:false}).limit(10);
+  const rows = (data||[]).filter(r=>r.location==='all' || LOC_GROUPS[LOC].includes(r.location)).slice(0,5);
+  if(!rows.length){ card.classList.add('hide'); return; }
+  card.classList.remove('hide');
+  el.innerHTML = rows.map(r=>
+    '<div class="ann-item"><div class="ann-title">'+esc(r.title)+'</div>'
+    +(r.body?'<div class="ann-body">'+esc(r.body)+'</div>':'')
+    +'<div class="ann-when">'+new Date(r.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</div></div>').join('');
+}
+
 window.addEventListener('DOMContentLoaded', async ()=>{
   applyLoc();
   const saved = localStorage.getItem('greys_emp_id');
@@ -387,6 +643,7 @@ window.addEventListener('DOMContentLoaded', async ()=>{
     localStorage.removeItem('greys_emp_id');
   }
   loadWeek(); // schedule is public — load right away, no login needed
+  annLoad();
 });
 </script>
 </body>
