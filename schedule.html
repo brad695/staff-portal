@@ -35,13 +35,10 @@
     .loc-tab{ flex:1; padding:10px 0; border-radius:12px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#b9c5d1; font-weight:700; font-size:0.86rem; cursor:pointer; font-family:inherit; }
     .loc-tab.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
 
-    /* login */
-    .login-wrap{ display:flex; justify-content:center; padding:56px 20px; }
-    .login-card{ background:var(--surface); border-radius:18px; box-shadow:var(--shadow); padding:26px; width:380px; max-width:100%; }
-    .login-card h2{ font-size:1.2rem; font-weight:800; letter-spacing:-0.3px; }
-    .login-card p{ font-size:0.86rem; color:var(--sub); margin:6px 0 16px; line-height:1.5; }
-    .login-card input{ width:100%; padding:12px 14px; border:1px solid var(--line); border-radius:12px; font-size:1rem; font-family:inherit; margin-bottom:12px; }
-    .login-card input:focus{ outline:none; border-color:var(--accent); }
+    /* inline login card (view your own shifts) */
+    #loginCard p{ font-size:0.86rem; color:var(--sub); margin:-2px 0 12px; line-height:1.5; }
+    #loginCard input{ width:100%; padding:12px 14px; border:1px solid var(--line); border-radius:12px; font-size:1rem; font-family:inherit; margin-bottom:10px; background:var(--surface); color:var(--ink); }
+    #loginCard input:focus{ outline:none; border-color:var(--accent); }
     .login-err{ font-size:0.8rem; color:var(--wax); min-height:18px; margin-bottom:6px; }
     .btn{ border:none; border-radius:14px; padding:12px 18px; font-size:0.92rem; font-weight:700; cursor:pointer; font-family:inherit; }
     .btn-primary{ background:var(--accent); color:#fff; }
@@ -129,20 +126,8 @@
     <button class="loc-tab" data-loc="franklin" onclick="setLoc('franklin')">Franklin</button>
   </div>
 
-  <!-- LOGIN -->
-  <div id="loginView" class="login-wrap">
-    <div class="login-card">
-      <h2>👋 Who are you?</h2>
-      <p>Enter the employee ID your manager gave you and we'll pull up your schedule. No password needed.</p>
-      <input type="text" id="loginEmail" placeholder="Your employee ID" autocomplete="off" autocapitalize="off"
-             onkeydown="if(event.key==='Enter') doLogin()" />
-      <div class="login-err" id="loginErr"></div>
-      <button class="btn btn-primary btn-block" id="loginBtn" onclick="doLogin()">View my schedule</button>
-    </div>
-  </div>
-
-  <!-- SCHEDULE -->
-  <div id="schedView" class="hide">
+  <!-- SCHEDULE (public — no login needed) -->
+  <div id="schedView">
     <div class="wk-nav">
       <button class="wk-btn" onclick="moveWeek(-1)" aria-label="Previous week">‹</button>
       <div class="wk-label" id="wkLabel"></div>
@@ -151,7 +136,17 @@
     </div>
 
     <div class="sec">
-      <div class="card">
+      <!-- inline login — unlocks "my week" + time off -->
+      <div class="card" id="loginCard">
+        <h3><i class="ti ti-user"></i> See your own shifts</h3>
+        <p>Enter the employee ID your manager gave you to see your week and request time off. No password needed.</p>
+        <input type="text" id="loginEmail" placeholder="Your employee ID" autocomplete="off" autocapitalize="off"
+               onkeydown="if(event.key==='Enter') doLogin()" />
+        <div class="login-err" id="loginErr"></div>
+        <button class="btn btn-primary btn-block" id="loginBtn" onclick="doLogin()">View my shifts</button>
+      </div>
+
+      <div class="card hide" id="myCard">
         <h3><i class="ti ti-user"></i> <span id="myName">My week</span> <span class="hours" id="myHours"></span></h3>
         <div id="myWeek"></div>
       </div>
@@ -166,7 +161,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card hide" id="roCard">
         <h3><i class="ti ti-beach"></i> Request time off</h3>
         <div class="ro-grid">
           <label class="ro-f">Start<input type="date" id="roStart"></label>
@@ -215,12 +210,11 @@ function setLoc(slug){
   if(!LOC_LABELS[slug]) return;
   LOC = slug; localStorage.setItem('greys_loc', slug);
   applyLoc();
-  if(document.getElementById('schedView').classList.contains('hide')) return;
   // my record may not exist at this location — re-check quietly
-  relogin();
+  if(localStorage.getItem('greys_emp_id')) relogin(); else loadWeek();
 }
 
-/* ── login by employee ID (no password — internal tool) ── */
+/* ── optional login by employee ID — unlocks "my week" + time off (no password — internal tool) ── */
 async function doLogin(){
   const empId = document.getElementById('loginEmail').value.trim();
   const err = document.getElementById('loginErr'); err.textContent='';
@@ -245,8 +239,9 @@ function enter(emp){
   ME = emp;
   if(emp.location !== LOC){ LOC = emp.location; localStorage.setItem('greys_loc', LOC); }
   applyLoc();
-  document.getElementById('loginView').classList.add('hide');
-  document.getElementById('schedView').classList.remove('hide');
+  document.getElementById('loginCard').classList.add('hide');
+  document.getElementById('myCard').classList.remove('hide');
+  document.getElementById('roCard').classList.remove('hide');
   document.getElementById('logoutBtn').classList.remove('hide');
   loadWeek();
   const rs = document.getElementById('roStart'); if(rs && !rs.value) rs.value = iso(new Date());
@@ -290,10 +285,12 @@ function logout(){
   localStorage.removeItem('greys_emp_id');
   localStorage.removeItem('greys_emp_email');
   ME = null;
-  document.getElementById('schedView').classList.add('hide');
+  document.getElementById('myCard').classList.add('hide');
+  document.getElementById('roCard').classList.add('hide');
   document.getElementById('logoutBtn').classList.add('hide');
-  document.getElementById('loginView').classList.remove('hide');
-  const el=document.getElementById('loginEmail'); el.value=''; el.focus();
+  document.getElementById('loginCard').classList.remove('hide');
+  document.getElementById('loginEmail').value='';
+  loadWeek(); // re-render without the "me" highlight
 }
 
 /* ── week data ── */
@@ -387,8 +384,9 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   if(saved){
     const { data } = await sb.from('portal_employees').select('*').ilike('login_id', idPat(saved)).eq('active', true);
     if(data && data.length){ enter(data.find(e=>e.location===LOC) || data[0]); return; }
+    localStorage.removeItem('greys_emp_id');
   }
-  document.getElementById('loginEmail').focus();
+  loadWeek(); // schedule is public — load right away, no login needed
 });
 </script>
 </body>

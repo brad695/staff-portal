@@ -4,9 +4,9 @@
 
 Three static pages, no app server (nothing to cold-start):
 
-- **`index.html`** — the staff portal. View-only: notes & specials tiles, events, calendar, Memphis reservations, music. A "🔐 Manager" link opens the console. The **My Shifts** tile opens `schedule.html` (the Schedule and Request Off tiles were removed — schedule info lives on the calendar, and time-off requests live on My Shifts).
+- **`index.html`** — the staff portal. View-only: notes & specials tiles, events, calendar, Memphis reservations, music. A "🔐 Manager" link opens the console. The **Schedule** tile opens `schedule.html` (the old Schedule and Request Off tiles were removed — schedule info lives on the calendar, and time-off requests live on the Schedule page).
 - **`manager.html`** — the manager console. Password login, left sidebar menu, then clean record lists for Content / Schedules / Employees: readable rows with type & location badges, location filter chips (All / Memphis / Nashville / Franklin), and a proper edit window per item (each item carries its own location). Plus time-off approvals and the **Staff Scheduling** tab (all three weekly grids + print). CSV import lives under each list.
-- **`schedule.html`** — the employee schedule view. Staff "log in" by typing their **employee ID** (any text the manager put on their record — no password; internal tool). They see their own week (shifts, roles, hours), the full weekly grid for their location, and a **Request time off** form (name auto-filled from their record) with their request history and statuses; approved time off shows as OFF badges.
+- **`schedule.html`** — the schedule view. The full weekly grid for the location is **public — no login needed**. An inline "See your own shifts" card lets staff type their **employee ID** (any text the manager put on their record — no password; internal tool) to unlock their own week (shifts, roles, hours, row highlighted in the grid) and a **Request time off** form (name auto-filled from their record) with their request history and statuses; approved time off shows as OFF badges.
 
 ## Staff scheduling
 
