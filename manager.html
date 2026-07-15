@@ -244,6 +244,11 @@
 
   <!-- STAFF SCHEDULING -->
   <div id="panel-scheduling" class="panel">
+    <div class="section-card" id="sgSwapCard" style="display:none;border:1px solid var(--gold,#c9a961);">
+      <h2>🔁 Swaps waiting on you</h2>
+      <div class="hint">A coworker accepted these shift offers — they only take effect once you approve. Approving moves the shift and notifies both employees.</div>
+      <div id="sgSwapList"></div>
+    </div>
     <div class="section-card">
       <h2>🗓️ Weekly Schedule — all locations</h2>
       <div class="hint">All three schedules for the week below. <strong>Nashville and Franklin share one staff pool</strong> — both grids show the combined roster, and a shift belongs to the grid you add it on. Click any cell to add a shift; <strong>drag a shift</strong> to another day or employee to move it; click one to edit, delete or copy it. Approved time off shows as a red <strong>OFF</strong> badge, and staff availability shows as grey <strong>unavail</strong> / green <strong>★</strong> chips. Edits stay private until you hit <strong>📣 Publish &amp; notify</strong> — that emails everyone whose week changed. Staff open their schedule at <strong>schedule.html</strong> with their employee ID.</div>
@@ -832,6 +837,7 @@ function sgToday(){ sgWeek=sgMonday(new Date()); sgLoad(); }
 
 async function sgLoad(){
   if(!SESSION) return;
+  sgSwapLoad();
   const from=sgIso(sgWeek), to=sgIso(sgAdd(sgWeek,6));
   document.getElementById('sgLabel').textContent =
     sgWeek.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+sgAdd(sgWeek,6).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
@@ -1116,6 +1122,37 @@ async function loadSwaps(){
         +'</div></div></div>';
     }).join('');
   }catch(e){ el.innerHTML='<div class="to-empty">❌ Could not load swaps.</div>'; }
+}
+// Swaps a coworker accepted → waiting on manager approval, pinned atop Staff Scheduling
+async function sgSwapLoad(){
+  const card = document.getElementById('sgSwapCard'), el = document.getElementById('sgSwapList');
+  if(!card || !el) return;
+  try{
+    const { data: swaps } = await sb.from('portal_swaps').select('*').eq('status','accepted').order('created_at',{ascending:true}).limit(30);
+    const rows = swaps||[];
+    if(!rows.length){ card.style.display='none'; return; }
+    const shiftIds = [...new Set(rows.map(r=>r.shift_id))];
+    const [emps, shifts] = await Promise.all([
+      sb.from('portal_employees').select('id,name'),
+      sb.from('portal_shifts').select('*').in('id', shiftIds)
+    ]);
+    const nameOf = id => ((emps.data||[]).find(e=>e.id===id)||{}).name || '(deleted)';
+    const shiftOf = id => (shifts.data||[]).find(s=>s.id===id);
+    el.innerHTML = rows.map(r=>{
+      const sh = shiftOf(r.shift_id);
+      const when = sh ? fmtDisplay(sh.date)+' · '+sgFmtT(String(sh.start_time).slice(0,5))+'–'+sgFmtT(String(sh.end_time).slice(0,5))+(sh.role?' · '+esc(sh.role):'')+' · '+LOC_LABELS[sh.location] : '(shift deleted)';
+      return '<div class="to-item"><div class="to-info">'
+        +'<div class="to-name">'+esc(nameOf(r.from_employee_id))+' → '+esc(nameOf(r.to_employee_id))+'</div>'
+        +'<div class="to-meta">'+when+'</div>'
+        +(r.note?'<div class="to-reason">"'+esc(r.note)+'"</div>':'')
+        +'</div><div class="to-right">'
+        +'<div style="display:flex;gap:6px;">'
+        +'<button class="btn btn-gold btn-sm" onclick="swSet('+r.id+',\'approved\')">Approve</button>'
+        +'<button class="btn btn-wax btn-sm" onclick="swSet('+r.id+',\'denied\')">Deny</button>'
+        +'</div></div></div>';
+    }).join('');
+    card.style.display='block';
+  }catch(e){ card.style.display='none'; }
 }
 async function swSet(id, status){
   if(status==='approved' && !confirm('Approve this swap? The shift moves to the other employee and both get an email.')) return;
