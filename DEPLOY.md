@@ -59,7 +59,7 @@ Set in Supabase → Edge Functions → Secrets:
 
 ## Texts (Twilio SMS)
 
-Staff add their own mobile number on **schedule.html → Notifications** (stored in `portal_employee_contacts.phone`; clearing the field opts out). With the three `TWILIO_*` secrets set, the Edge Function texts staff on top of the existing emails:
+Staff add their own mobile number on **schedule.html → Notifications** (stored in `portal_employee_contacts.phone`; clearing the field opts out). Managers can also set, change, or remove a number in the employee editor (Employees list → Edit → Mobile). With the three `TWILIO_*` secrets set, the Edge Function texts staff on top of the existing emails:
 
 - **📣 Publish & notify** — everyone whose week changed gets a text with their shifts.
 - **Announcements** — emailed *and* texted; the **Quick text (SMS only)** card on the same tab sends a one-off text (action `send-sms`) without posting anything to the staff page.
