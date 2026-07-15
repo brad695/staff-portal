@@ -50,8 +50,24 @@ Set in Supabase → Edge Functions → Secrets:
 | `WIX_API_KEY` | Wix API key |
 | `WIX_SITE_ID` | Wix site ID |
 | `WIX_LOCATION_ID` | (optional) Wix reservation location to show; defaults to Memphis |
+| `TWILIO_ACCOUNT_SID` | Twilio Account SID (starts `AC…`) |
+| `TWILIO_AUTH_TOKEN` | Twilio Auth Token |
+| `TWILIO_FROM` | the Twilio phone number in E.164 (`+1901…`), or a Messaging Service SID (`MG…`) |
+| `PORTAL_CRON_KEY` | shared key that lets the pg_cron job call `remind-shifts` (and nothing else) — must match the key inside the cron job (`select command from cron.job where jobname='portal-shift-reminders';`) |
 
 `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` are injected automatically.
+
+## Texts (Twilio SMS)
+
+Staff add their own mobile number on **schedule.html → Notifications** (stored in `portal_employee_contacts.phone`; clearing the field opts out). With the three `TWILIO_*` secrets set, the Edge Function texts staff on top of the existing emails:
+
+- **📣 Publish & notify** — everyone whose week changed gets a text with their shifts.
+- **Announcements** — emailed *and* texted; the **Quick text (SMS only)** card on the same tab sends a one-off text (action `send-sms`) without posting anything to the staff page.
+- **Time-off decisions** — approving/denying a request texts (and emails) the employee, matched by name like the OFF badges.
+- **Shift swaps** — the coworker gets a text when offered a shift; both sides get one on approve/deny.
+- **Shift reminders** — a `pg_cron` job (`portal-shift-reminders`, 21:30 UTC daily = 3:30/4:30pm Central) calls action `remind-shifts`, texting everyone who works **tomorrow** (Central time). One reminder per employee per day, deduped in `portal_sms_log` (which also logs every SMS sent, with errors). The cron job authenticates with `PORTAL_CRON_KEY`.
+
+If Twilio secrets are missing, everything still works — texts are just skipped. **US compliance:** a regular local number needs A2P 10DLC registration (or use a verified toll-free number) before carriers reliably deliver; trial accounts can only text verified numbers.
 
 ## Notes / follow-ups
 

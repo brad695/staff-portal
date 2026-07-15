@@ -342,7 +342,7 @@
   <div id="panel-announcements" class="panel">
     <div class="section-card">
       <h2>📣 New announcement</h2>
-      <div class="hint">Emails every active employee (with an email on file) at the chosen location, and shows on the staff schedule page.</div>
+      <div class="hint">Emails <strong>and texts</strong> every active employee (with an email / mobile number on file) at the chosen location, and shows on the staff schedule page.</div>
       <div class="rec-fields">
         <div class="rf full"><label>Title</label><input type="text" id="annTitle" placeholder="e.g. Holiday hours next week"></div>
         <div class="rf full"><label>Message</label><textarea id="annBody" placeholder="Details…"></textarea></div>
@@ -351,6 +351,18 @@
       <div class="row-actions">
         <button class="btn btn-gold" onclick="annSend()">Send announcement</button>
         <span class="save-msg" id="annMsg"></span>
+      </div>
+    </div>
+    <div class="section-card">
+      <h2>📱 Quick text (SMS only)</h2>
+      <div class="hint">Sends a one-off text to every active employee with a mobile number on file — nothing is posted to the staff page. Staff add their own number on the schedule page under Notifications.</div>
+      <div class="rec-fields">
+        <div class="rf full"><label>Message</label><textarea id="smsBody" placeholder="e.g. We're slammed tonight — anyone free to pick up a shift, text me back!"></textarea></div>
+        <div class="rf"><label>Location</label><select id="smsLoc"><option value="all">All locations</option><option value="memphis">Memphis</option><option value="nashville">Nashville + Franklin</option></select></div>
+      </div>
+      <div class="row-actions">
+        <button class="btn btn-gold" onclick="smsSend()">Send text</button>
+        <span class="save-msg" id="smsMsg"></span>
       </div>
     </div>
     <div class="section-card">
@@ -582,14 +594,15 @@ const SCHEMA = {
     ],
     defaults:{ active:'active' },
     valid:r=> !r.name ? 'A name is required.' : '',
-    map:r=>({ id:r.id, name:r.name, login_id:r.login_id||'', contact_email:r.contact_email||'', role:r.role||'', active:(r.active===false||r.active==='inactive')?'inactive':'active', location:r.location||'memphis' }),
+    map:r=>({ id:r.id, name:r.name, login_id:r.login_id||'', contact_email:r.contact_email||'', contact_phone:r.contact_phone||'', role:r.role||'', active:(r.active===false||r.active==='inactive')?'inactive':'active', location:r.location||'memphis' }),
     rowTitle:r=>r.name,
     rowTags:r=> r.active==='inactive' ? '<span class="tag tag-off2">inactive</span>' : '',
     rowMeta:r=>{
       const bits=[];
       bits.push(r.login_id ? 'ID: <strong>'+esc(r.login_id)+'</strong>' : '<span style="color:var(--wax);">no login ID yet</span>');
       if(r.role) bits.push(esc(r.role));
-      bits.push(r.contact_email ? '✉ '+esc(r.contact_email) : '<span style="color:var(--wax);">no email — won\'t get notifications</span>');
+      bits.push(r.contact_email ? '✉ '+esc(r.contact_email) : '<span style="color:var(--wax);">no email</span>');
+      bits.push(r.contact_phone ? '📱 '+esc(r.contact_phone) : '<span style="color:var(--wax);">no mobile — won\'t get texts</span>');
       return bits.join(' &nbsp;·&nbsp; ');
     },
     csvHeader:['name','employee_id','role','active'],
@@ -615,8 +628,8 @@ async function loadKind(kind){
     if(kind==='employees'){
       // emails live in a separate table only admins can read
       const { data: contacts } = await sb.from('portal_employee_contacts').select('*');
-      const em = {}; (contacts||[]).forEach(c=>{ em[c.employee_id]=c.email||''; });
-      rows = rows.map(r=>Object.assign({}, r, { contact_email: em[r.id]||'' }));
+      const em = {}, ph = {}; (contacts||[]).forEach(c=>{ em[c.employee_id]=c.email||''; ph[c.employee_id]=c.phone||''; });
+      rows = rows.map(r=>Object.assign({}, r, { contact_email: em[r.id]||'', contact_phone: ph[r.id]||'' }));
     }
     ROWS[kind] = rows.map(S.map);
   }catch(e){ ROWS[kind]=[]; }
@@ -1055,13 +1068,14 @@ async function sgDrop(ev, loc, empId, date){
 
 /* ── publish & notify ── */
 async function publishWeek(loc){
-  if(!confirm('Publish the '+LOC_LABELS[loc]+' schedule for this week?\n\nEveryone whose week changed (and has an email on file) gets an email with their shifts.')) return;
+  if(!confirm('Publish the '+LOC_LABELS[loc]+' schedule for this week?\n\nEveryone whose week changed gets an email and/or text with their shifts (whatever contact info they have on file).')) return;
   const el = document.getElementById('sgMsg-'+loc);
   el.className='save-msg'; el.textContent='Publishing…';
   const r = await fn('publish-week', { location: loc, week_start: sgIso(sgWeek) });
   if(r.ok){
-    let t = '✅ Published — emailed '+r.data.notified+' of '+r.data.changed+' affected employee(s).';
-    if(r.data.no_email && r.data.no_email.length) t += ' No email on file: '+r.data.no_email.join(', ')+'.';
+    let t = '✅ Published — emailed '+r.data.notified+', texted '+(r.data.sms_notified||0)+' of '+r.data.changed+' affected employee(s).';
+    if(r.data.no_contact && r.data.no_contact.length) t += ' No contact info on file: '+r.data.no_contact.join(', ')+'.';
+    else if(r.data.no_email && r.data.no_email.length) t += ' No email on file: '+r.data.no_email.join(', ')+'.';
     el.textContent = t; sgLoad();
   } else { el.className='save-msg err'; el.textContent='❌ '+(r.data.error||'Publish failed'); }
   setTimeout(()=>{ el.textContent=''; },12000);
@@ -1137,15 +1151,31 @@ async function annSend(){
   const loc = document.getElementById('annLoc').value;
   const m = document.getElementById('annMsg');
   if(!title){ m.className='save-msg err'; m.textContent='A title is required.'; return; }
-  if(!confirm('Send this announcement now? It emails every active employee'+(loc==='all'?' at all locations':'')+' with an email on file.')) return;
+  if(!confirm('Send this announcement now? It emails and texts every active employee'+(loc==='all'?' at all locations':'')+' with an email or mobile number on file.')) return;
   m.className='save-msg'; m.textContent='Sending…';
   const r = await fn('send-announcement', { title, body, location: loc });
   if(r.ok){
-    m.textContent='✅ Sent to '+r.data.sent+' of '+r.data.total+' employee(s).';
+    m.textContent='✅ Emailed '+r.data.sent+', texted '+(r.data.sms_sent||0)+' of '+r.data.total+' employee(s).';
     document.getElementById('annTitle').value=''; document.getElementById('annBody').value='';
     loadAnnouncements();
   } else { m.className='save-msg err'; m.textContent='❌ '+(r.data.error||'Send failed'); }
   setTimeout(()=>{ m.textContent=''; },9000);
+}
+async function smsSend(){
+  const body = document.getElementById('smsBody').value.trim();
+  const loc = document.getElementById('smsLoc').value;
+  const m = document.getElementById('smsMsg');
+  if(!body){ m.className='save-msg err'; m.textContent='Write a message first.'; return; }
+  if(!confirm('Text this now to every active employee'+(loc==='all'?' at all locations':'')+' with a mobile number on file?')) return;
+  m.className='save-msg'; m.textContent='Sending…';
+  const r = await fn('send-sms', { body, location: loc });
+  if(r.ok){
+    let t = '✅ Texted '+r.data.sent+' of '+r.data.total+' employee(s).';
+    if(r.data.no_phone && r.data.no_phone.length) t += ' No number on file: '+r.data.no_phone.join(', ')+'.';
+    m.textContent = t;
+    document.getElementById('smsBody').value='';
+  } else { m.className='save-msg err'; m.textContent='❌ '+(r.data.error||'Send failed'); }
+  setTimeout(()=>{ m.textContent=''; },12000);
 }
 async function annDel(id){
   if(!confirm('Delete this announcement from the staff page? (Emails already sent are unaffected.)')) return;

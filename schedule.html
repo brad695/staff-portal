@@ -223,11 +223,15 @@
       <!-- notifications -->
       <div class="card hide" id="notifyCard">
         <h3><i class="ti ti-bell"></i> Notifications</h3>
-        <p style="font-size:0.84rem;color:var(--sub);margin:-2px 0 10px;">Add your email to get the schedule when it's published or changes, plus a reminder the day before you work.</p>
+        <p style="font-size:0.84rem;color:var(--sub);margin:-2px 0 10px;">Add your email or mobile number to get the schedule when it's published or changes, plus a reminder the day before you work. Texts are free to receive but message &amp; data rates may apply — clear the field to stop them.</p>
         <input type="email" id="notifyEmail" placeholder="you@example.com" autocomplete="email"
                style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;font-size:1rem;font-family:inherit;margin-bottom:10px;background:var(--surface);color:var(--ink);">
-        <button class="btn btn-primary btn-block" onclick="saveEmail()">Save</button>
+        <button class="btn btn-primary btn-block" onclick="saveEmail()">Save email</button>
         <div class="ro-msg" id="notifyMsg"></div>
+        <input type="tel" id="notifyPhone" placeholder="Mobile number, e.g. 901-555-1234" autocomplete="tel"
+               style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;font-size:1rem;font-family:inherit;margin:10px 0;background:var(--surface);color:var(--ink);">
+        <button class="btn btn-primary btn-block" onclick="savePhone()">Save mobile number</button>
+        <div class="ro-msg" id="notifyPhoneMsg"></div>
       </div>
 
       <!-- announcements (public) -->
@@ -604,11 +608,24 @@ async function avSave(){
   setTimeout(()=>{ m.textContent=''; },5000);
 }
 
-/* ── notification email ── */
+/* ── notification email + texts ── */
 async function loadEmail(){
   if(!ME) return;
   const r = await fn('get-my-email', { employee_id:ME.id, login_id:ME.login_id });
-  if(r.ok) document.getElementById('notifyEmail').value = r.data.email||'';
+  if(r.ok){
+    document.getElementById('notifyEmail').value = r.data.email||'';
+    document.getElementById('notifyPhone').value = r.data.phone||'';
+  }
+}
+async function savePhone(){
+  if(!ME) return;
+  const m = document.getElementById('notifyPhoneMsg');
+  const phone = document.getElementById('notifyPhone').value.trim();
+  m.style.color='var(--sub)'; m.textContent='Saving…';
+  const r = await fn('set-my-phone', { employee_id:ME.id, login_id:ME.login_id, phone });
+  if(!r.ok){ m.style.color='var(--wax)'; m.textContent=r.data.error||'Could not save — try again.'; return; }
+  m.style.color='var(--mint-i)'; m.textContent = phone ? '✅ Saved — you\'ll get schedule texts here.' : 'Removed — no more texts.';
+  setTimeout(()=>{ m.textContent=''; },5000);
 }
 async function saveEmail(){
   if(!ME) return;
