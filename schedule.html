@@ -55,6 +55,16 @@
     .card h3{ font-size:0.95rem; font-weight:800; margin-bottom:10px; display:flex; align-items:center; gap:7px; }
     .card h3 i{ color:var(--accent); font-size:18px; }
     .card h3 .hours{ margin-left:auto; font-size:0.76rem; color:var(--sub); font-weight:700; }
+    /* my week + today's calendar side by side on wider screens, stacked on phones */
+    .duo{ display:grid; grid-template-columns:1fr; align-items:start; }
+    @media(min-width:700px){ .duo{ grid-template-columns:1fr 1fr; gap:14px; } }
+    .td-row{ display:flex; gap:10px; padding:9px 2px; border-top:1px solid var(--line); align-items:flex-start; }
+    .td-row:first-child{ border-top:none; }
+    .td-badge{ flex:none; font-size:0.66rem; font-weight:800; letter-spacing:0.03em; text-transform:uppercase; padding:3px 8px; border-radius:999px; margin-top:2px; }
+    .td-badge.special{ background:rgba(28,124,71,0.12); color:#1c7c47; }
+    .td-badge.event{ background:rgba(194,68,126,0.12); color:#c2447e; }
+    .td-title{ font-weight:700; font-size:0.9rem; }
+    .td-sub{ font-size:0.8rem; color:var(--sub); font-weight:500; }
 
     .my-row{ display:flex; align-items:center; gap:12px; padding:10px 2px; border-top:1px solid var(--line); }
     .my-row:first-of-type{ border-top:none; }
@@ -176,9 +186,15 @@
         <button class="btn btn-primary btn-block" id="loginBtn" onclick="doLogin()">View my shifts</button>
       </div>
 
-      <div class="card hide" id="myCard">
-        <h3><i class="ti ti-user"></i> <span id="myName">My week</span> <span class="hours" id="myHours"></span></h3>
-        <div id="myWeek"></div>
+      <div class="duo hide" id="myDuo">
+        <div class="card" id="myCard">
+          <h3><i class="ti ti-user"></i> <span id="myName">My week</span> <span class="hours" id="myHours"></span></h3>
+          <div id="myWeek"></div>
+        </div>
+        <div class="card" id="todayCard">
+          <h3><i class="ti ti-calendar-event"></i> Today at the shop <span class="hours" id="todayDate"></span></h3>
+          <div id="todayList"></div>
+        </div>
       </div>
 
       <div class="card">
@@ -336,7 +352,7 @@ function enter(emp){
   if(emp.location !== LOC){ LOC = emp.location; localStorage.setItem('greys_loc', LOC); }
   applyLoc();
   document.getElementById('loginCard').classList.add('hide');
-  document.getElementById('myCard').classList.remove('hide');
+  document.getElementById('myDuo').classList.remove('hide');
   document.getElementById('roCard').classList.remove('hide');
   document.getElementById('swapCard').classList.remove('hide');
   document.getElementById('avCard').classList.remove('hide');
@@ -344,7 +360,7 @@ function enter(emp){
   document.getElementById('logoutBtn').classList.remove('hide');
   loadWeek();
   const rs = document.getElementById('roStart'); if(rs && !rs.value) rs.value = iso(new Date());
-  roLoad(); swapLoad(); avLoad(); loadEmail(); annLoad();
+  roLoad(); swapLoad(); avLoad(); loadEmail(); annLoad(); loadToday();
 }
 
 /* ── request time off (name comes from the logged-in employee) ── */
@@ -380,11 +396,44 @@ async function roLoad(){
   }).join('');
 }
 function fmtShort(d){ return new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+
+/* ── today's calendar (specials + events/classes from portal_items) ── */
+function occursOn(item, dIso){
+  if(!item.date) return false;
+  const rep = item.repeat || 'none';
+  if(rep === 'none') return dIso >= item.date && dIso <= (item.end_date || item.date);
+  if(dIso < item.date) return false;
+  if(item.repeat_until && dIso > item.repeat_until) return false;
+  const d = new Date(dIso+'T12:00:00'), start = new Date(item.date+'T12:00:00');
+  const days = Math.round((d - start) / 86400000);
+  if(rep === 'weekly') return days % 7 === 0;
+  if(rep === 'biweekly') return days % 14 === 0;
+  if(rep === 'monthly') return d.getDate() === start.getDate();
+  return false;
+}
+async function loadToday(){
+  const el = document.getElementById('todayList'); if(!el) return;
+  const t = new Date(), tIso = iso(t);
+  document.getElementById('todayDate').textContent = t.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  const { data, error } = await sb.from('portal_items').select('*')
+    .in('location', LOC_GROUPS[LOC]).in('type', ['special','event']);
+  if(error){ el.innerHTML = '<div class="my-empty">Couldn\'t load today\'s calendar.</div>'; return; }
+  const items = (data||[]).filter(i => occursOn(i, tIso))
+    .sort((a,b) => (a.time||'').localeCompare(b.time||'') || String(a.title||'').localeCompare(String(b.title||'')));
+  el.innerHTML = items.length ? items.map(i=>{
+    const badge = i.type==='special' ? '<span class="td-badge special">Special</span>' : '<span class="td-badge event">Event</span>';
+    const locTag = LOC_GROUPS[LOC].length>1 && i.location ? ' <span class="loc-tag '+i.location+'">'+(LOC_SHORT[i.location]||'')+'</span>' : '';
+    return '<div class="td-row">'+badge+'<div>'+
+      '<div class="td-title">'+esc(i.title)+(i.time?' <span class="td-sub">· '+fmtTime(i.time)+'</span>':'')+locTag+'</div>'+
+      (i.body?'<div class="td-sub">'+esc(i.body)+'</div>':'')+
+      '</div></div>';
+  }).join('') : '<div class="my-empty">Nothing on the calendar today.</div>';
+}
 function logout(){
   localStorage.removeItem('greys_emp_id');
   localStorage.removeItem('greys_emp_email');
   ME = null;
-  ['myCard','roCard','swapCard','avCard','notifyCard'].forEach(id=>document.getElementById(id).classList.add('hide'));
+  ['myDuo','roCard','swapCard','avCard','notifyCard'].forEach(id=>document.getElementById(id).classList.add('hide'));
   document.getElementById('logoutBtn').classList.add('hide');
   document.getElementById('loginCard').classList.remove('hide');
   document.getElementById('loginEmail').value='';
