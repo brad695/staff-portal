@@ -242,6 +242,7 @@
     .info-card{ background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:13px 15px; margin-bottom:10px; }
     .info-card .il{ font-size:0.7rem; font-weight:800; text-transform:uppercase; letter-spacing:0.4px; color:var(--accent); margin-bottom:4px; }
     .info-card .iv{ font-size:0.95rem; color:var(--ink); line-height:1.55; white-space:pre-wrap; }
+    .info-card .iv a{ color:var(--accent); font-weight:700; text-decoration:none; word-break:break-all; }
 
     /* onboarding intake form */
     .ob-intro{ font-size:0.9rem; color:var(--sub); line-height:1.55; margin-bottom:14px; }
@@ -700,10 +701,12 @@ async function submitOnboarding(e){
 }
 
 // ── STUFF TO KNOW (quick reference) ──
+// after escaping, turn URLs (and site-relative .pdf paths) into tappable links
+function linkify(s){ return s.replace(/(https?:\/\/[^\s<]+|(?:^|\s)\/[A-Za-z0-9._\-\/]+\.pdf)/g, m=>{ const pre=m.match(/^\s/)?m[0]:''; const url=m.trim(); return pre+'<a href="'+url+'" target="_blank" rel="noopener">'+url+'</a>'; }); }
 function renderStuff(){
   const el = document.getElementById('stuffBody'); if(!el) return;
   if(!_info.length){ el.innerHTML = '<div class="empty"><span class="ic"><i class="ti ti-info-circle"></i></span>Nothing here yet.<br>A manager can add quick-reference info in the console.</div>'; return; }
-  el.innerHTML = _info.map(x=>'<div class="info-card"><div class="il">'+esc(x.title)+'</div>'+(x.body?'<div class="iv">'+esc(x.body)+'</div>':'')+'</div>').join('');
+  el.innerHTML = _info.map(x=>'<div class="info-card"><div class="il">'+esc(x.title)+'</div>'+(x.body?'<div class="iv">'+linkify(esc(x.body))+'</div>':'')+'</div>').join('');
 }
 
 function occurrences(item, winStart, winEnd){
