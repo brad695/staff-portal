@@ -239,14 +239,14 @@
       <!-- notifications -->
       <div class="card hide" id="notifyCard">
         <h3><i class="ti ti-bell"></i> Notifications</h3>
-        <p style="font-size:0.84rem;color:var(--sub);margin:-2px 0 10px;">Add your email or mobile number to get the schedule when it's published or changes, plus a reminder the day before you work. Texts are free to receive but message &amp; data rates may apply — clear the field to stop them.</p>
+        <p style="font-size:0.84rem;color:var(--sub);margin:-2px 0 10px;">Add your email or mobile number to get the schedule when it's published or changes, plus a reminder the day before you work.</p><p style="font-size:0.8rem;color:var(--sub);margin:0 0 10px;"><strong>Text alerts:</strong> By entering your mobile number, checking the consent box, and tapping &quot;Save mobile number,&quot; you agree to receive recurring automated employee-scheduling text messages (schedule published, schedule changes, and shift reminders) from GREYS Fine Cheeses &amp; Entertaining. Message frequency varies (typically 2&ndash;6 msgs/week). Message &amp; data rates may apply. Consent is not a condition of employment. Reply STOP to opt out or HELP for help. See our <a href="privacy.html">Privacy Policy</a> and <a href="terms.html">SMS Terms</a>.</p>
         <input type="email" id="notifyEmail" placeholder="you@example.com" autocomplete="email"
                style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;font-size:1rem;font-family:inherit;margin-bottom:10px;background:var(--surface);color:var(--ink);">
         <button class="btn btn-primary btn-block" onclick="saveEmail()">Save email</button>
         <div class="ro-msg" id="notifyMsg"></div>
         <input type="tel" id="notifyPhone" placeholder="Mobile number, e.g. 901-555-1234" autocomplete="tel"
                style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;font-size:1rem;font-family:inherit;margin:10px 0;background:var(--surface);color:var(--ink);">
-        <button class="btn btn-primary btn-block" onclick="savePhone()">Save mobile number</button>
+        <label style="display:flex;gap:8px;align-items:flex-start;font-size:0.78rem;color:var(--sub);margin:0 0 10px;"><input type="checkbox" id="smsConsent" style="margin-top:2px;"> <span>I agree to receive recurring scheduling and shift-reminder text messages from GREYS Fine Cheeses &amp; Entertaining at the number provided. Message frequency varies. Message &amp; data rates may apply. Reply STOP to opt out, HELP for help.</span></label><button class="btn btn-primary btn-block" onclick="savePhone()">Save mobile number</button>
         <div class="ro-msg" id="notifyPhoneMsg"></div>
       </div>
 
@@ -256,7 +256,7 @@
         <div id="annList"></div>
       </div>
     </div>
-    <div class="foot-note">Approved days show on the schedule automatically.</div>
+    <div class="foot-note">Approved days show on the schedule automatically. &middot; <a href="privacy.html">Privacy Policy</a> &middot; <a href="terms.html">SMS Terms</a></div>
   </div>
 
   <!-- swap request modal -->
@@ -669,7 +669,7 @@ async function loadEmail(){
 async function savePhone(){
   if(!ME) return;
   const m = document.getElementById('notifyPhoneMsg');
-  const phone = document.getElementById('notifyPhone').value.trim();
+  const phone = document.getElementById('notifyPhone').value.trim(); const consentEl = document.getElementById('smsConsent'); if(phone && consentEl && !consentEl.checked){ m.style.color='var(--wax)'; m.textContent='Please check the consent box to receive texts.'; return; }
   m.style.color='var(--sub)'; m.textContent='Saving…';
   const r = await fn('set-my-phone', { employee_id:ME.id, login_id:ME.login_id, phone });
   if(!r.ok){ m.style.color='var(--wax)'; m.textContent=r.data.error||'Could not save — try again.'; return; }
