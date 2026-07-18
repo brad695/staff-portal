@@ -161,8 +161,9 @@
     <div class="subtitle">Manage everything the staff portal shows</div>
   </div>
   <div class="head-actions">
-    <a class="head-link" href="index.html">↗ Staff portal</a>
-    <button class="head-link" id="logoutBtn" style="background:none;cursor:pointer;display:none;" onclick="logout()">Log out</button>
+    <a class="head-link" href="index.html">Portal</a>
+    <a class="head-link" href="manager.html">Manager</a>
+    <button class="head-link" id="logoutBtn" style="background:none;cursor:pointer;font-family:inherit;font-size:0.8rem;" onclick="logout()">Logout</button>
   </div>
 </header>
 
@@ -460,7 +461,6 @@ async function enterConsole(session){
   }
   document.getElementById('loginView').classList.add('hide');
   document.getElementById('consoleView').classList.remove('hide');
-  document.getElementById('logoutBtn').style.display='inline-block';
   loadAll();
 }
 async function logout(){ SESSION=null; await sb.auth.signOut(); location.reload(); }

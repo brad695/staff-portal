@@ -147,7 +147,8 @@
     </div>
     <div class="spacer"></div>
     <a class="top-link" href="index.html">Portal</a>
-    <button class="top-link hide" id="logoutBtn" onclick="logout()">Not you?</button>
+    <a class="top-link" href="manager.html">Manager</a>
+    <button class="top-link" id="logoutBtn" onclick="logout()">Logout</button>
   </div>
 
   <div class="loc-bar" id="locBar">
@@ -341,7 +342,6 @@ function enter(emp){
   document.getElementById('swapCard').classList.remove('hide');
   document.getElementById('avCard').classList.remove('hide');
   document.getElementById('notifyCard').classList.remove('hide');
-  document.getElementById('logoutBtn').classList.remove('hide');
   loadWeek();
   const rs = document.getElementById('roStart'); if(rs && !rs.value) rs.value = iso(new Date());
   roLoad(); swapLoad(); avLoad(); loadEmail(); annLoad();
@@ -385,7 +385,6 @@ function logout(){
   localStorage.removeItem('greys_emp_email');
   ME = null;
   ['myCard','roCard','swapCard','avCard','notifyCard'].forEach(id=>document.getElementById(id).classList.add('hide'));
-  document.getElementById('logoutBtn').classList.add('hide');
   document.getElementById('loginCard').classList.remove('hide');
   document.getElementById('loginEmail').value='';
   loadWeek(); // re-render without the "me" highlight
