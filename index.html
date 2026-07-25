@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <meta name="theme-color" content="#ffffff"/>
-  <title>Portal - GREYS</title>
+  <title>GREYS Memphis · Staff</title>
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -36,8 +36,6 @@
     .topbar .loc{ font-size:0.74rem; color:#b9c5d1; font-weight:600; }
     .topbar .spacer{ flex:1; }
     .icon-btn{ width:40px; height:40px; border-radius:50%; border:none; background:var(--surface); box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; font-size:1.05rem; cursor:pointer; color:var(--ink); text-decoration:none; }
-    .top-link{ color:#b9c5d1; font-size:0.8rem; font-weight:700; text-decoration:none; border:1px solid rgba(255,255,255,0.2); padding:7px 13px; border-radius:12px; background:none; cursor:pointer; font-family:inherit; }
-    .top-link:hover{ color:#fff; }
 
     /* location switcher — three segmented buttons under the header */
     .loc-bar{ display:flex; gap:8px; padding:12px 20px 0; }
@@ -133,9 +131,6 @@
     .res-main{ flex:1; min-width:0; }
     .res-name{ font-weight:700; font-size:0.98rem; }
     .res-meta{ font-size:0.78rem; color:var(--sub); margin-top:2px; }
-    .res-contact{ display:flex; flex-wrap:wrap; gap:3px 14px; margin-top:4px; font-size:0.78rem; }
-    .res-contact a{ color:var(--accent); text-decoration:none; font-weight:600; word-break:break-all; }
-    .res-note{ font-size:0.78rem; color:var(--sub); margin-top:4px; font-style:italic; }
     .res-badge{ font-size:0.62rem; font-weight:800; text-transform:uppercase; padding:4px 9px; border-radius:20px; white-space:nowrap; }
     .b-ok{ background:var(--mint); color:var(--mint-i); }
     .b-cancel{ background:rgba(224,104,91,0.18); color:#f0897c; }
@@ -159,6 +154,7 @@
     .cal-bar h3{ font-size:1.05rem; font-weight:800; flex:1; text-align:center; }
     .cal-nav{ width:38px; height:38px; border-radius:50%; border:none; background:var(--surface); box-shadow:var(--shadow); font-size:1rem; cursor:pointer; }
     .cal-today{ border:none; background:var(--accent); color:#fff; border-radius:12px; padding:8px 13px; font-weight:700; font-size:0.78rem; cursor:pointer; }
+    .cal-print{ border:none; background:var(--surface); color:var(--ink); box-shadow:var(--shadow); border-radius:12px; padding:8px 13px; font-weight:700; font-size:0.78rem; cursor:pointer; }
     .cal-legend{ display:flex; flex-wrap:wrap; gap:9px 14px; font-size:0.72rem; color:var(--sub); margin-bottom:12px; }
     .cal-legend .dot{ width:9px; height:9px; border-radius:3px; display:inline-block; margin-right:4px; vertical-align:middle; }
     .cal-grid{ background:var(--surface); border-radius:18px; box-shadow:var(--shadow); overflow:hidden; }
@@ -244,7 +240,6 @@
     .info-card{ background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:13px 15px; margin-bottom:10px; }
     .info-card .il{ font-size:0.7rem; font-weight:800; text-transform:uppercase; letter-spacing:0.4px; color:var(--accent); margin-bottom:4px; }
     .info-card .iv{ font-size:0.95rem; color:var(--ink); line-height:1.55; white-space:pre-wrap; }
-    .info-card .iv a{ color:var(--accent); font-weight:700; text-decoration:none; word-break:break-all; }
 
     /* onboarding intake form */
     .ob-intro{ font-size:0.9rem; color:var(--sub); line-height:1.55; margin-bottom:14px; }
@@ -294,6 +289,35 @@
       /* keep the floating home button aligned with the app column, not the whole window */
       .botbar{ left:50%; right:auto; transform:translateX(-50%); }
     }
+
+    /* ── PRINT: clean, calendar-only, white page ── */
+    @media print {
+      /* force a white page with dark text — the navy app bg must NOT print as a dark block */
+      html, body, .app { background:#ffffff !important; color:#000 !important; }
+      .app { max-width:none !important; min-height:0 !important; padding:0 !important; box-shadow:none !important; }
+
+      /* hide app chrome: top header bar, floating home button, home preview, and any non-active view */
+      .topbar, .botbar, #homePreview { display:none !important; }
+      .view:not(.active) { display:none !important; }
+
+      /* calendar header: keep the "Calendar" title + month label, drop the interactive buttons */
+      .sec-head { position:static !important; background:transparent !important; padding:0 0 8px !important; }
+      .sec-head .back-btn, .cal-nav, .cal-today, .cal-print { display:none !important; }
+      .sec-head h2 { color:#000 !important; }
+      .sec-body { padding:0 !important; }
+      .cal-bar { margin-bottom:10px !important; }
+      .cal-bar h3 { color:#000 !important; text-align:left !important; font-size:1.3rem !important; }
+
+      /* agenda: each day as a clean bordered block that won't split across pages */
+      .agenda, #agendaList { display:block !important; }
+      .ag-day { background:#fff !important; box-shadow:none !important; border:1px solid #bbb !important;
+                border-radius:8px !important; margin-bottom:10px !important;
+                break-inside:avoid; page-break-inside:avoid; }
+      .ag-date, .ag-row, .empty { color:#000 !important; }
+      .ag-today { background:#000 !important; color:#fff !important; }
+
+      @page { margin:14mm; }
+    }
   </style>
 </head>
 <body>
@@ -306,9 +330,7 @@
       <div class="loc">Staff Portal</div>
     </div>
     <div class="spacer"></div>
-    <a class="top-link" href="index.html">Portal</a>
-    <a class="top-link" href="manager.html">Manager</a>
-    <button class="top-link" onclick="topLogout()">Logout</button>
+    <a class="icon-btn" href="manager.html" title="Manager" aria-label="Manager"><i class="ti ti-lock"></i></a>
   </div>
 
   <!-- LOCATION BUTTONS -->
@@ -331,8 +353,9 @@
       <button class="tile" id="tile-specials" onclick="tileTap('specials')"><span class="ic ic-mint"><i class="ti ti-tools-kitchen-2"></i></span><span class="tl">Specials</span></button>
       <button class="tile" id="tile-resys" onclick="tileTap('resys')"><span class="ic ic-sky"><i class="ti ti-clipboard-list"></i></span><span class="tl">Resys</span></button>
       <button class="tile" id="tile-calendar" onclick="tileTap('calendar')"><span class="ic ic-lav"><i class="ti ti-calendar-month"></i></span><span class="tl">Calendar</span></button>
-      <button class="tile" id="tile-myshifts" onclick="location.href='schedule.html'"><span class="ic ic-mint"><i class="ti ti-calendar-week"></i></span><span class="tl">Schedule</span></button>
+      <button class="tile" id="tile-schedule" onclick="tileTap('schedule')"><span class="ic ic-peach"><i class="ti ti-clock-hour-4"></i></span><span class="tl">Schedule</span></button>
       <button class="tile" id="tile-events" onclick="tileTap('events')"><span class="ic ic-pink"><i class="ti ti-confetti"></i></span><span class="tl">Events</span></button>
+      <button class="tile" id="tile-requestoff" onclick="tileTap('requestoff')"><span class="ic ic-butter"><i class="ti ti-beach"></i></span><span class="tl">Request Off</span></button>
       <button class="tile" id="tile-onboarding" onclick="tileTap('onboarding')"><span class="ic ic-gray"><i class="ti ti-user-plus"></i></span><span class="tl" style="color:var(--gray-i);">Onboarding</span><span class="badge-soon">Soon</span></button>
       <button class="tile" id="tile-stuff" onclick="tileTap('stuff')"><span class="ic ic-sky"><i class="ti ti-info-circle"></i></span><span class="tl">Stuff to Know</span></button>
     </div>
@@ -388,6 +411,7 @@
         <h3 id="calMonthLabel">Month Year</h3>
         <button class="cal-nav" onclick="calNav(1)">›</button>
         <button class="cal-today" onclick="calGoToday()">Today</button>
+        <button class="cal-print" onclick="window.print()">🖨 Print</button>
       </div>
       <div id="agendaList" class="agenda"></div>
     </div>
@@ -500,14 +524,6 @@ const SB_URL = 'https://vdvtrevhqalmjwhjhjug.supabase.co';
 const SB_KEY = 'sb_publishable_LnlevWReed7K8cFk_f_Mxg_UywktQ5_';
 const FN_URL = SB_URL + '/functions/v1/portal-api';
 const sb = window.supabase.createClient(SB_URL, SB_KEY);
-
-/* top-bar logout: clears the staff schedule sign-in (and any manager session) */
-async function topLogout(){
-  localStorage.removeItem('greys_emp_id');
-  localStorage.removeItem('greys_emp_email');
-  try{ await sb.auth.signOut(); }catch(e){}
-  location.reload();
-}
 
 // ── LOCATIONS (default: Memphis) ──
 const LOCATIONS = {
@@ -713,12 +729,10 @@ async function submitOnboarding(e){
 }
 
 // ── STUFF TO KNOW (quick reference) ──
-// after escaping, turn URLs (and site-relative .pdf paths) into tappable links
-function linkify(s){ return s.replace(/(https?:\/\/[^\s<]+|(?:^|\s)\/[A-Za-z0-9._\-\/]+\.pdf)/g, m=>{ const pre=m.match(/^\s/)?m[0]:''; const url=m.trim(); return pre+'<a href="'+url+'" target="_blank" rel="noopener">'+url+'</a>'; }); }
 function renderStuff(){
   const el = document.getElementById('stuffBody'); if(!el) return;
   if(!_info.length){ el.innerHTML = '<div class="empty"><span class="ic"><i class="ti ti-info-circle"></i></span>Nothing here yet.<br>A manager can add quick-reference info in the console.</div>'; return; }
-  el.innerHTML = _info.map(x=>'<div class="info-card"><div class="il">'+esc(x.title)+'</div>'+(x.body?'<div class="iv">'+linkify(esc(x.body))+'</div>':'')+'</div>').join('');
+  el.innerHTML = _info.map(x=>'<div class="info-card"><div class="il">'+esc(x.title)+'</div>'+(x.body?'<div class="iv">'+esc(x.body)+'</div>':'')+'</div>').join('');
 }
 
 function occurrences(item, winStart, winEnd){
@@ -908,15 +922,6 @@ function resCardHTML(r){
   const dd=dt?dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
   const name=[who.firstName,who.lastName].filter(Boolean).join(' ')||'Guest';
   const party=det.partySize||'?';
-  const phone=who.phone||'';
-  const email=who.email||'';
-  const srcMap={ ONLINE:'Online', OFFLINE:'Staff-entered', WALK_IN:'Walk-in', UNKNOWN:'' };
-  const src=srcMap[r.source]!==undefined?srcMap[r.source]:(r.source||'');
-  const note=r.teamMessage||det.teamMessage||'';
-  const contact=[
-    phone?`<a href="tel:${esc(phone)}">📞 ${esc(phone)}</a>`:'',
-    email?`<a href="mailto:${esc(email)}">✉️ ${esc(email)}</a>`:''
-  ].filter(Boolean).join('');
   const st=r.status||'UNKNOWN'; const isCancel=cancel.includes(st);
   const isReq=st==='REQUESTED';
   const bcls=isCancel?'b-cancel':(isReq?'b-req':(st==='RESERVED'||st==='SEATED'||st==='FINISHED'?'b-ok':'b-other'));
@@ -928,12 +933,7 @@ function resCardHTML(r){
     : '';
   return `<div class="res-card${isCancel?' cancel':''}${isReq?' req':''}">
       <div class="res-when"><div class="t">${esc(tm)}</div><div class="d">${esc(dd)}</div></div>
-      <div class="res-main">
-        <div class="res-name">${esc(name)}</div>
-        <div class="res-meta">👥 Party of ${esc(party)}${src?' · '+esc(src):''}</div>
-        ${contact?`<div class="res-contact">${contact}</div>`:''}
-        ${note?`<div class="res-note">"${esc(note)}"</div>`:''}
-      </div>
+      <div class="res-main"><div class="res-name">${esc(name)}</div><div class="res-meta">👥 Party of ${esc(party)}</div></div>
       <span class="res-badge ${bcls}">${isReq?'NEEDS APPROVAL':st.replace(/_/g,' ')}</span>
       ${actions}
     </div>`;
