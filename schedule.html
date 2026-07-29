@@ -221,10 +221,11 @@
         <div class="ro-msg" id="avMsg"></div>
       </div>
 
-      <!-- notifications -->
-      <div class="card hide" id="notifyCard">
+      <!-- notifications (visible without login so the opt-in flow is publicly viewable; saving requires employee ID) -->
+      <div class="card" id="notifyCard">
         <h3><i class="ti ti-bell"></i> Notifications</h3>
-        <p style="font-size:0.84rem;color:var(--sub);margin:-2px 0 10px;">Add your email or mobile number to get the schedule when it's published or changes, plus a reminder the day before you work. Texts are free to receive but message &amp; data rates may apply — clear the field to stop them.</p>
+        <p style="font-size:0.84rem;color:var(--sub);margin:-2px 0 10px;">Add your email or mobile number to get the schedule when it's published or changes, plus a reminder the day before you work.</p>
+        <p id="notifyLoginNote" style="font-size:0.82rem;color:var(--sub);margin:0 0 10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px;"><i class="ti ti-user"></i> Sign in with your employee ID above to add or remove your contact info.</p>
         <input type="email" id="notifyEmail" placeholder="you@example.com" autocomplete="email"
                style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;font-size:1rem;font-family:inherit;margin-bottom:10px;background:var(--surface);color:var(--ink);">
         <button class="btn btn-primary btn-block" onclick="saveEmail()">Save email</button>
@@ -233,6 +234,7 @@
                style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;font-size:1rem;font-family:inherit;margin:10px 0;background:var(--surface);color:var(--ink);">
         <button class="btn btn-primary btn-block" onclick="savePhone()">Save mobile number</button>
         <div class="ro-msg" id="notifyPhoneMsg"></div>
+        <p style="font-size:0.76rem;color:var(--sub);line-height:1.55;margin:10px 0 0;">By saving your mobile number you agree to receive recurring automated work-scheduling text messages from <strong>Greys Fine Cheese &amp; Entertaining (GREYS)</strong>: published schedules and schedule changes, next-day shift reminders, time-off request decisions, shift swap updates, and manager announcements. Consent is optional and is not a condition of employment. Message frequency varies — typically a few messages per week. <strong>Message &amp; data rates may apply.</strong> Reply <strong>STOP</strong> to any message to cancel, or <strong>HELP</strong> for help; you can also opt out any time by clearing your number here. <a href="terms.html">SMS Terms &amp; Conditions</a> · <a href="privacy.html">Privacy Policy</a></p>
       </div>
 
       <!-- announcements (public) -->
@@ -241,7 +243,7 @@
         <div id="annList"></div>
       </div>
     </div>
-    <div class="foot-note">Approved days show on the schedule automatically.</div>
+    <div class="foot-note">Approved days show on the schedule automatically. · <a href="terms.html">SMS Terms</a> · <a href="privacy.html">Privacy Policy</a></div>
   </div>
 
   <!-- swap request modal -->
@@ -341,7 +343,7 @@ function enter(emp){
   document.getElementById('roCard').classList.remove('hide');
   document.getElementById('swapCard').classList.remove('hide');
   document.getElementById('avCard').classList.remove('hide');
-  document.getElementById('notifyCard').classList.remove('hide');
+  document.getElementById('notifyLoginNote').classList.add('hide');
   loadWeek();
   const rs = document.getElementById('roStart'); if(rs && !rs.value) rs.value = iso(new Date());
   roLoad(); swapLoad(); avLoad(); loadEmail(); annLoad();
@@ -384,7 +386,10 @@ function logout(){
   localStorage.removeItem('greys_emp_id');
   localStorage.removeItem('greys_emp_email');
   ME = null;
-  ['myCard','roCard','swapCard','avCard','notifyCard'].forEach(id=>document.getElementById(id).classList.add('hide'));
+  ['myCard','roCard','swapCard','avCard'].forEach(id=>document.getElementById(id).classList.add('hide'));
+  document.getElementById('notifyLoginNote').classList.remove('hide');
+  document.getElementById('notifyEmail').value='';
+  document.getElementById('notifyPhone').value='';
   document.getElementById('loginCard').classList.remove('hide');
   document.getElementById('loginEmail').value='';
   loadWeek(); // re-render without the "me" highlight
@@ -617,8 +622,8 @@ async function loadEmail(){
   }
 }
 async function savePhone(){
-  if(!ME) return;
   const m = document.getElementById('notifyPhoneMsg');
+  if(!ME){ m.style.color='var(--wax)'; m.textContent='Enter your employee ID in the card above first, then save your number.'; return; }
   const phone = document.getElementById('notifyPhone').value.trim();
   m.style.color='var(--sub)'; m.textContent='Saving…';
   const r = await fn('set-my-phone', { employee_id:ME.id, login_id:ME.login_id, phone });
@@ -627,8 +632,8 @@ async function savePhone(){
   setTimeout(()=>{ m.textContent=''; },5000);
 }
 async function saveEmail(){
-  if(!ME) return;
   const m = document.getElementById('notifyMsg');
+  if(!ME){ m.style.color='var(--wax)'; m.textContent='Enter your employee ID in the card above first, then save your email.'; return; }
   const email = document.getElementById('notifyEmail').value.trim();
   m.style.color='var(--sub)'; m.textContent='Saving…';
   const r = await fn('set-my-email', { employee_id:ME.id, login_id:ME.login_id, email });
