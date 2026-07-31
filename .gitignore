@@ -5,3 +5,6 @@ node_modules/
 _to_delete/
 _sync_backup/
 fix-sync.bat
+_stale/
+_stale/
+restore_*

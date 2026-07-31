@@ -96,6 +96,8 @@
     .sh{ background:var(--mint); color:var(--mint-i); border-radius:8px; padding:4px 6px; margin-bottom:4px; font-weight:700; line-height:1.3; }
     .sh .r{ display:block; font-weight:600; font-size:0.68rem; opacity:0.85; }
     .cell-off{ background:var(--offbg); color:var(--offink); border-radius:8px; padding:4px 6px; font-weight:800; text-transform:uppercase; font-size:0.66rem; text-align:center; }
+    .sh.oncall{ background:#fdebc4; color:#92400e; }
+    .oncall-pill{ display:inline-block; background:#fdebc4; color:#92400e; font-size:0.66rem; font-weight:800; text-transform:uppercase; padding:3px 9px; border-radius:20px; }
     .grid-empty{ text-align:center; color:var(--sub); padding:30px 10px; font-size:0.88rem; }
     .foot-note{ color:#b9c5d1; font-size:0.78rem; padding:2px 22px 16px; }
     .foot-note a{ color:var(--accent); font-weight:700; text-decoration:none; }
@@ -312,7 +314,10 @@ function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0
 function mondayOf(d){ const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); const dow=(x.getDay()+6)%7; x.setDate(x.getDate()-dow); return x; }
 function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
 function fmtTime(t){ if(!t) return ''; const [h,m]=t.split(':').map(Number); const ap=h>=12?'p':'a'; const hh=((h+11)%12)+1; return hh+(m?':'+String(m).padStart(2,'0'):'')+ap; }
-function shiftHours(s){ const [h1,m1]=s.start_time.split(':').map(Number); const [h2,m2]=s.end_time.split(':').map(Number); let hrs=(h2+m2/60)-(h1+m1/60); if(hrs<=0) hrs+=24; return hrs; }
+function shiftHours(s){ if(shKind(s)!=='shift') return 0; const [h1,m1]=s.start_time.split(':').map(Number); const [h2,m2]=s.end_time.split(':').map(Number); let hrs=(h2+m2/60)-(h1+m1/60); if(hrs<=0) hrs+=24; return hrs; }
+// managers can schedule 'oncall' and 'off' entries alongside regular shifts
+function shKind(s){ return s.kind==='oncall'||s.kind==='off' ? s.kind : 'shift'; }
+function shHasTimes(s){ return !(String(s.start_time).slice(0,5)==='00:00' && String(s.end_time).slice(0,5)==='00:00'); }
 function normName(s){ return String(s||'').trim().toLowerCase(); }
 function idPat(s){ return String(s).replace(/([\\%_])/g, '\\$1'); } // literal match for ilike
 
@@ -493,6 +498,18 @@ function render(){
     }
     dayShifts.forEach(s=>{
       const locTag = LOC_GROUPS[LOC].length>1 ? ' <span class="loc-tag '+s.location+'">'+LOC_SHORT[s.location]+'</span>' : '';
+      const kind = shKind(s);
+      if(kind==='off'){
+        rows.push('<div class="my-row">'+dayCell+'<div class="my-main"><span class="off-pill">Off</span>'+
+          (s.note?'<div class="my-note">'+esc(s.note)+'</div>':'')+'</div></div>');
+        return;
+      }
+      if(kind==='oncall'){
+        rows.push('<div class="my-row">'+dayCell+'<div class="my-main">'+
+          '<span class="oncall-pill">On call</span>'+(shHasTimes(s)?' <span class="my-time" style="font-size:0.85rem;">'+fmtTime(s.start_time)+' – '+fmtTime(s.end_time)+'</span>':'')+locTag+
+          (s.note?'<div class="my-note">'+esc(s.note)+'</div>':'')+'</div></div>');
+        return;
+      }
       const swapBtn = s.date>=todayIso ? '<button class="sw-btn" onclick="swapOpen('+s.id+')">Swap</button>' : '';
       rows.push('<div class="my-row">'+dayCell+'<div class="my-main">'+
         '<div class="my-time">'+fmtTime(s.start_time)+' – '+fmtTime(s.end_time)+locTag+'</div>'+
@@ -522,6 +539,9 @@ function render(){
       if(offFor(emp, di)) bits.push('<div class="cell-off">Off</div>');
       SHIFTS.filter(s=>s.employee_id===emp.id && s.date===di).forEach(s=>{
         const locTag = LOC_GROUPS[LOC].length>1 ? ' <span class="loc-tag '+s.location+'">'+LOC_SHORT[s.location]+'</span>' : '';
+        const kind = shKind(s);
+        if(kind==='off'){ bits.push('<div class="cell-off">Off</div>'); return; }
+        if(kind==='oncall'){ bits.push('<div class="sh oncall">On call'+(shHasTimes(s)?' '+fmtTime(s.start_time)+'–'+fmtTime(s.end_time):'')+locTag+'</div>'); return; }
         bits.push('<div class="sh">'+fmtTime(s.start_time)+'–'+fmtTime(s.end_time)+locTag+(s.role?'<span class="r">'+esc(s.role)+'</span>':'')+'</div>');
       });
       return '<td'+cls+'>'+bits.join('')+'</td>';

@@ -349,13 +349,19 @@
     <div style="background:var(--card);border-radius:var(--r);border-top:4px solid var(--cheddar);padding:24px;width:380px;max-width:100%;">
       <h2 style="font-size:1rem;color:var(--navy);margin-bottom:2px;" id="shTitle">Add shift</h2>
       <div class="hint" id="shSub" style="margin-bottom:12px;"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-        <label style="font-size:0.72rem;font-weight:700;color:var(--sub);">START
+      <label style="font-size:0.72rem;font-weight:700;color:var(--sub);display:block;margin-bottom:10px;">TYPE
+        <select id="shKindSel" onchange="shKindUI()" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r);font-family:inherit;margin-top:3px;background:#fff;">
+          <option value="shift">Shift (regular hours)</option>
+          <option value="oncall">On call</option>
+          <option value="off">Off — scheduled day off</option>
+        </select></label>
+      <div id="shTimesWrap" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <label style="font-size:0.72rem;font-weight:700;color:var(--sub);"><span id="shStartLbl">START</span>
           <input type="time" id="shStart" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r);font-family:inherit;margin-top:3px;"></label>
-        <label style="font-size:0.72rem;font-weight:700;color:var(--sub);">END
+        <label style="font-size:0.72rem;font-weight:700;color:var(--sub);"><span id="shEndLbl">END</span>
           <input type="time" id="shEnd" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r);font-family:inherit;margin-top:3px;"></label>
       </div>
-      <label style="font-size:0.72rem;font-weight:700;color:var(--sub);display:block;margin-bottom:10px;">ROLE / POSITION
+      <label id="shRoleWrap" style="font-size:0.72rem;font-weight:700;color:var(--sub);display:block;margin-bottom:10px;">ROLE / POSITION
         <input type="text" id="shRole" placeholder="Server, Kitchen, Bar…" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r);font-family:inherit;margin-top:3px;"></label>
       <label style="font-size:0.72rem;font-weight:700;color:var(--sub);display:block;margin-bottom:14px;">NOTE (optional)
         <input type="text" id="shNote" placeholder="e.g. training Maya" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r);font-family:inherit;margin-top:3px;"></label>
@@ -1063,12 +1069,12 @@ function sgAvLabel(a){
 }
 /* has the week changed since it was last published? */
 function sgSerialize(rows){
-  return JSON.stringify(rows.map(s=>[s.employee_id,s.date,String(s.start_time).slice(0,5),String(s.end_time).slice(0,5),s.role||'',s.note||'']).sort());
+  return JSON.stringify(rows.map(s=>[s.employee_id,s.date,String(s.start_time).slice(0,5),String(s.end_time).slice(0,5),s.role||'',s.note||'',sgKind(s)]).sort());
 }
 function sgPubState(loc){
   const g = SG[loc];
   if(!g.pub) return g.shifts.length ? {label:'Not published yet', cls:'pill-dirty'} : null;
-  const snap = (g.pub.snapshot||[]).map(s=>({employee_id:s.employee_id,date:s.date,start_time:s.start_time,end_time:s.end_time,role:s.role,note:s.note}));
+  const snap = (g.pub.snapshot||[]).map(s=>({employee_id:s.employee_id,date:s.date,start_time:s.start_time,end_time:s.end_time,role:s.role,note:s.note,kind:s.kind}));
   return sgSerialize(g.shifts)===sgSerialize(snap)
     ? {label:'Published ✓', cls:'pill-ok'}
     : {label:'Unpublished changes', cls:'pill-dirty'};
@@ -1099,10 +1105,18 @@ function sgRender(){
               : '<div style="background:#eeeae0;color:#8a8070;border-radius:2px;padding:1px 5px;margin:2px 0;font-size:0.6rem;font-weight:700;text-transform:uppercase;text-align:center;" title="Unavailable'+(a.note?': '+esc(a.note):'')+'">'+sgAvLabel(a)+'</div>');
           });
           g.shifts.filter(s=>s.employee_id===emp.id && s.date===di).forEach(s=>{
-            hrs+=sgHours(s);
-            bits.push('<div draggable="true" ondragstart="sgDrag(event,\''+loc+'\','+s.id+')" onclick="event.stopPropagation();openShift(\''+loc+'\','+emp.id+',\''+di+'\','+s.id+')" style="background:#d1fae5;color:#065f46;border-radius:2px;padding:3px 6px;margin:2px 0;font-size:0.74rem;font-weight:700;cursor:grab;line-height:1.3;" title="Drag to move · click to edit">'
-              +sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time)
-              +(s.role?'<span style="display:block;font-weight:600;font-size:0.64rem;opacity:0.85;">'+esc(s.role)+'</span>':'')+'</div>');
+            const kind = sgKind(s);
+            if(kind==='shift') hrs+=sgHours(s);
+            const noTimes = String(s.start_time).slice(0,5)==='00:00' && String(s.end_time).slice(0,5)==='00:00';
+            const style = kind==='off' ? 'background:#f6dad4;color:#9f2d20;'
+                        : kind==='oncall' ? 'background:#fdebc4;color:#92400e;'
+                        : 'background:#d1fae5;color:#065f46;';
+            const label = kind==='off' ? '<span style="text-transform:uppercase;font-size:0.68rem;letter-spacing:0.4px;">Off</span>'
+                        : kind==='oncall' ? '<span style="text-transform:uppercase;font-size:0.68rem;letter-spacing:0.4px;">On call</span>'+(noTimes?'':'<span style="display:block;font-weight:600;font-size:0.68rem;">'+sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time)+'</span>')
+                        : sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time);
+            bits.push('<div draggable="true" ondragstart="sgDrag(event,\''+loc+'\','+s.id+')" onclick="event.stopPropagation();openShift(\''+loc+'\','+emp.id+',\''+di+'\','+s.id+')" style="'+style+'border-radius:2px;padding:3px 6px;margin:2px 0;font-size:0.74rem;font-weight:700;cursor:grab;line-height:1.3;" title="Drag to move · click to edit">'
+              +label
+              +(kind!=='off' && s.role?'<span style="display:block;font-weight:600;font-size:0.64rem;opacity:0.85;">'+esc(s.role)+'</span>':'')+'</div>');
           });
           return '<td onclick="openShift(\''+loc+'\','+emp.id+',\''+di+'\')" ondragover="event.preventDefault()" ondrop="sgDrop(event,\''+loc+'\','+emp.id+',\''+di+'\')" style="cursor:pointer;min-width:104px;" title="Click to add a shift">'+bits.join('')+'</td>';
         }).join('');
@@ -1136,6 +1150,10 @@ function printGrid(loc){
       const di=sgIso(d); const bits=[];
       if(sgOff(loc,emp.name,di)) bits.push('<div class="off">OFF</div>');
       g.shifts.filter(s=>s.employee_id===emp.id && s.date===di).forEach(s=>{
+        const kind = sgKind(s);
+        if(kind==='off'){ bits.push('<div class="off">OFF</div>'); return; }
+        const noTimes = String(s.start_time).slice(0,5)==='00:00' && String(s.end_time).slice(0,5)==='00:00';
+        if(kind==='oncall'){ bits.push('<div class="psh"><em>On call</em>'+(noTimes?'':' '+sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time))+(s.role?'<br><small>'+esc(s.role)+'</small>':'')+'</div>'); return; }
         hrs+=sgHours(s);
         bits.push('<div class="psh">'+sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time)+(s.role?'<br><small>'+esc(s.role)+'</small>':'')+'</div>');
       });
@@ -1172,10 +1190,15 @@ function openShift(loc, empId, date, shiftId){
     +new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})
     +(sgOff(loc,emp.name,date)?' — ⚠️ has approved time off this day':'')
     +(unav?' — ⚠️ marked unavailable '+(unav.start_time?sgFmtT(String(unav.start_time).slice(0,5))+'–'+sgFmtT(String(unav.end_time||'').slice(0,5)):'all day'):'');
-  document.getElementById('shStart').value = sh?String(sh.start_time).slice(0,5):'16:00';
-  document.getElementById('shEnd').value = sh?String(sh.end_time).slice(0,5):'22:00';
+  const kind = sh ? sgKind(sh) : 'shift';
+  document.getElementById('shKindSel').value = kind;
+  const st = sh?String(sh.start_time).slice(0,5):'16:00', en = sh?String(sh.end_time).slice(0,5):'22:00';
+  // off/oncall rows store 00:00–00:00 when no times were set — show blanks instead
+  document.getElementById('shStart').value = (kind!=='shift' && st==='00:00' && en==='00:00') ? '' : st;
+  document.getElementById('shEnd').value = (kind!=='shift' && st==='00:00' && en==='00:00') ? '' : en;
   document.getElementById('shRole').value = sh?(sh.role||''):(emp.role||'');
   document.getElementById('shNote').value = sh?(sh.note||''):'';
+  shKindUI();
   document.getElementById('shErr').textContent='';
   document.getElementById('shDelBtn').style.display = sh?'inline-block':'none';
   // copy-to controls (only when editing an existing shift)
@@ -1203,12 +1226,12 @@ async function shCopy(){
   const m = document.getElementById('shCopyMsg');
   const empId = Number(document.getElementById('shCopyEmp').value);
   const date = document.getElementById('shCopyDay').value;
-  const start = document.getElementById('shStart').value, end = document.getElementById('shEnd').value;
-  if(!start||!end){ m.textContent='❌ Set start and end times first.'; return; }
+  const g = shGather();
+  if(g.err){ m.textContent='❌ '+g.err; return; }
   if(empId===SH_CTX.empId && date===SH_CTX.date){ m.textContent='That’s this shift’s own slot — pick another day or employee.'; return; }
   const emp = SG[SH_CTX.loc].emps.find(e=>e.id===empId);
-  const r = await fn('add-shift', { employee_id:empId, date, start_time:start, end_time:end,
-    role:document.getElementById('shRole').value, note:document.getElementById('shNote').value, location:SH_CTX.loc });
+  const r = await fn('add-shift', { employee_id:empId, date, start_time:g.start, end_time:g.end, kind:g.kind,
+    role:g.kind==='off'?'':document.getElementById('shRole').value, note:document.getElementById('shNote').value, location:SH_CTX.loc });
   if(!r.ok){ m.textContent='❌ '+(r.data.error||'Copy failed'); return; }
   const when = new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'numeric',day:'numeric'});
   m.textContent = '✅ Copied to '+(emp?emp.name:'employee')+' · '+when
@@ -1216,13 +1239,38 @@ async function shCopy(){
   sgLoad(); // refresh the grid behind the modal; keep it open for more copies
 }
 function shClose(){ document.getElementById('shiftModal').style.display='none'; SH_CTX=null; }
+// normalize a shift row's kind (older rows have none)
+function sgKind(s){ return s && (s.kind==='oncall'||s.kind==='off') ? s.kind : 'shift'; }
+function shKindUI(){
+  const kind = document.getElementById('shKindSel').value;
+  document.getElementById('shTimesWrap').style.display = kind==='off' ? 'none' : 'grid';
+  document.getElementById('shRoleWrap').style.display = kind==='off' ? 'none' : 'block';
+  const opt = kind==='oncall' ? ' (optional)' : '';
+  document.getElementById('shStartLbl').textContent = 'START'+opt;
+  document.getElementById('shEndLbl').textContent = 'END'+opt;
+  const saveBtn = document.querySelector('#shiftModal .btn-gold');
+  if(saveBtn) saveBtn.textContent = kind==='off' ? 'Save day off' : (kind==='oncall' ? 'Save on-call' : 'Save shift');
+}
+// Gather modal fields; off/oncall may omit times (stored as 00:00–00:00)
+function shGather(){
+  const kind = document.getElementById('shKindSel').value;
+  let start=document.getElementById('shStart').value, end=document.getElementById('shEnd').value;
+  if(kind==='shift'){
+    if(!start||!end) return { err:'Start and end times are required.' };
+  } else if(kind==='off'){ start='00:00'; end='00:00'; }
+  else { // on call: both or neither
+    if(!!start !== !!end) return { err:'Set both start and end for on-call hours, or leave both blank.' };
+    if(!start){ start='00:00'; end='00:00'; }
+  }
+  return { kind, start, end };
+}
 async function shSave(){
   if(!SH_CTX) return;
-  const start=document.getElementById('shStart').value, end=document.getElementById('shEnd').value;
   const err=document.getElementById('shErr');
-  if(!start||!end){ err.textContent='Start and end times are required.'; return; }
-  const payload={ employee_id:SH_CTX.empId, date:SH_CTX.date, start_time:start, end_time:end,
-    role:document.getElementById('shRole').value, note:document.getElementById('shNote').value, location:SH_CTX.loc };
+  const g = shGather();
+  if(g.err){ err.textContent=g.err; return; }
+  const payload={ employee_id:SH_CTX.empId, date:SH_CTX.date, start_time:g.start, end_time:g.end, kind:g.kind,
+    role:g.kind==='off'?'':document.getElementById('shRole').value, note:document.getElementById('shNote').value, location:SH_CTX.loc };
   const r = SH_CTX.shiftId ? await fn('update-shift', Object.assign({id:SH_CTX.shiftId},payload)) : await fn('add-shift', payload);
   if(!r.ok){ err.textContent='❌ '+(r.data.error||'Save failed'); return; }
   shClose(); sgLoad();
