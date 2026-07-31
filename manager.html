@@ -150,6 +150,15 @@
     .ob-fv{ font-size:0.86rem; color:var(--ink); word-break:break-word; }
     .ob-sub-actions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .pill-ok{ background:#d1fae5; color:#065f46; }
+    /* reservation status pills + rows */
+    .pill-req{ background:#fdebc4; color:#92400e; }
+    .pill-bad{ background:#fde2de; color:#9f2d20; }
+    .pill-mid{ background:#e2e8f0; color:#334155; }
+    .res-day{ background:#f4f1e8; padding:8px 16px; font-size:0.7rem; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:var(--sub); border-bottom:1px solid var(--line-soft); }
+    .res-row.cancelled .res-r-name, .res-row.cancelled .res-r-time{ text-decoration:line-through; color:var(--sub); }
+    .res-r-time{ font-weight:800; min-width:72px; }
+    .res-r-name{ font-weight:700; }
+    .res-r-meta{ font-size:0.8rem; color:var(--sub); }
     .hide{ display:none; }
   </style>
 </head>
@@ -180,12 +189,10 @@
 <div id="consoleView" class="hide">
   <div class="tabs">
     <div class="tab active" onclick="mtab('content')">Notes · Specials · Events</div>
-    <div class="tab" onclick="mtab('schedules')">Time Off</div>
+    <div class="tab" onclick="mtab('resys')">Reservations</div>
     <div class="tab" onclick="mtab('scheduling')">Staff Scheduling</div>
-    <div class="tab" onclick="mtab('swaps')">Shift Swaps</div>
+    <div class="tab" onclick="mtab('timeoff')">Time Off &amp; Swaps</div>
     <div class="tab" onclick="mtab('announcements')">Announcements</div>
-    <div class="tab" onclick="mtab('timeoff')">Time-Off Requests</div>
-    <div class="tab" onclick="mtab('onboarding')">Onboarding</div>
   </div>
 
   <div class="main">
@@ -219,8 +226,39 @@
     </div>
   </div>
 
-  <!-- SCHEDULES -->
-  <div id="panel-schedules" class="panel">
+  <!-- RESERVATIONS -->
+  <div id="panel-resys" class="panel">
+    <div class="section-card">
+      <h2>🗓️ Reservations</h2>
+      <div class="hint">Live from Wix. <strong>Add</strong> a phone-in or walk-in booking (created confirmed — the guest gets Wix's confirmation if you enter contact info), or <strong>click a reservation</strong> to change its time, party size, guest info, or cancel it. Requests still get approved or declined on the staff page.</div>
+      <div class="toolbar">
+        <select class="loc-sel" id="resLoc" onchange="loadResys()"><option value="memphis">Memphis</option><option value="nashville">Nashville</option><option value="franklin">Franklin</option></select>
+        <div class="rf"><label>From</label><input type="date" id="resFrom" onchange="loadResys()"></div>
+        <div class="rf"><label>To</label><input type="date" id="resTo" onchange="loadResys()"></div>
+        <div class="rf"><label>Status</label><select id="resStatus" onchange="renderResys()">
+          <option value="">All</option><option value="RESERVED">Reserved</option><option value="REQUESTED">Requested</option>
+          <option value="SEATED">Seated</option><option value="FINISHED">Finished</option>
+          <option value="CANCELLED">Cancelled / Declined</option><option value="NO_SHOW">No-show</option>
+        </select></div>
+        <button class="btn btn-ghost btn-sm" onclick="loadResys()">↻ Refresh</button>
+        <div class="spacer"></div>
+        <span class="save-msg" id="resStats"></span>
+        <button class="btn btn-gold" onclick="resNew()">＋ Add reservation</button>
+      </div>
+      <div class="rec-list" id="resList"><div class="rec-empty">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- TIME OFF & SWAPS (combined page: requests · calendar entries · shift swaps) -->
+  <div id="panel-timeoff" class="panel">
+    <div class="section-card">
+      <h2>🗓️ Time-Off Requests</h2>
+      <div class="hint">Approve, deny, or delete. Approved requests appear on the staff schedule and calendar.</div>
+      <div class="toolbar">
+        <select class="loc-sel" id="timeoffLoc" onchange="kindLoc('timeoff',this.value)"><option value="memphis">Memphis</option><option value="nashville">Nashville</option><option value="franklin">Franklin</option></select>
+      </div>
+      <div id="toList"><div class="to-empty">Loading…</div></div>
+    </div>
     <div class="section-card">
       <h2>📆 Time Off</h2>
       <div class="hint">Dated entries shown on the staff portal's schedule section. Click a row to edit it — each entry has its own location.</div>
@@ -240,6 +278,12 @@
         <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('schedules')">⬇ Template</button>
         <span class="csv-status" id="schedulesCsvStatus">Columns: name, date, end_date, note</span>
       </div>
+    </div>
+    <div class="section-card">
+      <h2>🔁 Shift Swaps</h2>
+      <div class="hint">Staff request swaps from their schedule page. <strong>Waiting on coworker</strong> means the other person hasn't accepted yet — you can still approve directly. Approving reassigns the shift and emails both people.</div>
+      <div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" onclick="loadSwaps()">↻ Refresh</button></div>
+      <div id="swList"><div class="to-empty">Loading…</div></div>
     </div>
   </div>
 
@@ -334,13 +378,27 @@
     </div>
   </div>
 
-  <!-- SHIFT SWAPS -->
-  <div id="panel-swaps" class="panel">
-    <div class="section-card">
-      <h2>🔁 Shift Swaps</h2>
-      <div class="hint">Staff request swaps from their schedule page. <strong>Waiting on coworker</strong> means the other person hasn't accepted yet — you can still approve directly. Approving reassigns the shift and emails both people.</div>
-      <div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" onclick="loadSwaps()">↻ Refresh</button></div>
-      <div id="swList"><div class="to-empty">Loading…</div></div>
+  <!-- reservation editor modal -->
+  <div id="resModal" style="display:none;position:fixed;inset:0;background:rgba(11,33,56,0.55);z-index:100;align-items:flex-start;justify-content:center;padding:30px 16px;overflow:auto;">
+    <div style="background:var(--card);border-radius:var(--r);border-top:4px solid var(--cheddar);padding:24px;width:560px;max-width:100%;">
+      <h2 style="font-size:1rem;color:var(--navy);margin-bottom:2px;" id="resTitle">Add reservation</h2>
+      <div class="hint" id="resSub" style="margin-bottom:0;"></div>
+      <div class="rec-fields">
+        <div class="rf"><label>Date</label><input type="date" id="rmDate"></div>
+        <div class="rf"><label>Time</label><input type="time" id="rmTime" step="900"></div>
+        <div class="rf"><label>Party size</label><input type="number" id="rmParty" min="1" max="99" value="2"></div>
+        <div class="rf"><label>Phone *</label><input type="tel" id="rmPhone" placeholder="e.g. 9015551234"></div>
+        <div class="rf"><label>First name *</label><input type="text" id="rmFirst"></div>
+        <div class="rf"><label>Last name</label><input type="text" id="rmLast"></div>
+        <div class="rf full"><label>Email</label><input type="email" id="rmEmail" placeholder="optional — Wix emails the confirmation here"></div>
+      </div>
+      <div class="login-err" id="resErr"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-gold" id="resSaveBtn" onclick="resSave()">Save</button>
+        <button class="btn btn-wax" id="resCancelBtn" style="display:none;" onclick="resCancelCurrent()">✕ Cancel reservation</button>
+        <div style="flex:1;"></div>
+        <button class="btn btn-ghost" onclick="resClose()">Close</button>
+      </div>
     </div>
   </div>
 
@@ -377,27 +435,6 @@
     </div>
   </div>
 
-  <!-- TIME OFF -->
-  <div id="panel-timeoff" class="panel">
-    <div class="section-card">
-      <h2>🗓️ Time-Off Requests</h2>
-      <div class="hint">Approve, deny, or delete. Approved requests appear on the staff schedule and calendar.</div>
-      <div class="toolbar">
-        <select class="loc-sel" id="timeoffLoc" onchange="kindLoc('timeoff',this.value)"><option value="memphis">Memphis</option><option value="nashville">Nashville</option><option value="franklin">Franklin</option></select>
-      </div>
-      <div id="toList"><div class="to-empty">Loading…</div></div>
-    </div>
-  </div>
-
-  <!-- ONBOARDING SUBMISSIONS -->
-  <div id="panel-onboarding" class="panel">
-    <div class="section-card">
-      <h2>🧑‍💼 New-Hire Onboarding</h2>
-      <div class="hint"><strong>Contains sensitive data (SSN, bank, ID photo).</strong> After you enter a submission into payroll, delete it here. The ID photo does <em>not</em> satisfy federal I-9 — you must inspect the original document in person.</div>
-      <div style="margin-bottom:14px;"><button class="btn btn-ghost btn-sm" onclick="loadOnboarding()">↻ Refresh</button></div>
-      <div id="obSubs"><div class="to-empty">Loading…</div></div>
-    </div>
-  </div>
   </div><!-- /.main -->
 </div>
 
@@ -471,7 +508,153 @@ function mtab(name){
   document.querySelector('.tab[onclick*="'+name+'"]').classList.add('active');
   document.getElementById('panel-'+name).classList.add('active');
 }
-function loadAll(){ loadKind('items'); loadKind('schedules'); loadKind('employees'); sgLoad(); loadTimeOff(); loadOnboarding(); loadSwaps(); loadAnnouncements(); }
+function loadAll(){ loadKind('items'); loadKind('schedules'); loadKind('employees'); sgLoad(); loadTimeOff(); loadSwaps(); loadAnnouncements(); resInit(); }
+
+/* ---- Reservations (Wix, via portal-api) ---- */
+// Wix reservation-location ids — must match index.html's LOCATIONS map.
+const WIX_LOCS = {
+  memphis:  '908a32b3-cd51-490f-b1cb-635321094200',
+  nashville:'825c5be0-25d3-4d7e-9418-b062b387f448',
+  franklin: '10119bc0-206a-415b-8423-660b05f56dec'
+};
+let RES_ROWS = [], RES_EDIT = null; // RES_EDIT = reservation being edited, null = adding new
+// local date parts, never toISOString (UTC shifts evening resys a day) — see fmtDisplay
+function resDstr(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function resInit(){
+  const now = new Date(), to = new Date(now.getTime() + 13*86400000);
+  const f = document.getElementById('resFrom'), t = document.getElementById('resTo');
+  if(!f.value){ f.value = resDstr(now); t.value = resDstr(to); }
+  const saved = localStorage.getItem('greys_loc');
+  if(WIX_LOCS[saved]) document.getElementById('resLoc').value = saved;
+  loadResys();
+}
+async function loadResys(){
+  const el = document.getElementById('resList');
+  el.innerHTML = '<div class="rec-empty">Loading…</div>';
+  document.getElementById('resStats').textContent = '';
+  const loc = document.getElementById('resLoc').value;
+  const f = document.getElementById('resFrom').value, t = document.getElementById('resTo').value;
+  const p = new URLSearchParams({ location_id: WIX_LOCS[loc] });
+  // date-input values are local days; send the full local day as instants
+  if(f) p.set('startDateFrom', new Date(f+'T00:00:00').toISOString());
+  if(t) p.set('startDateTo',   new Date(t+'T23:59:59').toISOString());
+  try{
+    const r = await fetch(FN_URL + '?action=reservations&' + p.toString(), { headers:{ apikey:SB_KEY, Authorization:'Bearer '+SB_KEY } });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error || 'load failed');
+    RES_ROWS = (data.reservations||[]).sort((a,b)=>((a.details&&a.details.startDate)||'').localeCompare((b.details&&b.details.startDate)||''));
+    renderResys();
+  }catch(e){ el.innerHTML = '<div class="rec-empty">❌ Could not load reservations.</div>'; }
+}
+function resPill(st){
+  if(st==='REQUESTED') return '<span class="pill pill-req">needs approval</span>';
+  if(['CANCELLED','CANCELED','DECLINED','NO_SHOW'].includes(st)) return '<span class="pill pill-bad">'+esc(st.replace(/_/g,' ').toLowerCase())+'</span>';
+  if(st==='RESERVED') return '<span class="pill pill-ok">reserved</span>';
+  return '<span class="pill pill-mid">'+esc((st||'').replace(/_/g,' ').toLowerCase())+'</span>';
+}
+function renderResys(){
+  const el = document.getElementById('resList');
+  const want = document.getElementById('resStatus').value;
+  const rows = RES_ROWS.filter(r=>{
+    if(!want) return true;
+    if(want==='CANCELLED') return ['CANCELLED','CANCELED','DECLINED'].includes(r.status);
+    return r.status===want;
+  });
+  if(!rows.length){ el.innerHTML = '<div class="rec-empty">No reservations in this range.</div>'; document.getElementById('resStats').textContent=''; return; }
+  const cancel = ['CANCELLED','CANCELED','DECLINED','NO_SHOW'];
+  let html = '', lastDay = '';
+  rows.forEach(r=>{
+    const det = r.details||{}, who = r.reservee||{};
+    const dt = det.startDate ? new Date(det.startDate) : null;
+    const day = dt ? dt.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'}) : 'No date';
+    if(day !== lastDay){ html += '<div class="res-day">'+esc(day)+'</div>'; lastDay = day; }
+    const tm = dt ? dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '—';
+    const name = [who.firstName,who.lastName].filter(Boolean).join(' ') || 'Guest';
+    const contact = [who.phone,who.email].filter(Boolean).join(' · ');
+    html += '<div class="rec-row res-row'+(cancel.includes(r.status)?' cancelled':'')+'" onclick="resOpen(\''+esc(r.id)+'\')">'
+      +'<span class="res-r-time">'+esc(tm)+'</span>'
+      +'<div style="flex:1;min-width:0;"><div class="res-r-name">'+esc(name)+'</div>'
+      +'<div class="res-r-meta">👥 '+esc(det.partySize||'?')+(contact?' · '+esc(contact):'')+'</div></div>'
+      +resPill(r.status)+'</div>';
+  });
+  el.innerHTML = html;
+  const live = rows.filter(r=>!cancel.includes(r.status));
+  const guests = live.reduce((s,r)=>s+(Number(r.details&&r.details.partySize)||0),0);
+  document.getElementById('resStats').textContent = live.length+' active · '+guests+' guests';
+}
+function resShowModal(){ document.getElementById('resErr').textContent=''; document.getElementById('resModal').style.display='flex'; }
+function resClose(){ document.getElementById('resModal').style.display='none'; }
+function resNew(){
+  RES_EDIT = null;
+  document.getElementById('resTitle').textContent = 'Add reservation — '+LOC_LABELS[document.getElementById('resLoc').value];
+  document.getElementById('resSub').textContent = 'Created as confirmed (a phone-in / walk-in the guest doesn’t need to approve).';
+  document.getElementById('rmDate').value = document.getElementById('resFrom').value || resDstr(new Date());
+  document.getElementById('rmTime').value = '18:00';
+  document.getElementById('rmParty').value = 2;
+  ['rmFirst','rmLast','rmPhone','rmEmail'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('resCancelBtn').style.display = 'none';
+  resShowModal();
+}
+function resOpen(id){
+  const r = RES_ROWS.find(x=>x.id===id); if(!r) return;
+  RES_EDIT = r;
+  const det = r.details||{}, who = r.reservee||{};
+  const done = ['CANCELLED','CANCELED','DECLINED','NO_SHOW','FINISHED'].includes(r.status);
+  document.getElementById('resTitle').textContent = 'Edit reservation';
+  document.getElementById('resSub').textContent = 'Status: '+(r.status||'?').replace(/_/g,' ').toLowerCase()+(done?' — read-only':' — the guest is notified of changes');
+  const dt = det.startDate ? new Date(det.startDate) : new Date();
+  document.getElementById('rmDate').value = resDstr(dt);
+  document.getElementById('rmTime').value = String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0');
+  document.getElementById('rmParty').value = det.partySize || 2;
+  document.getElementById('rmFirst').value = who.firstName || '';
+  document.getElementById('rmLast').value = who.lastName || '';
+  document.getElementById('rmPhone').value = who.phone || '';
+  document.getElementById('rmEmail').value = who.email || '';
+  document.getElementById('resSaveBtn').style.display = done ? 'none' : '';
+  document.getElementById('resCancelBtn').style.display = done ? 'none' : '';
+  resShowModal();
+}
+async function resSave(){
+  const err = document.getElementById('resErr'); err.textContent = '';
+  const d = document.getElementById('rmDate').value, t = document.getElementById('rmTime').value;
+  const party = Number(document.getElementById('rmParty').value);
+  const first = document.getElementById('rmFirst').value.trim();
+  const phone = document.getElementById('rmPhone').value.trim();
+  if(!d || !t){ err.textContent = 'Date and time are required.'; return; }
+  if(!party || party < 1){ err.textContent = 'Party size is required.'; return; }
+  if(!first || !phone){ err.textContent = 'Guest first name and phone are required.'; return; }
+  const start = new Date(d+'T'+t+':00').toISOString(); // local wall-clock → instant
+  const payload = {
+    start, party,
+    first_name: first,
+    last_name: document.getElementById('rmLast').value.trim(),
+    phone, email: document.getElementById('rmEmail').value.trim()
+  };
+  const btn = document.getElementById('resSaveBtn'); btn.disabled = true;
+  let r;
+  if(RES_EDIT) r = await fn('update-reservation', { id: RES_EDIT.id, ...payload });
+  else r = await fn('create-reservation', { location_id: WIX_LOCS[document.getElementById('resLoc').value], ...payload });
+  if(!r.ok && (r.status===428 || r.data.conflict)){
+    if(confirm('⚠️ Wix reports a conflict for that time (capacity or table availability).\n\nBook it anyway?')){
+      if(RES_EDIT) r = await fn('update-reservation', { id: RES_EDIT.id, ...payload, force:true });
+      else r = await fn('create-reservation', { location_id: WIX_LOCS[document.getElementById('resLoc').value], ...payload, force:true });
+    }
+  }
+  btn.disabled = false;
+  if(!r.ok){ err.textContent = '❌ '+(r.data.error || 'Could not save. Try again.'); return; }
+  resClose(); loadResys();
+}
+async function resCancelCurrent(){
+  if(!RES_EDIT) return;
+  const who = RES_EDIT.reservee||{};
+  if(!confirm('Cancel this reservation for '+([who.firstName,who.lastName].filter(Boolean).join(' ')||'this guest')+'? The guest will be notified.')) return;
+  const btn = document.getElementById('resCancelBtn'); btn.disabled = true;
+  const r = await fn('cancel-reservation', { id: RES_EDIT.id });
+  btn.disabled = false;
+  const err = document.getElementById('resErr');
+  if(!r.ok){ err.textContent = '❌ '+(r.data.error || 'Could not cancel. Try again.'); return; }
+  resClose(); loadResys();
+}
 
 /* ---- Onboarding submissions ---- */
 let OB_SUBS=[];

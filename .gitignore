@@ -2,6 +2,6 @@ notes.json
 events.json
 specials.json
 node_modules/
-
-github-sync.bundle
 _to_delete/
+_sync_backup/
+fix-sync.bat

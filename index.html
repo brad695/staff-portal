@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <meta name="theme-color" content="#ffffff"/>
-  <title>Portal - GREYS</title>
+  <title>GREYS Memphis · Staff</title>
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -133,9 +133,6 @@
     .res-main{ flex:1; min-width:0; }
     .res-name{ font-weight:700; font-size:0.98rem; }
     .res-meta{ font-size:0.78rem; color:var(--sub); margin-top:2px; }
-    .res-contact{ display:flex; flex-wrap:wrap; gap:3px 14px; margin-top:4px; font-size:0.78rem; }
-    .res-contact a{ color:var(--accent); text-decoration:none; font-weight:600; word-break:break-all; }
-    .res-note{ font-size:0.78rem; color:var(--sub); margin-top:4px; font-style:italic; }
     .res-badge{ font-size:0.62rem; font-weight:800; text-transform:uppercase; padding:4px 9px; border-radius:20px; white-space:nowrap; }
     .b-ok{ background:var(--mint); color:var(--mint-i); }
     .b-cancel{ background:rgba(224,104,91,0.18); color:#f0897c; }
@@ -296,7 +293,6 @@
       .botbar{ left:50%; right:auto; transform:translateX(-50%); }
     }
 
-
     /* ── PRINT: clean, calendar-only, white page ── */
     @media print {
       /* force a white page with dark text — the navy app bg must NOT print as a dark block */
@@ -362,8 +358,9 @@
       <button class="tile" id="tile-specials" onclick="tileTap('specials')"><span class="ic ic-mint"><i class="ti ti-tools-kitchen-2"></i></span><span class="tl">Specials</span></button>
       <button class="tile" id="tile-resys" onclick="tileTap('resys')"><span class="ic ic-sky"><i class="ti ti-clipboard-list"></i></span><span class="tl">Resys</span></button>
       <button class="tile" id="tile-calendar" onclick="tileTap('calendar')"><span class="ic ic-lav"><i class="ti ti-calendar-month"></i></span><span class="tl">Calendar</span></button>
-      <button class="tile" id="tile-myshifts" onclick="location.href='schedule.html'"><span class="ic ic-mint"><i class="ti ti-calendar-week"></i></span><span class="tl">Schedule</span></button>
+      <button class="tile" id="tile-schedule" onclick="tileTap('schedule')"><span class="ic ic-peach"><i class="ti ti-clock-hour-4"></i></span><span class="tl">Schedule</span></button>
       <button class="tile" id="tile-events" onclick="tileTap('events')"><span class="ic ic-pink"><i class="ti ti-confetti"></i></span><span class="tl">Events</span></button>
+      <button class="tile" id="tile-requestoff" onclick="tileTap('requestoff')"><span class="ic ic-butter"><i class="ti ti-beach"></i></span><span class="tl">Request Off</span></button>
       <button class="tile" id="tile-onboarding" onclick="tileTap('onboarding')"><span class="ic ic-gray"><i class="ti ti-user-plus"></i></span><span class="tl" style="color:var(--gray-i);">Onboarding</span><span class="badge-soon">Soon</span></button>
       <button class="tile" id="tile-stuff" onclick="tileTap('stuff')"><span class="ic ic-sky"><i class="ti ti-info-circle"></i></span><span class="tl">Stuff to Know</span></button>
     </div>
@@ -562,7 +559,7 @@ function setLoc(slug){
 
 function wixFetch(params){ params.set('location_id', LOCATIONS[LOC].wix); return fetch(FN_URL + '?action=reservations&' + params.toString(), { headers:{ apikey:SB_KEY, Authorization:'Bearer '+SB_KEY } }); }
 
-function fmt(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function fmt(d){ return d.toISOString().split('T')[0]; }
 function fmtDisplay(s){ if(!s) return ''; return new Date(s+'T12:00:00').toLocaleDateString('en-US',{ weekday:'short', month:'short', day:'numeric' }); }
 function fmtTime(t){ if(!t) return ''; const [h,m]=t.split(':').map(Number); const ap=h>=12?'PM':'AM'; return ((h%12)||12)+':'+String(m).padStart(2,'0')+' '+ap; }
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -940,15 +937,6 @@ function resCardHTML(r){
   const dd=dt?dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
   const name=[who.firstName,who.lastName].filter(Boolean).join(' ')||'Guest';
   const party=det.partySize||'?';
-  const phone=who.phone||'';
-  const email=who.email||'';
-  const srcMap={ ONLINE:'Online', OFFLINE:'Staff-entered', WALK_IN:'Walk-in', UNKNOWN:'' };
-  const src=srcMap[r.source]!==undefined?srcMap[r.source]:(r.source||'');
-  const note=r.teamMessage||det.teamMessage||'';
-  const contact=[
-    phone?`<a href="tel:${esc(phone)}">📞 ${esc(phone)}</a>`:'',
-    email?`<a href="mailto:${esc(email)}">✉️ ${esc(email)}</a>`:''
-  ].filter(Boolean).join('');
   const st=r.status||'UNKNOWN'; const isCancel=cancel.includes(st);
   const isReq=st==='REQUESTED';
   const bcls=isCancel?'b-cancel':(isReq?'b-req':(st==='RESERVED'||st==='SEATED'||st==='FINISHED'?'b-ok':'b-other'));
@@ -960,12 +948,7 @@ function resCardHTML(r){
     : '';
   return `<div class="res-card${isCancel?' cancel':''}${isReq?' req':''}">
       <div class="res-when"><div class="t">${esc(tm)}</div><div class="d">${esc(dd)}</div></div>
-      <div class="res-main">
-        <div class="res-name">${esc(name)}</div>
-        <div class="res-meta">👥 Party of ${esc(party)}${src?' · '+esc(src):''}</div>
-        ${contact?`<div class="res-contact">${contact}</div>`:''}
-        ${note?`<div class="res-note">"${esc(note)}"</div>`:''}
-      </div>
+      <div class="res-main"><div class="res-name">${esc(name)}</div><div class="res-meta">👥 Party of ${esc(party)}</div></div>
       <span class="res-badge ${bcls}">${isReq?'NEEDS APPROVAL':st.replace(/_/g,' ')}</span>
       ${actions}
     </div>`;
@@ -1112,6 +1095,5 @@ function renderAgenda(y,m){
 function calNav(dir){ _calMonth+=dir; if(_calMonth>11){_calMonth=0;_calYear++;} if(_calMonth<0){_calMonth=11;_calYear--;} renderCalendar(); }
 function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().getMonth(); _selDay=fmt(new Date()); renderCalendar(); }
 </script>
-<div style="text-align:center;padding:14px 20px 22px;font-size:0.78rem;color:#8fa0ae;">Greys Fine Cheese &amp; Entertaining · <a href="terms.html" style="color:#0b6aa9;text-decoration:none;font-weight:600;">SMS Terms</a> · <a href="privacy.html" style="color:#0b6aa9;text-decoration:none;font-weight:600;">Privacy Policy</a></div>
 </body>
 </html>
