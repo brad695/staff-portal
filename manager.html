@@ -460,7 +460,15 @@ function kindLoc(kind, v){
 }
 
 async function fn(action, payload) {
-  const token = SESSION ? SESSION.access_token : SB_KEY;
+  // Always use a FRESH token — access tokens expire after ~1 hour, and a stale
+  // one gets a 401 at the platform gate before our function even runs.
+  // getSession() auto-refreshes via the refresh token when needed.
+  let token = SB_KEY;
+  try {
+    const { data } = await sb.auth.getSession();
+    if (data && data.session) { SESSION = data.session; token = data.session.access_token; }
+    else if (SESSION) token = SESSION.access_token;
+  } catch(_) { if (SESSION) token = SESSION.access_token; }
   const res = await fetch(FN_URL + '?action=' + encodeURIComponent(action), {
     method:'POST',
     headers:{ 'Content-Type':'application/json', 'apikey':SB_KEY, 'Authorization':'Bearer '+token },
@@ -1412,7 +1420,8 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   if(data && data.session){ enterConsole(data.session); }
   else { const el = document.getElementById('loginPass'); if(el) el.focus(); }
   sb.auth.onAuthStateChange((_event, session)=>{
-    if(session && !SESSION) enterConsole(session);
+    if(session && !SESSION){ enterConsole(session); return; }
+    if(session) SESSION = session; // keep the token fresh after auto-refresh
   });
 });
 </script>
