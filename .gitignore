@@ -8,3 +8,4 @@ fix-sync.bat
 _stale/
 _stale/
 restore_*
+finish-sync.bat
