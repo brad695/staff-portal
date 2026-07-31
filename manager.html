@@ -663,7 +663,9 @@ async function resCancelCurrent(){
   const who = RES_EDIT.reservee||{};
   if(!confirm('Cancel this reservation for '+([who.firstName,who.lastName].filter(Boolean).join(' ')||'this guest')+'? The guest will be notified.')) return;
   const btn = document.getElementById('resCancelBtn'); btn.disabled = true;
-  const r = await fn('cancel-reservation', { id: RES_EDIT.id });
+  // include the guest's phone — Wix's cancel endpoint demands it, and its
+  // single-reservation lookup doesn't always return it server-side
+  const r = await fn('cancel-reservation', { id: RES_EDIT.id, phone: who.phone || document.getElementById('rmPhone').value.trim() });
   btn.disabled = false;
   const err = document.getElementById('resErr');
   if(!r.ok){ err.textContent = '❌ '+(r.data.error || 'Could not cancel. Try again.'); return; }
