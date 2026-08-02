@@ -12,22 +12,22 @@
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root{
-      --paper:#E9DFC7; --card:#FBF7EB; --rind:#211D19;
-      --navy:#0B2138; --navy2:#06273A; --navy-soft:#13314f;
-      --wax:#A52B1E; --cheddar:#E0A21C; --gold:#E2D827;
-      --ink:#221E1B; --sub:#6E6353; --line:#D6C8AB; --line-soft:#e7dcc4;
+      --paper:#ffffff; --card:#ffffff; --rind:#111111;
+      --navy:#111111; --navy2:#1a1a1a; --navy-soft:#333333;
+      --wax:#A52B1E; --cheddar:#E0A21C; --gold:#E0A21C;
+      --ink:#111111; --sub:#666666; --line:#dddddd; --line-soft:#ececec;
       --r:2px;
     }
     *{ box-sizing:border-box; margin:0; padding:0; }
     body{ font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--paper); color:var(--ink); min-height:100vh; }
     h1,h2,h3{ font-family:'Archivo',sans-serif; }
 
-    header{ background:var(--navy); color:#fff; padding:16px 28px; display:flex; align-items:center; justify-content:space-between; border-bottom:3px solid var(--cheddar); }
+    header{ background:#ffffff; color:var(--ink); padding:16px 28px; display:flex; align-items:center; justify-content:space-between; border-bottom:3px solid var(--cheddar); }
     header h1{ font-size:1.3rem; font-weight:900; letter-spacing:-0.5px; }
-    header .subtitle{ font-size:0.7rem; font-weight:600; letter-spacing:0.4px; text-transform:uppercase; color:var(--cheddar); margin-top:3px; }
+    header .subtitle{ font-size:0.7rem; font-weight:600; letter-spacing:0.4px; text-transform:uppercase; color:var(--sub); margin-top:3px; }
     .head-actions{ display:flex; gap:10px; align-items:center; }
-    .head-link{ color:#cfe0ef; font-size:0.8rem; font-weight:600; text-decoration:none; border:1px solid rgba(255,255,255,0.25); padding:6px 12px; border-radius:var(--r); }
-    .head-link:hover{ background:rgba(255,255,255,0.08); }
+    .head-link{ color:var(--ink); font-size:0.8rem; font-weight:600; text-decoration:none; border:1px solid #d9d9d9; padding:6px 12px; border-radius:var(--r); }
+    .head-link:hover{ background:#f2f2f2; }
     .loc-sel{ padding:7px 12px; border:1px solid var(--line); border-radius:var(--r); font-family:inherit; font-size:0.82rem; font-weight:700; background:#fff; color:var(--ink); cursor:pointer; }
 
     .login-wrap{ display:flex; align-items:center; justify-content:center; padding:70px 16px; }
@@ -42,10 +42,10 @@
     /* left sidebar menu */
     #consoleView{ display:flex; align-items:stretch; min-height:calc(100vh - 76px); }
     #consoleView.hide{ display:none; }
-    .tabs{ background:var(--navy2); display:flex; flex-direction:column; width:220px; flex-shrink:0; padding:12px 0; }
-    .tab{ padding:13px 22px; color:rgba(231,238,245,0.5); font-size:0.74rem; font-weight:700; cursor:pointer; border-left:3px solid transparent; white-space:nowrap; letter-spacing:0.5px; text-transform:uppercase; }
-    .tab:hover{ color:rgba(255,255,255,0.9); }
-    .tab.active{ color:#fff; border-left-color:var(--cheddar); background:rgba(255,255,255,0.06); }
+    .tabs{ background:#f4f4f4; border-right:1px solid #e2e2e2; display:flex; flex-direction:column; width:220px; flex-shrink:0; padding:12px 0; }
+    .tab{ padding:13px 22px; color:#777777; font-size:0.74rem; font-weight:700; cursor:pointer; border-left:3px solid transparent; white-space:nowrap; letter-spacing:0.5px; text-transform:uppercase; }
+    .tab:hover{ color:#111111; }
+    .tab.active{ color:#111111; border-left-color:var(--cheddar); background:#ffffff; }
     .main{ flex:1; min-width:0; }
     @media(max-width:820px){
       #consoleView{ flex-direction:column; }
@@ -62,12 +62,12 @@
     .section-card .hint{ font-size:0.82rem; color:var(--sub); margin-bottom:16px; line-height:1.5; }
 
     .btn{ border:none; border-radius:var(--r); padding:9px 18px; font-size:0.84rem; font-weight:700; cursor:pointer; font-family:inherit; }
-    .btn-gold{ background:var(--gold); color:var(--navy2); }
-    .btn-gold:hover{ background:var(--cheddar); color:#fff; }
-    .btn-navy{ background:var(--navy); color:#fff; }
-    .btn-navy:hover{ background:var(--navy-soft); }
+    .btn-gold{ background:var(--gold); color:#1a1a1a; }
+    .btn-gold:hover{ background:#c78d13; color:#1a1a1a; }
+    .btn-navy{ background:#e9e9e9; color:#111111; }
+    .btn-navy:hover{ background:#dcdcdc; }
     .btn-ghost{ background:none; border:1px solid var(--line); color:var(--rind); }
-    .btn-ghost:hover{ background:#efe7d3; }
+    .btn-ghost:hover{ background:#efefef; }
     .btn-wax{ background:none; border:1px solid #f0d6cf; color:var(--wax); }
     .btn-wax:hover{ background:#f6dad4; }
     .btn-sm{ padding:5px 10px; font-size:0.74rem; }
@@ -79,11 +79,11 @@
     .toolbar .spacer{ flex:1; }
     .bulk-wrap{ overflow:auto; border:1px solid var(--line); border-radius:var(--r); background:#fff; }
     table.bulk{ width:100%; border-collapse:collapse; font-size:0.86rem; min-width:880px; }
-    table.bulk thead th{ background:var(--navy); color:#fff; font-family:'Archivo',sans-serif; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.4px; padding:9px 10px; text-align:left; white-space:nowrap; }
+    table.bulk thead th{ background:#f1f1f1; color:#111111; font-family:'Archivo',sans-serif; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.4px; padding:9px 10px; text-align:left; white-space:nowrap; }
     table.bulk tbody td{ padding:6px 8px; border-bottom:1px solid var(--line-soft); vertical-align:middle; }
     table.bulk input, table.bulk select{ border:1px solid transparent; background:#fff; padding:7px 8px; font-family:inherit; font-size:0.84rem; width:100%; }
     table.bulk input:hover, table.bulk select:hover{ border-color:var(--line-soft); }
-    table.bulk input:focus, table.bulk select:focus{ border-color:var(--cheddar); background:#fffdf6; outline:none; }
+    table.bulk input:focus, table.bulk select:focus{ border-color:var(--cheddar); background:#fafafa; outline:none; }
     table.bulk tr.dirty td{ background:#fff7e2; }
     table.bulk tr.newrow td{ background:#eef7ee; }
     .td-actions{ white-space:nowrap; }
@@ -92,17 +92,17 @@
     .pill-new{ background:#d1fae5; color:#065f46; }
     .pill-dirty{ background:#fdebc4; color:#92400e; }
 
-    .csv-box{ border:1px dashed var(--line); border-radius:var(--r); padding:14px 16px; background:#fffdf6; display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:14px; }
+    .csv-box{ border:1px dashed var(--line); border-radius:var(--r); padding:14px 16px; background:#fafafa; display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:14px; }
     .csv-box .csv-status{ font-size:0.8rem; color:var(--sub); }
 
     /* clean record lists (replaces the old bulk tables) */
     .chips{ display:flex; gap:6px; flex-wrap:wrap; }
     .chip{ border:1px solid var(--line); background:#fff; border-radius:20px; padding:7px 15px; font-size:0.78rem; font-weight:700; cursor:pointer; color:var(--sub); font-family:inherit; }
     .chip:hover{ border-color:var(--cheddar); }
-    .chip.on{ background:var(--navy); color:#fff; border-color:var(--navy); }
+    .chip.on{ background:var(--gold); color:#1a1a1a; border-color:var(--gold); }
     .rec-list{ border:1px solid var(--line); border-radius:var(--r); background:#fff; overflow:hidden; }
     .rec-row{ display:flex; align-items:center; gap:14px; padding:13px 16px; border-bottom:1px solid var(--line-soft); cursor:pointer; }
-    .rec-row:hover{ background:#fffcf2; }
+    .rec-row:hover{ background:#f7f7f7; }
     .rec-row:last-child{ border-bottom:none; }
     .rec-main{ flex:1; min-width:0; }
     .rec-title{ font-weight:700; font-size:0.95rem; color:var(--rind); line-height:1.5; }
@@ -114,7 +114,7 @@
     .tag-special{ background:#d1fae5; color:#065f46; }
     .tag-event{ background:#fbdaf0; color:#9d2f72; }
     .tag-info{ background:#fdebc4; color:#92400e; }
-    .tag-loc{ background:#f1ead6; color:#6E6353; }
+    .tag-loc{ background:#ebebeb; color:#666666; }
     .tag-off2{ background:#e8e8e8; color:#777; }
     .rec-fields{ display:grid; grid-template-columns:1fr 1fr; gap:12px 14px; margin:14px 0; }
     .rf{ display:flex; flex-direction:column; gap:5px; }
@@ -154,7 +154,7 @@
     .pill-req{ background:#fdebc4; color:#92400e; }
     .pill-bad{ background:#fde2de; color:#9f2d20; }
     .pill-mid{ background:#e2e8f0; color:#334155; }
-    .res-day{ background:#f4f1e8; padding:8px 16px; font-size:0.7rem; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:var(--sub); border-bottom:1px solid var(--line-soft); }
+    .res-day{ background:#f3f3f3; padding:8px 16px; font-size:0.7rem; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:var(--sub); border-bottom:1px solid var(--line-soft); }
     .res-row.cancelled .res-r-name, .res-row.cancelled .res-r-time{ text-decoration:line-through; color:var(--sub); }
     .res-r-time{ font-weight:800; min-width:72px; }
     .res-r-name{ font-weight:700; }
@@ -330,7 +330,7 @@
   </div>
 
   <!-- record editor modal -->
-  <div id="recModal" style="display:none;position:fixed;inset:0;background:rgba(11,33,56,0.55);z-index:100;align-items:flex-start;justify-content:center;padding:30px 16px;overflow:auto;">
+  <div id="recModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:flex-start;justify-content:center;padding:30px 16px;overflow:auto;">
     <div style="background:var(--card);border-radius:var(--r);border-top:4px solid var(--cheddar);padding:24px;width:560px;max-width:100%;">
       <h2 style="font-size:1rem;color:var(--navy);margin-bottom:10px;" id="recTitle">Edit</h2>
       <div class="rec-fields" id="recFields"></div>
@@ -345,7 +345,7 @@
   </div>
 
   <!-- shift editor modal -->
-  <div id="shiftModal" style="display:none;position:fixed;inset:0;background:rgba(11,33,56,0.55);z-index:100;align-items:center;justify-content:center;padding:16px;">
+  <div id="shiftModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:16px;">
     <div style="background:var(--card);border-radius:var(--r);border-top:4px solid var(--cheddar);padding:24px;width:380px;max-width:100%;">
       <h2 style="font-size:1rem;color:var(--navy);margin-bottom:2px;" id="shTitle">Add shift</h2>
       <div class="hint" id="shSub" style="margin-bottom:12px;"></div>
@@ -385,7 +385,7 @@
   </div>
 
   <!-- reservation editor modal -->
-  <div id="resModal" style="display:none;position:fixed;inset:0;background:rgba(11,33,56,0.55);z-index:100;align-items:flex-start;justify-content:center;padding:30px 16px;overflow:auto;">
+  <div id="resModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:flex-start;justify-content:center;padding:30px 16px;overflow:auto;">
     <div style="background:var(--card);border-radius:var(--r);border-top:4px solid var(--cheddar);padding:24px;width:560px;max-width:100%;">
       <h2 style="font-size:1rem;color:var(--navy);margin-bottom:2px;" id="resTitle">Add reservation</h2>
       <div class="hint" id="resSub" style="margin-bottom:0;"></div>
@@ -1104,7 +1104,7 @@ function sgRender(){
           sgAv(loc,emp.id,wd).forEach(a=>{
             bits.push(a.kind==='preferred'
               ? '<div style="background:#e7f6ee;color:#0a7a52;border:1px dashed #9fd8bc;border-radius:2px;padding:1px 5px;margin:2px 0;font-size:0.6rem;font-weight:700;text-align:center;" title="Prefers to work'+(a.note?': '+esc(a.note):'')+'">'+sgAvLabel(a)+'</div>'
-              : '<div style="background:#eeeae0;color:#8a8070;border-radius:2px;padding:1px 5px;margin:2px 0;font-size:0.6rem;font-weight:700;text-transform:uppercase;text-align:center;" title="Unavailable'+(a.note?': '+esc(a.note):'')+'">'+sgAvLabel(a)+'</div>');
+              : '<div style="background:#ececec;color:#777777;border-radius:2px;padding:1px 5px;margin:2px 0;font-size:0.6rem;font-weight:700;text-transform:uppercase;text-align:center;" title="Unavailable'+(a.note?': '+esc(a.note):'')+'">'+sgAvLabel(a)+'</div>');
           });
           g.shifts.filter(s=>s.employee_id===emp.id && s.date===di).forEach(s=>{
             const kind = sgKind(s);
