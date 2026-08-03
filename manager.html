@@ -128,12 +128,22 @@
     .rec-card{ background:var(--card); border-radius:var(--r); border-top:4px solid var(--cheddar); padding:24px; width:560px; max-width:100%; max-height:92vh; display:flex; flex-direction:column; }
     .rec-card .rec-fields{ overflow-y:auto; flex:1 1 auto; min-height:0; padding-right:2px; }
     .rec-foot{ display:flex; gap:8px; flex-wrap:wrap; padding-top:12px; border-top:1px solid var(--line); margin-top:4px; }
+    /* checkmark pills (radio groups) */
+    .rec-radios{ display:flex; gap:6px; flex-wrap:wrap; }
+    .rec-radio{ display:flex; align-items:center; gap:5px; border:1px solid var(--line); border-radius:999px; padding:8px 12px; font-size:0.83rem; cursor:pointer; background:#fff; user-select:none; }
+    .rec-radio input{ display:none; }
+    .rec-radio.on{ border-color:var(--cheddar); background:#fff7e0; font-weight:700; }
+    .rec-radio.on::before{ content:'✓'; color:var(--cheddar); font-weight:900; }
     @media (max-width:640px){
       #recModal{ padding:0 !important; align-items:flex-end !important; }
-      .rec-card{ width:100%; border-radius:16px 16px 0 0; border-top:none; padding:16px 16px calc(16px + env(safe-area-inset-bottom)); max-height:94vh; max-height:94dvh; }
-      .rec-fields{ grid-template-columns:1fr; }
-      .rf input, .rf select, .rf textarea{ font-size:16px; padding:12px; } /* 16px stops iOS auto-zoom */
-      .rec-foot .btn{ padding:12px 18px; font-size:0.95rem; }
+      .rec-card{ width:100%; border-radius:16px 16px 0 0; border-top:none; padding:12px 12px calc(10px + env(safe-area-inset-bottom)); max-height:94vh; max-height:94dvh; }
+      .rec-card h2{ margin-bottom:6px !important; }
+      .rec-fields{ gap:8px 8px; margin:8px 0; }
+      .rf input, .rf select, .rf textarea{ font-size:16px; padding:10px; } /* 16px stops iOS auto-zoom */
+      .rf textarea{ min-height:52px; }
+      .rec-section{ padding-top:8px; }
+      .rec-foot{ padding-top:8px; }
+      .rec-foot .btn{ padding:11px 16px; font-size:0.95rem; }
     }
 
     .to-item{ display:flex; align-items:flex-start; gap:14px; padding:14px 0; border-bottom:1px solid var(--line-soft); }
@@ -260,7 +270,7 @@
   <div id="panel-events" class="panel">
     <div class="section-card">
       <h2>🎉 Events</h2>
-      <div class="hint">Manual events shown on the staff portal — private parties, buyouts, happenings that don't sell tickets. Each one can block Wix online reservations for its time window or the whole day at its location. Ticketed classes &amp; events live under <strong>Tickets &amp; Classes</strong>.</div>
+      <div class="hint">Manual events shown on the staff portal — private parties, buyouts, happenings that don't sell tickets. "Block during event" closes Wix online reservations from <strong>1 hr before the start time until the end time</strong> at that location; "Block all day" closes the whole date. Ticketed classes &amp; events live under <strong>Tickets &amp; Classes</strong>.</div>
       <div class="toolbar">
         <div class="chips" id="evChips"></div>
         <div class="spacer"></div>
@@ -918,20 +928,19 @@ const SCHEMA = {
       {k:'location', label:'Location', type:'select', options:['memphis','nashville','franklin'], names:LOC_LABELS},
       {k:'date', label:'Date', type:'date'},
       {k:'time', label:'Start time', type:'time'},
+      {k:'blockTo', label:'End time', type:'time'},
       {k:'endDate', label:'End date (multi-day)', type:'date'},
       {k:'repeat', label:'Repeat', type:'select', options:['none','weekly','biweekly','monthly']},
       {k:'repeatUntil', label:'Repeat until', type:'date', showIf:v=>v.repeat && v.repeat!=='none'},
-      {k:'secBlock', label:'🚫 Wix online reservations', type:'section'},
-      {k:'blockScope', label:'Table reservations on this date', type:'select', full:true, options:['none','window','day'],
-        names:{ none:'Keep taking reservations (no block)', window:'Block during the event (1 hr before start → "block until")', day:'Block the whole day — entire restaurant' }},
-      {k:'blockTo', label:'Block until (time)', type:'time', showIf:v=>v.blockScope==='window'},
+      {k:'blockScope', label:'🚫 Wix reservations', type:'radio', full:true, options:['none','window','day'],
+        names:{ none:'Do not block', window:'Block during event', day:'Block all day' }},
       {k:'body', label:'Details', type:'textarea', full:true, ph:'Details shown on the portal'}
     ],
     defaults:{ blockScope:'none', repeat:'none' },
     rowFilter:r=> (r.type||'note')==='event',
     valid:r=> !r.title ? 'A title is required.'
       : !r.date ? 'Events need a date.'
-      : (r.blockScope==='window' && (!r.time || !r.blockTo)) ? 'To block during the event, set the start time and "block until" time.'
+      : (r.blockScope==='window' && (!r.time || !r.blockTo)) ? 'To block during the event, set the start and end times.'
       : '',
     map:r=>({ id:r.id, type:'event', title:r.title, date:r.date||'', time:(r.time||'').slice(0,5), endDate:r.end_date||'',
       repeat:r.repeat||'none', repeatUntil:r.repeat_until||'', body:r.body||'', location:r.location||'memphis',
@@ -943,10 +952,10 @@ const SCHEMA = {
     rowMeta:r=>{
       const bits=[];
       if(r.date) bits.push('📅 '+fmtDisplay(r.date)+(r.endDate?' – '+fmtDisplay(r.endDate):''));
-      if(r.time) bits.push('🕐 '+r.time);
+      if(r.time) bits.push('🕐 '+r.time+(r.blockTo?'–'+r.blockTo:''));
       if(r.repeat && r.repeat!=='none') bits.push('↻ '+r.repeat+(r.repeatUntil?' until '+fmtDisplay(r.repeatUntil):''));
-      if(r.blockScope==='day') bits.push('🚫 Wix reservations blocked all day');
-      else if(r.blockScope==='window') bits.push('🚫 Wix reservations blocked until '+r.blockTo);
+      if(r.blockScope==='day') bits.push('🚫 Wix blocked all day');
+      else if(r.blockScope==='window') bits.push('🚫 Wix blocked during event');
       if(r.body) bits.push(esc(r.body.length>100 ? r.body.slice(0,100)+'…' : r.body));
       return bits.join(' &nbsp;·&nbsp; ');
     },
@@ -1087,7 +1096,10 @@ function openRec(kind, row){
     if(f.type==='section') return '<div class="rec-section" id="rec-w-'+f.k+'">'+f.label+'</div>';
     let v = row ? (row[f.k]!=null ? row[f.k] : '') : (S.defaults[f.k]!=null ? S.defaults[f.k] : (f.k==='location' ? DEF_LOC : ''));
     let input;
-    if(f.type==='select'){
+    if(f.type==='radio'){
+      input = '<div class="rec-radios">'+f.options.map(o=>
+        '<label class="rec-radio'+(String(v)===o?' on':'')+'"><input type="radio" name="rec-f-'+f.k+'" value="'+o+'"'+(String(v)===o?' checked':'')+'>'+((f.names&&f.names[o])||o)+'</label>').join('')+'</div>';
+    } else if(f.type==='select'){
       input = '<select id="rec-f-'+f.k+'">'+f.options.map(o=>
         '<option value="'+o+'"'+(String(v)===o?' selected':'')+'>'+((f.names&&f.names[o])||o)+'</option>').join('')+'</select>';
     } else if(f.type==='textarea'){
@@ -1107,13 +1119,20 @@ function openRec(kind, row){
   document.getElementById('recModal').style.display='flex';
   const first = document.querySelector('#recFields input, #recFields textarea'); if(first) first.focus();
 }
+function recGetVal(f){
+  if(f.type==='radio'){
+    const el = document.querySelector('input[name="rec-f-'+f.k+'"]:checked');
+    return el ? el.value : '';
+  }
+  const el = document.getElementById('rec-f-'+f.k);
+  return el ? el.value : '';
+}
 function recFieldVals(){
   if(!REC_CTX) return {};
   const vals = {};
   SCHEMA[REC_CTX.kind].fields.forEach(f=>{
     if(f.type==='section') return;
-    const el = document.getElementById('rec-f-'+f.k);
-    vals[f.k] = el ? el.value : '';
+    vals[f.k] = recGetVal(f);
   });
   return vals;
 }
@@ -1126,13 +1145,18 @@ function recApplyVisibility(){
     const wrap = document.getElementById('rec-w-'+f.k);
     if(wrap) wrap.style.display = f.showIf(vals) ? '' : 'none';
   });
+  // keep the ✓ pill highlight in sync
+  document.querySelectorAll('.rec-radios .rec-radio').forEach(l=>{
+    const inp = l.querySelector('input');
+    if(inp) l.classList.toggle('on', inp.checked);
+  });
 }
 function recClose(){ document.getElementById('recModal').style.display='none'; REC_CTX=null; }
 async function recSave(){
   if(!REC_CTX) return;
   const kind = REC_CTX.kind, S = SCHEMA[kind];
   const payload = {};
-  S.fields.forEach(f=>{ if(f.type==='section') return; payload[f.k] = document.getElementById('rec-f-'+f.k).value; });
+  S.fields.forEach(f=>{ if(f.type==='section') return; payload[f.k] = recGetVal(f); });
   if(S.fixed) Object.assign(payload, S.fixed); // e.g. events are always type:'event'
   // fields hidden by showIf save as empty so stale values don't linger
   S.fields.forEach(f=>{ if(f.showIf && !f.showIf(payload)) payload[f.k] = ''; });
