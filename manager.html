@@ -123,6 +123,18 @@
     .rf input, .rf select, .rf textarea{ padding:10px 11px; border:1px solid var(--line); border-radius:var(--r); font-family:inherit; font-size:0.92rem; background:#fff; }
     .rf input:focus, .rf select:focus, .rf textarea:focus{ outline:none; border-color:var(--cheddar); }
     .rf textarea{ min-height:76px; resize:vertical; }
+    /* record edit modal: card on desktop, bottom sheet on phones */
+    .rec-section{ grid-column:1 / -1; font-size:0.72rem; font-weight:800; color:var(--sub); text-transform:uppercase; letter-spacing:0.4px; border-top:1px solid var(--line); padding-top:12px; margin-top:2px; }
+    .rec-card{ background:var(--card); border-radius:var(--r); border-top:4px solid var(--cheddar); padding:24px; width:560px; max-width:100%; max-height:92vh; display:flex; flex-direction:column; }
+    .rec-card .rec-fields{ overflow-y:auto; flex:1 1 auto; min-height:0; padding-right:2px; }
+    .rec-foot{ display:flex; gap:8px; flex-wrap:wrap; padding-top:12px; border-top:1px solid var(--line); margin-top:4px; }
+    @media (max-width:640px){
+      #recModal{ padding:0 !important; align-items:flex-end !important; }
+      .rec-card{ width:100%; border-radius:16px 16px 0 0; border-top:none; padding:16px 16px calc(16px + env(safe-area-inset-bottom)); max-height:94vh; max-height:94dvh; }
+      .rec-fields{ grid-template-columns:1fr; }
+      .rf input, .rf select, .rf textarea{ font-size:16px; padding:12px; } /* 16px stops iOS auto-zoom */
+      .rec-foot .btn{ padding:12px 18px; font-size:0.95rem; }
+    }
 
     .to-item{ display:flex; align-items:flex-start; gap:14px; padding:14px 0; border-bottom:1px solid var(--line-soft); }
     .to-item:last-child{ border-bottom:none; }
@@ -378,12 +390,12 @@
   </div>
 
   <!-- record editor modal -->
-  <div id="recModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:flex-start;justify-content:center;padding:30px 16px;overflow:auto;">
-    <div style="background:var(--card);border-radius:var(--r);border-top:4px solid var(--cheddar);padding:24px;width:560px;max-width:100%;">
+  <div id="recModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:30px 16px;overflow:auto;">
+    <div class="rec-card">
       <h2 style="font-size:1rem;color:var(--navy);margin-bottom:10px;" id="recTitle">Edit</h2>
       <div class="rec-fields" id="recFields"></div>
       <div class="login-err" id="recErr"></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <div class="rec-foot">
         <button class="btn btn-gold" onclick="recSave()">Save</button>
         <button class="btn btn-wax" id="recDelBtn" style="display:none;" onclick="recDeleteCurrent()">🗑 Delete</button>
         <div style="flex:1;"></div>
@@ -869,7 +881,7 @@ const SCHEMA = {
       {k:'time', label:'Time', type:'time'},
       {k:'endDate', label:'End date', type:'date'},
       {k:'repeat', label:'Repeat', type:'select', options:['none','weekly','biweekly','monthly']},
-      {k:'repeatUntil', label:'Repeat until', type:'date'},
+      {k:'repeatUntil', label:'Repeat until', type:'date', showIf:v=>v.repeat && v.repeat!=='none'},
       {k:'body', label:'Details', type:'textarea', full:true, ph:'Details shown on the portal'}
     ],
     defaults:{ type:'note', repeat:'none' },
@@ -902,16 +914,17 @@ const SCHEMA = {
     label:'event',
     fixed:{ type:'event' },
     fields:[
-      {k:'location', label:'Location', type:'select', options:['memphis','nashville','franklin'], names:LOC_LABELS},
       {k:'title', label:'Event title', type:'text', full:true, ph:'Shown on the staff portal'},
+      {k:'location', label:'Location', type:'select', options:['memphis','nashville','franklin'], names:LOC_LABELS},
       {k:'date', label:'Date', type:'date'},
       {k:'time', label:'Start time', type:'time'},
       {k:'endDate', label:'End date (multi-day)', type:'date'},
       {k:'repeat', label:'Repeat', type:'select', options:['none','weekly','biweekly','monthly']},
-      {k:'repeatUntil', label:'Repeat until', type:'date'},
-      {k:'blockScope', label:'🚫 Wix online reservations', type:'select', options:['none','window','day'],
+      {k:'repeatUntil', label:'Repeat until', type:'date', showIf:v=>v.repeat && v.repeat!=='none'},
+      {k:'secBlock', label:'🚫 Wix online reservations', type:'section'},
+      {k:'blockScope', label:'Table reservations on this date', type:'select', full:true, options:['none','window','day'],
         names:{ none:'Keep taking reservations (no block)', window:'Block during the event (1 hr before start → "block until")', day:'Block the whole day — entire restaurant' }},
-      {k:'blockTo', label:'Block until (time)', type:'time'},
+      {k:'blockTo', label:'Block until (time)', type:'time', showIf:v=>v.blockScope==='window'},
       {k:'body', label:'Details', type:'textarea', full:true, ph:'Details shown on the portal'}
     ],
     defaults:{ blockScope:'none', repeat:'none' },
@@ -1071,6 +1084,7 @@ function openRec(kind, row){
   document.getElementById('recTitle').textContent = (row?'Edit ':'Add ')+S.label;
   document.getElementById('recErr').textContent = '';
   document.getElementById('recFields').innerHTML = S.fields.map(f=>{
+    if(f.type==='section') return '<div class="rec-section" id="rec-w-'+f.k+'">'+f.label+'</div>';
     let v = row ? (row[f.k]!=null ? row[f.k] : '') : (S.defaults[f.k]!=null ? S.defaults[f.k] : (f.k==='location' ? DEF_LOC : ''));
     let input;
     if(f.type==='select'){
@@ -1081,19 +1095,47 @@ function openRec(kind, row){
     } else {
       input = '<input type="'+f.type+'" id="rec-f-'+f.k+'" value="'+esc(v)+'"'+(f.ph?' placeholder="'+esc(f.ph)+'"':'')+'>';
     }
-    return '<div class="rf'+(f.full?' full':'')+'"><label>'+f.label+'</label>'+input+'</div>';
+    return '<div class="rf'+(f.full?' full':'')+'" id="rec-w-'+f.k+'"><label>'+f.label+'</label>'+input+'</div>';
   }).join('');
+  // fields with showIf(values) appear only when relevant (e.g. "Block until"
+  // only when blocking a window, "Repeat until" only when repeating)
+  document.querySelectorAll('#recFields select, #recFields input').forEach(el=>{
+    el.addEventListener('change', recApplyVisibility);
+  });
+  recApplyVisibility();
   document.getElementById('recDelBtn').style.display = row?'inline-block':'none';
   document.getElementById('recModal').style.display='flex';
   const first = document.querySelector('#recFields input, #recFields textarea'); if(first) first.focus();
+}
+function recFieldVals(){
+  if(!REC_CTX) return {};
+  const vals = {};
+  SCHEMA[REC_CTX.kind].fields.forEach(f=>{
+    if(f.type==='section') return;
+    const el = document.getElementById('rec-f-'+f.k);
+    vals[f.k] = el ? el.value : '';
+  });
+  return vals;
+}
+function recApplyVisibility(){
+  if(!REC_CTX) return;
+  const S = SCHEMA[REC_CTX.kind];
+  const vals = recFieldVals();
+  S.fields.forEach(f=>{
+    if(!f.showIf) return;
+    const wrap = document.getElementById('rec-w-'+f.k);
+    if(wrap) wrap.style.display = f.showIf(vals) ? '' : 'none';
+  });
 }
 function recClose(){ document.getElementById('recModal').style.display='none'; REC_CTX=null; }
 async function recSave(){
   if(!REC_CTX) return;
   const kind = REC_CTX.kind, S = SCHEMA[kind];
   const payload = {};
-  S.fields.forEach(f=>{ payload[f.k] = document.getElementById('rec-f-'+f.k).value; });
+  S.fields.forEach(f=>{ if(f.type==='section') return; payload[f.k] = document.getElementById('rec-f-'+f.k).value; });
   if(S.fixed) Object.assign(payload, S.fixed); // e.g. events are always type:'event'
+  // fields hidden by showIf save as empty so stale values don't linger
+  S.fields.forEach(f=>{ if(f.showIf && !f.showIf(payload)) payload[f.k] = ''; });
   const problem = S.valid(payload);
   if(problem){ document.getElementById('recErr').textContent = '❌ '+problem; return; }
   const wasId = REC_CTX.id;
