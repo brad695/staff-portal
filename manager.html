@@ -194,13 +194,17 @@
 <div id="consoleView" class="hide">
   <div class="tabs">
     <div class="tab-head">Staff</div>
-    <div class="tab active" onclick="mtab('content')">Notes · Specials · Events</div>
-    <div class="tab" onclick="mtab('resys')">Reservations</div>
+    <div class="tab active" onclick="mtab('content')">Notes · Specials · Info</div>
     <div class="tab" onclick="mtab('scheduling')">Staff Scheduling</div>
     <div class="tab" onclick="mtab('timeoff')">Time Off &amp; Swaps</div>
     <div class="tab" onclick="mtab('announcements')">Announcements</div>
+    <div class="tab-head">Events &amp; Reservations</div>
+    <div class="tab" onclick="mtab('events')">Events</div>
+    <div class="tab" onclick="mtab('resys')">Reservations</div>
     <div class="tab-head">Tickets &amp; Classes</div>
     <div class="tab" onclick="tkTab(this,'admin')">Dashboard</div>
+    <div class="tab" onclick="tkTab(this,'edit',{kind:'class'})">＋ Add Class</div>
+    <div class="tab" onclick="tkTab(this,'edit',{kind:'event'})">＋ Add Ticketed Event</div>
     <div class="tab" onclick="tkTab(this,'report')">Accounting</div>
     <div class="tab" onclick="tkTab(this,'bulk')">Bulk Add Classes</div>
     <div class="tab" onclick="tkTab(this,'holds')">Reserved Tables</div>
@@ -220,7 +224,7 @@
   <!-- UNIFIED CONTENT EDITOR -->
   <div id="panel-content" class="panel active">
     <div class="section-card">
-      <h2>📋 Content</h2>
+      <h2>📋 Notes · Specials · Info</h2>
       <div class="toolbar">
         <div class="chips" id="itemsChips"></div>
         <div class="spacer"></div>
@@ -237,6 +241,21 @@
         <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('items')">⬇ Template</button>
         <span class="csv-status" id="itemsCsvStatus">Columns: type, title, date, time, end_date, repeat, repeat_until, details</span>
       </div>
+    </div>
+  </div>
+
+  <!-- EVENTS (staff portal — manual, non-ticketed) -->
+  <div id="panel-events" class="panel">
+    <div class="section-card">
+      <h2>🎉 Events</h2>
+      <div class="hint">Manual events shown on the staff portal — private parties, buyouts, happenings that don't sell tickets. Each one can block Wix online reservations for its time window or the whole day at its location. Ticketed classes &amp; events live under <strong>Tickets &amp; Classes</strong>.</div>
+      <div class="toolbar">
+        <div class="chips" id="evChips"></div>
+        <div class="spacer"></div>
+        <span class="save-msg" id="evMsg"></span>
+        <button class="btn btn-gold" onclick="recNew('events')">＋ Add event</button>
+      </div>
+      <div class="rec-list" id="evList"><div class="rec-empty">Loading…</div></div>
     </div>
   </div>
 
@@ -260,6 +279,21 @@
         <button class="btn btn-gold" onclick="resNew()">＋ Add reservation</button>
       </div>
       <div class="rec-list" id="resList"><div class="rec-empty">Loading…</div></div>
+    </div>
+
+    <!-- Blocked dates: windows where the Wix widget shows no availability -->
+    <div class="section-card" style="margin-top:14px;">
+      <h2>🚫 Blocked Dates — Online Reservations</h2>
+      <div class="hint">During these windows the Wix reservation widget shows <strong>no availability</strong> at the selected location (set automatically by portal events, or add one manually for a buyout or private party). Phone-in bookings added here still work. If the end time is earlier than the start time, the block runs into the next day.</div>
+      <div class="rec-list" id="blkList"><div class="rec-empty">Loading…</div></div>
+      <div class="toolbar" style="margin-top:10px;">
+        <div class="rf"><label>Date</label><input type="date" id="blkDate"></div>
+        <div class="rf"><label>From</label><input type="time" id="blkFrom" value="17:00"></div>
+        <div class="rf"><label>To</label><input type="time" id="blkTo" value="21:00"></div>
+        <div class="rf" style="flex:1;min-width:140px;"><label>Note</label><input type="text" id="blkNote" placeholder="Private party"></div>
+        <button class="btn btn-gold btn-sm" onclick="blkAdd()">🚫 Block</button>
+        <span class="save-msg" id="blkMsg"></span>
+      </div>
     </div>
   </div>
 
@@ -552,7 +586,7 @@ function mtab(name){
   document.querySelector('.tab[onclick*="'+name+'"]').classList.add('active');
   document.getElementById('panel-'+name).classList.add('active');
 }
-function loadAll(){ loadKind('items'); loadKind('schedules'); loadKind('employees'); sgLoad(); loadTimeOff(); loadSwaps(); loadAnnouncements(); resInit(); if(window.tkInit)tkInit(); if(window.ccInit)ccInit(); }
+function loadAll(){ loadKind('items'); loadKind('events'); loadKind('schedules'); loadKind('employees'); sgLoad(); loadTimeOff(); loadSwaps(); loadAnnouncements(); resInit(); if(window.tkInit)tkInit(); if(window.ccInit)ccInit(); }
 
 /* ---- Reservations (Wix, via portal-api) ---- */
 // Wix reservation-location ids — must match index.html's LOCATIONS map.
@@ -589,6 +623,80 @@ async function loadResys(){
     RES_ROWS = (data.reservations||[]).sort((a,b)=>((a.details&&a.details.startDate)||'').localeCompare((b.details&&b.details.startDate)||''));
     renderResys();
   }catch(e){ el.innerHTML = '<div class="rec-empty">❌ Could not load reservations.</div>'; }
+  blkLoad();
+}
+
+/* ---- Blocked dates (Wix specialHourPeriod, managed through portal-api) ----
+   Reads the location's online-reservations schedule from action=locations;
+   adds/removes windows through the admin block/unblock actions. Blocks whose
+   comment starts with [EVT:...] were created automatically by portal events. */
+let BLK_ROWS = [];
+async function blkLoad(){
+  const el = document.getElementById('blkList'); if(!el) return;
+  const locId = WIX_LOCS[document.getElementById('resLoc').value];
+  try{
+    const r = await fetch(FN_URL + '?action=locations', { headers:{ apikey:SB_KEY, Authorization:'Bearer '+SB_KEY } });
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.error || 'load failed');
+    const loc = (data.reservationLocations||[]).find(l=>l.id===locId);
+    const bs = (((loc||{}).configuration||{}).onlineReservations||{}).businessSchedule || {};
+    const stillRelevant = Date.now() - 86400000; // keep showing blocks for a day after they end
+    BLK_ROWS = (bs.specialHourPeriod||[])
+      .filter(p=>p.isClosed!==false)
+      .filter(p=>!p.endDate || isNaN(Date.parse(p.endDate)) || Date.parse(p.endDate) > stillRelevant)
+      .sort((a,b)=>String(a.startDate||'').localeCompare(String(b.startDate||'')));
+    blkRender();
+  }catch(e){ el.innerHTML = '<div class="rec-empty">❌ Could not load blocked dates.</div>'; }
+}
+function blkFmt(iso){
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return esc(String(iso||''));
+  return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+function blkRender(){
+  const el = document.getElementById('blkList');
+  if(!BLK_ROWS.length){ el.innerHTML = '<div class="rec-empty">No blocked dates for this location.</div>'; return; }
+  el.innerHTML = BLK_ROWS.map((p,i)=>{
+    const fromEvent = /^\[EVT:/.test(p.comment||'');
+    const label = (p.comment||'').replace(/^\[EVT:[^\]]*\]\s*/,'').replace(/^\[MANUAL\]\s*/,'') || 'Blocked';
+    return '<div class="rec-row">'
+      +'<span class="res-r-time">'+blkFmt(p.startDate)+' → '+blkFmt(p.endDate)+'</span>'
+      +'<div style="flex:1;min-width:0;"><div class="res-r-name">'+esc(label)+'</div></div>'
+      +'<span class="pill pill-mid">'+(fromEvent?'event':'manual')+'</span>'
+      +'<button class="btn btn-ghost btn-sm" onclick="blkRemove('+i+')">✕ Unblock</button>'
+      +'</div>';
+  }).join('');
+}
+async function blkAdd(){
+  const msg = document.getElementById('blkMsg'); msg.textContent = '';
+  const d = document.getElementById('blkDate').value;
+  const f = document.getElementById('blkFrom').value, t = document.getElementById('blkTo').value;
+  const note = document.getElementById('blkNote').value.trim();
+  if(!d || !f || !t){ msg.textContent = '❌ Date, from and to are required.'; return; }
+  const start = new Date(d+'T'+f+':00');
+  let end = new Date(d+'T'+t+':00');
+  if(end <= start) end = new Date(end.getTime() + 86400000); // crosses midnight → next day
+  const locId = WIX_LOCS[document.getElementById('resLoc').value];
+  msg.textContent = '…';
+  const r = await fn('block-reservations', {
+    location_id: locId, start: start.toISOString(), end: end.toISOString(),
+    comment: '[MANUAL] ' + (note || 'Blocked by manager')
+  });
+  if(!r.ok){ msg.textContent = '❌ ' + (r.data.error || 'Could not save the block.'); return; }
+  msg.textContent = '✓ Blocked';
+  document.getElementById('blkNote').value = '';
+  blkLoad();
+  setTimeout(()=>{ msg.textContent=''; }, 3000);
+}
+async function blkRemove(i){
+  const p = BLK_ROWS[i]; if(!p) return;
+  if(!p.comment){ alert('This block has no note (it was made in the Wix dashboard) — remove it there.'); return; }
+  if(!confirm('Unblock '+blkFmt(p.startDate)+' → '+blkFmt(p.endDate)+'? The Wix widget will take online reservations for this window again.')) return;
+  const locId = WIX_LOCS[document.getElementById('resLoc').value];
+  const r = await fn('unblock-reservations', { location_id: locId, comment: p.comment || '', start: p.startDate });
+  const msg = document.getElementById('blkMsg');
+  if(!r.ok){ msg.textContent = '❌ ' + (r.data.error || 'Could not remove the block.'); return; }
+  blkLoad();
 }
 function resPill(st){
   if(st==='REQUESTED') return '<span class="pill pill-req">needs approval</span>';
@@ -754,7 +862,7 @@ const SCHEMA = {
     list:'itemsList', chips:'itemsChips', msg:'itemsMsg', csvStatus:'itemsCsvStatus', table:'portal_items',
     label:'content',
     fields:[
-      {k:'type', label:'Type', type:'select', options:['note','special','event','info']},
+      {k:'type', label:'Type', type:'select', options:['note','special','info']},
       {k:'location', label:'Location', type:'select', options:['memphis','nashville','franklin'], names:LOC_LABELS},
       {k:'title', label:'Title', type:'text', full:true, ph:'Title shown on the portal'},
       {k:'date', label:'Date', type:'date'},
@@ -765,6 +873,7 @@ const SCHEMA = {
       {k:'body', label:'Details', type:'textarea', full:true, ph:'Details shown on the portal'}
     ],
     defaults:{ type:'note', repeat:'none' },
+    rowFilter:r=> (r.type||'note')!=='event', // events have their own section now
     valid:r=> !r.title ? 'A title is required.' : ((r.type==='special'||r.type==='event') && !r.date ? 'Specials and events need a date.' : ''),
     map:r=>({ id:r.id, type:r.type||'note', title:r.title, date:r.date||'', time:(r.time||'').slice(0,5), endDate:r.end_date||'', repeat:r.repeat||'none', repeatUntil:r.repeat_until||'', body:r.body||'', location:r.location||'memphis' }),
     rowTitle:r=>r.title,
@@ -782,9 +891,55 @@ const SCHEMA = {
     sample:[
       ['note','Door code changed','','','','none','','New back-door code is 4417'],
       ['special','Taco Tuesday','2026-07-07','17:00','','weekly','2026-12-29','Half-price street tacos all night'],
-      ['event','Wine & Cheese Tasting','2026-07-18','18:30','','none','','Six wines paired with our cheese flight'],
       ['info','Manager on call','','','','none','','Text Sam at 901-555-0142 for anything urgent']
     ],
+    addAction:'add-item', updateAction:'update-item', deleteAction:'delete-item', bulkAction:'bulk-add-items'
+  },
+  // Staff-portal events (manual, non-ticketed) — same portal_items table as
+  // content, filtered to type='event', with Wix reservation-block settings.
+  events: {
+    list:'evList', chips:'evChips', msg:'evMsg', csvStatus:'evCsvStatus', table:'portal_items',
+    label:'event',
+    fixed:{ type:'event' },
+    fields:[
+      {k:'location', label:'Location', type:'select', options:['memphis','nashville','franklin'], names:LOC_LABELS},
+      {k:'title', label:'Event title', type:'text', full:true, ph:'Shown on the staff portal'},
+      {k:'date', label:'Date', type:'date'},
+      {k:'time', label:'Start time', type:'time'},
+      {k:'endDate', label:'End date (multi-day)', type:'date'},
+      {k:'repeat', label:'Repeat', type:'select', options:['none','weekly','biweekly','monthly']},
+      {k:'repeatUntil', label:'Repeat until', type:'date'},
+      {k:'blockScope', label:'🚫 Wix online reservations', type:'select', options:['none','window','day'],
+        names:{ none:'Keep taking reservations (no block)', window:'Block during the event (1 hr before start → "block until")', day:'Block the whole day — entire restaurant' }},
+      {k:'blockTo', label:'Block until (time)', type:'time'},
+      {k:'body', label:'Details', type:'textarea', full:true, ph:'Details shown on the portal'}
+    ],
+    defaults:{ blockScope:'none', repeat:'none' },
+    rowFilter:r=> (r.type||'note')==='event',
+    valid:r=> !r.title ? 'A title is required.'
+      : !r.date ? 'Events need a date.'
+      : (r.blockScope==='window' && (!r.time || !r.blockTo)) ? 'To block during the event, set the start time and "block until" time.'
+      : '',
+    map:r=>({ id:r.id, type:'event', title:r.title, date:r.date||'', time:(r.time||'').slice(0,5), endDate:r.end_date||'',
+      repeat:r.repeat||'none', repeatUntil:r.repeat_until||'', body:r.body||'', location:r.location||'memphis',
+      blockScope:r.block_scope||'none', blockTo:(r.block_to||'').slice(0,5) }),
+    rowTitle:r=>r.title,
+    rowTags:r=>'<span class="tag tag-event">event</span>'
+      +(r.blockScope==='day' ? '<span class="tag tag-special">🚫 all day</span>'
+        : r.blockScope==='window' ? '<span class="tag tag-special">🚫 '+esc((r.time||''))+'–'+esc((r.blockTo||''))+'</span>' : ''),
+    rowMeta:r=>{
+      const bits=[];
+      if(r.date) bits.push('📅 '+fmtDisplay(r.date)+(r.endDate?' – '+fmtDisplay(r.endDate):''));
+      if(r.time) bits.push('🕐 '+r.time);
+      if(r.repeat && r.repeat!=='none') bits.push('↻ '+r.repeat+(r.repeatUntil?' until '+fmtDisplay(r.repeatUntil):''));
+      if(r.blockScope==='day') bits.push('🚫 Wix reservations blocked all day');
+      else if(r.blockScope==='window') bits.push('🚫 Wix reservations blocked until '+r.blockTo);
+      if(r.body) bits.push(esc(r.body.length>100 ? r.body.slice(0,100)+'…' : r.body));
+      return bits.join(' &nbsp;·&nbsp; ');
+    },
+    csvHeader:['title','date','time','end_date','repeat','repeat_until','details'],
+    csvRowToObj:c=>({ type:'event', title:c[0]||'', date:c[1]||'', time:c[2]||'', endDate:c[3]||'', repeat:(c[4]||'none').toLowerCase().trim(), repeatUntil:c[5]||'', body:c[6]||'' }),
+    sample:[['Wine & Cheese Tasting','2026-09-18','18:30','','none','','Six wines paired with our cheese flight']],
     addAction:'add-item', updateAction:'update-item', deleteAction:'delete-item', bulkAction:'bulk-add-items'
   },
   schedules: {
@@ -849,8 +1004,8 @@ const SCHEMA = {
     addAction:'add-employee', updateAction:'update-employee', deleteAction:'delete-employee', bulkAction:'bulk-add-employees'
   }
 };
-const ROWS = { items:[], schedules:[], employees:[] };
-const FILTER = { items:'all', schedules:'all', employees:'all' };
+const ROWS = { items:[], events:[], schedules:[], employees:[] };
+const FILTER = { items:'all', events:'all', schedules:'all', employees:'all' };
 const PENDING_CSV = { items:null, schedules:null, employees:null };
 
 async function loadKind(kind){
@@ -860,6 +1015,7 @@ async function loadKind(kind){
     q = kind==='items' ? q.order('type').order('date',{nullsFirst:true}) : kind==='employees' ? q.order('name') : q.order('date');
     const { data } = await q;
     let rows = data||[];
+    if(S.rowFilter) rows = rows.filter(S.rowFilter); // e.g. split events out of content
     if(kind==='employees'){
       // emails live in a separate table only admins can read
       const { data: contacts } = await sb.from('portal_employee_contacts').select('*');
@@ -937,27 +1093,77 @@ async function recSave(){
   const kind = REC_CTX.kind, S = SCHEMA[kind];
   const payload = {};
   S.fields.forEach(f=>{ payload[f.k] = document.getElementById('rec-f-'+f.k).value; });
+  if(S.fixed) Object.assign(payload, S.fixed); // e.g. events are always type:'event'
   const problem = S.valid(payload);
   if(problem){ document.getElementById('recErr').textContent = '❌ '+problem; return; }
+  const wasId = REC_CTX.id;
+  const prevRow = wasId ? (ROWS[kind]||[]).find(x=>x.id===wasId) : null;
   let r;
-  if(REC_CTX.id){ payload.id = REC_CTX.id; r = await fn(S.updateAction, payload); }
+  if(wasId){ payload.id = wasId; r = await fn(S.updateAction, payload); }
   else { r = await fn(S.addAction, payload); }
   if(!r.ok){ document.getElementById('recErr').textContent = '❌ '+(r.data.error||'Save failed'); return; }
   recClose();
   msg(kind, '✅ Saved.', false);
   await loadKind(kind);
   if(kind==='employees') sgLoad();
+  if(kind==='events'){
+    const savedId = wasId || (r.data && r.data.id) || null;
+    const rec = savedId ? ROWS.events.find(x=>x.id===savedId) : null;
+    if(rec){
+      // moved locations → clear the block left behind at the old one
+      if(prevRow && prevRow.location!==rec.location && WIX_LOCS[prevRow.location]){
+        await fn('unblock-reservations', { location_id: WIX_LOCS[prevRow.location], comment_prefix: '[EVT-P:'+savedId+']' });
+      }
+      await staffEventSyncBlock(rec, prevRow);
+    }
+  }
+}
+
+/* Wix block sync for staff-portal events: comment key "[EVT-P:<portal_items id>]".
+   window = start time − 1 hr → "block until" (next day if it wraps midnight);
+   day = local midnight → midnight. Repeating events only block the base date. */
+async function staffEventSyncBlock(rec, prevRow){
+  try{
+    const locId = WIX_LOCS[rec.location]; if(!locId) return;
+    const prefix = '[EVT-P:'+rec.id+']';
+    if(rec.blockScope==='day' || rec.blockScope==='window'){
+      let start, end;
+      if(rec.blockScope==='day'){
+        start = new Date(rec.date+'T00:00:00');
+        end = new Date(start.getTime() + 86400000);
+      } else {
+        start = new Date(rec.date+'T'+rec.time+':00');
+        start = new Date(start.getTime() - 3600000); // 1 hr setup buffer
+        end = new Date(rec.date+'T'+rec.blockTo+':00');
+        if(end <= start) end = new Date(end.getTime() + 86400000); // wraps past midnight
+      }
+      if(isNaN(start.getTime()) || isNaN(end.getTime())) return;
+      const r = await fn('block-reservations', {
+        location_id: locId, start: start.toISOString(), end: end.toISOString(),
+        comment: prefix+' '+(rec.title||'Event')+(rec.blockScope==='day'?' (all day)':''),
+        replace_prefix: prefix
+      });
+      if(!r.ok) alert('⚠️ Event saved, but blocking Wix reservations failed: '+(r.data.error||'unknown error'));
+    } else if(prevRow && (prevRow.blockScope==='day' || prevRow.blockScope==='window')){
+      const r = await fn('unblock-reservations', { location_id: locId, comment_prefix: prefix });
+      if(!r.ok) alert('⚠️ Event saved, but removing the Wix block failed: '+(r.data.error||'unknown error'));
+    }
+  }catch(_){ /* blocking is best-effort — the event itself saved */ }
 }
 function recDeleteCurrent(){ if(REC_CTX) recDelete(REC_CTX.kind, REC_CTX.id, true); }
 async function recDelete(kind, id, fromModal){
   if(!id) return;
   if(!confirm('Delete this permanently?')) return;
+  const old = kind==='events' ? (ROWS.events||[]).find(x=>x.id===id) : null;
   const r = await fn(SCHEMA[kind].deleteAction, { id });
   if(!r.ok){ msg(kind, '❌ '+(r.data.error||'Delete failed'), true); return; }
   if(fromModal) recClose();
   msg(kind, '🗑 Deleted.', false);
   await loadKind(kind);
   if(kind==='employees') sgLoad();
+  if(old && (old.blockScope==='day' || old.blockScope==='window') && WIX_LOCS[old.location]){
+    await fn('unblock-reservations', { location_id: WIX_LOCS[old.location], comment_prefix: '[EVT-P:'+id+']' });
+  }
 }
 function msg(kind, text, isErr){
   const el = document.getElementById(SCHEMA[kind].msg);
@@ -1823,6 +2029,9 @@ const eventFromRow = (r) => ({
   // "event_tabled" (tables: class-style grouping capped at party size).
   kind: r.kind || (r.party_size > 1 ? "event_tabled" : "class"),
   location: r.location || "Memphis",
+  // Wix online-reservation block: 'none' | 'window' (1hr before → end) | 'day' (whole date)
+  blockScope: r.block_scope || (r.block_resys ? "window" : "none"),
+  archived: !!r.archived, // hidden from the dashboard's default views
 });
 const eventToRow = (ev) => ({
   title: ev.title,
@@ -1837,7 +2046,69 @@ const eventToRow = (ev) => ({
   group_seating: ev.groupSeating !== false,
   kind: ev.kind || "class",
   location: ev.location || "Memphis",
+  block_scope: ev.blockScope || "none",
+  block_resys: (ev.blockScope || "none") !== "none", // kept in sync for older rows/queries
+  archived: !!ev.archived,
 });
+// ── Wix online-reservation blocks (via the console's portal-api helper) ──
+// When an event has a blockScope, close the Wix reservation widget for the
+// event window (1 hr before start → end) or the whole day, at the event's
+// location. Uses the
+// global fn() + WIX_LOCS from the console shell. Comment convention
+// "[EVT:<id>] Title" lets edits replace and deletes remove their own block.
+const WIX_BLOCK_BUFFER_MIN = 60;
+const wixLocIdFor = (loc) => {
+  try { return WIX_LOCS[String(loc || "").trim().toLowerCase()] || null; } catch (_) { return null; }
+};
+const wixBlockWindow = (ev) => {
+  if (!ev || !ev.date) return null;
+  if ((ev.blockScope || "none") === "day") {
+    // whole restaurant, midnight to midnight (local) on the event date
+    const from = new Date(ev.date + "T00:00:00");
+    if (isNaN(from.getTime())) return null;
+    return { start: from.toISOString(), end: new Date(from.getTime() + 86400000).toISOString() };
+  }
+  if (!ev.time) return null;
+  const start = new Date(ev.date + "T" + ev.time + ":00");
+  if (isNaN(start.getTime())) return null;
+  const from = new Date(start.getTime() - WIX_BLOCK_BUFFER_MIN * 60000);
+  const to = new Date(start.getTime() + (Number(ev.durationMin) || 120) * 60000);
+  return { start: from.toISOString(), end: to.toISOString() };
+};
+const syncWixBlock = async (ev, prev) => {
+  try {
+    if (typeof fn !== "function") return;
+    // location changed on edit → clear the block at the old location first
+    if (prev && prev.location !== ev.location) {
+      const oldLoc = wixLocIdFor(prev.location);
+      if (oldLoc) await fn("unblock-reservations", { location_id: oldLoc, comment_prefix: "[EVT:" + ev.id + "]" });
+    }
+    const locId = wixLocIdFor(ev.location);
+    if (!locId) return;
+    if ((ev.blockScope || "none") !== "none") {
+      const w = wixBlockWindow(ev);
+      if (!w) return;
+      const r = await fn("block-reservations", {
+        location_id: locId, start: w.start, end: w.end,
+        comment: "[EVT:" + ev.id + "] " + (ev.title || "Event") + (ev.blockScope === "day" ? " (all day)" : ""),
+        replace_prefix: "[EVT:" + ev.id + "]",
+      });
+      if (!r.ok) window.alert("⚠️ Saved, but blocking Wix reservations failed: " + (r.data.error || "unknown error"));
+    } else if (prev && (prev.blockScope || "none") !== "none") {
+      // toggled off → remove the old block
+      const r = await fn("unblock-reservations", { location_id: locId, comment_prefix: "[EVT:" + ev.id + "]" });
+      if (!r.ok) window.alert("⚠️ Saved, but un-blocking Wix reservations failed: " + (r.data.error || "unknown error"));
+    }
+  } catch (_) { /* Wix block is best-effort — the event itself saved fine */ }
+};
+const removeWixBlock = async (ev) => {
+  try {
+    if (typeof fn !== "function" || !ev) return;
+    const locId = wixLocIdFor(ev.location);
+    if (!locId) return;
+    await fn("unblock-reservations", { location_id: locId, comment_prefix: "[EVT:" + ev.id + "]" });
+  } catch (_) { /* best-effort */ }
+};
 // Holds (split-payment table reservations) <-> app objects.
 const holdFromRow = (r) => ({
   id: r.id,
@@ -2247,6 +2518,7 @@ function App() {
   const saveEvent = async (ev, isEdit) => {
     if (!db) return;
     if (isEdit) {
+      const before = events.find((e) => e.id === ev.id) || null;
       const { data } = await db
         .from("events")
         .update(eventToRow(ev))
@@ -2256,6 +2528,7 @@ function App() {
       if (data) {
         const s = eventFromRow(data);
         setEvents((prev) => prev.map((e) => (e.id === ev.id ? s : e)));
+        await syncWixBlock(s, before);
       }
     } else {
       const { data } = await db
@@ -2263,15 +2536,50 @@ function App() {
         .insert(eventToRow(ev))
         .select()
         .single();
-      if (data) setEvents((prev) => [...prev, eventFromRow(data)]);
+      if (data) {
+        const s = eventFromRow(data);
+        setEvents((prev) => [...prev, s]);
+        await syncWixBlock(s, null);
+      }
     }
   };
 
   const deleteEvent = async (id) => {
     if (!db) return;
+    const gone = events.find((e) => e.id === id) || null;
     await db.from("events").delete().eq("id", id);
     setEvents((prev) => prev.filter((e) => e.id !== id));
     setRegs((prev) => prev.filter((r) => r.eventId !== id));
+    if (gone && (gone.blockScope || "none") !== "none") await removeWixBlock(gone);
+  };
+
+  // Archive / unarchive: hide finished events from the dashboard's default
+  // views without deleting them (bookings and report history are kept).
+  const archiveEvent = async (id, val) => {
+    if (!db) return;
+    const { data } = await db
+      .from("events")
+      .update({ archived: !!val })
+      .eq("id", id)
+      .select()
+      .single();
+    if (data) {
+      const s = eventFromRow(data);
+      setEvents((prev) => prev.map((e) => (e.id === id ? s : e)));
+    }
+  };
+  const archiveAllPast = async (ids) => {
+    if (!db || !ids.length) return;
+    const { data } = await db
+      .from("events")
+      .update({ archived: true })
+      .in("id", ids)
+      .select();
+    if (data && data.length) {
+      const byId = {};
+      data.forEach((r) => { byId[r.id] = eventFromRow(r); });
+      setEvents((prev) => prev.map((e) => byId[e.id] || e));
+    }
   };
 
   const go = (name, params = {}) => setView({ name, ...params });
@@ -2280,7 +2588,8 @@ function App() {
   useEffect(() => {
     window.tkGo = (name, params) => setView({ name, ...(params || {}) });
     if (window.__tkPending) {
-      setView({ name: window.__tkPending });
+      const p = window.__tkPending;
+      setView(typeof p === "string" ? { name: p } : { name: p.name, ...(p.params || {}) });
       window.__tkPending = null;
     }
     return () => { delete window.tkGo; };
@@ -2319,6 +2628,8 @@ function App() {
                   revenueFor={revenueFor}
                   go={go}
                   onDelete={(id) => deleteEvent(id)}
+                  onArchive={archiveEvent}
+                  onArchiveAll={archiveAllPast}
                 />
               )}
               {view.name === "report" && (
@@ -3581,8 +3892,8 @@ function AdminPromos({ promos, uses, events, onSave, onDelete }) {
     </div>
   );
 }
-function AdminDash({ events, regs, soldFor, revenueFor, go, onDelete }) {
-  const [classFilter, setClassFilter] = useState("upcoming"); // upcoming|past|all
+function AdminDash({ events, regs, soldFor, revenueFor, go, onDelete, onArchive, onArchiveAll }) {
+  const [classFilter, setClassFilter] = useState("upcoming"); // upcoming|past|all|archived
   const [locFilter, setLocFilter] = useState("all"); // all | Memphis | Nashville | Franklin
   const locEvents =
     locFilter === "all"
@@ -3592,13 +3903,18 @@ function AdminDash({ events, regs, soldFor, revenueFor, go, onDelete }) {
     (a.date + a.time).localeCompare(b.date + b.time)
   );
   const today = todayStr();
-  const upcomingClasses = sorted.filter((e) => e.date >= today);
-  const pastClasses = sorted.filter((e) => e.date < today);
+  // Archived events live only in the Archived view; everything else excludes them.
+  const active = sorted.filter((e) => !e.archived);
+  const archivedClasses = sorted.filter((e) => e.archived);
+  const upcomingClasses = active.filter((e) => e.date >= today);
+  const pastClasses = active.filter((e) => e.date < today);
   const shownClasses =
     classFilter === "past"
       ? [...pastClasses].reverse() // most-recent past first
+      : classFilter === "archived"
+      ? [...archivedClasses].reverse()
       : classFilter === "all"
-      ? sorted
+      ? active
       : upcomingClasses;
   return (
     <div>
@@ -3634,8 +3950,24 @@ function AdminDash({ events, regs, soldFor, revenueFor, go, onDelete }) {
           >
             <option value="upcoming">Upcoming ({upcomingClasses.length})</option>
             <option value="past">Past ({pastClasses.length})</option>
-            <option value="all">All ({sorted.length})</option>
+            <option value="all">All ({active.length})</option>
+            <option value="archived">📦 Archived ({archivedClasses.length})</option>
           </select>
+          {classFilter === "past" && pastClasses.length > 0 && (
+            <button
+              className="cc-mini"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Archive all ${pastClasses.length} past ${pastClasses.length === 1 ? "entry" : "entries"}${locFilter === "all" ? "" : " at " + locFilter}? They move to the Archived view — bookings and reports are kept.`
+                  )
+                )
+                  onArchiveAll(pastClasses.map((e) => e.id));
+              }}
+            >
+              📦 Archive all past
+            </button>
+          )}
         </div>
       </div>
 
@@ -3653,6 +3985,8 @@ function AdminDash({ events, regs, soldFor, revenueFor, go, onDelete }) {
               ? "No past classes."
               : classFilter === "upcoming"
               ? "No upcoming classes — add one above."
+              : classFilter === "archived"
+              ? "Nothing archived yet — archive past classes to tidy this list."
               : "No classes yet."}
           </div>
         )}
@@ -3666,7 +4000,7 @@ function AdminDash({ events, regs, soldFor, revenueFor, go, onDelete }) {
                 <button className="cc-link" onClick={() => go("detail", { eventId: ev.id })}>
                   {ev.title}
                 </button>
-                <span className="cc-td-sub">📍 {ev.location || "Memphis"}</span>
+                <span className="cc-td-sub">📍 {ev.location || "Memphis"}{ev.blockScope === "day" ? " · 🚫 day blocked" : ev.blockScope === "window" ? " · 🚫 resys blocked" : ""}{ev.archived ? " · 📦 archived" : ""}</span>
               </span>
               <span className="cc-mono">{fmtDate(ev.date)} · {fmtTime(ev.time)}</span>
               <span>
@@ -3685,6 +4019,11 @@ function AdminDash({ events, regs, soldFor, revenueFor, go, onDelete }) {
                 <button className="cc-mini" onClick={() => go("edit", { eventId: ev.id })}>
                   Edit
                 </button>
+                {(past || ev.archived) && (
+                  <button className="cc-mini" onClick={() => onArchive(ev.id, !ev.archived)}>
+                    {ev.archived ? "Unarchive" : "📦 Archive"}
+                  </button>
+                )}
                 <button
                   className="cc-mini danger"
                   onClick={() => {
@@ -3989,6 +4328,11 @@ function AdminEdit({ ev, kind, onCancel, onSave }) {
     ev?.addOns?.map((a) => ({ ...a, priceStr: (a.price / 100).toString() })) ||
       []
   );
+  // Wix online-reservation block for this date: none, just the event window,
+  // or the whole day. Defaults to the window for new events, none for classes.
+  const [blockScope, setBlockScope] = useState(
+    ev ? (ev.blockScope || "none") : isClass ? "none" : "window"
+  );
   const [err, setErr] = useState("");
 
   const addRow = () =>
@@ -4034,6 +4378,8 @@ function AdminEdit({ ev, kind, onCancel, onSave }) {
       location,
       partySize: tabled ? Math.max(2, Number(partySize) || 2) : 1,
       groupSeating: isClass ? true : tabled,
+      blockScope,
+      archived: ev ? !!ev.archived : false,
     };
     // First date updates the existing class; any extra dates create new ones.
     const evs = validDates.map((d, idx) => ({
@@ -4075,6 +4421,17 @@ function AdminEdit({ ev, kind, onCancel, onSave }) {
             {l}
           </option>
         ))}
+      </select>
+
+      <label className="cc-label">Wix online reservations on this date</label>
+      <select
+        className="cc-input"
+        value={blockScope}
+        onChange={(e) => setBlockScope(e.target.value)}
+      >
+        <option value="none">Keep taking online reservations (no block)</option>
+        <option value="window">🚫 Block during the {noun} only (1 hr before start → end)</option>
+        <option value="day">🚫 Block the whole day — entire restaurant, midnight to midnight</option>
       </select>
 
       <label className="cc-label">Date(s)</label>
@@ -6154,9 +6511,10 @@ ReactDOM.createRoot(document.getElementById("tk-root")).render(<App />);
     el.classList.add('active');
     document.getElementById(panelId).classList.add('active');
   }
-  window.tkTab = function(el, view){
+  window.tkTab = function(el, view, params){
     activate(el, 'panel-tickets');
-    if (window.tkGo) { tkGo(view); } else { window.__tkPending = view; window.tkInit(); }
+    if (window.tkGo) { tkGo(view, params); }
+    else { window.__tkPending = params ? { name: view, params: params } : view; window.tkInit(); }
   };
   window.ccTab = function(el, tab){
     activate(el, 'panel-cheese');
