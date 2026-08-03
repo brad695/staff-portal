@@ -4472,8 +4472,8 @@ function assignTables(parties) {
 }
 
 // Printable seating roster — groups/parties with their add-ons + a Table line.
-function SeatingRoster({ parties }) {
-  const tables = assignTables(parties);
+function SeatingRoster({ parties, noTables }) {
+  const tables = noTables ? null : assignTables(parties);
   return (
     <>
       {parties.length === 0 ? (
@@ -4489,14 +4489,16 @@ function SeatingRoster({ parties }) {
                   ? `Party ${i + 1}`
                   : (p.members[0] && p.members[0].name) || "Guest"}
               </span>
-              <span
-                className={
-                  "cc-rparty-table" +
-                  (tables[i] === "Unassigned" ? " unassigned" : "")
-                }
-              >
-                {tables[i]}
-              </span>
+              {!noTables && (
+                <span
+                  className={
+                    "cc-rparty-table" +
+                    (tables[i] === "Unassigned" ? " unassigned" : "")
+                  }
+                >
+                  {tables[i]}
+                </span>
+              )}
             </div>
             <div className="cc-rparty-seats">
               {p.size} {p.size === 1 ? "seat" : "seats"}
@@ -4968,9 +4970,11 @@ function AdminDetail({ ev, regs, soldFor, go, onRefund, onUpdate, onAddComp }) {
         {rosterOpen && (
           <>
             <p className="cc-hint" style={{ margin: "0 0 12px" }}>
-              Each party below can be assigned to a table — groups stay together.
+              {ev.location === "Nashville"
+                ? "Nashville uses its own floor setup — parties are listed for check-in, no table assignments."
+                : "Each party below can be assigned to a table — groups stay together."}
             </p>
-            <SeatingRoster parties={parties} />
+            <SeatingRoster parties={parties} noTables={ev.location === "Nashville"} />
           </>
         )}
       </div>
@@ -5157,7 +5161,7 @@ function AdminDetail({ ev, regs, soldFor, go, onRefund, onUpdate, onAddComp }) {
 
       {/* Print-only roster — hidden on screen, shown when the manager prints */}
       <div className="cc-print-roster">
-        <SeatingRoster parties={parties} />
+        <SeatingRoster parties={parties} noTables={ev.location === "Nashville"} />
       </div>
     </div>
   );
