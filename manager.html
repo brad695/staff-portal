@@ -25,9 +25,17 @@
     header{ background:#ffffff; color:var(--ink); padding:16px 28px; display:flex; align-items:center; justify-content:space-between; border-bottom:3px solid var(--cheddar); }
     header h1{ font-size:1.3rem; font-weight:900; letter-spacing:-0.5px; }
     header .subtitle{ font-size:0.7rem; font-weight:600; letter-spacing:0.4px; text-transform:uppercase; color:var(--sub); margin-top:3px; }
-    .head-actions{ display:flex; gap:10px; align-items:center; }
+    .head-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
     .head-link{ color:var(--ink); font-size:0.8rem; font-weight:600; text-decoration:none; border:1px solid #d9d9d9; padding:6px 12px; border-radius:var(--r); }
     .head-link:hover{ background:#f2f2f2; }
+    /* Phones: the header's link row used to run off the right edge and drag the
+       whole console into a sideways scroll on every tab. Let it wrap. */
+    @media (max-width:640px){
+      header{ padding:12px 14px; gap:10px; align-items:flex-start; }
+      header h1{ font-size:1.1rem; }
+      .head-actions{ gap:6px; }
+      .head-link{ font-size:0.72rem; padding:5px 9px; }
+    }
     .loc-sel{ padding:7px 12px; border:1px solid var(--line); border-radius:var(--r); font-family:inherit; font-size:0.82rem; font-weight:700; background:#fff; color:var(--ink); cursor:pointer; }
 
     .login-wrap{ display:flex; align-items:center; justify-content:center; padding:70px 16px; }
@@ -232,6 +240,8 @@
     <div class="tab" onclick="tkTab(this,'holds')">Reserved Tables</div>
     <div class="tab" onclick="tkTab(this,'customers')">Customers</div>
     <div class="tab" onclick="tkTab(this,'promos')">Promo Codes</div>
+    <div class="tab-head">Cheese Case</div>
+    <div class="tab" onclick="mtab('plu')">🧀 New Cheese Entry</div>
     <div class="tab-head">Cheese Club</div>
     <div class="tab" onclick="ccTab(this,'ov')">Clubs</div>
     <div class="tab" onclick="ccTab(this,'subs')">Subscriptions</div>
@@ -517,6 +527,180 @@
     <div id="tk-root"><div class="rec-empty">Loading ticket back office…</div></div>
   </div>
 
+  <!-- ═══ CHEESE CASE — new cheese entry + running PLU list (ported from CheeseEntry) ═══ -->
+  <style id="plu-style">
+    #panel-plu .plu-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap; }
+    #panel-plu .plu-badge{ background:var(--navy); color:#fff; border-radius:var(--r); padding:9px 18px; text-align:center; min-width:140px; }
+    #panel-plu .plu-badge.bc{ background:#2b4a63; }
+    #panel-plu .plu-badge .lbl{ font-size:0.6rem; text-transform:uppercase; letter-spacing:1px; opacity:.75; }
+    #panel-plu .plu-badge .num{ font-size:1.35rem; font-family:ui-monospace,Menlo,monospace; font-weight:700; line-height:1.25; }
+    #panel-plu .plu-badge .num.sm{ font-size:0.95rem; }
+
+    #panel-plu .plu-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:13px; margin-bottom:14px; }
+    #panel-plu .plu-grid .span2{ grid-column:span 2; }
+    #panel-plu label.fld{ display:flex; flex-direction:column; gap:5px; font-size:0.72rem; font-weight:700; color:var(--ink);
+                          text-transform:uppercase; letter-spacing:0.4px; }
+    /* :not(checkbox) matters — the checkbox must not inherit width:100%, and
+       `label.fld input` outranks a plain `.hotwrap input` override. */
+    #panel-plu label.fld input:not([type=checkbox]), #panel-plu label.fld select{
+      border:1px solid var(--line); border-radius:var(--r); padding:9px 10px; font-family:inherit; font-size:0.9rem;
+      width:100%; background:#fff; color:var(--ink); text-transform:none; letter-spacing:0; font-weight:400;
+    }
+    #panel-plu label.fld input:focus, #panel-plu label.fld select:focus{ border-color:var(--cheddar); outline:none; }
+    #panel-plu label.fld input:disabled{ background:#f3f3f3; color:#888; }
+    #panel-plu input.mono{ font-family:ui-monospace,Menlo,monospace; letter-spacing:0.5px; }
+    #panel-plu a.mini{ font-weight:400; font-size:0.68rem; color:#2b6cb0; margin-left:6px; cursor:pointer; text-decoration:none; text-transform:none; letter-spacing:0; }
+    #panel-plu a.mini:hover{ text-decoration:underline; }
+    #panel-plu .fnote{ font-size:0.66rem; font-weight:400; color:var(--sub); text-transform:none; letter-spacing:0; min-height:13px; }
+    #panel-plu .fnote.bad{ color:var(--wax); }
+    #panel-plu .fnote.good{ color:#0a7a52; }
+    #panel-plu .hotwrap{ display:flex; align-items:center; justify-content:flex-start; gap:8px; padding:9px 0;
+                         font-weight:400; text-transform:none; letter-spacing:0; font-size:0.86rem; cursor:pointer; }
+    #panel-plu .hotwrap input{ width:18px; height:18px; min-width:18px; flex:none; margin:0; padding:0; }
+
+    #panel-plu .sq-hint{ font-size:0.76rem; color:var(--sub); margin-top:9px; line-height:1.6; }
+    #panel-plu .sq-hint b{ color:var(--ink); font-family:ui-monospace,Menlo,monospace; }
+    #panel-plu .notice{ margin-top:12px; padding:10px 13px; border-radius:var(--r); font-size:0.84rem; display:none; line-height:1.5; }
+    #panel-plu .notice.ok{ display:block; background:#e7f4ec; color:#0a7a52; }
+    #panel-plu .notice.warn{ display:block; background:#fdf5e0; color:#8a6d1a; }
+    #panel-plu .notice.err{ display:block; background:#fbeae8; color:var(--wax); }
+
+    #panel-plu .syncbar{ display:flex; align-items:center; gap:11px; flex-wrap:wrap; background:#f6f6f6;
+      border:1px solid var(--line); border-radius:var(--r); padding:9px 14px; margin-bottom:14px; font-size:0.82rem; color:var(--ink); }
+    #panel-plu .syncbar .dot{ width:8px; height:8px; border-radius:50%; background:#0a7a52; flex:none; }
+    #panel-plu .syncbar .dot.warn{ background:var(--cheddar); }
+    #panel-plu .syncbar .spacer{ flex:1; }
+
+    #panel-plu .pill{ display:inline-block; padding:2px 9px; border-radius:999px; font-size:0.68rem; font-weight:700; white-space:nowrap; }
+    #panel-plu .pill.synced{ background:#e7f4ec; color:#0a7a52; }
+    #panel-plu .pill.pending{ background:#fdf5e0; color:#8a6d1a; }
+    #panel-plu .pill.skipped{ background:#eee; color:var(--sub); }
+    #panel-plu .pill.error{ background:#fbeae8; color:var(--wax); }
+    #panel-plu .mode{ display:inline-block; font-size:0.66rem; color:var(--sub); white-space:nowrap; }
+    #panel-plu .mode b{ font-weight:700; color:var(--ink); }
+    #panel-plu a.sqlink{ display:inline-block; font-size:0.66rem; color:#2b6cb0; text-decoration:none; }
+    #panel-plu a.sqlink:hover{ text-decoration:underline; }
+    #panel-plu .stack{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; }
+    #panel-plu td.mono{ font-family:ui-monospace,Menlo,monospace; }
+    #panel-plu td.plu{ font-family:ui-monospace,Menlo,monospace; font-weight:700; }
+    #panel-plu .none{ color:#aaa; font-weight:400; }
+    #panel-plu table.bulk{ min-width:0; }
+    /* the shared .td-actions is nowrap, which pushed the retry buttons off the
+       right edge on narrower laptops — let them wrap onto a second line */
+    #panel-plu td.td-actions{ white-space:normal; }
+    #panel-plu td.td-actions .btn{ margin:2px 3px 2px 0; }
+    #panel-plu .plu-search{ border:1px solid var(--line); border-radius:var(--r); padding:7px 10px; font-family:inherit; font-size:0.84rem; width:200px; }
+
+    /* ── phone: form stacks two-up, list becomes cards instead of a sideways scroll ── */
+    @media (max-width:900px){
+      #panel-plu .plu-grid{ grid-template-columns:repeat(2,1fr); }
+    }
+    @media (max-width:700px){
+      #panel-plu .plu-grid{ grid-template-columns:1fr; }
+      #panel-plu .plu-grid .span2{ grid-column:span 1; }
+      #panel-plu .plu-search{ width:100%; }
+      /* 16px stops iOS zoom-on-focus. Checkboxes are excluded — the padding
+         would inflate the box and shove its label across the row. */
+      #panel-plu label.fld input:not([type=checkbox]), #panel-plu label.fld select{ font-size:16px; padding:11px 10px; }
+      #panel-plu .btn{ padding:12px 18px; }
+      #panel-plu .syncbar{ font-size:0.8rem; }
+      #panel-plu .syncbar .spacer{ display:none; }
+      #panel-plu .syncbar .btn{ width:100%; }
+
+      #panel-plu .bulk-wrap{ border:none; background:none; overflow:visible; }
+      #panel-plu table.bulk thead{ display:none; }
+      #panel-plu table.bulk, #panel-plu table.bulk tbody, #panel-plu table.bulk tr, #panel-plu table.bulk td{ display:block; width:auto; }
+      #panel-plu table.bulk tr{ border:1px solid var(--line); border-radius:var(--r); background:#fff; padding:10px 12px; margin-bottom:10px; }
+      #panel-plu table.bulk tbody td{ border:none; padding:3px 0; display:flex; gap:10px; align-items:flex-start; }
+      #panel-plu table.bulk tbody td::before{
+        content:attr(data-l); flex:0 0 92px; font-size:0.62rem; font-weight:700; text-transform:uppercase;
+        letter-spacing:0.4px; color:var(--sub); padding-top:2px;
+      }
+      #panel-plu table.bulk tbody td.empty-row{ display:block; }
+      #panel-plu table.bulk tbody td.empty-row::before{ content:none; }
+      #panel-plu table.bulk td .btn{ padding:8px 12px; }
+    }
+  </style>
+
+  <div id="panel-plu" class="panel">
+    <div class="section-card">
+      <div class="plu-top">
+        <div>
+          <h2>🧀 New Cheese Entry</h2>
+          <div class="hint" style="margin-bottom:0;">Adds to the running PLU list, then pushes to DateCodeGenie for labels and Square for the register.</div>
+        </div>
+        <div class="plu-badge" id="pluBadge">
+          <div class="lbl" id="pluBadgeLabel">Next PLU</div>
+          <div class="num" id="pluNext">…</div>
+        </div>
+      </div>
+
+      <form id="pluForm" style="margin-top:18px;">
+        <div class="plu-grid">
+          <label class="fld span2">Name *
+            <input id="pf_name" placeholder="e.g. Cabot Clothbound Cheddar" />
+          </label>
+          <label class="fld span2">Marketing Name
+            <input id="pf_marketing" placeholder="What prints on the label (defaults to name)" />
+          </label>
+          <label class="fld">Price ($)
+            <input id="pf_price" type="number" step="0.01" min="0" inputmode="decimal" placeholder="12.99" />
+          </label>
+          <label class="fld">Price per lb ($)
+            <input id="pf_ppl" type="number" step="0.01" min="0" inputmode="decimal" placeholder="24.99" />
+          </label>
+          <label class="fld">Barcode <a class="mini" id="pf_genBarcode">generate</a>
+            <input id="pf_barcode" class="mono" inputmode="numeric" placeholder="Scan, type, or generate" />
+            <span class="fnote" id="pf_barcodeNote"></span>
+          </label>
+          <label class="fld">PLU <a class="mini" id="pf_pluToggle">override</a>
+            <input id="pf_plu" class="mono" inputmode="numeric" disabled placeholder="auto" />
+            <span class="fnote" id="pf_pluNote"></span>
+          </label>
+          <label class="fld">Category
+            <select id="pf_category"></select>
+          </label>
+          <label class="fld">Default Printer Profile
+            <select id="pf_printer"></select>
+          </label>
+          <label class="fld">Hot Buttons
+            <span class="hotwrap"><input id="pf_hot" type="checkbox" checked /><span>Enable in the app</span></span>
+          </label>
+        </div>
+        <div class="row-actions">
+          <button type="submit" class="btn btn-gold" id="pluSubmit">Save</button>
+          <span class="save-msg" id="pluSaveHint" style="color:var(--sub);font-weight:400;"></span>
+        </div>
+        <div class="sq-hint" id="pluSqHint"></div>
+        <div class="notice" id="pluNotice"></div>
+      </form>
+    </div>
+
+    <div class="section-card">
+      <div class="syncbar" id="pluSyncBar">
+        <span class="dot" id="pluSyncDot"></span>
+        <span id="pluSyncText">Checking Square…</span>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-ghost btn-sm" id="pluPushAll" style="display:none;">Push pending to Square</button>
+      </div>
+      <div class="toolbar">
+        <h2 style="margin:0;">Running PLU List</h2>
+        <span class="save-msg" id="pluCount" style="color:var(--sub);font-weight:400;"></span>
+        <div class="spacer"></div>
+        <input id="pluSearch" class="plu-search" placeholder="Search name, PLU, barcode…" />
+        <button type="button" class="btn btn-ghost btn-sm" id="pluExport">Export CSV</button>
+      </div>
+      <div class="bulk-wrap">
+        <table class="bulk">
+          <thead>
+            <tr><th>PLU</th><th>Name</th><th>Marketing</th><th>Category</th><th>Price</th><th>Per lb</th><th>Barcode</th><th>DateCodeGenie</th><th>Square</th><th></th></tr>
+          </thead>
+          <tbody id="pluBody"><tr><td colspan="10" class="empty-row">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ CHEESE CLUB (ported from Cheese Club partner portal) ═══ -->
   <div id="panel-cheese" class="panel">
     <div id="ccApp"><div class="empty">Loading Cheese Club…</div></div>
@@ -605,10 +789,25 @@ async function logout(){ SESSION=null; await sb.auth.signOut(); location.reload(
 function mtab(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-  document.querySelector('.tab[onclick*="'+name+'"]').classList.add('active');
+  const tab = document.querySelector('.tab[onclick*="'+name+'"]');
+  tab.classList.add('active');
   document.getElementById('panel-'+name).classList.add('active');
+  // On phones the menu is a horizontal strip — pull the active tab into view
+  // so you can see where you are instead of guessing.
+  if (window.innerWidth <= 820 && tab.scrollIntoView) {
+    tab.scrollIntoView({ inline:'center', block:'nearest' });
+  }
+  window.scrollTo(0, 0);
 }
-function loadAll(){ loadKind('items'); loadKind('events'); loadKind('schedules'); loadKind('employees'); sgLoad(); loadTimeOff(); loadSwaps(); loadAnnouncements(); resInit(); if(window.tkInit)tkInit(); if(window.ccInit)ccInit(); }
+// Deep links from the staff portal: manager.html#plu opens that tab on login.
+function openHashTab(){
+  const want = (location.hash || '').replace('#','').trim();
+  if (!want) return;
+  if (document.getElementById('panel-' + want)) mtab(want);
+}
+window.addEventListener('hashchange', openHashTab);
+
+function loadAll(){ loadKind('items'); loadKind('events'); loadKind('schedules'); loadKind('employees'); sgLoad(); loadTimeOff(); loadSwaps(); loadAnnouncements(); resInit(); if(window.tkInit)tkInit(); if(window.ccInit)ccInit(); if(window.pluInit)pluInit(); openHashTab(); }
 
 /* ---- Reservations (Wix, via portal-api) ---- */
 // Wix reservation-location ids — must match index.html's LOCATIONS map.
@@ -7077,6 +7276,448 @@ function viewNoAdmin(){return $(`<div class="empty">This area is for store opera
 
 
 document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e.target.id==='ccModalBg') window.ccCloseModal(); });
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CHEESE CASE — new cheese entry + running PLU list
+   Ported from the standalone CheeseEntry page. Writes go through the
+   cheese-items edge function (service role); reads come straight from the
+   table under the signed-in manager's session.
+   ═══════════════════════════════════════════════════════════════════════ */
+(function(){
+  const PLU_FN = SB_URL + '/functions/v1/cheese-items';
+  const CATEGORIES = ["Cheese","Charcuterie","Specialty","Sandwiches","Jams","Retail","Catering","NY BUTCHER BOARD","COCORICO"];
+  const PRINTER_PROFILES = ["Greys Cheese Label","No Weight Item","Greys Sandwiches","No Weight 2x4","Small sticker",
+    "Charcuterie 2x4","Cheesemas Sticker","Flight Sticker","No Weight w/Date","Cheese Case Sticker","QR CODE"];
+
+  let items = [], nextPlu = null, overridePlu = false, editingId = null;
+
+  const $ = (id) => document.getElementById(id);
+  const hasPlu = (v) => v !== null && v !== undefined && v !== '';
+  const pad5 = (n) => hasPlu(n) ? String(n).padStart(5,'0') : '';
+  const money = (v) => !hasPlu(v) ? '—' : '$' + Number(v).toFixed(2);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const authHeaders = () => ({
+    'Content-Type':'application/json',
+    'apikey': SB_KEY,
+    'Authorization': 'Bearer ' + (SESSION ? SESSION.access_token : SB_KEY)
+  });
+  const optionsHtml = (list, sel) => list.map(v =>
+    '<option value="'+esc(v)+'"'+(v===sel?' selected':'')+'>'+esc(v)+'</option>').join('');
+
+  /* ---------- UPC-A ---------- */
+  function upcCheckDigit(first11){
+    let sum = 0;
+    for (let i=0;i<11;i++) sum += Number(first11[i]) * (i%2===0 ? 3 : 1);
+    return (10 - (sum%10)) % 10;
+  }
+  const upcIsValid = (c) => /^\d{12}$/.test(c) && Number(c[11]) === upcCheckDigit(c.slice(0,11));
+  const isGtin = (c) => /^(\d{8}|\d{12}|\d{13}|\d{14})$/.test(String(c||'').trim());
+  const buildStoreBarcode = (n) => {
+    const f = '2' + String(n).padStart(5,'0') + '00000';
+    return f + upcCheckDigit(f);
+  };
+  // Local fallback if the edge function can't hand us a number.
+  function nextStoreBarcodeLocal(){
+    const used = new Set();
+    for (const i of items){
+      if (hasPlu(i.plu)) used.add(Number(i.plu));
+      const bc = String(i.barcode||'');
+      if (/^2\d{11}$/.test(bc)) used.add(Number(bc.slice(1,6)));
+    }
+    let n = hasPlu(nextPlu) ? Number(nextPlu) : 1;
+    while (used.has(n) && n < 99999) n++;
+    return buildStoreBarcode(n);
+  }
+
+  /* ---------- Square ---------- */
+  const SQUARE_ITEM_URL = (id) => 'https://app.squareup.com/dashboard/items/library/' + id;
+
+  // Mirrors the pricing rules in the cheese-items edge function.
+  // Change both together or this preview starts lying.
+  function priceMode(i){
+    const ppl = i.price_per_lb;
+    if (hasPlu(ppl) && Number(ppl) > 0)
+      return { key:'lb', label:'per lb', hint:'Sold by weight — the register asks for pounds' };
+    if (hasPlu(i.price) && Number(i.price) > 0)
+      return { key:'fixed', label:'fixed', hint:'Fixed price, sold in whole units' };
+    return { key:'var', label:'variable', hint:'No price in Square — the cashier keys the amount' };
+  }
+
+  const STATUS = {
+    synced:{label:'Synced',cls:'synced'}, pending:{label:'Pending',cls:'pending'},
+    skipped:{label:'Not sent',cls:'skipped'}, error:{label:'Sync error',cls:'error'}
+  };
+  function statusPill(status, err){
+    const st = STATUS[status] || STATUS.pending;
+    return '<span class="pill '+st.cls+'" title="'+esc(err||'')+'">'+st.label+'</span>';
+  }
+  function squareCell(i){
+    const m = priceMode(i);
+    const out = [statusPill(i.square_status, i.square_error),
+                 '<span class="mode" title="'+esc(m.hint)+'">→ <b>'+m.label+'</b></span>'];
+    if (i.square_item_id) out.push('<a class="sqlink" target="_blank" rel="noopener" href="'+
+      SQUARE_ITEM_URL(i.square_item_id)+'" title="Open in Square Dashboard">open in Square ↗</a>');
+    return '<div class="stack">'+out.join('')+'</div>';
+  }
+
+  const pendingSquare = () => items.filter(i => i.square_status !== 'synced');
+
+  function renderSyncBar(){
+    const pending = pendingSquare(), inSq = items.length - pending.length;
+    $('pluSyncDot').className = 'dot' + (pending.length ? ' warn' : '');
+    $('pluSyncText').innerHTML = pending.length
+      ? '<b>'+inSq+'</b> of <b>'+items.length+'</b> items are in Square — <b>'+pending.length+'</b> still need pushing.'
+      : 'All <b>'+items.length+'</b> items are in Square.';
+    const btn = $('pluPushAll');
+    btn.style.display = pending.length ? '' : 'none';
+    if (pending.length) btn.textContent = 'Push ' + pending.length + ' to Square';
+  }
+
+  function setNotice(kind, text){
+    const n = $('pluNotice');
+    n.className = 'notice' + (kind ? ' ' + kind : '');
+    n.textContent = text || '';
+  }
+
+  /* ---------- load ---------- */
+  async function load(){
+    try {
+      const [itemsRes, pluRes] = await Promise.all([
+        sb.from('cheese_items').select('*').order('plu',{ascending:false,nullsFirst:true}).limit(2000),
+        sb.rpc('next_plu')
+      ]);
+      if (itemsRes.error) throw new Error(itemsRes.error.message);
+      items = itemsRes.data || [];
+      nextPlu = pluRes.error ? null : pluRes.data;
+      render();
+    } catch(e){
+      setNotice('err', "Couldn't load the PLU list: " + e.message);
+    }
+  }
+
+  /* ---------- what will this entry be saved as? ---------- */
+  function saveMode(){
+    const barcode = $('pf_barcode').value.trim();
+    const manual = $('pf_plu').value.trim();
+    if (overridePlu && manual) return { kind:'plu', plu:manual, barcode };
+    if (barcode) return { kind:'barcode', plu:null, barcode };
+    return { kind:'plu', plu:pad5(nextPlu), barcode };
+  }
+
+  function renderForm(){
+    const mode = saveMode(), badge = $('pluBadge'), num = $('pluNext');
+    if (mode.kind === 'barcode'){
+      badge.classList.add('bc');
+      $('pluBadgeLabel').textContent = 'Saving with barcode';
+      num.textContent = mode.barcode; num.classList.add('sm');
+      $('pluSaveHint').innerHTML = 'Barcode <b>'+esc(mode.barcode)+'</b> — no PLU needed.';
+    } else {
+      badge.classList.remove('bc');
+      $('pluBadgeLabel').textContent = overridePlu ? 'PLU (manual)' : 'Next PLU';
+      num.textContent = mode.plu || '…'; num.classList.remove('sm');
+      $('pluSaveHint').innerHTML = mode.plu
+        ? 'Will be added as PLU <b>'+esc(mode.plu)+'</b>'+(overridePlu?' (manual)':' — next available') : '';
+    }
+
+    if (!overridePlu){
+      $('pf_plu').value = mode.kind === 'barcode' ? '' : pad5(nextPlu);
+      $('pf_plu').placeholder = mode.kind === 'barcode' ? 'not needed' : 'auto';
+    }
+    $('pf_pluNote').className = 'fnote';
+    $('pf_pluNote').textContent = overridePlu ? 'Manual — must not already be in use'
+      : mode.kind === 'barcode' ? 'Skipped — barcode identifies this item' : 'Next available number';
+
+    const bc = $('pf_barcode').value.trim(), note = $('pf_barcodeNote');
+    if (!bc){ note.className='fnote'; note.textContent='Optional — if set, no PLU is used'; }
+    else if (/^\d{12}$/.test(bc)){
+      const ok = upcIsValid(bc);
+      note.className = 'fnote ' + (ok ? 'good' : 'bad');
+      note.textContent = ok ? 'Valid UPC-A ✓' : 'Check digit should be ' + upcCheckDigit(bc.slice(0,11));
+    } else { note.className='fnote'; note.textContent = bc.length + ' characters — not a 12-digit UPC'; }
+
+    // Spell out what the register will get, so nobody has to remember
+    // which price field wins.
+    const draft = { price: $('pf_price').value, price_per_lb: $('pf_ppl').value };
+    const pm = priceMode(draft);
+    const amt = pm.key === 'lb' ? Number(draft.price_per_lb) : pm.key === 'fixed' ? Number(draft.price) : null;
+    const sqName = $('pf_marketing').value.trim() || $('pf_name').value.trim();
+    const bits = ['Goes to Square as <b>' + (sqName ? esc(sqName) : '…') + '</b>'];
+    if (pm.key === 'lb') bits.push('$'+amt.toFixed(2)+'/lb, sold by weight');
+    else if (pm.key === 'fixed') bits.push('$'+amt.toFixed(2)+' fixed');
+    else bits.push('no price — cashier keys the amount');
+    bits.push('SKU <b>'+esc(mode.kind==='barcode' ? mode.barcode : (mode.plu||'…'))+'</b>');
+    if (bc && isGtin(bc)) bits.push('UPC <b>'+esc(bc)+'</b>');
+    else if (bc) bits.push('barcode not a valid UPC — SKU only');
+    $('pluSqHint').innerHTML = bits.join(' · ');
+  }
+
+  function render(){
+    renderForm();
+    renderSyncBar();
+    $('pluCount').textContent = items.length + ' items';
+
+    const q = $('pluSearch').value.trim().toLowerCase();
+    const filtered = !q ? items : items.filter(i =>
+      (i.name||'').toLowerCase().includes(q) || (i.marketing_name||'').toLowerCase().includes(q) ||
+      pad5(i.plu).includes(q) || (i.barcode||'').includes(q));
+
+    const body = $('pluBody');
+    if (!filtered.length){
+      body.innerHTML = '<tr><td colspan="10" class="empty-row">'+(items.length?'No matches.':'No items yet.')+'</td></tr>';
+      return;
+    }
+
+    body.innerHTML = filtered.map(i => {
+      if (i.id === editingId){
+        const inp = (id,val,ph,type) => '<input id="'+id+'" '+(type?'type="'+type+'" step="0.01" min="0" ':'')+
+          'value="'+esc(val ?? '')+'" placeholder="'+ph+'" />';
+        const catList = (CATEGORIES.includes(i.category) || !i.category) ? CATEGORIES : [i.category].concat(CATEGORIES);
+        const profList = (PRINTER_PROFILES.includes(i.printer_profile) || !i.printer_profile) ? PRINTER_PROFILES : [i.printer_profile].concat(PRINTER_PROFILES);
+        const pluEdit = hasPlu(i.plu) ? pad5(i.plu)
+          : '<span class="none">—</span> <button type="button" class="btn btn-ghost btn-sm" data-assignplu="'+i.id+'">assign PLU</button>';
+        return '<tr class="dirty">'+
+          '<td class="plu" data-l="PLU">'+pluEdit+'</td>'+
+          '<td data-l="Name">'+inp('pe_name',i.name,'Name')+'</td>'+
+          '<td data-l="Marketing">'+inp('pe_marketing',i.marketing_name,'Marketing name')+'</td>'+
+          '<td data-l="Category"><select id="pe_category">'+optionsHtml(catList, i.category||'Cheese')+'</select></td>'+
+          '<td data-l="Price">'+inp('pe_price',i.price,'Price','number')+'</td>'+
+          '<td data-l="Per lb">'+inp('pe_ppl',i.price_per_lb,'Per lb','number')+'</td>'+
+          '<td data-l="Barcode">'+inp('pe_barcode',i.barcode,'Barcode')+'</td>'+
+          '<td data-l="Printer"><select id="pe_printer">'+optionsHtml(profList, i.printer_profile||'Greys Cheese Label')+'</select></td>'+
+          '<td data-l="Hot buttons"><label class="hotwrap"><input id="pe_hot" type="checkbox"'+(i.hot_buttons!==false?' checked':'')+' /><span>Enabled</span></label></td>'+
+          '<td class="td-actions" data-l="">'+
+            '<button type="button" class="btn btn-gold btn-sm" data-save="'+i.id+'">Save</button> '+
+            '<button type="button" class="btn btn-ghost btn-sm" data-cancel="1">Cancel</button></td>'+
+        '</tr>';
+      }
+
+      const btns = ['<button type="button" class="btn btn-ghost btn-sm" data-edit="'+i.id+'">Edit</button>'];
+      if (i.dcg_status === 'error' || i.dcg_status === 'skipped')
+        btns.push('<button type="button" class="btn btn-ghost btn-sm" data-retry="'+i.id+'" data-target="dcg">→ DCG</button>');
+      if (i.square_status === 'error' || i.square_status === 'skipped')
+        btns.push('<button type="button" class="btn btn-ghost btn-sm" data-retry="'+i.id+'" data-target="square">→ Square</button>');
+      const meta = [i.printer_profile || 'no printer profile', i.hot_buttons !== false ? 'hot buttons on' : 'hot buttons off'].join(' · ');
+
+      return '<tr>'+
+        '<td class="plu" data-l="PLU">'+(hasPlu(i.plu) ? pad5(i.plu) : '<span class="none">—</span>')+'</td>'+
+        '<td data-l="Name" title="'+esc(meta)+'">'+esc(i.name)+'</td>'+
+        '<td data-l="Marketing">'+(i.marketing_name?esc(i.marketing_name):'—')+'</td>'+
+        '<td data-l="Category">'+(i.category?esc(i.category):'—')+'</td>'+
+        '<td data-l="Price">'+money(i.price)+'</td>'+
+        '<td data-l="Per lb">'+money(i.price_per_lb)+'</td>'+
+        '<td class="mono" data-l="Barcode">'+(i.barcode?esc(i.barcode):'—')+'</td>'+
+        '<td data-l="DateCodeGenie">'+statusPill(i.dcg_status, i.dcg_error)+'</td>'+
+        '<td data-l="Square">'+squareCell(i)+'</td>'+
+        '<td class="td-actions" data-l="">'+btns.join(' ')+'</td>'+
+      '</tr>';
+    }).join('');
+  }
+
+  /* ---------- save a new item ---------- */
+  $('pluForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = $('pf_name').value.trim();
+    if (!name){ setNotice('err','Name is required.'); $('pf_name').focus(); return; }
+
+    const mode = saveMode();
+    if (overridePlu && mode.plu && !/^\d{1,6}$/.test(mode.plu)){ setNotice('err','PLU must be a number.'); return; }
+    if (mode.barcode && !/^\d{6,14}$/.test(mode.barcode)){ setNotice('err','Barcode should be 6–14 digits.'); return; }
+    if (mode.barcode && items.some(i => i.barcode === mode.barcode)){
+      setNotice('err','Barcode ' + mode.barcode + ' is already on another item.'); return;
+    }
+
+    const btn = $('pluSubmit');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    setNotice(null,'');
+    try {
+      const res = await fetch(PLU_FN, { method:'POST', headers:authHeaders(), body: JSON.stringify({
+        action:'add', name,
+        marketing_name: $('pf_marketing').value.trim() || null,
+        price: $('pf_price').value === '' ? null : Number($('pf_price').value),
+        price_per_lb: $('pf_ppl').value === '' ? null : Number($('pf_ppl').value),
+        barcode: mode.barcode || null,
+        plu: (mode.kind==='plu' && overridePlu && mode.plu) ? Number(mode.plu) : null,
+        assign_plu: mode.kind === 'plu',
+        category: $('pf_category').value,
+        printer_profile: $('pf_printer').value,
+        hot_buttons: $('pf_hot').checked
+      })});
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'HTTP ' + res.status);
+      const it = data.item;
+      const part = (label, st, err) => st === 'synced' ? label + ' ✓'
+        : st === 'error' ? label + ' failed (' + (err||'error') + ')' : label + ' not sent (key not set up)';
+      const worst = [it.dcg_status, it.square_status].includes('error') ? 'err'
+        : [it.dcg_status, it.square_status].includes('skipped') ? 'warn' : 'ok';
+      setNotice(worst, 'Saved ' + it.name + ' as ' + (hasPlu(it.plu) ? 'PLU ' + pad5(it.plu) : 'barcode ' + it.barcode) + '. ' +
+        part('DateCodeGenie', it.dcg_status, it.dcg_error) + ' · ' + part('Square', it.square_status, it.square_error));
+      ['pf_name','pf_marketing','pf_price','pf_ppl','pf_barcode','pf_plu'].forEach(id => $(id).value = '');
+      $('pf_category').value = 'Cheese'; $('pf_printer').value = 'Greys Cheese Label'; $('pf_hot').checked = true;
+      overridePlu = false; $('pf_plu').disabled = true; $('pf_pluToggle').textContent = 'override';
+      await load();
+      $('pf_name').focus();
+    } catch(err){
+      setNotice('err','Save failed: ' + err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save'; render();
+    }
+  });
+
+  /* ---------- barcode generator ---------- */
+  $('pf_genBarcode').addEventListener('click', async (e) => {
+    e.preventDefault();
+    const link = $('pf_genBarcode');
+    link.textContent = 'generating…';
+    try {
+      const res = await fetch(PLU_FN, { method:'POST', headers:authHeaders(), body: JSON.stringify({action:'generate_barcode'}) });
+      const data = await res.json();
+      if (!res.ok || data.error || !data.barcode) throw new Error(data.error || 'HTTP ' + res.status);
+      $('pf_barcode').value = data.barcode;
+    } catch(err){
+      $('pf_barcode').value = nextStoreBarcodeLocal();
+    } finally {
+      link.textContent = 'generate'; renderForm();
+    }
+  });
+
+  $('pf_pluToggle').addEventListener('click', (e) => {
+    e.preventDefault();
+    overridePlu = !overridePlu;
+    $('pf_plu').disabled = !overridePlu;
+    $('pf_plu').value = overridePlu ? '' : pad5(nextPlu);
+    $('pf_pluToggle').textContent = overridePlu ? 'use auto' : 'override';
+    if (overridePlu) $('pf_plu').focus();
+    renderForm();
+  });
+
+  ['pf_barcode','pf_plu','pf_name','pf_marketing','pf_price','pf_ppl'].forEach(id =>
+    $(id).addEventListener('input', renderForm));
+  $('pluSearch').addEventListener('input', render);
+
+  /* ---------- table actions ---------- */
+  $('pluBody').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const ds = btn.dataset;
+
+    if (ds.edit){ editingId = ds.edit; render(); return; }
+    if (ds.cancel){ editingId = null; render(); return; }
+
+    if (ds.assignplu){
+      btn.disabled = true; btn.textContent = 'assigning…';
+      try {
+        const res = await fetch(PLU_FN, { method:'POST', headers:authHeaders(),
+          body: JSON.stringify({action:'update', id:ds.assignplu, plu:nextPlu}) });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'HTTP ' + res.status);
+        setNotice('ok','Assigned PLU ' + pad5(data.item.plu) + ' to ' + data.item.name + '.');
+        editingId = null; await load();
+      } catch(err){
+        setNotice('err',"Couldn't assign a PLU: " + err.message);
+        btn.disabled = false; btn.textContent = 'assign PLU';
+      }
+      return;
+    }
+
+    if (ds.save){
+      btn.disabled = true; btn.textContent = 'Saving…';
+      try {
+        const res = await fetch(PLU_FN, { method:'POST', headers:authHeaders(), body: JSON.stringify({
+          action:'update', id:ds.save,
+          name: $('pe_name').value,
+          marketing_name: $('pe_marketing').value,
+          price: $('pe_price').value === '' ? null : Number($('pe_price').value),
+          price_per_lb: $('pe_ppl').value === '' ? null : Number($('pe_ppl').value),
+          barcode: $('pe_barcode').value,
+          category: $('pe_category').value,
+          printer_profile: $('pe_printer').value,
+          hot_buttons: $('pe_hot').checked
+        })});
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'HTTP ' + res.status);
+        const it = data.item;
+        const part = (label, st, err) => st === 'synced' ? label + ' ✓'
+          : st === 'error' ? label + ' failed (' + (err||'error') + ')' : label + ' not updated (' + (err||'not set up') + ')';
+        setNotice([it.dcg_status,it.square_status].includes('error') ? 'err'
+          : [it.dcg_status,it.square_status].includes('skipped') ? 'warn' : 'ok',
+          'Updated ' + it.name + ' (' + (hasPlu(it.plu) ? 'PLU ' + pad5(it.plu) : 'barcode ' + it.barcode) + '). ' +
+          part('DateCodeGenie', it.dcg_status, it.dcg_error) + ' · ' + part('Square', it.square_status, it.square_error));
+        editingId = null; await load();
+      } catch(err){
+        setNotice('err','Update failed: ' + err.message);
+        btn.disabled = false; btn.textContent = 'Save';
+      }
+      return;
+    }
+
+    if (ds.retry){
+      const original = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Pushing…';
+      try {
+        const res = await fetch(PLU_FN, { method:'POST', headers:authHeaders(),
+          body: JSON.stringify({action:'retry_sync', id:ds.retry, target: ds.target || 'both'}) });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'HTTP ' + res.status);
+        await load();
+      } catch(err){
+        setNotice('err','Retry failed: ' + err.message);
+        btn.disabled = false; btn.textContent = original;
+      }
+    }
+  });
+
+  /* ---------- push everything that isn't in Square yet ---------- */
+  $('pluPushAll').addEventListener('click', async () => {
+    const queue = pendingSquare();
+    if (!queue.length) return;
+    const btn = $('pluPushAll');
+    btn.disabled = true; setNotice(null,'');
+    let ok = 0; const failed = [];
+    for (let n = 0; n < queue.length; n++){
+      btn.textContent = 'Pushing ' + (n+1) + ' of ' + queue.length + '…';
+      try {
+        const res = await fetch(PLU_FN, { method:'POST', headers:authHeaders(),
+          body: JSON.stringify({action:'retry_sync', id:queue[n].id, target:'square'}) });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'HTTP ' + res.status);
+        if (data.item && data.item.square_status === 'synced') ok++;
+        else failed.push(queue[n].name + ' (' + ((data.item && data.item.square_error) || 'not sent') + ')');
+      } catch(err){ failed.push(queue[n].name + ' (' + err.message + ')'); }
+    }
+    btn.disabled = false;
+    await load();
+    if (!failed.length) setNotice('ok','Pushed ' + ok + ' item' + (ok===1?'':'s') + ' to Square.');
+    else setNotice(ok ? 'warn' : 'err', 'Pushed ' + ok + ' of ' + queue.length + '. Didn\'t go: ' +
+      failed.slice(0,5).join('; ') + (failed.length > 5 ? ' …and ' + (failed.length-5) + ' more' : ''));
+  });
+
+  /* ---------- CSV ---------- */
+  $('pluExport').addEventListener('click', () => {
+    const sorted = items.slice().sort((a,b) => {
+      if (!hasPlu(a.plu) && !hasPlu(b.plu)) return String(a.barcode||'').localeCompare(String(b.barcode||''));
+      if (!hasPlu(a.plu)) return 1;
+      if (!hasPlu(b.plu)) return -1;
+      return a.plu - b.plu;
+    });
+    const rows = [
+      ['PLU','Name','Marketing Name','Price','Price per lb','Barcode','Category','Printer Profile','Hot Buttons','DCG Status','Square Status','Square Pricing','Square Item ID'],
+      ...sorted.map(i => [pad5(i.plu), i.name, i.marketing_name||'', i.price ?? '', i.price_per_lb ?? '',
+        i.barcode||'', i.category||'', i.printer_profile||'', i.hot_buttons !== false ? 'x':'',
+        i.dcg_status, i.square_status, priceMode(i).label, i.square_item_id||''])
+    ];
+    const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+    a.download = 'plu-list-' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+  });
+
+  $('pf_category').innerHTML = optionsHtml(CATEGORIES, 'Cheese');
+  $('pf_printer').innerHTML = optionsHtml(PRINTER_PROFILES, 'Greys Cheese Label');
+
+  window.pluInit = load;
+})();
+
 </script>
 </body>
 </html>

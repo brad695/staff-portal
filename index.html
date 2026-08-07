@@ -31,7 +31,21 @@
     .app{ max-width:520px; margin:0 auto; min-height:100vh; background:var(--bg); position:relative; padding-bottom:84px; }
 
     /* top bar / header */
-    .topbar{ display:flex; align-items:center; gap:10px; padding:16px 20px 14px; border-bottom:1px solid rgba(255,255,255,0.12); margin-bottom:4px; }
+    .topbar{ display:flex; align-items:center; gap:10px; padding:16px 20px 14px; border-bottom:1px solid rgba(255,255,255,0.12); margin-bottom:4px; flex-wrap:wrap; }
+    /* small phones (<=380px): the three top links used to run past the right edge */
+    @media (max-width:380px){
+      .topbar{ padding:14px 14px 12px; gap:7px; }
+      .top-link{ font-size:0.72rem; padding:6px 10px; }
+    }
+    /* very small phones (<=340px): shrink the tiles rather than let the two-up
+       grid overflow. Deliberately NOT overflow-wrap:break-word — that shreds
+       longer labels like "Onboarding" into single letters. */
+    @media (max-width:340px){
+      .tiles{ gap:10px; padding:12px 12px 2px; }
+      .tile{ padding:10px 12px; gap:10px; }
+      .tile .ic{ width:30px; height:30px; }
+      .tile .tl{ font-size:1rem; }
+    }
     .topbar .brand{ font-weight:800; font-size:1.35rem; letter-spacing:-0.3px; color:#ffffff; }
     .topbar .loc{ font-size:0.74rem; color:#b9c5d1; font-weight:600; }
     .topbar .spacer{ flex:1; }
@@ -64,12 +78,12 @@
     .notes-empty{ display:none; }
 
     .tiles{ display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:14px 20px 2px; }
-    .tile{ background:var(--tile); border-radius:4px; box-shadow:0 3px 12px rgba(20,40,60,0.16); padding:10px 16px; cursor:pointer; border:1px solid var(--tile-line); text-align:left; transition:transform .08s, box-shadow .08s; display:flex; flex-direction:row; align-items:center; gap:14px; }
+    .tile{ background:var(--tile); border-radius:4px; box-shadow:0 3px 12px rgba(20,40,60,0.16); padding:10px 16px; cursor:pointer; border:1px solid var(--tile-line); text-align:left; transition:transform .08s, box-shadow .08s; display:flex; flex-direction:row; align-items:center; gap:14px; min-width:0; }
     .tile:active{ transform:scale(0.97); }
     .tile.on{ border-color:var(--accent); box-shadow:0 0 0 2px var(--accent), 0 3px 12px rgba(0,0,0,0.20); }
     .tile .ic{ width:34px; height:34px; border-radius:4px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
     .tile .ic i{ font-size:19px; line-height:1; }
-    .tile .tl{ font-weight:700; font-size:1.18rem; letter-spacing:-0.3px; color:var(--tile-ink); line-height:1.15; }
+    .tile .tl{ font-weight:700; font-size:1.18rem; letter-spacing:-0.3px; color:var(--tile-ink); line-height:1.15; min-width:0; }
     .tile.full{ grid-column:1 / -1; }
     .badge-soon{ margin-left:auto; font-size:0.64rem; font-weight:700; color:var(--gray-i); background:var(--gray); padding:5px 11px; border-radius:20px; }
     .ic-mint{ background:var(--mint); color:var(--mint-i);} .ic-sky{ background:var(--sky); color:var(--sky-i);}
@@ -366,6 +380,7 @@
       <button class="tile" id="tile-events" onclick="tileTap('events')"><span class="ic ic-pink"><i class="ti ti-confetti"></i></span><span class="tl">Events</span></button>
       <button class="tile" id="tile-onboarding" onclick="tileTap('onboarding')"><span class="ic ic-gray"><i class="ti ti-user-plus"></i></span><span class="tl" style="color:var(--gray-i);">Onboarding</span><span class="badge-soon">Soon</span></button>
       <button class="tile" id="tile-stuff" onclick="tileTap('stuff')"><span class="ic ic-sky"><i class="ti ti-info-circle"></i></span><span class="tl">Stuff to Know</span></button>
+      <button class="tile" id="tile-cheese-entry" onclick="location.href='manager.html#plu'"><span class="ic ic-butter"><i class="ti ti-barcode"></i></span><span class="tl">Cheese Entry</span></button>
     </div>
     <div id="homePreview" class="home-preview" style="display:none;"></div>
   </div>
