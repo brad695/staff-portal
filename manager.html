@@ -242,6 +242,8 @@
     <div class="tab" onclick="tkTab(this,'promos')">Promo Codes</div>
     <div class="tab-head">Cheese Case</div>
     <div class="tab" onclick="mtab('plu')">🧀 New Cheese Entry</div>
+    <div class="tab-head">Marketing</div>
+    <div class="tab" onclick="mtab('campaigns')">✉️ Email Campaigns</div>
     <div class="tab-head">Cheese Club</div>
     <div class="tab" onclick="ccTab(this,'ov')">Clubs</div>
     <div class="tab" onclick="ccTab(this,'subs')">Subscriptions</div>
@@ -621,6 +623,59 @@
       #panel-plu table.bulk td .btn{ padding:8px 12px; }
     }
   </style>
+  <style id="emc-style">
+    #panel-campaigns .emc-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap; }
+    #panel-campaigns .emc-inline{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    #panel-campaigns .emc-inline input{ flex:1; min-width:180px; }
+
+    #panel-campaigns .emc-editor{ display:grid; grid-template-columns:1fr 1fr; gap:22px; align-items:start; }
+    #panel-campaigns .emc-preview{ width:100%; height:620px; border:1px solid var(--line); border-radius:var(--r); background:#fff; }
+    #panel-campaigns .emc-code{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:0.78rem; min-height:340px; line-height:1.45; }
+
+    #panel-campaigns .emc-stats{ display:flex; gap:12px; flex-wrap:wrap; margin:16px 0 4px; }
+    #panel-campaigns .emc-stats div{ background:var(--navy); color:#fff; border-radius:var(--r); padding:14px 22px; min-width:120px; text-align:center; }
+    #panel-campaigns .emc-stats b{ display:block; font-size:1.5rem; color:var(--cheddar); font-family:'Archivo',sans-serif; }
+    #panel-campaigns .emc-stats span{ font-size:0.62rem; text-transform:uppercase; letter-spacing:1px; opacity:.8; }
+
+    #panel-campaigns .emc-score{ display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; }
+    #panel-campaigns .emc-card{ background:var(--navy); color:#fff; border-radius:var(--r); padding:16px 18px; }
+    #panel-campaigns .emc-card h3{ margin:0 0 8px; color:var(--cheddar); font-size:0.7rem; letter-spacing:1px; text-transform:uppercase; }
+    #panel-campaigns .emc-card table{ width:100%; border-collapse:collapse; font-size:0.86rem; }
+    #panel-campaigns .emc-card td{ padding:5px 0; border-bottom:1px solid #333; }
+    #panel-campaigns .emc-card tr:last-child td{ border-bottom:none; }
+    #panel-campaigns .emc-card td:last-child{ text-align:right; font-weight:700; }
+    #panel-campaigns .emc-rate{ color:var(--cheddar); font-weight:400; font-size:0.78rem; }
+
+    #panel-campaigns .emc-bar{ height:12px; background:#ececec; border-radius:var(--r); overflow:hidden; margin:16px 0 0; }
+    #panel-campaigns .emc-bar div{ height:100%; background:var(--cheddar); transition:width .4s; }
+
+    #panel-campaigns .emc-warn{ border:1px solid #f0d6cf; background:#fdf3f1; color:#8a2318; border-radius:var(--r);
+                                padding:11px 14px; font-size:0.82rem; line-height:1.5; margin:14px 0 0; }
+    #panel-campaigns .emc-warn ul{ margin:6px 0 0 18px; }
+    #panel-campaigns .emc-warn li{ margin:3px 0; }
+    #panel-campaigns .emc-ok{ border:1px solid #cdeadd; background:#f2fbf7; color:#0a7a52; border-radius:var(--r);
+                              padding:9px 14px; font-size:0.82rem; margin:14px 0 0; }
+
+    #panel-campaigns .emc-st-draft{ background:#ebebeb; color:#666; }
+    #panel-campaigns .emc-st-sending{ background:#fdebc4; color:#92400e; }
+    #panel-campaigns .emc-st-sent{ background:#d1fae5; color:#065f46; }
+    #panel-campaigns .emc-st-failed{ background:#f6dad4; color:#9f2d20; }
+
+    #panel-campaigns .emc-toast{ position:fixed; left:50%; bottom:26px; transform:translate(-50%,120%); z-index:900;
+      background:#111; color:#fff; padding:11px 20px; border-radius:var(--r); font-size:0.85rem; font-weight:600;
+      transition:transform .25s; max-width:calc(100vw - 32px); }
+    #panel-campaigns .emc-toast.show{ transform:translate(-50%,0); }
+    #panel-campaigns .emc-toast.err{ background:var(--wax); }
+
+    @media (max-width:900px){
+      #panel-campaigns .emc-editor{ grid-template-columns:1fr; }
+      #panel-campaigns .emc-preview{ height:420px; }
+    }
+    @media (max-width:640px){
+      #panel-campaigns .emc-stats div{ flex:1; min-width:96px; padding:12px 10px; }
+      #panel-campaigns .emc-stats b{ font-size:1.2rem; }
+    }
+  </style>
 
   <div id="panel-plu" class="panel">
     <div class="section-card">
@@ -699,6 +754,25 @@
         </table>
       </div>
     </div>
+  </div>
+
+  <!-- ═══ MARKETING — EMAIL CAMPAIGNS (ported from EmailCampaigns.jsx) ═══ -->
+  <div id="panel-campaigns" class="panel">
+    <div class="section-card">
+      <div class="emc-top">
+        <div>
+          <h2>✉️ Email Campaigns</h2>
+          <div class="hint" style="margin-bottom:0;">Saved templates, one contact list, single or A/B sends through Amazon SES — with per-variant results.</div>
+        </div>
+        <div class="chips" id="emcNav">
+          <button type="button" class="chip on" data-v="campaigns">Campaigns</button>
+          <button type="button" class="chip" data-v="templates">Templates</button>
+          <button type="button" class="chip" data-v="contacts">Contacts</button>
+        </div>
+      </div>
+    </div>
+    <div id="emcBody"><div class="section-card"><div class="rec-empty">Loading…</div></div></div>
+    <div class="emc-toast" id="emcToast"></div>
   </div>
 
   <!-- ═══ CHEESE CLUB (ported from Cheese Club partner portal) ═══ -->
@@ -807,7 +881,7 @@ function openHashTab(){
 }
 window.addEventListener('hashchange', openHashTab);
 
-function loadAll(){ loadKind('items'); loadKind('events'); loadKind('schedules'); loadKind('employees'); sgLoad(); loadTimeOff(); loadSwaps(); loadAnnouncements(); resInit(); if(window.tkInit)tkInit(); if(window.ccInit)ccInit(); if(window.pluInit)pluInit(); openHashTab(); }
+function loadAll(){ loadKind('items'); loadKind('events'); loadKind('schedules'); loadKind('employees'); sgLoad(); loadTimeOff(); loadSwaps(); loadAnnouncements(); resInit(); if(window.tkInit)tkInit(); if(window.ccInit)ccInit(); if(window.pluInit)pluInit(); if(window.emcInit)emcInit(); openHashTab(); }
 
 /* ---- Reservations (Wix, via portal-api) ---- */
 // Wix reservation-location ids — must match index.html's LOCATIONS map.
@@ -7730,6 +7804,504 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
   $('pf_printer').innerHTML = optionsHtml(PRINTER_PROFILES, 'Greys Cheese Label');
 
   window.pluInit = load;
+})();
+
+window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "subject": "Cheese with soul & story — 10% off every board", "html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>10% Off All Cheeseboards | GREYS Fine Cheeses</title>\n</head>\n<body style=\"margin:0; padding:0; background-color:#EEF1F5;\">\n<!-- Preheader (hidden preview text) -->\n<div style=\"display:none; max-height:0; overflow:hidden; font-size:1px; color:#EEF1F5;\">\nCheese with soul &amp; story — and 10% off every board, online only.\n</div>\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#EEF1F5;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:600px; max-width:100%; background-color:#3E4C63; border-radius:10px; overflow:hidden;\">\n\n  <!-- Header -->\n  <tr><td align=\"center\" style=\"padding:28px 20px 8px;\">\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:26px; letter-spacing:2px; color:#FFFFFF;\">GREYS</div>\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:11px; letter-spacing:4px; color:#F2C230; text-transform:uppercase; padding-top:2px;\">Fine Cheeses</div>\n  </td></tr>\n\n  <!-- Hero -->\n  <tr><td style=\"padding:18px 24px 0;\">\n    <img src=\"images/hero-spread.jpg\" width=\"552\" alt=\"A GREYS charcuterie and cheese spread\" style=\"width:100%; height:auto; display:block; border-radius:8px;\">\n  </td></tr>\n\n  <tr><td align=\"center\" style=\"padding:22px 32px 4px;\">\n    <div style=\"font-family:Georgia, 'Times New Roman', serif; font-style:italic; font-size:20px; color:#F2C230;\">Cheese with soul &amp; story</div>\n  </td></tr>\n\n  <!-- Story -->\n  <tr><td style=\"padding:12px 36px 0; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:22px; color:#DDE3EC;\">\n    <p style=\"margin:0 0 14px;\">We're the only specialty cheese shop in Memphis, Nashville &amp; Franklin — founded in 2019 by Jackie and Kurt Mullican with a simple mission: real food, made by small producers who care deeply for their herds and their land.</p>\n    <p style=\"margin:0 0 14px;\">We travel to creameries across the US, Europe, and South America to hand-pick every wheel in our case. When you order a GREYS board, you're not just getting cheese — you're supporting the incredible people who make it.</p>\n  </td></tr>\n\n  <!-- Two photos -->\n  <tr><td style=\"padding:8px 24px 0;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n    <tr>\n      <td width=\"49%\" style=\"padding-right:6px;\"><img src=\"images/creamery-cave.jpg\" width=\"270\" alt=\"Visiting a cheese aging cave\" style=\"width:100%; height:auto; display:block; border-radius:8px;\"></td>\n      <td width=\"49%\" style=\"padding-left:6px;\"><img src=\"images/creamery-farm.jpg\" width=\"270\" alt=\"At the farm with our producers\" style=\"width:100%; height:auto; display:block; border-radius:8px;\"></td>\n    </tr>\n    </table>\n  </td></tr>\n\n  <tr><td style=\"padding:16px 36px 0; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:22px; color:#DDE3EC;\">\n    <p style=\"margin:0;\">Every board is built by our trained cheesemongers — a curated mix of artisan cheeses, charcuterie, and accoutrements, styled to steal the show at your next dinner, party, or night in.</p>\n  </td></tr>\n\n  <!-- Offer block -->\n  <tr><td style=\"padding:24px 24px 0;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#354156; border:2px solid #F2C230; border-radius:10px;\">\n    <tr><td align=\"center\" style=\"padding:24px 20px;\">\n      <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:13px; letter-spacing:3px; color:#F2C230; text-transform:uppercase;\">This week only</div>\n      <div style=\"font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:30px; color:#FFFFFF; padding:8px 0 4px;\">10% Off All Cheeseboards</div>\n      <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:14px; color:#DDE3EC; padding-bottom:14px;\">The Demi &bull; The Gathering &bull; Custom Platters</div>\n      <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:14px; color:#FFFFFF;\">Use code</div>\n      <div style=\"font-family:'Courier New', Courier, monospace; font-weight:bold; font-size:26px; letter-spacing:4px; color:#F2C230; padding:6px 0 16px;\">BOARD10</div>\n      <!-- Button -->\n      <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n        <td style=\"background-color:#F2C230; border-radius:6px;\">\n          <a href=\"https://greyscheese.com\" style=\"display:inline-block; padding:13px 34px; font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:15px; color:#3E4C63; text-decoration:none;\">Order Your Board</a>\n        </td>\n      </tr></table>\n      <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:12px; color:#B9C2D0; padding-top:12px;\">Online orders only</div>\n    </td></tr>\n    </table>\n  </td></tr>\n\n  <!-- Boards teaser -->\n  <tr><td style=\"padding:22px 24px 0;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n    <tr>\n      <td width=\"49%\" valign=\"top\" style=\"padding-right:6px;\">\n        <img src=\"images/boards-table.jpg\" width=\"270\" alt=\"Styled GREYS cheeseboards on a table\" style=\"width:100%; height:auto; display:block; border-radius:8px;\">\n      </td>\n      <td width=\"49%\" valign=\"top\" style=\"padding-left:6px; font-family:Arial, Helvetica, sans-serif; color:#FFFFFF;\">\n        <div style=\"font-size:14px; font-weight:bold; padding:4px 0 2px;\">The Demi Board &mdash; <span style=\"color:#F2C230;\">$50</span></div>\n        <div style=\"font-size:12px; color:#C7CFDC; line-height:17px;\">Dinner for 2 or appetizer for 4</div>\n        <div style=\"font-size:14px; font-weight:bold; padding:12px 0 2px;\">The Gathering Board &mdash; <span style=\"color:#F2C230;\">$99</span></div>\n        <div style=\"font-size:12px; color:#C7CFDC; line-height:17px;\">Dinner for 6 or appetizer for 12</div>\n        <div style=\"font-size:14px; font-weight:bold; padding:12px 0 2px;\">Custom Platters &mdash; <span style=\"color:#F2C230;\">from $150</span></div>\n        <div style=\"font-size:12px; color:#C7CFDC; line-height:17px;\">Pick your cheeses &amp; charcuterie &bull; serves 20&ndash;60</div>\n      </td>\n    </tr>\n    </table>\n  </td></tr>\n\n  <!-- Footer -->\n  <tr><td align=\"center\" style=\"padding:26px 24px 26px;\">\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:12px; letter-spacing:2px; color:#F2C230; text-transform:uppercase;\">Memphis &bull; Nashville &bull; Franklin</div>\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:11px; color:#8E99AC; padding-top:10px; line-height:17px;\">\n      GREYS Fine Cheeses &bull; Discount applies to online cheeseboard orders only.<br>\n      GREYS Fine Cheeses &bull; {{POSTAL_ADDRESS}}<br><a href=\"{{UNSUBSCRIBE_URL}}\" style=\"color:#8E99AC;\">Unsubscribe</a>\n    </div>\n  </td></tr>\n\n</table>\n</td></tr>\n</table>\n</body>\n</html>\n"}, {"name": "Cheeseboard promo — B (direct, 10OFFBOARDS)", "subject": "10% off all cheeseboards. Code inside.", "html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>10% Off All Cheeseboards | GREYS Fine Cheeses</title>\n</head>\n<body style=\"margin:0; padding:0; background-color:#EEF1F5;\">\n<!-- Preheader (hidden preview text) -->\n<div style=\"display:none; max-height:0; overflow:hidden; font-size:1px; color:#EEF1F5;\">\n10% off every cheeseboard. Code 10OFFBOARDS. Online only.\n</div>\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#EEF1F5;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:600px; max-width:100%; background-color:#3E4C63; border-radius:10px; overflow:hidden;\">\n\n  <!-- Header -->\n  <tr><td align=\"center\" style=\"padding:26px 20px 6px;\">\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:24px; letter-spacing:2px; color:#FFFFFF;\">GREYS</div>\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:10px; letter-spacing:4px; color:#F2C230; text-transform:uppercase; padding-top:2px;\">Fine Cheeses</div>\n  </td></tr>\n\n  <!-- Offer -->\n  <tr><td align=\"center\" style=\"padding:16px 32px 0;\">\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:34px; line-height:40px; color:#FFFFFF;\">10% Off<br>All Cheeseboards</div>\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:15px; color:#DDE3EC; padding:10px 0 0;\">Use code</div>\n    <div style=\"font-family:'Courier New', Courier, monospace; font-weight:bold; font-size:26px; letter-spacing:3px; color:#F2C230; padding:4px 0 2px;\">10OFFBOARDS</div>\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:13px; letter-spacing:2px; color:#F2C230; text-transform:uppercase; padding-bottom:16px;\">Online only</div>\n    <!-- Button -->\n    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n      <td style=\"background-color:#F2C230; border-radius:6px;\">\n        <a href=\"https://greyscheese.com\" style=\"display:inline-block; padding:14px 40px; font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:16px; color:#3E4C63; text-decoration:none;\">Order Now</a>\n      </td>\n    </tr></table>\n  </td></tr>\n\n  <!-- Single image -->\n  <tr><td style=\"padding:22px 24px 0;\">\n    <img src=\"images/board-close.jpg\" width=\"552\" alt=\"A GREYS cheeseboard\" style=\"width:100%; height:auto; display:block; border-radius:8px;\">\n  </td></tr>\n\n  <!-- Prices -->\n  <tr><td style=\"padding:16px 40px 0;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"font-family:Arial, Helvetica, sans-serif;\">\n    <tr>\n      <td style=\"padding:9px 0; border-bottom:1px solid #4C5A73; color:#FFFFFF; font-size:14px; font-weight:bold;\">The Demi Board <span style=\"font-weight:normal; color:#C7CFDC; font-size:12px;\">&mdash; feeds 2&ndash;4</span></td>\n      <td align=\"right\" style=\"padding:9px 0; border-bottom:1px solid #4C5A73; color:#F2C230; font-size:16px; font-weight:bold;\">$50</td>\n    </tr>\n    <tr>\n      <td style=\"padding:9px 0; border-bottom:1px solid #4C5A73; color:#FFFFFF; font-size:14px; font-weight:bold;\">The Gathering Board <span style=\"font-weight:normal; color:#C7CFDC; font-size:12px;\">&mdash; feeds 6&ndash;12</span></td>\n      <td align=\"right\" style=\"padding:9px 0; border-bottom:1px solid #4C5A73; color:#F2C230; font-size:16px; font-weight:bold;\">$99</td>\n    </tr>\n    <tr>\n      <td style=\"padding:9px 0; color:#FFFFFF; font-size:14px; font-weight:bold;\">Custom Platters <span style=\"font-weight:normal; color:#C7CFDC; font-size:12px;\">&mdash; serves 20&ndash;60</span></td>\n      <td align=\"right\" style=\"padding:9px 0; color:#F2C230; font-size:16px; font-weight:bold;\">from $150</td>\n    </tr>\n    </table>\n  </td></tr>\n\n  <!-- Footer -->\n  <tr><td align=\"center\" style=\"padding:24px 24px 24px;\">\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:11px; letter-spacing:2px; color:#F2C230; text-transform:uppercase;\">Memphis &bull; Nashville &bull; Franklin</div>\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:11px; color:#8E99AC; padding-top:8px; line-height:17px;\">\n      Discount applies to online cheeseboard orders only.<br>\n      GREYS Fine Cheeses &bull; {{POSTAL_ADDRESS}}<br><a href=\"{{UNSUBSCRIBE_URL}}\" style=\"color:#8E99AC;\">Unsubscribe</a>\n    </div>\n  </td></tr>\n\n</table>\n</td></tr>\n</table>\n</body>\n</html>\n"}];
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MARKETING — Email Campaigns
+   Ported from the standalone EmailCampaigns.jsx (React) to the console's
+   vanilla pattern, same as the Cheese Club and Cheese Case tabs.
+   Reads/writes go through the signed-in manager's `sb` session (em_* RLS
+   allows authenticated); sending goes through the send-campaign-batch
+   edge function, which holds the SES credentials.
+   ═══════════════════════════════════════════════════════════════════════ */
+(function(){
+  const EMC_FN   = SB_URL + '/functions/v1/send-campaign-batch';
+  const FROM_DEF = 'GREYS Fine Cheeses <hello@greyscheese.com>';
+  const BATCH_UI = 150;
+
+  let view = 'campaigns';          // campaigns | templates | contacts
+  let booted = false;
+  let campaigns = [], templates = [], openCampaign = null, draft = null, editTpl = null;
+  let sending = false, testTo = '';
+
+  const $  = (id) => document.getElementById(id);
+  const el = () => $('emcBody');
+  const esc2 = (s) => String(s == null ? '' : s)
+    .replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const num = (n) => Number(n || 0).toLocaleString();
+  const pct = (a, b) => b ? Math.round((a / b) * 100) + '%' : '—';
+
+  function toast(msg, err){
+    const t = $('emcToast');
+    t.textContent = msg;
+    t.className = 'emc-toast show' + (err ? ' err' : '');
+    clearTimeout(t._t);
+    t._t = setTimeout(() => { t.className = 'emc-toast'; }, 3600);
+  }
+
+  const authHeaders = () => ({
+    'Content-Type':'application/json',
+    'apikey': SB_KEY,
+    'Authorization': 'Bearer ' + (SESSION ? SESSION.access_token : SB_KEY)
+  });
+
+  /* Friendlier than a raw PostgREST error when the schema isn't there yet. */
+  function dbErr(e){
+    const m = String(e && e.message || e || '');
+    if (/em_\w+.*(does not exist|schema cache)/i.test(m))
+      return 'The campaign tables are not in this Supabase project yet — run the campaign schema migration.';
+    return m;
+  }
+
+  /* ---------- data ---------- */
+  async function loadCampaigns(){
+    const [c, t] = await Promise.all([
+      sb.from('em_campaigns').select('*').order('created_at', { ascending:false }),
+      sb.from('em_templates').select('id,name,subject').order('updated_at', { ascending:false })
+    ]);
+    if (c.error) throw c.error;
+    campaigns = c.data || [];
+    templates = t.data || [];
+  }
+  async function loadTemplates(){
+    const { data, error } = await sb.from('em_templates').select('*').order('updated_at', { ascending:false });
+    if (error) throw error;
+    templates = data || [];
+  }
+  async function contactStats(){
+    const a = await sb.from('em_contacts').select('id', { count:'exact', head:true });
+    if (a.error) throw a.error;
+    const b = await sb.from('em_contacts').select('id', { count:'exact', head:true }).eq('subscribed', false);
+    return { total: a.count || 0, unsub: b.count || 0 };
+  }
+
+  /* ---------- render ---------- */
+  async function render(){
+    const box = el();
+    if (!box) return;
+    try {
+      if (view === 'templates')      await renderTemplates(box);
+      else if (view === 'contacts')  await renderContacts(box);
+      else                           await renderCampaigns(box);
+    } catch (e) {
+      box.innerHTML = '<div class="section-card"><div class="rec-empty" style="font-style:normal;">'
+        + esc2(dbErr(e)) + '</div></div>';
+    }
+  }
+
+  function setView(v){
+    view = v; openCampaign = null; draft = null; editTpl = null;
+    document.querySelectorAll('#emcNav .chip').forEach(c => c.classList.toggle('on', c.dataset.v === v));
+    render();
+  }
+
+  /* ---------- CAMPAIGNS ---------- */
+  async function renderCampaigns(box){
+    if (openCampaign) return renderDetail(box);
+    if (draft)        return renderComposer(box);
+    await loadCampaigns();
+
+    const rows = campaigns.map(c => `
+      <div class="rec-row" data-open="${esc2(c.id)}">
+        <div class="rec-main">
+          <div class="rec-title">${esc2(c.name)}</div>
+          <div class="rec-meta">${c.mode === 'ab' ? 'A/B test' : 'Single'} ·
+            <span class="pill emc-st-${esc2(c.status)}">${esc2(c.status)}</span>
+            ${c.launched_at ? ' · launched ' + esc2(new Date(c.launched_at).toLocaleDateString()) : ''}</div>
+        </div>
+        <div class="rec-actions">
+          <button class="btn btn-ghost btn-sm" data-open="${esc2(c.id)}">${c.status === 'draft' ? 'Review' : 'Results'}</button>
+        </div>
+      </div>`).join('');
+
+    box.innerHTML = `
+      <div class="section-card">
+        <div class="toolbar">
+          <h2 style="margin:0;">Campaigns</h2>
+          <div class="spacer"></div>
+          <button class="btn btn-gold" id="emcNew">＋ New campaign</button>
+        </div>
+        <div class="rec-list">${rows || '<div class="rec-empty">Nothing yet. Your first campaign is one click away.</div>'}</div>
+      </div>`;
+
+    $('emcNew').onclick = () => {
+      if (!templates.length) return toast('Create a template first — Templates tab.', true);
+      draft = { name:'', mode:'single', from_address:FROM_DEF, template_a:'', template_b:'', subject_a:'', subject_b:'' };
+      render();
+    };
+    box.querySelectorAll('[data-open]').forEach(n => n.onclick = (ev) => {
+      ev.stopPropagation();
+      openCampaign = campaigns.find(c => c.id === n.dataset.open);
+      render();
+    });
+  }
+
+  function tplOptions(sel){
+    return '<option value="">— choose —</option>' + templates.map(t =>
+      `<option value="${esc2(t.id)}"${t.id === sel ? ' selected' : ''}>${esc2(t.name)}</option>`).join('');
+  }
+  const tplById = (id) => templates.find(t => t.id === id);
+
+  function renderComposer(box){
+    const ab = draft.mode === 'ab';
+    box.innerHTML = `
+      <div class="section-card" style="max-width:640px;">
+        <div class="toolbar">
+          <button class="btn btn-ghost btn-sm" id="emcBack">← All campaigns</button>
+          <div class="spacer"></div>
+        </div>
+        <h2>New campaign</h2>
+        <div class="hint">Nothing sends until you press Launch on the next screen.</div>
+        <div class="rec-fields">
+          <div class="rf full"><label>Campaign name</label>
+            <input id="emc_name" value="${esc2(draft.name)}" placeholder="Cheeseboard promo — August" /></div>
+          <div class="rf full"><label>From address</label>
+            <input id="emc_from" value="${esc2(draft.from_address)}" /></div>
+          <div class="rf full"><label>Type</label>
+            <div class="rec-radios">
+              <label class="rec-radio${ab ? '' : ' on'}" data-mode="single"><input type="radio" name="emcmode" />Single email</label>
+              <label class="rec-radio${ab ? ' on' : ''}" data-mode="ab"><input type="radio" name="emcmode" />A/B test (50/50)</label>
+            </div></div>
+          <div class="rf"><label>${ab ? 'Version A template' : 'Template'}</label>
+            <select id="emc_ta">${tplOptions(draft.template_a)}</select></div>
+          <div class="rf"><label>${ab ? 'Subject A' : 'Subject'}</label>
+            <input id="emc_sa" value="${esc2(draft.subject_a)}" placeholder="${esc2(tplById(draft.template_a)?.subject || 'defaults to the template subject')}" /></div>
+          ${ab ? `
+          <div class="rf"><label>Version B template</label>
+            <select id="emc_tb">${tplOptions(draft.template_b)}</select></div>
+          <div class="rf"><label>Subject B</label>
+            <input id="emc_sb" value="${esc2(draft.subject_b)}" placeholder="${esc2(tplById(draft.template_b)?.subject || 'defaults to the template subject')}" /></div>` : ''}
+          <div class="rec-section">Send yourself a test first</div>
+          <div class="rf full"><label>Test address</label>
+            <div class="emc-inline">
+              <input id="emc_test" value="${esc2(testTo)}" placeholder="you@greyscheese.com" />
+              <button class="btn btn-ghost btn-sm" id="emcTestA">${ab ? 'Test A' : 'Send test'}</button>
+              ${ab ? '<button class="btn btn-ghost btn-sm" id="emcTestB">Test B</button>' : ''}
+            </div></div>
+        </div>
+        <div class="row-actions">
+          <button class="btn btn-gold" id="emcSave">Save campaign</button>
+          <button class="btn btn-ghost" id="emcCancel">Cancel</button>
+        </div>
+      </div>`;
+
+    const grab = () => {
+      draft.name = $('emc_name').value.trim();
+      draft.from_address = $('emc_from').value.trim();
+      draft.template_a = $('emc_ta').value;
+      draft.subject_a = $('emc_sa').value.trim();
+      if ($('emc_tb')) draft.template_b = $('emc_tb').value;
+      if ($('emc_sb')) draft.subject_b = $('emc_sb').value.trim();
+      testTo = $('emc_test').value.trim();
+    };
+    box.querySelectorAll('[data-mode]').forEach(n => n.onclick = () => {
+      grab(); draft.mode = n.dataset.mode; render();
+    });
+    $('emc_ta').onchange = () => { grab(); render(); };
+    if ($('emc_tb')) $('emc_tb').onchange = () => { grab(); render(); };
+    $('emcBack').onclick = $('emcCancel').onclick = () => { draft = null; render(); };
+    $('emcTestA').onclick = () => { grab(); testSend(draft.template_a, draft.subject_a); };
+    if ($('emcTestB')) $('emcTestB').onclick = () => { grab(); testSend(draft.template_b, draft.subject_b); };
+    $('emcSave').onclick = async () => {
+      grab();
+      if (!draft.name || !draft.template_a) return toast('Name and a template are required.', true);
+      if (draft.mode === 'ab' && !draft.template_b) return toast('A/B mode needs a second template.', true);
+      const row = {
+        name: draft.name, mode: draft.mode, from_address: draft.from_address,
+        template_a: draft.template_a,
+        template_b: draft.mode === 'ab' ? draft.template_b : null,
+        subject_a: draft.subject_a || tplById(draft.template_a)?.subject || '',
+        subject_b: draft.mode === 'ab' ? (draft.subject_b || tplById(draft.template_b)?.subject || '') : null
+      };
+      const { data, error } = await sb.from('em_campaigns').insert(row).select().single();
+      if (error) return toast(dbErr(error), true);
+      draft = null; openCampaign = data; render();
+    };
+  }
+
+  async function testSend(templateId, subject){
+    if (!testTo) return toast('Enter a test address first.', true);
+    if (!templateId) return toast('Pick a template first.', true);
+    toast('Sending test…');
+    try {
+      const r = await fetch(EMC_FN, {
+        method:'POST', headers: authHeaders(),
+        body: JSON.stringify({ test_to:testTo, template_id:templateId, subject, from_address: draft ? draft.from_address : FROM_DEF })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (j.ok) toast('Test sent to ' + testTo);
+      else toast(j.error || ('Send failed (HTTP ' + r.status + ')'), true);
+    } catch (e) { toast(String(e), true); }
+  }
+
+  async function renderDetail(box){
+    const { data: c } = await sb.from('em_campaigns').select('*').eq('id', openCampaign.id).single();
+    if (c) openCampaign = c;
+    const camp = openCampaign;
+    const { data: s } = await sb.from('em_campaign_stats').select('*').eq('campaign_id', camp.id);
+    const stats = (s || []).sort((a, b) => String(a.variant).localeCompare(String(b.variant)));
+    const total = stats.reduce((a, r) => a + r.sent + r.failed + r.queued, 0);
+    const done  = stats.reduce((a, r) => a + r.sent + r.failed, 0);
+    const p     = total ? Math.round((done / total) * 100) : 0;
+
+    const cards = stats.map(r => `
+      <div class="emc-card">
+        <h3>${camp.mode === 'ab' ? 'Version ' + esc2(r.variant) : 'Results'}</h3>
+        <table>
+          <tr><td>Sent</td><td>${num(r.sent)}</td></tr>
+          <tr><td>Opens</td><td>${num(r.opens)} <span class="emc-rate">${pct(r.opens, r.sent)}</span></td></tr>
+          <tr><td>Clicks</td><td>${num(r.clicks)} <span class="emc-rate">${pct(r.clicks, r.sent)}</span></td></tr>
+          <tr><td>Bounces</td><td>${num(r.bounces)}</td></tr>
+          <tr><td>Failed</td><td>${num(r.failed)}</td></tr>
+          <tr><td>Still queued</td><td>${num(r.queued)}</td></tr>
+        </table>
+      </div>`).join('');
+
+    box.innerHTML = `
+      <div class="section-card">
+        <div class="toolbar">
+          <button class="btn btn-ghost btn-sm" id="emcBack">← All campaigns</button>
+          <div class="spacer"></div>
+          <span class="pill emc-st-${esc2(camp.status)}">${esc2(camp.status)}</span>
+        </div>
+        <h2 style="margin-top:6px;">${esc2(camp.name)}</h2>
+        <div class="hint">${camp.mode === 'ab' ? 'A/B test — contacts are split 50/50 by a hash of their email, so the split is stable.' : 'Single email to every subscribed contact.'}
+          From ${esc2(camp.from_address || FROM_DEF)}.</div>
+        ${camp.status === 'draft' ? `
+          <div class="emc-warn">This has not been sent. Launch queues every subscribed contact — there is no undo.</div>
+          <div class="row-actions"><button class="btn btn-gold" id="emcLaunch">Launch campaign</button></div>` : ''}
+        ${camp.status === 'sending' ? `
+          <div class="emc-bar"><div style="width:${p}%"></div></div>
+          <div class="hint" style="margin:6px 0 0;">${num(done)} / ${num(total)} sent (${p}%) — batches of ${BATCH_UI}, about 11 emails a second.</div>
+          <div class="row-actions">
+            <button class="btn btn-gold" id="emcResume"${sending ? ' disabled' : ''}>${sending ? 'Sending…' : 'Resume sending'}</button>
+            <span class="save-msg" style="color:var(--sub);font-weight:400;">Keep this tab open while it sends. If it stops, Resume picks up exactly where it left off — nobody gets a duplicate.</span>
+          </div>` : ''}
+      </div>
+      ${stats.length ? `<div class="section-card"><h2>Results</h2>
+        <div class="emc-score">${cards}</div>
+        <div class="row-actions"><button class="btn btn-ghost btn-sm" id="emcRefresh">Refresh stats</button></div>
+        <div class="hint" style="margin:10px 0 0;">Opens are directional — Apple Mail inflates them. Clicks are real. Code redemptions in Square are the truth.</div>
+      </div>` : ''}`;
+
+    $('emcBack').onclick = () => { openCampaign = null; render(); };
+    if ($('emcRefresh')) $('emcRefresh').onclick = render;
+    if ($('emcResume'))  $('emcResume').onclick = runBatches;
+    if ($('emcLaunch'))  $('emcLaunch').onclick = async () => {
+      const { count } = await sb.from('em_contacts').select('id', { count:'exact', head:true }).eq('subscribed', true);
+      if (!count) return toast('No subscribed contacts yet — import some on the Contacts tab.', true);
+      if (!window.confirm('Send "' + camp.name + '" to ' + num(count) + ' subscribed contacts?\n\nThis cannot be undone.')) return;
+      const { error } = await sb.rpc('em_launch_campaign', { p_campaign: camp.id });
+      if (error) return toast(dbErr(error), true);
+      await render();
+      runBatches();
+    };
+  }
+
+  async function runBatches(){
+    if (sending) return;
+    sending = true;
+    if ($('emcResume')) { $('emcResume').disabled = true; $('emcResume').textContent = 'Sending…'; }
+    try {
+      let remaining = 1;
+      while (remaining > 0) {
+        const r = await fetch(EMC_FN, {
+          method:'POST', headers: authHeaders(),
+          body: JSON.stringify({ campaign_id: openCampaign.id })
+        });
+        const j = await r.json().catch(() => ({}));
+        if (j.error) { toast(j.error, true); break; }
+        remaining = j.remaining;
+        await render();
+        if (!$('emcResume') && !$('emcRefresh')) break; // user navigated away
+      }
+    } catch (e) {
+      toast(String(e), true);
+    } finally {
+      sending = false;
+      render();
+    }
+  }
+
+  /* ---------- TEMPLATES ---------- */
+  const STARTERS = window.EMC_STARTERS || [];
+
+  function tplWarnings(html){
+    const w = [];
+    if (!/\{\{UNSUBSCRIBE_URL\}\}/.test(html))
+      w.push('No {{UNSUBSCRIBE_URL}} — Gmail and Outlook will punish you for this. Add it to the footer.');
+    const rel = (html.match(/<img[^>]+src=["'](?!https?:|data:|cid:)[^"']+["']/gi) || []).length;
+    if (rel) w.push(rel + ' image' + (rel > 1 ? 's use' : ' uses') + ' a relative path. Email clients cannot load those — upload them somewhere public and use the full https:// URL.');
+    if (!/\{\{POSTAL_ADDRESS\}\}/.test(html))
+      w.push('No {{POSTAL_ADDRESS}} — CAN-SPAM wants a physical mailing address in the footer.');
+    return w;
+  }
+
+  async function renderTemplates(box){
+    if (editTpl) return renderTplEditor(box);
+    await loadTemplates();
+    const rows = templates.map(t => `
+      <div class="rec-row" data-tpl="${esc2(t.id)}">
+        <div class="rec-main">
+          <div class="rec-title">${esc2(t.name)}</div>
+          <div class="rec-meta">${esc2(t.subject || 'no default subject')}</div>
+        </div>
+        <div class="rec-actions"><button class="btn btn-ghost btn-sm" data-tpl="${esc2(t.id)}">Edit</button></div>
+      </div>`).join('');
+
+    box.innerHTML = `
+      <div class="section-card">
+        <div class="toolbar">
+          <h2 style="margin:0;">Saved templates</h2>
+          <div class="spacer"></div>
+          ${(!templates.length && STARTERS.length) ? '<button class="btn btn-ghost btn-sm" id="emcSeed">Load starter templates</button>' : ''}
+          <button class="btn btn-gold" id="emcNewTpl">＋ New template</button>
+        </div>
+        <div class="rec-list">${rows || '<div class="rec-empty">No templates yet — create one, or load the two cheeseboard starters.</div>'}</div>
+      </div>`;
+
+    $('emcNewTpl').onclick = () => { editTpl = { name:'', subject:'', html:'' }; render(); };
+    if ($('emcSeed')) $('emcSeed').onclick = async () => {
+      $('emcSeed').disabled = true;
+      const { error } = await sb.from('em_templates').insert(STARTERS.map(s => ({ name:s.name, subject:s.subject, html:s.html })));
+      if (error) { toast(dbErr(error), true); $('emcSeed').disabled = false; return; }
+      toast('Loaded ' + STARTERS.length + ' starter templates.');
+      render();
+    };
+    box.querySelectorAll('[data-tpl]').forEach(n => n.onclick = (ev) => {
+      ev.stopPropagation();
+      editTpl = { ...templates.find(t => t.id === n.dataset.tpl) };
+      render();
+    });
+  }
+
+  function renderTplEditor(box){
+    box.innerHTML = `
+      <div class="section-card">
+        <div class="toolbar">
+          <button class="btn btn-ghost btn-sm" id="emcBack">← All templates</button>
+          <div class="spacer"></div>
+          ${editTpl.id ? '<button class="btn btn-wax btn-sm" id="emcDelTpl">Delete</button>' : ''}
+        </div>
+        <div class="emc-editor">
+          <div>
+            <div class="rec-fields" style="grid-template-columns:1fr;">
+              <div class="rf"><label>Template name</label>
+                <input id="emc_tname" value="${esc2(editTpl.name)}" placeholder="Cheeseboard promo — story version" /></div>
+              <div class="rf"><label>Default subject</label>
+                <input id="emc_tsubj" value="${esc2(editTpl.subject)}" /></div>
+              <div class="rf"><label>HTML</label>
+                <textarea id="emc_thtml" class="emc-code" spellcheck="false">${esc2(editTpl.html)}</textarea></div>
+            </div>
+            <div class="hint" style="margin:0 0 8px;">Replaced at send time:
+              <code>{{UNSUBSCRIBE_URL}}</code>, <code>{{POSTAL_ADDRESS}}</code>. Images must be full https:// URLs.</div>
+            <div id="emcTplWarn"></div>
+            <div class="row-actions">
+              <button class="btn btn-gold" id="emcSaveTpl">Save template</button>
+              <button class="btn btn-ghost" id="emcCancelTpl">Cancel</button>
+            </div>
+          </div>
+          <div>
+            <div class="rf"><label>Live preview</label></div>
+            <iframe id="emcPreview" class="emc-preview" sandbox=""></iframe>
+          </div>
+        </div>
+      </div>`;
+
+    const ta = $('emc_thtml');
+    const paint = () => {
+      $('emcPreview').srcdoc = ta.value;
+      const w = tplWarnings(ta.value);
+      $('emcTplWarn').innerHTML = w.length
+        ? '<div class="emc-warn"><strong>Before you send:</strong><ul>' + w.map(x => '<li>' + esc2(x) + '</li>').join('') + '</ul></div>'
+        : '<div class="emc-ok">Footer tokens and image URLs look right.</div>';
+    };
+    let t; ta.oninput = () => { clearTimeout(t); t = setTimeout(paint, 350); };
+    paint();
+
+    $('emcBack').onclick = $('emcCancelTpl').onclick = () => { editTpl = null; render(); };
+    if ($('emcDelTpl')) $('emcDelTpl').onclick = async () => {
+      if (!window.confirm('Delete "' + editTpl.name + '"? Campaigns already sent keep their results.')) return;
+      const { error } = await sb.from('em_templates').delete().eq('id', editTpl.id);
+      if (error) return toast(dbErr(error), true);
+      editTpl = null; toast('Template deleted.'); render();
+    };
+    $('emcSaveTpl').onclick = async () => {
+      const row = { name: $('emc_tname').value.trim(), subject: $('emc_tsubj').value.trim(),
+                    html: ta.value, updated_at: new Date().toISOString() };
+      if (!row.name) return toast('Give the template a name.', true);
+      const { error } = editTpl.id
+        ? await sb.from('em_templates').update(row).eq('id', editTpl.id)
+        : await sb.from('em_templates').insert(row);
+      if (error) return toast(dbErr(error), true);
+      editTpl = null; toast('Template saved.'); render();
+    };
+  }
+
+  /* ---------- CONTACTS ---------- */
+  async function renderContacts(box){
+    const s = await contactStats();
+    box.innerHTML = `
+      <div class="section-card">
+        <h2>Contacts</h2>
+        <div class="hint">One list for every marketing email. Unsubscribes, hard bounces and spam complaints
+          switch a contact off automatically and no import ever switches them back on.</div>
+        <div class="emc-stats">
+          <div><b>${num(s.total)}</b><span>total</span></div>
+          <div><b>${num(s.total - s.unsub)}</b><span>subscribed</span></div>
+          <div><b>${num(s.unsub)}</b><span>opted out</span></div>
+        </div>
+        <div class="row-actions">
+          <button class="btn btn-gold" id="emcImportCust">Import from customers</button>
+          <button class="btn btn-ghost" id="emcImportCsv">Import CSV</button>
+          <input type="file" id="emcCsvFile" accept=".csv,text/csv" style="display:none;" />
+          <span class="save-msg" id="emcImportMsg" style="color:var(--sub);font-weight:400;"></span>
+        </div>
+        <div class="hint" style="margin:12px 0 0;">
+          <strong>Import from customers</strong> pulls every valid email out of the ticket/booking customers table.
+          <strong>Import CSV</strong> takes any file with an email column — a Wix or Square export drops straight in.
+          Both skip anyone already on the list.</div>
+      </div>`;
+
+    const msg = $('emcImportMsg');
+    $('emcImportCust').onclick = async () => {
+      $('emcImportCust').disabled = true; msg.textContent = 'Importing…';
+      const { data, error } = await sb.rpc('em_import_customers');
+      $('emcImportCust').disabled = false;
+      if (error) { msg.textContent = ''; return toast(dbErr(error), true); }
+      toast('Added ' + num(data) + ' new contacts.');
+      render();
+    };
+    $('emcImportCsv').onclick = () => $('emcCsvFile').click();
+    $('emcCsvFile').onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      msg.textContent = 'Reading…';
+      const text = await f.text();
+      const emails = [...new Set(text.split(/\r?\n/)
+        .map(l => (l.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/) || [])[0])
+        .filter(Boolean).map(x => x.toLowerCase()))];
+      if (!emails.length) { msg.textContent = ''; return toast('No email addresses found in that file.', true); }
+      for (let i = 0; i < emails.length; i += 500) {
+        msg.textContent = 'Importing ' + num(Math.min(i + 500, emails.length)) + ' / ' + num(emails.length) + '…';
+        const { error } = await sb.from('em_contacts')
+          .upsert(emails.slice(i, i + 500).map(email => ({ email })), { onConflict:'email', ignoreDuplicates:true });
+        if (error) { msg.textContent = ''; return toast(dbErr(error), true); }
+      }
+      e.target.value = '';
+      toast('Processed ' + num(emails.length) + ' unique addresses.');
+      render();
+    };
+  }
+
+  /* ---------- boot ---------- */
+  window.emcInit = function(){
+    if (booted) return;
+    booted = true;
+    document.querySelectorAll('#emcNav .chip').forEach(c => c.onclick = () => setView(c.dataset.v));
+    render();
+  };
 })();
 
 </script>
