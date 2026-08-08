@@ -376,7 +376,7 @@
     </div>
     <div class="section-card">
       <h2>🗓️ Weekly Schedule — all locations</h2>
-      <div class="hint">All three schedules for the week below. <strong>Nashville and Franklin share one staff pool</strong> — both grids show the combined roster, and a shift belongs to the grid you add it on. Click any cell to add a shift; <strong>drag a shift</strong> to another day or employee to move it; click one to edit, delete or copy it. Approved time off shows as a red <strong>OFF</strong> badge, and staff availability shows as grey <strong>unavail</strong> / green <strong>★</strong> chips. Edits stay private until you hit <strong>📣 Publish &amp; notify</strong> — that emails everyone whose week changed. Staff open their schedule at <strong>schedule.html</strong> with their employee ID.</div>
+      <div class="hint">All three schedules for the week below. <strong>Nashville and Franklin share one staff pool</strong> — both grids show the combined roster, and a shift belongs to the grid you add it on. Click any cell to add a shift; <strong>drag a shift</strong> to another day or employee to copy it there (the original stays put); click one to edit, delete or copy it. Approved time off shows as a red <strong>OFF</strong> badge, and staff availability shows as grey <strong>unavail</strong> / green <strong>★</strong> chips. Edits stay private until you hit <strong>📣 Publish &amp; notify</strong> — that emails everyone whose week changed. Staff open their schedule at <strong>schedule.html</strong> with their employee ID.</div>
       <div class="toolbar">
         <button class="btn btn-ghost btn-sm" onclick="sgMove(-1)">‹ Prev</button>
         <strong id="sgLabel" style="min-width:190px;text-align:center;"></strong>
@@ -1617,11 +1617,11 @@ function sgRender(){
             const label = kind==='off' ? '<span style="text-transform:uppercase;font-size:0.68rem;letter-spacing:0.4px;">Off</span>'
                         : kind==='oncall' ? '<span style="text-transform:uppercase;font-size:0.68rem;letter-spacing:0.4px;">On call</span>'+(noTimes?'':'<span style="display:block;font-weight:600;font-size:0.68rem;">'+sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time)+'</span>')
                         : sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time);
-            bits.push('<div draggable="true" ondragstart="sgDrag(event,\''+loc+'\','+s.id+')" onclick="event.stopPropagation();openShift(\''+loc+'\','+emp.id+',\''+di+'\','+s.id+')" style="'+style+'border-radius:2px;padding:3px 6px;margin:2px 0;font-size:0.74rem;font-weight:700;cursor:grab;line-height:1.3;" title="Drag to move · click to edit">'
+            bits.push('<div draggable="true" ondragstart="sgDrag(event,\''+loc+'\','+s.id+')" onclick="event.stopPropagation();openShift(\''+loc+'\','+emp.id+',\''+di+'\','+s.id+')" style="'+style+'border-radius:2px;padding:3px 6px;margin:2px 0;font-size:0.74rem;font-weight:700;cursor:grab;line-height:1.3;" title="Drag to copy · click to edit">'
               +label
               +(kind!=='off' && s.role?'<span style="display:block;font-weight:600;font-size:0.64rem;opacity:0.85;">'+esc(s.role)+'</span>':'')+'</div>');
           });
-          return '<td onclick="openShift(\''+loc+'\','+emp.id+',\''+di+'\')" ondragover="event.preventDefault()" ondrop="sgDrop(event,\''+loc+'\','+emp.id+',\''+di+'\')" style="cursor:pointer;min-width:104px;" title="Click to add a shift">'+bits.join('')+'</td>';
+          return '<td onclick="openShift(\''+loc+'\','+emp.id+',\''+di+'\')" ondragover="sgOver(event)" ondrop="sgDrop(event,\''+loc+'\','+emp.id+',\''+di+'\')" style="cursor:pointer;min-width:104px;" title="Click to add a shift">'+bits.join('')+'</td>';
         }).join('');
         return '<tr><td style="font-weight:700;white-space:nowrap;">'+esc(emp.name)
           +'<span style="display:block;font-weight:500;font-size:0.7rem;color:var(--sub);">'+esc(emp.role||'')+(hrs?' · '+(Math.round(hrs*10)/10)+' hrs':'')+'</span></td>'+cells+'</tr>';
@@ -1793,24 +1793,38 @@ async function sgCopyPrev(loc){
   setTimeout(()=>{ el.textContent=''; },4500);
 }
 
-/* ── drag & drop: move a shift to another day / employee ── */
+/* ── drag & drop: copy a shift to another day / employee (original stays put) ── */
 let SG_DRAG = null;
 function sgDrag(ev, loc, shiftId){
   SG_DRAG = { loc, shiftId };
-  ev.dataTransfer.effectAllowed = 'move';
+  ev.dataTransfer.effectAllowed = 'copy';
   try{ ev.dataTransfer.setData('text/plain', String(shiftId)); }catch(_){}
+}
+function sgOver(ev){
+  ev.preventDefault();
+  try{ ev.dataTransfer.dropEffect = 'copy'; }catch(_){}
 }
 async function sgDrop(ev, loc, empId, date){
   ev.preventDefault(); ev.stopPropagation();
   if(!SG_DRAG || SG_DRAG.loc !== loc){ SG_DRAG=null; return; } // shifts stay on their own grid
   const s = SG[loc].shifts.find(x=>x.id===SG_DRAG.shiftId);
   SG_DRAG = null;
-  if(!s || (s.employee_id===empId && s.date===date)) return;
+  if(!s || (s.employee_id===empId && s.date===date)) return; // same slot — nothing to copy
   const emp = SG[loc].emps.find(e=>e.id===empId);
   const el = document.getElementById('sgMsg-'+loc);
-  const r = await fn('move-shift', { id:s.id, employee_id:empId, date });
-  if(r.ok){ el.className='save-msg'; el.textContent='✅ Moved to '+(emp?emp.name:'employee')+' · '+new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'numeric',day:'numeric'}); }
-  else { el.className='save-msg err'; el.textContent='❌ '+(r.data.error||'Move failed'); }
+  const kind = sgKind(s);
+  const r = await fn('add-shift', {
+    employee_id: empId, date,
+    start_time: String(s.start_time||'').slice(0,5) || '00:00',
+    end_time: String(s.end_time||'').slice(0,5) || '00:00',
+    kind, role: kind==='off' ? '' : (s.role||''), note: s.note||'', location: loc
+  });
+  if(r.ok){
+    el.className='save-msg';
+    el.textContent='✅ Copied to '+(emp?emp.name:'employee')+' · '+new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'numeric',day:'numeric'})
+      +(emp && sgOff(loc,emp.name,date)?' — ⚠️ they have approved time off that day':'');
+  }
+  else { el.className='save-msg err'; el.textContent='❌ '+(r.data.error||'Copy failed'); }
   setTimeout(()=>{ el.textContent=''; },4500);
   sgLoad();
 }
