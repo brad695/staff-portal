@@ -8247,6 +8247,13 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
             </div>
             <div class="hint" style="margin:0 0 8px;">Replaced at send time:
               <code>{{UNSUBSCRIBE_URL}}</code>, <code>{{POSTAL_ADDRESS}}</code>. Images must be full https:// URLs.</div>
+            <div class="emc-inline" style="margin:0 0 8px;">
+              <button type="button" class="btn btn-ghost btn-sm" id="emcImgPick">Host an image</button>
+              <input type="file" id="emcImgFile" accept="image/*" style="display:none;" />
+              <input id="emcImgUrl" placeholder="…or paste a Canva / image URL" />
+              <button type="button" class="btn btn-ghost btn-sm" id="emcImgGo">Import</button>
+            </div>
+            <div id="emcImgOut"></div>
             <div id="emcTplWarn"></div>
             <div class="row-actions">
               <button class="btn btn-gold" id="emcSaveTpl">Save template</button>
@@ -8270,6 +8277,43 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     };
     let t; ta.oninput = () => { clearTimeout(t); t = setTimeout(paint, 350); };
     paint();
+
+    /* host an image, hand back a URL you can paste into the HTML above */
+    const imgOut = (u) => {
+      $('emcImgOut').innerHTML =
+        '<div class="emc-ok" style="margin:0 0 8px;">Hosted. Paste this into your HTML:'
+        + '<div class="emc-inline" style="margin-top:6px;">'
+        + '<input readonly id="emcImgResult" value="' + esc2(u) + '" />'
+        + '<button type="button" class="btn btn-ghost btn-sm" id="emcImgCopy">Copy</button></div></div>';
+      $('emcImgCopy').onclick = () => {
+        const f = $('emcImgResult'); f.select();
+        navigator.clipboard ? navigator.clipboard.writeText(f.value).then(() => toast('URL copied.'))
+                            : toast('Select and copy the URL.');
+      };
+    };
+    const imgBusy = (on) => { $('emcImgGo').disabled = on; $('emcImgPick').disabled = on; };
+    $('emcImgPick').onclick = () => $('emcImgFile').click();
+    $('emcImgFile').onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      imgBusy(true); toast('Uploading…');
+      const ext  = (f.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g,'');
+      const path = new Date().toISOString().slice(0,10) + '/' + Math.random().toString(36).slice(2,10) + '.' + ext;
+      const up = await sb.storage.from('email-assets').upload(path, f, { contentType:f.type, upsert:false });
+      imgBusy(false); e.target.value = '';
+      if (up.error) return toast('Upload failed: ' + up.error.message, true);
+      imgOut(sb.storage.from('email-assets').getPublicUrl(path).data.publicUrl);
+      toast('Image hosted.');
+    };
+    $('emcImgGo').onclick = async () => {
+      const u = $('emcImgUrl').value.trim();
+      if (!u) return toast('Paste an image URL first.', true);
+      imgBusy(true); toast('Fetching…');
+      try {
+        const hosted = await window.emcHostImage(u, 'email-assets', $('emc_tname').value);
+        $('emcImgUrl').value = ''; imgOut(hosted); toast('Image hosted.');
+      } catch (err) { toast(String(err.message || err), true); }
+      imgBusy(false);
+    };
 
     $('emcBack').onclick = $('emcCancelTpl').onclick = () => { editTpl = null; render(); };
     if ($('emcDelTpl')) $('emcDelTpl').onclick = async () => {
@@ -8344,6 +8388,22 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       render();
     };
   }
+
+  /* ---------- shared: host an image somewhere permanent ---------- */
+  // Canva export links expire within hours. Email clients and the Instagram API both
+  // fetch images later, from their own servers, so the bytes have to be copied into
+  // our own bucket or the picture is gone by the time anyone looks.
+  window.emcHostImage = async function(url, bucket, name){
+    const r = await fetch(SB_URL + '/functions/v1/asset-import', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'apikey':SB_KEY,
+                'Authorization':'Bearer ' + (SESSION ? SESSION.access_token : SB_KEY) },
+      body: JSON.stringify({ url:url, bucket:bucket, name:name })
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!j.ok) throw new Error(j.error || ('import failed (HTTP ' + r.status + ')'));
+    return j.public_url;
+  };
 
   /* ---------- boot ---------- */
   window.emcInit = function(){
@@ -8454,8 +8514,10 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
                 <div class="emc-inline">
                   <button type="button" class="btn btn-ghost btn-sm" id="socPick">Choose image</button>
                   <input type="file" id="socFile" accept="image/*" style="display:none;" />
-                  <span class="save-msg" id="socUpMsg" style="color:var(--sub);font-weight:400;"></span>
-                </div></div>
+                  <input id="socUrl" placeholder="…or paste a Canva / image URL" />
+                  <button type="button" class="btn btn-ghost btn-sm" id="socImport">Import</button>
+                </div>
+                <span class="save-msg" id="socUpMsg" style="color:var(--sub);font-weight:400;"></span></div>
               <div class="rf"><label>Post to</label><div class="rec-radios">${chips}</div></div>
             </div>
             <div class="row-actions">
@@ -8505,6 +8567,22 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 
     $('socPick').onclick = () => $('socFile').click();
     $('socFile').onchange = (e) => { draft.caption = cap.value; upload(e.target.files[0]); };
+    $('socImport').onclick = async () => {
+      const u = $('socUrl').value.trim();
+      if (!u) return toast('Paste an image URL first.', true);
+      draft.caption = cap.value;
+      $('socImport').disabled = true;
+      $('socUpMsg').textContent = 'Fetching\u2026';
+      try {
+        draft.image_url = await window.emcHostImage(u, 'social-assets', draft.caption.slice(0, 40));
+        toast('Image hosted.');
+        render();
+      } catch (err) {
+        $('socUpMsg').textContent = '';
+        $('socImport').disabled = false;
+        toast(String(err.message || err), true);
+      }
+    };
     $('socClear').onclick = () => { draft = { caption:'', image_url:'', platforms:['instagram','facebook'] }; render(); };
     $('socDraft').onclick = () => { draft.caption = cap.value; save('draft'); };
     $('socPost').onclick  = () => { draft.caption = cap.value; save('send'); };
