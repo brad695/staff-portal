@@ -39,7 +39,7 @@
     }
     /* very small phones (<=340px): shrink the tiles rather than let the two-up
        grid overflow. Deliberately NOT overflow-wrap:break-word — that shreds
-       longer labels like "Onboarding" into single letters. */
+       longer labels like "Stuff to Know" into single letters. */
     @media (max-width:340px){
       .tiles{ gap:10px; padding:12px 12px 2px; }
       .tile{ padding:10px 12px; gap:10px; }
@@ -237,49 +237,19 @@
     .spin{ display:inline-block; width:18px; height:18px; border:3px solid var(--line); border-top-color:var(--accent); border-radius:50%; animation:sp .7s linear infinite; vertical-align:middle; }
     @keyframes sp{ to{ transform:rotate(360deg);} }
 
-    /* onboarding */
-    .ob-progress{ background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-bottom:14px; }
-    .ob-progress .lbl{ display:flex; font-size:0.82rem; font-weight:700; color:var(--sub); margin-bottom:9px; }
-    .ob-progress .lbl .pct{ margin-left:auto; color:var(--accent); }
-    .ob-bar{ height:8px; background:rgba(20,40,60,0.09); border-radius:6px; overflow:hidden; }
-    .ob-bar > span{ display:block; height:100%; background:var(--accent); border-radius:6px; transition:width .3s ease; }
-    .ob-step{ display:flex; gap:12px; align-items:flex-start; background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-bottom:10px; }
-    .ob-step.done{ border-color:var(--accent); }
-    .ob-check{ width:26px; height:26px; border-radius:6px; border:2px solid var(--line); background:transparent; color:transparent; flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:15px; margin-top:1px; transition:all .12s; }
-    .ob-step.done .ob-check{ background:var(--accent); border-color:var(--accent); color:#fff; }
-    .ob-main{ flex:1; min-width:0; cursor:pointer; }
-    .ob-title{ font-weight:700; font-size:0.98rem; color:var(--ink); display:flex; align-items:center; gap:8px; line-height:1.3; }
-    .ob-step.done .ob-title{ color:var(--sub); text-decoration:line-through; }
-    .ob-title .chev{ margin-left:auto; color:var(--sub); font-size:0.9rem; transition:transform .2s; flex-shrink:0; }
-    .ob-step.open .ob-title .chev{ transform:rotate(180deg); }
-    .ob-body{ display:none; font-size:0.9rem; color:var(--sub); line-height:1.55; margin-top:8px; white-space:pre-wrap; }
-    .ob-step.open .ob-body{ display:block; }
-
     /* stuff to know */
     .info-card{ background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:13px 15px; margin-bottom:10px; }
     .info-card .il{ font-size:0.7rem; font-weight:800; text-transform:uppercase; letter-spacing:0.4px; color:var(--accent); margin-bottom:4px; }
     .info-card .iv{ font-size:0.95rem; color:var(--ink); line-height:1.55; white-space:pre-wrap; }
     .info-card .iv a{ color:var(--accent); font-weight:700; text-decoration:none; word-break:break-all; }
 
-    /* onboarding intake form */
-    .ob-intro{ font-size:0.9rem; color:var(--sub); line-height:1.55; margin-bottom:14px; }
-    .ob-form .form-card h3{ display:flex; align-items:center; gap:8px; }
-    .ob-form .form-card h3 i{ color:var(--accent); font-size:19px; }
     .req{ color:var(--accent); }
     .field select, .field textarea{ width:100%; padding:12px 13px; border:1px solid var(--line); border-radius:13px; font-size:0.92rem; font-family:inherit; background:#f5f8fb; color:var(--ink); }
     .field textarea{ resize:vertical; min-height:60px; }
-    .ob-note{ font-size:0.78rem; color:#f0a274; background:rgba(236,138,94,0.10); border:1px solid rgba(236,138,94,0.35); border-radius:8px; padding:9px 11px; margin-bottom:13px; line-height:1.5; }
-    .ob-days{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:4px; }
-    .ob-day{ padding:8px 13px; border:1px solid var(--line); border-radius:8px; background:#f0f4f8; color:var(--ink); font-size:0.82rem; font-weight:700; cursor:pointer; user-select:none; }
-    .ob-day.sel{ background:var(--accent); border-color:var(--accent); color:#fff; }
-    .ob-ack{ display:flex; gap:11px; align-items:flex-start; margin-bottom:12px; cursor:pointer; font-size:0.9rem; color:var(--ink); line-height:1.4; }
-    .ob-ack input{ width:20px; height:20px; margin-top:1px; accent-color:var(--accent); flex-shrink:0; }
-    .ob-file{ display:block; width:100%; font-size:0.84rem; color:var(--sub); padding:11px; border:1px dashed var(--line); border-radius:12px; background:#f5f8fb; cursor:pointer; }
-    .ob-file::file-selector-button{ background:var(--accent); color:#fff; border:none; border-radius:8px; padding:7px 12px; font-family:inherit; font-weight:700; margin-right:10px; cursor:pointer; }
     .to-msg.err{ color:#f0897c; } .to-msg.ok{ color:var(--mint-i); }
 
     /* ── deep-blue app background: keep labels that sit directly on it light (white cards keep their dark text) ── */
-    .section-label, .res-stats, .cal-legend, .empty, .fg label, .ob-intro{ color:#8ca0b0; }
+    .section-label, .res-stats, .cal-legend, .empty, .fg label{ color:#8ca0b0; }
     #view-calendar .cal-bar h3{ color:#eaf1f6; }
     .home-preview .section-label{ color:var(--sub); }
 
@@ -304,8 +274,6 @@
       /* section views share the wider frame */
       .sec-head{ padding:18px 28px 12px; }
       .sec-body{ padding:8px 28px 24px; }
-      /* forms & the onboarding intake read better capped and centered, not stretched */
-      .ob-form, #obThanks, #view-onboarding .ob-intro{ max-width:680px; margin-left:auto; margin-right:auto; }
       /* keep the floating home button aligned with the app column, not the whole window */
       .botbar{ left:50%; right:auto; transform:translateX(-50%); }
     }
@@ -378,9 +346,9 @@
       <button class="tile" id="tile-calendar" onclick="tileTap('calendar')"><span class="ic ic-lav"><i class="ti ti-calendar-month"></i></span><span class="tl">Calendar</span></button>
       <button class="tile" id="tile-myshifts" onclick="location.href='schedule.html'"><span class="ic ic-mint"><i class="ti ti-calendar-week"></i></span><span class="tl">Schedule</span></button>
       <button class="tile" id="tile-events" onclick="tileTap('events')"><span class="ic ic-pink"><i class="ti ti-confetti"></i></span><span class="tl">Events</span></button>
-      <button class="tile" id="tile-onboarding" onclick="tileTap('onboarding')"><span class="ic ic-gray"><i class="ti ti-user-plus"></i></span><span class="tl" style="color:var(--gray-i);">Onboarding</span><span class="badge-soon">Soon</span></button>
       <button class="tile" id="tile-stuff" onclick="tileTap('stuff')"><span class="ic ic-sky"><i class="ti ti-info-circle"></i></span><span class="tl">Stuff to Know</span></button>
       <button class="tile" id="tile-cheese-entry" onclick="location.href='manager.html#plu'"><span class="ic ic-butter"><i class="ti ti-barcode"></i></span><span class="tl">Cheese Entry</span></button>
+      <button class="tile" id="tile-catering" onclick="location.href='manager.html#preorders'"><span class="ic ic-peach"><i class="ti ti-file-check"></i></span><span class="tl">Catering</span></button>
     </div>
     <div id="homePreview" class="home-preview" style="display:none;"></div>
   </div>
@@ -453,79 +421,6 @@
     <div class="sec-head"><button class="back-btn" onclick="showView('home')">‹</button><h2>Events</h2></div>
     <div class="sec-body">
       <div id="eventsGrid"></div>
-    </div>
-  </div>
-
-  <!-- ══ ONBOARDING (new-hire intake form) ══ -->
-  <div id="view-onboarding" class="view">
-    <div class="sec-head"><button class="back-btn" onclick="showView('home')">‹</button><h2>Onboarding</h2></div>
-    <div class="sec-body">
-      <div id="obThanks" style="display:none"></div>
-      <form id="obForm" class="ob-form" onsubmit="submitOnboarding(event)">
-        <div class="ob-intro">Welcome to Grey's! Please fill this out before your first shift. Your information is private and goes only to management.</div>
-
-        <div class="form-card">
-          <h3><i class="ti ti-user"></i> Personal &amp; contact</h3>
-          <div class="field"><label>Full legal name <span class="req">*</span></label><input type="text" id="obName" placeholder="First & last name" required></div>
-          <div class="row2"><div class="field"><label>Preferred name</label><input type="text" id="obPreferred" placeholder="What you go by"></div>
-            <div class="field"><label>Date of birth</label><input type="date" id="obDob"></div></div>
-          <div class="row2"><div class="field"><label>Phone</label><input type="tel" id="obPhone" placeholder="(901) 555-0123"></div>
-            <div class="field"><label>Email</label><input type="email" id="obEmail" placeholder="you@email.com"></div></div>
-          <div class="field"><label>Home address</label><input type="text" id="obAddress" placeholder="Street, city, state, ZIP"></div>
-          <div class="row2"><div class="field"><label>Emergency contact</label><input type="text" id="obEmName" placeholder="Name"></div>
-            <div class="field"><label>Emergency phone</label><input type="tel" id="obEmPhone" placeholder="(901) 555-0123"></div></div>
-        </div>
-
-        <div class="form-card">
-          <h3><i class="ti ti-calendar-week"></i> Availability</h3>
-          <div class="field"><label>Days you can work</label>
-            <div class="ob-days">
-              <span class="ob-day" data-day="Mon" onclick="this.classList.toggle('sel')">Mon</span>
-              <span class="ob-day" data-day="Tue" onclick="this.classList.toggle('sel')">Tue</span>
-              <span class="ob-day" data-day="Wed" onclick="this.classList.toggle('sel')">Wed</span>
-              <span class="ob-day" data-day="Thu" onclick="this.classList.toggle('sel')">Thu</span>
-              <span class="ob-day" data-day="Fri" onclick="this.classList.toggle('sel')">Fri</span>
-              <span class="ob-day" data-day="Sat" onclick="this.classList.toggle('sel')">Sat</span>
-              <span class="ob-day" data-day="Sun" onclick="this.classList.toggle('sel')">Sun</span>
-            </div>
-          </div>
-          <div class="field"><label>Typical hours you're available</label><input type="text" id="obHours" placeholder="e.g. weekdays 4pm–close, weekends open"></div>
-        </div>
-
-        <div class="form-card">
-          <h3><i class="ti ti-briefcase"></i> Start details</h3>
-          <div class="row2"><div class="field"><label>Available start date</label><input type="date" id="obStart"></div>
-            <div class="field"><label>Shirt size</label><select id="obShirt"><option value="">—</option><option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option></select></div></div>
-        </div>
-
-        <div class="form-card">
-          <h3><i class="ti ti-building-bank"></i> Direct deposit</h3>
-          <div class="ob-note">For payroll only. Stored securely and visible only to management.</div>
-          <div class="field"><label>Bank name</label><input type="text" id="obBank" placeholder="e.g. Regions Bank"></div>
-          <div class="row2"><div class="field"><label>Routing number</label><input type="text" id="obRouting" inputmode="numeric" placeholder="9 digits"></div>
-            <div class="field"><label>Account number</label><input type="text" id="obAccount" inputmode="numeric" placeholder="Account #"></div></div>
-          <div class="field"><label>Account type</label><select id="obAcctType"><option value="">—</option><option>Checking</option><option>Savings</option></select></div>
-        </div>
-
-        <div class="form-card">
-          <h3><i class="ti ti-id"></i> Tax &amp; ID</h3>
-          <div class="ob-note">Your SSN is needed for tax forms (W-4). Bring your <strong>original</strong> ID on day one — federal I-9 law requires a manager to inspect it in person; the photo below is just to get a head start.</div>
-          <div class="field"><label>Social Security number</label><input type="text" id="obSsn" inputmode="numeric" placeholder="XXX-XX-XXXX"></div>
-          <div class="field"><label>Photo of your government ID (license or passport)</label><input type="file" id="obId" class="ob-file" accept="image/*" capture="environment"></div>
-        </div>
-
-        <div class="form-card">
-          <h3><i class="ti ti-file-check"></i> Acknowledgements</h3>
-          <label class="ob-ack"><input type="checkbox" id="obAckHandbook"> I have read and agree to the Employee Handbook.</label>
-          <label class="ob-ack"><input type="checkbox" id="obAckSafety"> I have read and agree to the Safety &amp; Food-Handling guidelines.</label>
-          <label class="ob-ack"><input type="checkbox" id="obAckAccurate"> I confirm the information above is accurate and complete.</label>
-          <div class="field"><label>Signature — type your full name <span class="req">*</span></label><input type="text" id="obSign" placeholder="Your full name"></div>
-          <div style="font-size:0.76rem;color:var(--sub);margin-top:-4px;">Typing your name acts as your signature, dated today.</div>
-        </div>
-
-        <button type="submit" id="obSubmit" class="btn btn-primary btn-block">Submit onboarding</button>
-        <div class="to-msg" id="obMsg"></div>
-      </form>
     </div>
   </div>
 
@@ -604,7 +499,7 @@ function closePreview(){
 }
 function tileTap(section){
   if (section === 'stuff'){ closePreview(); showView(section); return; }   // content sections open directly
-  if (_openTile === section){ if (section === 'requestoff' || section === 'onboarding'){ closePreview(); return; } showView(section); return; }   // second tap → full section (requestoff/onboarding just collapse)
+  if (_openTile === section){ if (section === 'requestoff'){ closePreview(); return; } showView(section); return; }   // second tap → full section (requestoff just collapses)
   _openTile = section;
   document.querySelectorAll('.tile').forEach(t => t.classList.remove('on'));
   const tb = document.getElementById('tile-' + section); if (tb) tb.classList.add('on');
@@ -658,9 +553,6 @@ function renderPreview(section){
       + '<div class="section-label" style="margin:14px 0 8px;">Your requests</div><div id="toList"></div>';
     const ts = document.getElementById('toStart'); if (ts) ts.value = fmt(new Date());
     renderTimeOffList();
-  } else if (section === 'onboarding'){
-    p.innerHTML = '<div class="pv-head"><span class="pv-title"><i class="ti ti-user-plus"></i> Onboarding</span></div>'
-      + '<div class="pv-empty">Coming soon — new-hire onboarding will live here.</div>';
   }
 }
 
@@ -701,62 +593,6 @@ async function loadItems(){
   renderStuff();
   if (document.getElementById('view-specials').classList.contains('active')) renderSpecialsFull();
   if (document.getElementById('view-calendar').classList.contains('active')) renderCalendar();
-}
-
-// ── ONBOARDING (new-hire intake form → secure submit via Edge Function) ──
-function obResizeImage(file, maxDim, quality){
-  return new Promise((res, rej)=>{
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = ()=>{
-      let w=img.naturalWidth, h=img.naturalHeight;
-      if(Math.max(w,h) > maxDim){ const s=maxDim/Math.max(w,h); w=Math.round(w*s); h=Math.round(h*s); }
-      const c=document.createElement('canvas'); c.width=w; c.height=h;
-      c.getContext('2d').drawImage(img,0,0,w,h);
-      URL.revokeObjectURL(url);
-      try{ res(c.toDataURL('image/jpeg', quality)); }catch(err){ rej(err); }
-    };
-    img.onerror = ()=>{ URL.revokeObjectURL(url); rej(new Error('image')); };
-    img.src = url;
-  });
-}
-async function submitOnboarding(e){
-  e.preventDefault();
-  const g = id => document.getElementById(id);
-  const msg = g('obMsg');
-  const fail = t => { msg.textContent = t; msg.className='to-msg err'; msg.style.display='block'; window.scrollTo(0, document.body.scrollHeight); };
-  const name = g('obName').value.trim();
-  if(!name) return fail('Please enter your full legal name.');
-  if(!g('obSign').value.trim()) return fail('Please type your name as a signature at the bottom.');
-  const btn = g('obSubmit'); const orig = btn.textContent;
-  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Submitting…'; msg.style.display='none';
-  let idImage = '';
-  const f = g('obId').files[0];
-  if(f){ try{ idImage = await obResizeImage(f, 1400, 0.7); }catch(_){ /* submit without image if it fails */ } }
-  const days = Array.from(document.querySelectorAll('.ob-day.sel')).map(d=>d.dataset.day);
-  const hours = g('obHours').value.trim();
-  const availability = [days.join(', '), hours].filter(Boolean).join(days.length && hours ? ' — ' : '');
-  const payload = {
-    full_name:name, preferred_name:g('obPreferred').value.trim(), dob:g('obDob').value||null,
-    email:g('obEmail').value.trim(), phone:g('obPhone').value.trim(), address:g('obAddress').value.trim(),
-    emergency_name:g('obEmName').value.trim(), emergency_phone:g('obEmPhone').value.trim(),
-    ssn:g('obSsn').value.trim(), bank_name:g('obBank').value.trim(), routing:g('obRouting').value.trim(),
-    account:g('obAccount').value.trim(), account_type:g('obAcctType').value,
-    availability, start_date:g('obStart').value||null, shirt_size:g('obShirt').value,
-    ack_handbook:g('obAckHandbook').checked, ack_safety:g('obAckSafety').checked, ack_policies:g('obAckAccurate').checked,
-    ack_signature:g('obSign').value.trim(), idImage
-  };
-  try{
-    const r = await fetch(FN_URL+'?action=submit-onboarding', { method:'POST', headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_KEY }, body:JSON.stringify(payload) });
-    const d = await r.json().catch(()=>({}));
-    if(r.ok && d.ok){
-      g('obForm').style.display='none';
-      const t = g('obThanks');
-      t.style.display='block';
-      t.innerHTML = '<div class="empty"><span class="ic"><i class="ti ti-circle-check"></i></span><strong>Thanks, '+esc(name)+'!</strong><br>Your onboarding info was submitted to management.<br>Remember to bring your original ID for your first shift.</div>';
-      window.scrollTo(0,0);
-    } else { btn.disabled=false; btn.textContent=orig; fail('❌ '+(d.error||'Something went wrong. Please try again.')); }
-  }catch(err){ btn.disabled=false; btn.textContent=orig; fail('❌ Network error. Please try again.'); }
 }
 
 // ── STUFF TO KNOW (quick reference) ──
