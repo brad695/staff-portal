@@ -257,6 +257,66 @@
       .po-split{ grid-template-columns:1fr; }
       .po-cart{ border-left:none; padding-left:0; border-top:1px solid var(--line-soft); padding-top:18px; }
     }
+    /* ═══ NAV v2 — 7 sections, sub-tabs inside the panel ═══
+       The original .tab elements are MOVED into per-section strips at runtime,
+       so mtab()/tkTab()/ccTab() and their onclick attributes keep working. */
+    .tabs{ padding:10px 0; gap:2px; position:sticky; top:0; align-self:flex-start; max-height:100vh; overflow-y:auto; }
+    .sect{ display:flex; align-items:center; gap:12px; width:100%; background:none; border:none;
+           border-left:3px solid transparent; padding:0 18px; min-height:52px; cursor:pointer;
+           font:inherit; font-size:0.82rem; font-weight:700; color:#777; text-align:left; letter-spacing:0.3px; }
+    .sect:hover{ color:#111; background:#efefef; }
+    .sect.on{ color:#111; border-left-color:var(--cheddar); background:#fff; }
+    .sect .ico{ font-size:1.15rem; width:24px; text-align:center; flex:none; }
+    .sect .lbl{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+    .lbl-phone{ display:none; }
+
+    /* sub-tab strip, sits at the top of the panel area */
+    .subbar{ border-bottom:1px solid var(--line); background:#fff; position:sticky; top:0; z-index:40; }
+    .subgrp{ display:none; gap:6px; padding:10px 28px; overflow-x:auto; scrollbar-width:none; }
+    .subgrp::-webkit-scrollbar{ display:none; }
+    .subgrp.on{ display:flex; }
+    .subbar .tab{ border:1px solid var(--line); border-radius:var(--r); padding:11px 16px; min-height:44px;
+                  display:flex; align-items:center; white-space:nowrap; font-size:0.8rem; font-weight:700;
+                  text-transform:none; letter-spacing:0; color:var(--sub); background:none; flex:none; }
+    .subbar .tab:hover{ background:#f4f4f4; color:var(--ink); }
+    .subbar .tab.active{ background:var(--gold); border-color:var(--gold); color:#1a1a1a; }
+    .subbar .tab-head{ display:none; }
+
+    /* the "More" sheet (mobile) */
+    .navmore-bg{ display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:960; }
+    .navmore-bg.show{ display:block; }
+    .navmore{ position:fixed; left:0; right:0; bottom:0; background:#fff; border-radius:14px 14px 0 0;
+              padding:10px 0 calc(10px + env(safe-area-inset-bottom)); z-index:961; max-height:76vh; overflow:auto; }
+    .navmore .grab{ width:42px; height:4px; background:#ddd; border-radius:99px; margin:6px auto 10px; }
+    .navmore .sect{ border-left:none; border-top:none; min-height:58px; font-size:0.95rem;
+                    flex-direction:row; gap:14px; text-align:left; padding:0 22px; letter-spacing:0.3px;
+                    justify-content:flex-start; }
+    .navmore .sect .ico{ font-size:1.2rem; width:26px; }
+    .navmore .lbl-desk{ display:inline; } .navmore .lbl-phone{ display:none; }
+    .navmore .sect.on{ background:#faf6ea; }
+
+    @media(max-width:820px){
+      .tabs{ position:fixed; left:0; right:0; bottom:0; top:auto; width:100%; max-height:none;
+             flex-direction:row; overflow:visible; padding:0 0 env(safe-area-inset-bottom);
+             border-right:none; border-top:1px solid #e2e2e2; background:#fff; z-index:950;
+             box-shadow:0 -2px 12px rgba(0,0,0,0.07); }
+      .sect{ flex:1 1 0; min-width:0; flex-direction:column; gap:3px; justify-content:center; padding:8px 2px;
+             min-height:62px; border-left:none; border-top:3px solid transparent; text-align:center;
+             font-size:0.63rem; letter-spacing:0.2px; }
+      .sect:hover{ background:none; }
+      .sect.on{ border-left-color:transparent; border-top-color:var(--cheddar); background:#fffdf7; }
+      .sect .ico{ font-size:1.3rem; width:auto; }
+      .lbl-desk{ display:none; } .lbl-phone{ display:block; }
+      .sect.hide-mobile{ display:none; }
+      .subgrp{ padding:8px 14px; }
+      .subbar .tab{ padding:12px 15px; min-height:46px; }
+      .main{ padding-bottom:78px; }          /* clear the bottom bar */
+      .panel{ padding:18px 14px; }
+      .po-modal-bg{ z-index:970; }
+    }
+    @media(min-width:821px){
+      .sect.more{ display:none; }
+    }
 </style>
 </head>
 <body>
@@ -9367,6 +9427,171 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     drawCart();
     loadDevices();
   };
+})();
+</script>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   NAV v2 — sections + sub-tabs
+   25 tabs in one list was unusable on a phone. This rebuilds the nav at
+   runtime from the existing markup: the .tab-head elements become 7
+   sections, and the .tab elements are MOVED (not cloned) into a sub-tab
+   strip per section. Moving them means every onclick attribute, and
+   mtab()/tkTab()/ccTab()'s own querySelector('.tab[onclick*=…]') lookups,
+   keep working untouched.
+   Desktop: icon rail on the left. Phone: fixed bottom bar, 4 sections +
+   More, with the sub-tabs scrolling across the top.
+   ═══════════════════════════════════════════════════════════════════ */
+(function(){
+  // icon + short phone label, keyed by the tab-head text. Reorder PRIMARY to
+  // change which four sections get a slot on the phone bar.
+  const META = {
+    'Staff':                  { ico:'👥', desk:'Staff',       phone:'Staff'    },
+    'Events & Reservations':  { ico:'🗓',  desk:'Events',      phone:'Events'   },
+    'Tickets & Classes':      { ico:'🎟',  desk:'Tickets',     phone:'Tickets'  },
+    'Cheese Case':            { ico:'🧀', desk:'Cheese Case', phone:'Cheese'   },
+    'Marketing':              { ico:'📣', desk:'Marketing',   phone:'Mktg'     },
+    'Catering':               { ico:'🥂', desk:'Catering',    phone:'Catering' },
+    'Cheese Club':            { ico:'📦', desk:'Cheese Club', phone:'Club'     }
+  };
+  const PRIMARY = ['Staff','Tickets & Classes','Cheese Case','Catering'];
+
+  function build(){
+    const rail = document.querySelector('.tabs');
+    const main = document.querySelector('.main');
+    if(!rail || !main || rail.dataset.v2) return;
+
+    // 1. read the existing flat list into groups
+    const groups = [];
+    let cur = null;
+    Array.from(rail.children).forEach(el=>{
+      if(el.classList.contains('tab-head')){
+        cur = { name: el.textContent.trim(), tabs: [] };
+        groups.push(cur);
+      } else if(el.classList.contains('tab')){
+        if(!cur){ cur = { name:'Staff', tabs:[] }; groups.push(cur); }
+        cur.tabs.push(el);
+      }
+    });
+    if(!groups.length) return;
+
+    // 2. sub-tab strips go at the top of the content area
+    const subbar = document.createElement('div');
+    subbar.className = 'subbar';
+    groups.forEach((g,i)=>{
+      const strip = document.createElement('div');
+      strip.className = 'subgrp';
+      strip.dataset.s = i;
+      g.tabs.forEach(t=> strip.appendChild(t));   // move, don't clone
+      subbar.appendChild(strip);
+      g.strip = strip;
+    });
+    main.insertBefore(subbar, main.firstChild);
+
+    // 3. the rail becomes section buttons
+    rail.innerHTML = '';
+    rail.dataset.v2 = '1';
+    groups.forEach((g,i)=>{
+      const m = META[g.name] || { ico:'•', desk:g.name, phone:g.name };
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sect' + (PRIMARY.includes(g.name) ? '' : ' hide-mobile');
+      b.dataset.s = i;
+      b.innerHTML = '<span class="ico">'+m.ico+'</span>'
+                  + '<span class="lbl lbl-desk"></span><span class="lbl lbl-phone"></span>';
+      b.querySelector('.lbl-desk').textContent  = m.desk  || g.name;
+      b.querySelector('.lbl-phone').textContent = m.phone || g.name;
+      b.addEventListener('click', ()=> openSection(i, true));
+      rail.appendChild(b);
+      g.btn = b;
+    });
+
+    // 4. "More" — phone only, holds every section
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'sect more';
+    more.innerHTML = '<span class="ico">⋯</span><span class="lbl">More</span>';
+    rail.appendChild(more);
+
+    const bg = document.createElement('div');
+    bg.className = 'navmore-bg';
+    const sheet = document.createElement('div');
+    sheet.className = 'navmore';
+    sheet.innerHTML = '<div class="grab"></div>';
+    groups.forEach((g,i)=>{
+      const m = META[g.name] || { ico:'•' };
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'sect'; b.dataset.s = i;
+      b.innerHTML = '<span class="ico">'+m.ico+'</span><span class="lbl"></span>';
+      b.querySelector('.lbl').textContent = g.name;   // full name, there's room
+      b.addEventListener('click', ()=>{ closeMore(); openSection(i, true); });
+      sheet.appendChild(b);
+      g.sheetBtn = b;
+    });
+    document.body.appendChild(bg); document.body.appendChild(sheet);
+    const openMore  = ()=>{ bg.classList.add('show'); sheet.classList.add('show'); sheet.style.display='block'; };
+    const closeMore = ()=>{ bg.classList.remove('show'); sheet.style.display='none'; };
+    sheet.style.display = 'none';
+    more.addEventListener('click', openMore);
+    bg.addEventListener('click', closeMore);
+
+    window.__NAV = { groups, more };
+
+    // 5. show whichever section owns the tab that's already active
+    const active = document.querySelector('.tab.active');
+    const start = Math.max(0, groups.findIndex(g=> g.tabs.includes(active)));
+    openSection(start, false);
+  }
+
+  // Reveal a section. `fire` clicks its first tab so the panel follows along;
+  // syncing from an existing .active tab must not re-fire anything.
+  function openSection(i, fire){
+    const G = window.__NAV; if(!G) return;
+    G.groups.forEach((g,j)=>{
+      const on = j === i;
+      g.btn.classList.toggle('on', on);
+      if(g.sheetBtn) g.sheetBtn.classList.toggle('on', on);
+      g.strip.classList.toggle('on', on);
+    });
+    G.more.classList.toggle('on', !G.groups[i].btn.classList.contains('hide-mobile') ? false : true);
+    if(fire){
+      const g = G.groups[i];
+      const already = g.tabs.find(t=> t.classList.contains('active'));
+      (already || g.tabs[0]).click();
+    }
+    G.groups[i].strip.scrollLeft = 0;
+  }
+
+  // Any tab activation from anywhere (deep links, code, a click) pulls its
+  // section into view.
+  function syncSection(){
+    const G = window.__NAV; if(!G) return;
+    const active = document.querySelector('.tab.active');
+    if(!active) return;
+    const i = G.groups.findIndex(g=> g.tabs.includes(active));
+    if(i >= 0 && !G.groups[i].strip.classList.contains('on')) openSection(i, false);
+    if(window.innerWidth <= 820 && active.scrollIntoView){
+      active.scrollIntoView({ inline:'center', block:'nearest' });
+    }
+  }
+
+  // Wrap the three tab routers so they keep the rail honest.
+  function wrap(){
+    ['mtab','tkTab','ccTab'].forEach(name=>{
+      const orig = window[name];
+      if(typeof orig !== 'function' || orig.__wrapped) return;
+      const fn = function(){ const r = orig.apply(this, arguments); try{ syncSection(); }catch(e){} return r; };
+      fn.__wrapped = true;
+      window[name] = fn;
+    });
+  }
+
+  function boot(){ build(); wrap(); }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+  // tkTab/ccTab are defined in later script blocks, so wrap again once
+  // everything has parsed.
+  window.addEventListener('load', wrap);
 })();
 </script>
 </body>
