@@ -221,6 +221,24 @@
     .po-btn.var .po-btn-p{ color:var(--sub); font-weight:700; font-size:0.72rem; }
     .po-btn.hit{ border-color:#0a7a52; background:#eef8f3; }
     .po-quick-h{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+    /* modifier picker */
+    .po-mod{ display:none; border:1px solid var(--gold); border-radius:var(--r); padding:14px; margin-top:10px; background:#fffdf6; }
+    .po-mod.show{ display:block; }
+    .po-mod-item{ font-size:0.9rem; font-weight:800; margin-bottom:2px; }
+    .po-mod-base{ font-size:0.75rem; color:var(--sub); margin-bottom:12px; }
+    .po-mod-l{ margin-bottom:12px; }
+    .po-mod-lh{ font-size:0.68rem; letter-spacing:1.2px; text-transform:uppercase; color:var(--sub); font-weight:800; margin-bottom:6px; }
+    .po-mod-lh .req{ color:var(--wax); }
+    .po-mod-opts{ display:flex; flex-wrap:wrap; gap:6px; }
+    .po-opt{ border:1px solid var(--line); background:var(--card); border-radius:999px; padding:6px 13px; font:inherit; font-size:0.78rem; cursor:pointer; }
+    .po-opt:hover{ border-color:var(--gold); }
+    .po-opt.on{ background:#1a1a1a; border-color:#1a1a1a; color:#fff; }
+    .po-opt .pp{ opacity:.7; font-size:0.72rem; margin-left:4px; }
+    .po-mod-foot{ display:flex; align-items:center; gap:10px; margin-top:14px; }
+    .po-mod-tot{ margin-left:auto; font-size:0.9rem; font-weight:800; }
+    .po-mod-warn{ font-size:0.75rem; color:var(--wax); margin-top:8px; display:none; }
+    .po-mod-warn.show{ display:block; }
+    .po-line-mods{ font-size:0.75rem; color:var(--sub); margin-top:3px; padding-left:2px; }
     .po-quick-h .po-refresh{ border:none; background:none; font:inherit; font-size:0.72rem; color:var(--sub); cursor:pointer; text-decoration:underline; padding:0; }
     .po-results{ margin-top:10px; max-height:230px; overflow:auto; border:1px solid var(--line-soft); border-radius:var(--r); }
     .po-res{ display:flex; justify-content:space-between; gap:12px; padding:8px 11px; cursor:pointer; border-bottom:1px solid var(--line-soft); font-size:0.84rem; }
@@ -1018,6 +1036,7 @@
             </div>
             <div class="po-qtabs" id="poQTabs"></div>
             <div class="po-qgrid" id="poQGrid"><div class="po-hintline">Loading the catering menu…</div></div>
+            <div class="po-mod" id="poMod"></div>
           </div>
 
           <div class="po-h">Search everything else</div>
@@ -9141,16 +9160,19 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
      Catering (or Cheeseboards) in Square makes a button appear here on the
      next load. Nothing to redeploy. */
   let QUICK = [];          // [{id,name,items:[...]}]
+  let MODS  = {};          // modifier_list_id -> {name,selection_type,modifiers:[...]}
   let QUICKTAB = 0;
   let quickLoaded = false;
+  let PICK = null;         // the item currently being configured in the picker
 
   async function loadQuick(force){
     if(quickLoaded && !force) return;
     const grid = $('#poQGrid');
     grid.innerHTML = '<div class="po-hintline">Loading the catering menu…</div>';
     try{
-      const {groups} = await poFn({action:'catalog_catering'});
+      const {groups, modifier_lists} = await poFn({action:'catalog_catering'});
       QUICK = groups || [];
+      MODS  = modifier_lists || {};
       quickLoaded = true;
       if(QUICKTAB >= QUICK.length) QUICKTAB = 0;
       drawQuick();
@@ -9173,21 +9195,131 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     ).join('');
 
     const btns = [];
-    (QUICK[QUICKTAB].items || []).forEach(it=>{
-      (it.variations || []).forEach(v=>{
+    (QUICK[QUICKTAB].items || []).forEach((it,ii)=>{
+      const hasMods = (it.modifier_list_ids || []).some(m=> MODS[m.id]);
+      (it.variations || []).forEach((v,vi)=>{
         const priced = v.price_cents != null && v.price_cents > 0;
         const label  = it.name + (v.name && v.name !== 'Regular' ? ' · ' + v.name : '');
         btns.push(
           '<button class="po-btn'+(priced?'':' var')+'" type="button"'
           + ' data-id="'+esc(v.id)+'" data-name="'+esc(label)+'" data-price="'+(v.price_cents||0)+'"'
-          + ' data-weight="'+(v.sold_by_weight?1:0)+'" title="'+esc(label)+'">'
-          + '<span class="po-btn-n">'+esc(label)+'</span>'
+          + ' data-weight="'+(v.sold_by_weight?1:0)+'" data-i="'+ii+'" data-v="'+vi+'"'
+          + ' title="'+esc(label)+'">'
+          + '<span class="po-btn-n">'+esc(label)+(hasMods?' <span style="opacity:.5">▸</span>':'')+'</span>'
           + '<span class="po-btn-p">'+(priced ? usd(v.price_cents) + (v.sold_by_weight?' /lb':'') : 'price at counter')+'</span>'
           + '</button>'
         );
       });
     });
     grid.innerHTML = btns.join('') || '<div class="po-hintline">Nothing sellable in this category.</div>';
+  }
+
+  /* ---------- modifier picker ----------
+     Square holds the modifier lists; this just draws them. Selections ride
+     along on the line item as catalog_object_ids and Square prices them, so
+     the register and the pre-order always agree. */
+  function closeMod(){ PICK = null; $('#poMod').classList.remove('show'); $('#poMod').innerHTML = ''; }
+
+  function openMod(item, variation){
+    const lists = (item.modifier_list_ids || []).map(m=> ({...MODS[m.id], min:m.min, max:m.max})).filter(l=> l && l.id);
+    if(!lists.length) return false;
+    PICK = {
+      item, variation, lists,
+      // Pre-tick anything Square marks on-by-default.
+      chosen: lists.map(l=> (l.modifiers||[]).filter(m=> m.on_by_default).map(m=> m.id)),
+    };
+    drawMod();
+    $('#poMod').classList.add('show');
+    $('#poMod').scrollIntoView({block:'nearest', behavior:'smooth'});
+    return true;
+  }
+
+  function modTotal(){
+    if(!PICK) return 0;
+    let t = Number(PICK.variation.price_cents || 0);
+    PICK.lists.forEach((l,li)=>{
+      (l.modifiers||[]).forEach(m=>{
+        if(PICK.chosen[li].includes(m.id)) t += Number(m.price_cents||0);
+      });
+    });
+    return t;
+  }
+
+  function drawMod(){
+    if(!PICK) return;
+    const label = PICK.item.name + (PICK.variation.name && PICK.variation.name !== 'Regular' ? ' · ' + PICK.variation.name : '');
+    const body = PICK.lists.map((l,li)=>{
+      const single = (l.selection_type || 'SINGLE') === 'SINGLE';
+      const need   = Number(l.min || 0) > 0;
+      const opts = (l.modifiers||[]).map(m=>
+        '<button class="po-opt'+(PICK.chosen[li].includes(m.id)?' on':'')+'" type="button" data-l="'+li+'" data-m="'+esc(m.id)+'">'
+        + esc(m.name) + (m.price_cents ? '<span class="pp">+'+usd(m.price_cents)+'</span>' : '')
+        + '</button>'
+      ).join('');
+      return '<div class="po-mod-l">'
+        + '<div class="po-mod-lh">'+esc(l.name)+' <span style="opacity:.6">'+(single?'pick one':'pick any')+'</span>'
+        + (need?' <span class="req">*required</span>':'') + '</div>'
+        + '<div class="po-mod-opts">'+opts+'</div></div>';
+    }).join('');
+
+    $('#poMod').innerHTML =
+      '<div class="po-mod-item">'+esc(label)+'</div>'
+      + '<div class="po-mod-base">'+usd(PICK.variation.price_cents||0)+' base</div>'
+      + body
+      + '<div class="po-mod-warn" id="poModWarn"></div>'
+      + '<div class="po-mod-foot">'
+      +   '<button class="btn btn-gold btn-sm" id="poModAdd" type="button">Add to order</button>'
+      +   '<button class="btn btn-ghost btn-sm" id="poModCancel" type="button">Cancel</button>'
+      +   '<span class="po-mod-tot">'+usd(modTotal())+'</span>'
+      + '</div>';
+  }
+
+  function toggleMod(li, mid){
+    if(!PICK) return;
+    const l = PICK.lists[li];
+    const single = (l.selection_type || 'SINGLE') === 'SINGLE';
+    const cur = PICK.chosen[li];
+    if(single){
+      // Tapping the selected chip again clears it, unless the list is required.
+      PICK.chosen[li] = cur.includes(mid) ? (Number(l.min||0) > 0 ? [mid] : []) : [mid];
+    } else {
+      const max = Number(l.max || 0);
+      if(cur.includes(mid)) PICK.chosen[li] = cur.filter(x=> x !== mid);
+      else if(max > 0 && cur.length >= max) return toast('Only '+max+' allowed for '+l.name+'.', true);
+      else PICK.chosen[li] = cur.concat([mid]);
+    }
+    drawMod();
+  }
+
+  function commitMod(){
+    if(!PICK) return;
+    // Square enforces minimums at the register; catching it here means staff
+    // find out now instead of when the card is already in the reader.
+    for(let li=0; li<PICK.lists.length; li++){
+      const l = PICK.lists[li], min = Number(l.min || 0);
+      if(min > 0 && PICK.chosen[li].length < min){
+        const w = $('#poModWarn');
+        w.textContent = 'Pick ' + (min===1 ? 'an option' : min+' options') + ' for ' + l.name + '.';
+        w.classList.add('show');
+        return;
+      }
+    }
+    const mods = [];
+    PICK.lists.forEach((l,li)=>{
+      (l.modifiers||[]).forEach(m=>{
+        if(PICK.chosen[li].includes(m.id)) mods.push({catalog_object_id:m.id, name:m.name, base_price_cents:Number(m.price_cents||0)});
+      });
+    });
+    const label = PICK.item.name + (PICK.variation.name && PICK.variation.name !== 'Regular' ? ' · ' + PICK.variation.name : '');
+    addLine({
+      catalog_object_id: PICK.variation.id,
+      name: label,
+      unit_price_cents: modTotal(),
+      sold_by_weight: !!PICK.variation.sold_by_weight,
+      modifiers: mods,
+    });
+    toast('Added — ' + label);
+    closeMod();
   }
 
   // Flash the button green so staff get a hit confirmation without a toast.
@@ -9199,7 +9331,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 
   /* ---------- cart ---------- */
   function addLine(line){
-    const key = line.catalog_object_id || ('custom:'+line.name+':'+line.unit_price_cents);
+    const modKey = (line.modifiers||[]).map(m=> m.catalog_object_id).sort().join(',');
+    const key = (line.catalog_object_id || ('custom:'+line.name+':'+line.unit_price_cents))
+              + (modKey ? '|' + modKey : '');
     const hit = CART.find(l=> l.key === key);
     if(hit) hit.quantity = Number(hit.quantity) + 1;
     else CART.push(Object.assign({key, quantity:1, note:''}, line));
@@ -9214,6 +9348,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       +   '<span class="po-line-n">'+esc(l.name)+(l.sold_by_weight?' <em>(per lb)</em>':'')+'</span>'
       +   '<button class="po-x" data-rm="'+i+'" type="button" title="Remove">×</button>'
       + '</div>'
+      + ((l.modifiers||[]).length
+          ? '<div class="po-line-mods">+ '+esc(l.modifiers.map(m=> m.name + (m.base_price_cents ? ' ('+usd(m.base_price_cents)+')' : '')).join(', '))+'</div>'
+          : '')
       + '<div class="po-line-bot">'
       +   '<input class="po-qty" type="number" min="0.01" step="'+(l.sold_by_weight?'0.01':'1')+'" value="'+l.quantity+'" data-q="'+i+'" />'
       +   '<span class="po-line-x">×</span>'
@@ -9259,7 +9396,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
           name: l.name,
           quantity: l.quantity,
           unit_price_cents: l.unit_price_cents,
-          note: l.note || undefined
+          note: l.note || undefined,
+          modifiers: (l.modifiers||[]).length ? l.modifiers : undefined
         })),
         actor: (window.CURRENT_USER_EMAIL || 'manager')
       });
@@ -9472,6 +9610,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     $('#poQTabs').addEventListener('click', e=>{
       const t = e.target.closest('.po-qtab'); if(!t) return;
       QUICKTAB = Number(t.dataset.qt || 0);
+      closeMod();
       drawQuick();
     });
     $('#po_qrefresh').addEventListener('click', ()=> loadQuick(true));
@@ -9480,9 +9619,20 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       const price = Number(b.dataset.price||0);
       // Variable-price items would send $0 to Square and fail the order, so
       // send staff to the custom line with the name already filled in.
-      if(!price){ $('#po_cname').value = b.dataset.name; $('#po_cprice').focus(); return; }
+      if(!price){ closeMod(); $('#po_cname').value = b.dataset.name; $('#po_cprice').focus(); return; }
+      const item = (QUICK[QUICKTAB].items || [])[Number(b.dataset.i)];
+      const vari = item && (item.variations || [])[Number(b.dataset.v)];
+      // Items with modifier lists open the picker instead of adding straight away.
+      if(item && vari && openMod(item, vari)){ flash(b); return; }
       addLine({ catalog_object_id:b.dataset.id, name:b.dataset.name, unit_price_cents:price, sold_by_weight:b.dataset.weight==='1' });
       flash(b);
+    });
+
+    $('#poMod').addEventListener('click', e=>{
+      const opt = e.target.closest('.po-opt');
+      if(opt) return toggleMod(Number(opt.dataset.l), opt.dataset.m);
+      if(e.target.closest('#poModAdd')) return commitMod();
+      if(e.target.closest('#poModCancel')) return closeMod();
     });
     loadQuick();
 
