@@ -207,6 +207,21 @@
     .po-split{ display:grid; grid-template-columns:1fr 1fr; gap:26px; margin-top:24px; }
     .po-h{ font-size:0.7rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--sub); font-weight:800; margin-bottom:10px; }
     .po-search{ width:100%; }
+    /* quick-add buttons — live from the Square catering categories */
+    .po-quick{ margin-bottom:16px; }
+    .po-qtabs{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+    .po-qtab{ border:1px solid var(--line); background:none; border-radius:999px; padding:5px 13px; font:inherit; font-size:0.74rem; font-weight:700; cursor:pointer; color:var(--sub); }
+    .po-qtab.active{ background:#1a1a1a; border-color:#1a1a1a; color:#fff; }
+    .po-qgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(146px,1fr)); gap:8px; max-height:268px; overflow:auto; padding:2px; }
+    .po-btn{ border:1px solid var(--line); background:var(--card); border-radius:var(--r); padding:10px 11px; font:inherit; text-align:left; cursor:pointer; display:flex; flex-direction:column; gap:5px; min-height:66px; transition:border-color .12s, transform .06s; }
+    .po-btn:hover{ border-color:var(--gold); background:#faf6ea; }
+    .po-btn:active{ transform:scale(0.98); }
+    .po-btn-n{ font-size:0.78rem; font-weight:700; line-height:1.25; }
+    .po-btn-p{ font-size:0.8rem; font-weight:800; color:#1a1a1a; margin-top:auto; }
+    .po-btn.var .po-btn-p{ color:var(--sub); font-weight:700; font-size:0.72rem; }
+    .po-btn.hit{ border-color:#0a7a52; background:#eef8f3; }
+    .po-quick-h{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+    .po-quick-h .po-refresh{ border:none; background:none; font:inherit; font-size:0.72rem; color:var(--sub); cursor:pointer; text-decoration:underline; padding:0; }
     .po-results{ margin-top:10px; max-height:230px; overflow:auto; border:1px solid var(--line-soft); border-radius:var(--r); }
     .po-res{ display:flex; justify-content:space-between; gap:12px; padding:8px 11px; cursor:pointer; border-bottom:1px solid var(--line-soft); font-size:0.84rem; }
     .po-res:hover{ background:#faf6ea; }
@@ -996,7 +1011,16 @@
 
       <div class="po-split">
         <div class="po-pick">
-          <div class="po-h">Add items</div>
+          <div class="po-quick" id="poQuick">
+            <div class="po-quick-h">
+              <div class="po-h">Catering menu</div>
+              <button class="po-refresh" id="po_qrefresh" type="button">refresh</button>
+            </div>
+            <div class="po-qtabs" id="poQTabs"></div>
+            <div class="po-qgrid" id="poQGrid"><div class="po-hintline">Loading the catering menu…</div></div>
+          </div>
+
+          <div class="po-h">Search everything else</div>
           <input id="po_search" class="po-search" placeholder="Search the Square catalog — boards, trays, cheeses…" autocomplete="off" />
           <div class="po-results" id="poResults"><div class="po-hintline">Type to search, or add a custom line below.</div></div>
           <div class="po-custom">
@@ -9112,6 +9136,67 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   }
   const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+  /* ---------- quick-add buttons ----------
+     Pulled live from the Square catering categories, so adding an item to
+     Catering (or Cheeseboards) in Square makes a button appear here on the
+     next load. Nothing to redeploy. */
+  let QUICK = [];          // [{id,name,items:[...]}]
+  let QUICKTAB = 0;
+  let quickLoaded = false;
+
+  async function loadQuick(force){
+    if(quickLoaded && !force) return;
+    const grid = $('#poQGrid');
+    grid.innerHTML = '<div class="po-hintline">Loading the catering menu…</div>';
+    try{
+      const {groups} = await poFn({action:'catalog_catering'});
+      QUICK = groups || [];
+      quickLoaded = true;
+      if(QUICKTAB >= QUICK.length) QUICKTAB = 0;
+      drawQuick();
+    }catch(e){
+      grid.innerHTML = '<div class="po-hintline bad">'+esc(e.message)+'</div>';
+      $('#poQTabs').innerHTML = '';
+    }
+  }
+
+  function drawQuick(){
+    const tabs = $('#poQTabs'), grid = $('#poQGrid');
+    if(!QUICK.length){
+      tabs.innerHTML = '';
+      grid.innerHTML = '<div class="po-hintline">No items in the catering categories yet — add them in Square, then hit refresh.</div>';
+      return;
+    }
+    tabs.innerHTML = QUICK.map((g,i)=>
+      '<button class="po-qtab'+(i===QUICKTAB?' active':'')+'" data-qt="'+i+'" type="button">'
+      + esc(g.name) + ' <span style="opacity:.6">'+g.items.length+'</span></button>'
+    ).join('');
+
+    const btns = [];
+    (QUICK[QUICKTAB].items || []).forEach(it=>{
+      (it.variations || []).forEach(v=>{
+        const priced = v.price_cents != null && v.price_cents > 0;
+        const label  = it.name + (v.name && v.name !== 'Regular' ? ' · ' + v.name : '');
+        btns.push(
+          '<button class="po-btn'+(priced?'':' var')+'" type="button"'
+          + ' data-id="'+esc(v.id)+'" data-name="'+esc(label)+'" data-price="'+(v.price_cents||0)+'"'
+          + ' data-weight="'+(v.sold_by_weight?1:0)+'" title="'+esc(label)+'">'
+          + '<span class="po-btn-n">'+esc(label)+'</span>'
+          + '<span class="po-btn-p">'+(priced ? usd(v.price_cents) + (v.sold_by_weight?' /lb':'') : 'price at counter')+'</span>'
+          + '</button>'
+        );
+      });
+    });
+    grid.innerHTML = btns.join('') || '<div class="po-hintline">Nothing sellable in this category.</div>';
+  }
+
+  // Flash the button green so staff get a hit confirmation without a toast.
+  function flash(el){
+    if(!el) return;
+    el.classList.add('hit');
+    setTimeout(()=> el.classList.remove('hit'), 260);
+  }
+
   /* ---------- cart ---------- */
   function addLine(line){
     const key = line.catalog_object_id || ('custom:'+line.name+':'+line.unit_price_cents);
@@ -9373,7 +9458,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 
   /* ---------- wiring ---------- */
   window.poInit = function(){
-    if(window._poWired) { loadDevices(); return; }
+    if(window._poWired) { loadDevices(); loadQuick(); return; }
     window._poWired = true;
 
     // default the date to a week out — catering is rarely same-day
@@ -9383,6 +9468,23 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 
     $$('.po-subtab').forEach(b=> b.addEventListener('click', ()=> sub(b.dataset.po)));
     $('#po_search').addEventListener('input', onSearch);
+
+    $('#poQTabs').addEventListener('click', e=>{
+      const t = e.target.closest('.po-qtab'); if(!t) return;
+      QUICKTAB = Number(t.dataset.qt || 0);
+      drawQuick();
+    });
+    $('#po_qrefresh').addEventListener('click', ()=> loadQuick(true));
+    $('#poQGrid').addEventListener('click', e=>{
+      const b = e.target.closest('.po-btn'); if(!b) return;
+      const price = Number(b.dataset.price||0);
+      // Variable-price items would send $0 to Square and fail the order, so
+      // send staff to the custom line with the name already filled in.
+      if(!price){ $('#po_cname').value = b.dataset.name; $('#po_cprice').focus(); return; }
+      addLine({ catalog_object_id:b.dataset.id, name:b.dataset.name, unit_price_cents:price, sold_by_weight:b.dataset.weight==='1' });
+      flash(b);
+    });
+    loadQuick();
 
     $('#poResults').addEventListener('click', e=>{
       const r = e.target.closest('.po-res'); if(!r) return;
