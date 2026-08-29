@@ -1,0 +1,1602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="theme-color" content="#E0A21C" />
+<title>GREYS · Order Pad</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   GREYS ORDER PAD — a counter tablet, not a desktop console.
+   Everything tappable is at least 48px. No hover-only affordances,
+   no tiny number spinners, no horizontal scrolling anywhere.
+   ══════════════════════════════════════════════════════════════════ */
+:root{
+  --paper:#ffffff; --card:#ffffff; --cream:#faf7f0;
+  --gold:#E0A21C; --gold-soft:#f7e9c8; --wax:#A52B1E; --green:#0a7a52;
+  --ink:#111111; --sub:#6a6a6a; --line:#dcdcdc; --line-soft:#ededed;
+  --rail:#f4f2ee;
+  --r:3px;
+  --tap:52px;
+}
+*{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+html,body{ height:100%; overflow:hidden; }
+body{
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:var(--paper); color:var(--ink);
+  font-size:16px; -webkit-text-size-adjust:100%;
+  overscroll-behavior:none;
+}
+h1,h2,h3{ font-family:'Archivo',sans-serif; }
+button, input, select, textarea{ font-family:inherit; font-size:inherit; color:inherit; }
+button{ cursor:pointer; background:none; border:none; touch-action:manipulation; }
+.hide{ display:none !important; }
+.mono{ font-family:ui-monospace,Menlo,Consolas,monospace; }
+::-webkit-scrollbar{ width:10px; height:10px; }
+::-webkit-scrollbar-thumb{ background:#d5d5d5; border-radius:6px; }
+
+/* ── generic controls ─────────────────────────────────────────── */
+.btn{
+  min-height:var(--tap); padding:0 20px; border:1px solid var(--line);
+  border-radius:var(--r); background:#fff; font-weight:700; font-size:0.95rem;
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+}
+.btn:active{ transform:translateY(1px); }
+.btn[disabled]{ opacity:0.45; pointer-events:none; }
+.btn-gold{ background:var(--gold); border-color:var(--gold); color:#161616; }
+.btn-dark{ background:#141414; border-color:#141414; color:#fff; }
+.btn-wax{ background:#fff; border-color:#e6c4bf; color:var(--wax); }
+.btn-lg{ min-height:64px; font-size:1.05rem; width:100%; }
+.fld{ display:block; }
+.fld > span{ display:block; font-size:0.7rem; letter-spacing:1.4px; text-transform:uppercase; color:var(--sub); font-weight:700; margin-bottom:6px; }
+.fld input, .fld textarea, input.txt{
+  width:100%; min-height:var(--tap); padding:12px 14px;
+  border:1px solid var(--line); border-radius:var(--r); background:#fff;
+  font-size:1rem;
+}
+.fld input:focus, .fld textarea:focus, input.txt:focus{ outline:none; border-color:var(--gold); box-shadow:0 0 0 3px var(--gold-soft); }
+.pill{ display:inline-block; padding:4px 10px; border-radius:20px; font-size:0.72rem; font-weight:700; }
+.pill-ok{ background:#e2f4ec; color:var(--green); }
+.pill-warn{ background:#fdf0d5; color:#8a5b00; }
+.pill-bad{ background:#f9e6e3; color:var(--wax); }
+
+/* ── lock / sign-in ───────────────────────────────────────────── */
+.lock{ height:100%; display:flex; align-items:center; justify-content:center; background:var(--cream); padding:24px; }
+.lock-card{ width:420px; max-width:100%; background:#fff; border:1px solid var(--line); border-top:5px solid var(--gold); border-radius:var(--r); padding:34px 30px; text-align:center; }
+.lock-card h1{ font-size:1.6rem; font-weight:900; letter-spacing:-0.5px; }
+.lock-card .sub{ font-size:0.72rem; letter-spacing:2.5px; text-transform:uppercase; color:var(--gold); font-weight:800; margin-top:4px; }
+.lock-card p{ font-size:0.9rem; color:var(--sub); margin:18px 0 20px; }
+.lock-card input{ text-align:center; letter-spacing:2px; }
+.lock-err{ min-height:22px; font-size:0.86rem; color:var(--wax); margin:10px 0 4px; }
+
+/* ── shell ────────────────────────────────────────────────────── */
+.app{ height:100%; display:flex; flex-direction:column; }
+.bar{
+  flex:0 0 auto; display:flex; align-items:center; gap:14px;
+  padding:10px 16px; border-bottom:3px solid var(--gold); background:#fff;
+}
+.brand{ font-family:'Archivo',sans-serif; font-weight:900; font-size:1.15rem; letter-spacing:-0.4px; white-space:nowrap; }
+.brand span{ display:block; font-family:'Inter',sans-serif; font-size:0.6rem; letter-spacing:2px; text-transform:uppercase; color:var(--gold); font-weight:800; }
+.search{ flex:1; position:relative; min-width:0; }
+.search input{ width:100%; min-height:var(--tap); padding:12px 46px 12px 44px; border:1px solid var(--line); border-radius:var(--r); font-size:1rem; background:var(--cream); }
+.search input:focus{ outline:none; border-color:var(--gold); background:#fff; }
+.search .mag{ position:absolute; left:15px; top:50%; transform:translateY(-50%); color:var(--sub); font-size:1rem; pointer-events:none; }
+.search .clr{ position:absolute; right:6px; top:50%; transform:translateY(-50%); width:40px; height:40px; font-size:1.3rem; color:var(--sub); }
+.bar-right{ display:flex; align-items:center; gap:8px; flex:0 0 auto; }
+.chip{ min-height:var(--tap); padding:0 16px; border:1px solid var(--line); border-radius:var(--r); font-weight:700; font-size:0.85rem; background:#fff; white-space:nowrap; }
+.chip.icon{ width:var(--tap); padding:0; font-size:1.2rem; }
+.term{ display:flex; flex-direction:column; align-items:flex-start; padding:6px 12px; border:1px solid var(--line); border-radius:var(--r); line-height:1.25; }
+.term .l{ font-size:0.58rem; letter-spacing:1.4px; text-transform:uppercase; color:var(--sub); font-weight:800; }
+.term .v{ font-size:0.82rem; font-weight:800; white-space:nowrap; max-width:150px; overflow:hidden; text-overflow:ellipsis; }
+.term.bad{ border-color:#e6c4bf; } .term.bad .v{ color:var(--wax); }
+
+.body{ flex:1; min-height:0; display:grid; grid-template-columns:216px minmax(0,1fr) 372px; }
+
+/* ── category rail ────────────────────────────────────────────── */
+.rail{ background:var(--rail); border-right:1px solid var(--line-soft); overflow-y:auto; -webkit-overflow-scrolling:touch; padding:10px 0 40px; }
+.rail-b{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  width:100%; min-height:var(--tap); padding:12px 14px 12px 16px;
+  text-align:left; font-weight:700; font-size:0.9rem; color:#4a4a4a;
+  border-left:4px solid transparent; line-height:1.25;
+}
+.rail-b .n{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rail-dot{ width:11px; height:11px; border-radius:50%; background:var(--c,#cfcfcf); flex:0 0 auto; }
+.rail-b .c{ font-size:0.72rem; color:#9a9a9a; font-weight:700; flex:0 0 auto; }
+.rail-b.active{ background:#fff; color:var(--ink); border-left-color:var(--gold); }
+.rail-sep{ font-size:0.62rem; letter-spacing:1.6px; text-transform:uppercase; color:#a5a099; font-weight:800; padding:16px 16px 6px; }
+
+/* ── item grid ────────────────────────────────────────────────── */
+.gridwrap{ overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 18px 60px; background:#fff; }
+/* Sticky so the sort row is still there 60 cheeses down the list. */
+.gridhead{
+  position:sticky; top:0; z-index:3; background:#fff;
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  padding:16px 0 12px; margin-bottom:14px; border-bottom:1px solid var(--line-soft);
+}
+.gridhead-t{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; min-width:0; }
+.gridhead h2{ font-size:1.25rem; font-weight:800; letter-spacing:-0.3px; }
+.gridhead .s{ font-size:0.8rem; color:var(--sub); }
+.sortbar{ margin-left:auto; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.sortbar .lbl{ font-size:0.62rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--sub); font-weight:800; margin-right:2px; }
+.sortb{
+  min-height:44px; padding:0 14px; border:1px solid var(--line); border-radius:var(--r);
+  background:#fff; font-weight:700; font-size:0.82rem; white-space:nowrap;
+}
+.sortb.on{ background:#141414; border-color:#141414; color:#fff; }
+.grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(142px,1fr)); gap:10px; }
+/* Every tile carries a colour: Square's own label_color when the item has
+   one, otherwise the colour this pad gives the item's category. --c is the
+   solid accent, --tint the wash behind the card; both are set inline. */
+.tile{
+  position:relative; display:flex; flex-direction:column; align-items:stretch;
+  border:1px solid var(--line); border-top:5px solid var(--c,var(--gold));
+  border-radius:var(--r); background:var(--tint,#fff);
+  overflow:hidden; min-height:76px; text-align:left;
+}
+.tile:active{ border-color:var(--c,var(--gold)); filter:brightness(0.96); }
+.tile-img{ height:60px; background:#f2efe8 center/cover no-repeat; flex:0 0 auto; }
+.tile-b{ padding:8px 10px 9px; display:flex; flex-direction:column; gap:3px; flex:1; }
+/* Three lines is enough for every real cheese name and it caps how tall a
+   grid row can get — without it one 4-line name stretches its whole row. */
+.tile-n{
+  font-size:0.84rem; font-weight:700; line-height:1.25;
+  display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden;
+}
+.tile-p{ margin-top:auto; font-size:0.82rem; font-weight:800; color:#2a2a2a; }
+.tile-p .from{ font-weight:600; color:var(--sub); font-size:0.7rem; }
+.tile-tags{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.tile-tag{ font-size:0.57rem; letter-spacing:1.1px; text-transform:uppercase; color:var(--c,var(--gold)); font-weight:800; }
+.tile-opt{ font-size:0.55rem; letter-spacing:1px; text-transform:uppercase; color:var(--sub); font-weight:700; }
+/* Square's own five-character POS label, shown only when the seller set one. */
+.tile-abbr{
+  position:absolute; top:7px; right:7px; z-index:1;
+  font-size:0.55rem; font-weight:800; letter-spacing:0.8px; text-transform:uppercase;
+  color:#fff; background:var(--c,var(--gold)); padding:2px 6px; border-radius:2px;
+}
+.empty{ padding:50px 10px; text-align:center; color:var(--sub); font-size:0.95rem; }
+.empty b{ display:block; font-size:1.05rem; color:var(--ink); margin-bottom:6px; }
+
+/* ── cart ─────────────────────────────────────────────────────── */
+.cart{ border-left:1px solid var(--line-soft); background:var(--cream); display:flex; flex-direction:column; min-height:0; }
+.cart-h{ flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 16px; border-bottom:1px solid var(--line-soft); }
+.cart-h h2{ font-size:1rem; font-weight:800; letter-spacing:-0.2px; }
+.cart-h .n{ font-size:0.78rem; color:var(--sub); }
+.cart-lines{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:6px 16px 16px; }
+.cl{ padding:12px 0; border-bottom:1px solid var(--line-soft); }
+.cl-top{ display:flex; gap:10px; justify-content:space-between; }
+.cl-n{ font-size:0.92rem; font-weight:700; line-height:1.3; }
+.cl-n em{ font-style:normal; font-weight:500; color:var(--sub); }
+.cl-t{ font-size:0.92rem; font-weight:800; white-space:nowrap; }
+.cl-sub{ font-size:0.78rem; color:var(--sub); margin-top:3px; line-height:1.35; }
+.cl-note{ font-size:0.78rem; color:#8a6d1f; margin-top:3px; font-style:italic; }
+.cl-bot{ display:flex; align-items:center; gap:8px; margin-top:9px; }
+.step{ display:flex; align-items:center; border:1px solid var(--line); border-radius:var(--r); background:#fff; overflow:hidden; }
+.step button{ width:46px; height:46px; font-size:1.35rem; font-weight:700; color:#333; }
+.step button:active{ background:var(--gold-soft); }
+.step .q{ min-width:52px; text-align:center; font-weight:800; font-size:0.98rem; }
+.cl-act{ margin-left:auto; display:flex; gap:6px; }
+.cl-act button{ width:46px; height:46px; border:1px solid var(--line); border-radius:var(--r); background:#fff; font-size:1rem; }
+.cart-f{ flex:0 0 auto; padding:14px 16px calc(14px + env(safe-area-inset-bottom)); border-top:1px solid var(--line-soft); background:#fff; }
+.tot{ display:flex; justify-content:space-between; align-items:baseline; font-size:1.35rem; font-weight:900; letter-spacing:-0.5px; }
+.tot span:first-child{ font-size:0.78rem; letter-spacing:1.6px; text-transform:uppercase; color:var(--sub); font-weight:800; }
+.fine{ font-size:0.72rem; color:var(--sub); margin-top:4px; line-height:1.4; }
+.cart-btns{ display:flex; gap:8px; margin-top:12px; }
+.cart-btns .btn{ flex:1; }
+
+/* ── bottom bar (portrait) ────────────────────────────────────── */
+.cartbar{ display:none; }
+
+/* ── sheets ───────────────────────────────────────────────────── */
+.sheet-bg{ position:fixed; inset:0; background:rgba(15,12,8,0.55); z-index:800; display:none; align-items:flex-end; justify-content:center; }
+.sheet-bg.show{ display:flex; }
+.sheet{ background:#fff; width:min(720px,100%); max-height:92dvh; border-radius:var(--r) var(--r) 0 0; display:flex; flex-direction:column; overflow:hidden; border-top:6px solid var(--c,transparent); }
+.sheet.wide{ width:min(940px,100%); }
+.sheet-h{ flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 20px; border-bottom:1px solid var(--line-soft); }
+.sheet-h h2{ font-size:1.15rem; font-weight:800; letter-spacing:-0.3px; }
+.sheet-h .s{ font-size:0.8rem; color:var(--sub); margin-top:2px; }
+.sheet-x{ width:var(--tap); height:var(--tap); border:1px solid var(--line); border-radius:var(--r); font-size:1.3rem; flex:0 0 auto; }
+.sheet-b{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:18px 20px; }
+.sheet-f{ flex:0 0 auto; padding:14px 20px calc(14px + env(safe-area-inset-bottom)); border-top:1px solid var(--line-soft); background:#fff; }
+.grp{ margin-bottom:22px; }
+.grp-h{ font-size:0.7rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--sub); font-weight:800; margin-bottom:9px; display:flex; gap:8px; align-items:baseline; }
+.grp-h .req{ color:var(--wax); letter-spacing:0.5px; text-transform:none; font-size:0.72rem; font-weight:700; }
+.grp-h .lim{ color:var(--sub); letter-spacing:0.5px; text-transform:none; font-size:0.72rem; font-weight:600; }
+.opts{ display:flex; flex-wrap:wrap; gap:8px; }
+.opt{
+  min-height:var(--tap); padding:10px 16px; border:1px solid var(--line); border-radius:var(--r);
+  background:#fff; font-weight:700; font-size:0.92rem; display:flex; align-items:center; gap:8px;
+}
+.opt .p{ font-weight:600; color:var(--sub); font-size:0.82rem; }
+.opt.on{ border-color:var(--gold); background:var(--gold-soft); }
+.opt.on .p{ color:#7a5c12; }
+.row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.stack{ display:flex; flex-direction:column; gap:12px; }
+.qtyrow{ display:flex; align-items:center; gap:14px; }
+.qtyrow .step button{ width:58px; height:58px; font-size:1.5rem; }
+.qtyrow .step .q{ min-width:64px; font-size:1.1rem; }
+.big$ { font-size:1.5rem; font-weight:900; letter-spacing:-0.5px; margin-left:auto; }
+
+/* keypad */
+.kp{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; max-width:330px; }
+.kp button{ min-height:60px; border:1px solid var(--line); border-radius:var(--r); font-size:1.25rem; font-weight:700; background:#fff; }
+.kp button:active{ background:var(--gold-soft); }
+.kp-out{ font-family:'Archivo',sans-serif; font-size:2.2rem; font-weight:900; letter-spacing:-1px; padding:12px 0 16px; }
+
+/* when picker */
+.when{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.when .opt{ justify-content:center; flex-direction:column; gap:2px; min-height:72px; text-align:center; }
+.when .opt .t{ font-size:1rem; font-weight:800; }
+.when .opt .d{ font-size:0.76rem; color:var(--sub); font-weight:600; }
+.when .opt.on .d{ color:#7a5c12; }
+.days{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+
+/* orders list */
+.ord{ border:1px solid var(--line-soft); border-radius:var(--r); padding:14px; margin-bottom:10px; }
+.ord-top{ display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+.ord-w{ font-size:1rem; font-weight:800; }
+.ord-s{ font-size:0.8rem; color:var(--sub); margin-top:2px; }
+.ord-t{ font-size:1.05rem; font-weight:900; white-space:nowrap; }
+.ord-btns{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+.ord-btns .btn{ min-height:46px; padding:0 14px; font-size:0.85rem; }
+
+/* ── payment overlay ──────────────────────────────────────────── */
+.pay-bg{ position:fixed; inset:0; background:rgba(15,12,8,0.75); z-index:900; display:none; align-items:center; justify-content:center; padding:20px; }
+.pay-bg.show{ display:flex; }
+.pay{ background:#fff; border-radius:var(--r); width:min(520px,100%); padding:38px 30px calc(30px + env(safe-area-inset-bottom)); text-align:center; }
+.pay-amt{ font-family:'Archivo',sans-serif; font-size:3.4rem; font-weight:900; letter-spacing:-2px; line-height:1; }
+.pay-who{ font-size:0.95rem; color:var(--sub); margin-top:8px; }
+.pay-msg{ font-size:1.05rem; margin-top:18px; font-weight:600; }
+.pay-tick{ font-size:4rem; color:var(--green); line-height:1; margin-top:16px; }
+.pay.bad .pay-msg{ color:var(--wax); }
+.pay-btns{ display:flex; gap:10px; justify-content:center; margin-top:26px; flex-wrap:wrap; }
+.pay-btns .btn{ flex:1; min-width:150px; }
+.spin{ width:44px; height:44px; margin:20px auto 0; border:4px solid var(--line); border-top-color:var(--gold); border-radius:50%; animation:sp 0.9s linear infinite; }
+@keyframes sp{ to{ transform:rotate(360deg); } }
+
+/* ── toast ────────────────────────────────────────────────────── */
+/* Bottom-left: clear of the sort row at the top of the grid AND of the cart's
+   Clear / Review buttons on the right. */
+.toast{
+  position:fixed; left:24px; bottom:24px; transform:translateY(90px);
+  background:#141414; color:#fff; padding:14px 22px; border-radius:var(--r);
+  font-size:0.92rem; font-weight:600; z-index:1000; opacity:0; transition:all 0.22s;
+  max-width:min(420px,80vw); box-shadow:0 10px 30px rgba(0,0,0,0.25);
+}
+.toast.show{ transform:none; opacity:1; }
+.toast.bad{ background:var(--wax); }
+
+/* ══ TABLET PORTRAIT / NARROW ══════════════════════════════════ */
+@media (max-width:1080px){
+  .body{ grid-template-columns:180px minmax(0,1fr); }
+  .cart{
+    position:fixed; top:0; right:0; bottom:0; width:min(430px,92vw); z-index:700;
+    transform:translateX(103%); transition:transform 0.25s ease; box-shadow:-14px 0 40px rgba(0,0,0,0.18);
+    border-left:1px solid var(--line);
+  }
+  .cart.open{ transform:none; }
+  .cartbar{
+    display:flex; align-items:center; gap:12px; flex:0 0 auto;
+    padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line-soft); background:#fff;
+  }
+  .cartbar .sum{ min-width:0; }
+  .cartbar .sum .l{ font-size:0.72rem; letter-spacing:1.4px; text-transform:uppercase; color:var(--sub); font-weight:800; }
+  .cartbar .sum .v{ font-size:1.2rem; font-weight:900; letter-spacing:-0.5px; }
+  .cartbar .btn{ margin-left:auto; min-width:190px; }
+  .toast{ bottom:calc(88px + env(safe-area-inset-bottom)); }
+  .cart-shade{ position:fixed; inset:0; background:rgba(15,12,8,0.4); z-index:690; display:none; }
+  .cart-shade.show{ display:block; }
+  .grid{ grid-template-columns:repeat(auto-fill,minmax(132px,1fr)); }
+}
+@media (max-width:760px){
+  .body{ grid-template-columns:1fr; }
+  .rail{
+    grid-row:1; display:flex; overflow-x:auto; overflow-y:hidden; padding:8px;
+    border-right:none; border-bottom:1px solid var(--line-soft); gap:8px;
+  }
+  .rail-b{ width:auto; border-left:none; border:1px solid var(--line); border-radius:var(--r); background:#fff; white-space:nowrap; padding:10px 14px; }
+  .rail-b.active{ border-color:var(--gold); background:var(--gold-soft); }
+  .rail-b .c, .rail-sep{ display:none; }
+  .brand span{ display:none; }
+  .bar{ flex-wrap:wrap; }
+  .search{ order:3; flex-basis:100%; }
+  .grid{ grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px; }
+  .sortbar{ margin-left:0; flex-basis:100%; }
+  .sortbar .sortb{ flex:1; padding:0 8px; }
+  .sheet{ max-height:96dvh; }
+  .row2{ grid-template-columns:1fr; }
+}
+@media (min-width:1400px){
+  .body{ grid-template-columns:244px minmax(0,1fr) 400px; }
+  .grid{ grid-template-columns:repeat(auto-fill,minmax(158px,1fr)); }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ LOCK SCREEN ═══════════════════════════════════════════════ -->
+<div class="lock" id="lock">
+  <div class="lock-card">
+    <h1>GREYS</h1>
+    <div class="sub">Order Pad</div>
+    <p>Sign in once on this tablet. It stays signed in until someone taps Lock.</p>
+    <input id="pw" class="txt" type="password" placeholder="Manager password" autocomplete="current-password" />
+    <div class="lock-err" id="lockErr"></div>
+    <button class="btn btn-gold btn-lg" id="signin">Unlock</button>
+  </div>
+</div>
+
+<!-- ═══ APP ═══════════════════════════════════════════════════════ -->
+<div class="app hide" id="app">
+
+  <header class="bar">
+    <div class="brand">GREYS<span>Order Pad</span></div>
+    <div class="search">
+      <span class="mag">⌕</span>
+      <input id="q" class="txt" placeholder="Search every category…" autocomplete="off" enterkeyhint="search" />
+      <button class="clr hide" id="qx" type="button" aria-label="Clear search">×</button>
+    </div>
+    <div class="bar-right">
+      <div class="term" id="term"><span class="l">Terminal</span><span class="v" id="termName">…</span></div>
+      <button class="chip" id="btnOrders" type="button">Orders</button>
+      <button class="chip icon" id="btnRefresh" type="button" title="Reload the menu from Square">↻</button>
+      <button class="chip" id="btnLock" type="button">Lock</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <nav class="rail" id="rail"></nav>
+
+    <section class="gridwrap" id="gridwrap">
+      <div class="gridhead">
+        <div class="gridhead-t">
+          <h2 id="catName">Loading…</h2>
+          <div class="s" id="catSub"></div>
+        </div>
+        <div class="sortbar" id="sortbar">
+          <span class="lbl">Sort</span>
+          <button class="sortb on" type="button" data-sort="grouped">Grouped</button>
+          <button class="sortb" type="button" data-sort="az">A–Z</button>
+          <button class="sortb" type="button" data-sort="price-up">Price ↑</button>
+          <button class="sortb" type="button" data-sort="price-down">Price ↓</button>
+        </div>
+      </div>
+      <div class="grid" id="grid"></div>
+    </section>
+
+    <aside class="cart" id="cart">
+      <div class="cart-h">
+        <div>
+          <h2>Order</h2>
+          <div class="n" id="cartCount">Nothing added yet</div>
+        </div>
+        <button class="chip" id="btnCustom" type="button">＋ Open item</button>
+      </div>
+      <div class="cart-lines" id="cartLines"></div>
+      <div class="cart-f">
+        <div class="tot"><span>Subtotal</span><b id="est">$0.00</b></div>
+        <div class="fine">Square adds tax and gives the final total when the order is created.</div>
+        <div class="cart-btns">
+          <button class="btn" id="btnClear" type="button">Clear</button>
+          <button class="btn btn-gold" id="btnCheckout" type="button">Review</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="cartbar" id="cartbar">
+    <div class="sum">
+      <div class="l"><span id="barCount">0 items</span></div>
+      <div class="v" id="barTotal">$0.00</div>
+    </div>
+    <button class="btn btn-gold" id="btnOpenCart" type="button">View order</button>
+  </div>
+</div>
+
+<div class="cart-shade" id="cartShade"></div>
+
+<!-- sheets + overlays -->
+<div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet"></div></div>
+<div class="pay-bg" id="payBg"><div class="pay" id="pay"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   GREYS ORDER PAD  ·  order.html
+   A standalone touchscreen page for the counter tablet.
+
+   It talks to the same `square-preorders` edge function the manager
+   console's Pre-Orders tab uses, so every order lands in the same
+   `preorders` table and on the same Square Terminal. The differences:
+
+     * the WHOLE catalog, browsed by Square category (action
+       catalog_browse), not just a catering search;
+     * Today/ASAP orders as well as scheduled pickups (asap:true);
+     * a layout built for fingers — 52px minimum targets, a category
+       rail, tile grid and a persistent cart.
+
+   Auth is the same hidden manager account as the rest of the portal.
+   The Supabase session persists in localStorage, so the tablet stays
+   unlocked across reloads until someone taps Lock.
+   ══════════════════════════════════════════════════════════════════ */
+(function(){
+'use strict';
+
+const SB_URL = 'https://vdvtrevhqalmjwhjhjug.supabase.co';
+const SB_KEY = 'sb_publishable_LnlevWReed7K8cFk_f_Mxg_UywktQ5_';
+const FN_URL = SB_URL + '/functions/v1/square-preorders';
+const MANAGER_EMAIL = 'manager@greyscheese.com';
+const CACHE_KEY = 'greys_orderpad_catalog_v1';
+const CACHE_TTL = 6 * 3600 * 1000;   // the catalog barely moves; ↻ forces a reload
+const SORT_KEY  = 'greys_orderpad_sort';
+
+const sb = window.supabase.createClient(SB_URL, SB_KEY);
+
+const $  = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const usd = c => '$' + (Number(c||0)/100).toFixed(2);
+const qtyTxt = l => l.sold_by_weight ? Number(l.quantity).toFixed(2) : String(Number(l.quantity));
+
+/* ── colour ──────────────────────────────────────────────────────
+   Three layers, in priority order.
+
+   1. Square's own per-item tile colour (`label_color`) and 5-character POS
+      label (`abbreviation`). Set either in the Square item editor and this
+      pad uses it verbatim — nothing below overrides it.
+   2. Otherwise the item's FAMILY colour. A family is a word shared by two or
+      more items in the same category: a brand (WISEACRE, JASPER HILL, RLM)
+      or a kind (BOX LUNCH, PLATTER, GRAZING). Every item in a family gets
+      the same colour, and families get sharply different colours from each
+      other — that is the point, so the counter can find "the Wiseacre block"
+      or "the platters" by colour alone.
+   3. An item that shares nothing with anything gets a colour of its own.
+
+   The category rail keeps one steady colour per category so you still know
+   where you are; the grid is where the differentiation lives.
+   ─────────────────────────────────────────────────────────────── */
+
+// The rail: one steady colour per category.
+const PALETTE = ['#B4532E','#7A6118','#3E6B55','#2F5B7A','#65477A','#8A5A2B',
+                 '#4C6A72','#5C7A38','#96432F','#54607A','#7A4A5E','#3D6E6E'];
+
+// The grid: 18 hues spread right around the wheel, all dark enough for white
+// badge text and light enough that a 12% wash stays readable under black text.
+const FAMILY_PALETTE = [
+  '#B03A2E','#CA6F1E','#B7950B','#7E8C1D','#4F8A2E','#1E8449',
+  '#148F77','#1F8FA8','#2471A3','#34495E','#5B4B8A','#7D3C98',
+  '#C2185B','#8E44AD','#6D4C41','#546E7A','#AF601A','#A93226'
+];
+
+// Words that say nothing about what an item IS, so they never form a family.
+const STOP = new Set(['THE','AND','FOR','WITH','FROM','OUR','NEW',
+  'ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN',
+  'SMALL','LARGE','MEDIUM','REG','REGULAR','HALF','WHOLE','EACH','ITEM','OZ',
+  'LBS','PER','MIX','ASSORTED','SEASONAL','SPECIAL','HOUSE','FRESH']);
+
+function normHex(c){
+  if(!c) return null;
+  const h = String(c).replace('#','').trim();
+  return /^[0-9a-fA-F]{6}$/.test(h) ? '#' + h : null;
+}
+function hashStr(s){
+  let h = 2166136261;
+  for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return h >>> 0;
+}
+function groupColor(id){
+  const i = S.groups.findIndex(g => g.id === id);
+  if(i >= 0) return PALETTE[i % PALETTE.length];
+  return PALETTE[hashStr(String(id||'')) % PALETTE.length];
+}
+function words(name){
+  return String(name||'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim().split(' ')
+    .filter(t => t.length >= 3 && !STOP.has(t) && !/^[0-9]+$/.test(t));
+}
+
+/* Work out each category's families, colour them, and stand like items next
+   to each other so the colour and the layout say the same thing. Runs once
+   per catalog load; everything after it just reads the result. */
+function buildFamilies(){
+  // The colour counter runs across the WHOLE catalog, not per category, so
+  // the first family in Cheese does not land on the same colour as the first
+  // family in Catering — which matters in the "All items" view.
+  let famN = 0;
+  S.groups.forEach(g=>{
+    const items = g.items || [];
+
+    // How many items in this category use each word.
+    const seen = {};
+    items.forEach(it => new Set(words(it.name)).forEach(w => seen[w] = (seen[w]||0) + 1));
+
+    // An item's family is the word it shares with the MOST other items, so the
+    // biggest block wins: all three platters land together as PLATTER rather
+    // than splitting into "cheese platter" and "charcuterie platter", and the
+    // blues sit together as BLUE. Ties go to the longer word (BOX/LUNCH -> LUNCH).
+    items.forEach(it=>{
+      const mine = Array.from(new Set(words(it.name))).filter(w => seen[w] >= 2);
+      mine.sort((a,b) => seen[b] - seen[a] || b.length - a.length || (a < b ? -1 : 1));
+      it.family = mine[0] || null;
+      it.fam_n = it.family ? seen[it.family] : 1;
+    });
+
+    // Biggest families first, then family name, then item name. Items that
+    // belong to nothing fall to the bottom, alphabetical.
+    items.sort((a,b)=>{
+      const sa = a.family ? a.fam_n : 0, sb = b.family ? b.fam_n : 0;
+      if(sa !== sb) return sb - sa;
+      const fa = a.family || '', fb = b.family || '';
+      if(fa !== fb) return fa < fb ? -1 : 1;
+      return String(a.name||'').localeCompare(String(b.name||''));
+    });
+
+    // One palette entry per family, handed out in the order the families
+    // appear. The stride of 7 against 18 colours is coprime, so consecutive
+    // families jump ~140° around the wheel and every colour is used before
+    // any repeats — which is what stops two greens sitting side by side.
+    // Cost of walking in order rather than hashing: adding an item to a
+    // category can shift the colours after it. Catalog edits are rare, and a
+    // grid where neighbours are obviously different is worth more.
+    const STRIDE = 7;
+    const byFamily = {};
+    items.forEach(it=>{
+      const key = it.family || ('\u0000' + it.name);
+      if(byFamily[key] == null){
+        byFamily[key] = FAMILY_PALETTE[(famN * STRIDE) % FAMILY_PALETTE.length];
+        famN++;
+      }
+      it.pad_color = byFamily[key];
+    });
+  });
+}
+
+function itemColor(it){
+  return normHex(it.label_color) || it.pad_color || groupColor(it.group_id);
+}
+function tint(hex, a){
+  const h = hex.replace('#','');
+  return 'rgba(' + parseInt(h.slice(0,2),16) + ',' + parseInt(h.slice(2,4),16)
+       + ',' + parseInt(h.slice(4,6),16) + ',' + a + ')';
+}
+
+/* ── state ─────────────────────────────────────────────────────── */
+const S = {
+  groups: [],        // [{id,name,items:[]}]
+  mods: {},          // modifier_list_id -> {name, selection_type, modifiers[]}
+  cat: null,         // active category id, or '__all'
+  sort: 'grouped',   // grouped | az | price-up | price-down
+  q: '',
+  cart: [],
+  devices: [],
+  fetchedAt: null,
+  busy: false
+};
+
+/* ── plumbing ──────────────────────────────────────────────────── */
+async function fn(payload){
+  const { data:{ session } } = await sb.auth.getSession();
+  const res = await fetch(FN_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SB_KEY,
+      'Authorization': 'Bearer ' + (session ? session.access_token : SB_KEY)
+    },
+    body: JSON.stringify(payload || {})
+  });
+  let data = {};
+  try { data = await res.json(); } catch(e){}
+  if(!res.ok) throw new Error(data.error || ('Request failed (' + res.status + ')'));
+  return data;
+}
+
+let toastT = null;
+function toast(msg, bad){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.toggle('bad', !!bad);
+  t.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(()=> t.classList.remove('show'), 3400);
+}
+
+const fmtWhen = iso => new Date(iso).toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+const fmtDay  = d   => d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+const ymd     = d   => { const p = n => String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); };
+
+/* ══ SIGN IN ═══════════════════════════════════════════════════════ */
+async function signIn(){
+  const pw = $('#pw').value;
+  const err = $('#lockErr');
+  err.textContent = '';
+  if(!pw) { err.textContent = 'Enter the manager password.'; return; }
+  const btn = $('#signin'); btn.disabled = true; btn.textContent = 'Checking…';
+  try{
+    const { error } = await sb.auth.signInWithPassword({ email: MANAGER_EMAIL, password: pw });
+    if(error) throw error;
+    $('#pw').value = '';
+    await start();
+  }catch(e){
+    err.textContent = (e && e.message) ? e.message : 'That password was not accepted.';
+  }finally{
+    btn.disabled = false; btn.textContent = 'Unlock';
+  }
+}
+
+async function lock(){
+  try{ await sb.auth.signOut(); }catch(e){}
+  try{ localStorage.removeItem(CACHE_KEY); }catch(e){}
+  S.cart = []; S.groups = [];
+  $('#app').classList.add('hide');
+  $('#lock').classList.remove('hide');
+  $('#lock').style.display = '';
+  setTimeout(()=> $('#pw').focus(), 60);
+}
+
+/* ══ CATALOG ═══════════════════════════════════════════════════════ */
+function readCache(){
+  try{
+    const raw = localStorage.getItem(CACHE_KEY);
+    if(!raw) return null;
+    const c = JSON.parse(raw);
+    if(!c || !c.at || (Date.now() - c.at) > CACHE_TTL) return null;
+    return c.data;
+  }catch(e){ return null; }
+}
+function writeCache(data){
+  try{ localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), data })); }catch(e){}
+}
+
+async function loadCatalog(force){
+  const cached = force ? null : readCache();
+  if(cached){ applyCatalog(cached); return; }
+  $('#catName').textContent = 'Loading the menu…';
+  $('#grid').innerHTML = '<div class="empty">Pulling every category from Square…</div>';
+  try{
+    const data = await fn({ action:'catalog_browse' });
+    writeCache(data);
+    applyCatalog(data);
+    if(force) toast('Menu reloaded — ' + (data.item_count || 0) + ' items.');
+  }catch(e){
+    $('#catName').textContent = 'Menu unavailable';
+    $('#grid').innerHTML = '<div class="empty"><b>Could not load the menu</b>' + esc(e.message) + '</div>';
+  }
+}
+
+/* The pad is used mostly for catering, so it opens there — everything else is
+   one tap away in the rail. Prefer a category actually named Catering, then
+   whatever the server pinned first, then just the first group. */
+function landingCat(groups, pinned){
+  if(!groups || !groups.length) return '__all';
+  const named = groups.find(g => /catering/i.test(String(g.name || '')));
+  if(named) return named.id;
+  const pin = (pinned || []).find(id => groups.some(g => g.id === id));
+  return pin || groups[0].id;
+}
+
+function applyCatalog(data){
+  S.groups = (data.groups || []).filter(g => (g.items||[]).length);
+  S.groups.forEach(g => (g.items||[]).forEach(it=>{
+    if(!it.group_id) it.group_id = g.id;   // cache written before group_id existed
+  }));
+  buildFamilies();
+  S.mods = data.modifier_lists || {};
+  S.fetchedAt = data.fetched_at || null;
+  if(!S.cat || (S.cat !== '__all' && !S.groups.some(g => g.id === S.cat))){
+    S.cat = landingCat(S.groups, data.pinned);
+  }
+  renderRail();
+  renderGrid();
+}
+
+const allItems = () => S.groups.reduce((a,g)=> a.concat(g.items), []);
+
+/* ── category rail ─────────────────────────────────────────────── */
+function renderRail(){
+  const total = allItems().length;
+  let html = '<button class="rail-b' + (S.cat==='__all'?' active':'') + '" data-cat="__all" style="--c:#E0A21C">'
+           + '<span class="rail-dot"></span><span class="n">All items</span><span class="c">' + total + '</span></button>'
+           + '<div class="rail-sep">Categories</div>';
+  html += S.groups.map(g =>
+    '<button class="rail-b' + (S.cat===g.id?' active':'') + '" data-cat="' + esc(g.id) + '" style="--c:' + groupColor(g.id) + '">'
+    + '<span class="rail-dot"></span><span class="n">' + esc(g.name) + '</span><span class="c">' + g.items.length + '</span></button>'
+  ).join('');
+  $('#rail').innerHTML = html;
+}
+
+/* ── item grid ─────────────────────────────────────────────────── */
+function priceLabel(it){
+  const priced = it.variations.filter(v => v.price_cents != null && v.price_cents > 0);
+  if(!priced.length) return '<span class="from">Price at counter</span>';
+  const min = Math.min.apply(null, priced.map(v => v.price_cents));
+  const many = priced.length > 1 || priced.length < it.variations.length;
+  return (many ? '<span class="from">from </span>' : '') + usd(min)
+       + (priced[0].sold_by_weight ? '<span class="from"> /lb</span>' : '');
+}
+
+/* ── sorting ───────────────────────────────────────────────────
+   "Grouped" is the order buildFamilies() left behind — brands and item
+   types blocked together — and it is the default because that is what the
+   colours are showing. The other three are flat re-sorts of the same list.
+   Items with no fixed price sort to the bottom either way; nobody wants the
+   open-price board sitting at the head of a price list.                    */
+function priceOf(it){
+  const priced = (it.variations || []).filter(v => v.price_cents > 0);
+  return priced.length ? Math.min.apply(null, priced.map(v => v.price_cents)) : null;
+}
+function sortItems(list){
+  if(S.sort === 'grouped') return list;
+  const byName = (a,b) => String(a.name||'').localeCompare(String(b.name||''));
+  const out = list.slice();
+  if(S.sort === 'az'){ out.sort(byName); return out; }
+  const dir = S.sort === 'price-down' ? -1 : 1;
+  out.sort((a,b)=>{
+    const pa = priceOf(a), pb = priceOf(b);
+    if(pa == null && pb == null) return byName(a,b);
+    if(pa == null) return 1;
+    if(pb == null) return -1;
+    return (pa - pb) * dir || byName(a,b);
+  });
+  return out;
+}
+function setSort(k){
+  S.sort = k;
+  try{ localStorage.setItem(SORT_KEY, k); }catch(e){}
+  renderSort();
+  renderGrid();
+  $('#gridwrap').scrollTop = 0;
+}
+function renderSort(){
+  $$('#sortbar .sortb').forEach(b => b.classList.toggle('on', b.dataset.sort === S.sort));
+}
+
+function visibleItems(){
+  if(S.q){
+    const q = S.q.toLowerCase();
+    return allItems()
+      .filter(it => String(it.name||'').toLowerCase().includes(q))
+      .slice(0, 200);
+  }
+  if(S.cat === '__all') return allItems();
+  const g = S.groups.find(g => g.id === S.cat);
+  return g ? g.items : [];
+}
+
+function renderGrid(){
+  const items = sortItems(visibleItems());
+  const g = S.groups.find(g => g.id === S.cat);
+  $('#catName').textContent = S.q ? 'Search' : (S.cat === '__all' ? 'All items' : (g ? g.name : ''));
+  const SORT_NOTE = { az:'A–Z', 'price-up':'cheapest first', 'price-down':'dearest first' };
+  $('#catSub').textContent = items.length
+    ? items.length + (S.q ? ' match' + (items.length===1?'':'es') + ' for “' + S.q + '”' : ' item' + (items.length===1?'':'s'))
+      + (SORT_NOTE[S.sort] ? ' · ' + SORT_NOTE[S.sort] : '')
+    : '';
+
+  if(!items.length){
+    $('#grid').innerHTML = S.q
+      ? '<div class="empty"><b>Nothing matched “' + esc(S.q) + '”</b>Try fewer letters, or add it as an open item.</div>'
+      : '<div class="empty"><b>No items in this category</b>Add one to it in Square and tap ↻.</div>';
+    return;
+  }
+
+  // Index into the flat visible list — the tile only has to carry a number.
+  window.__VIS = items;
+  $('#grid').innerHTML = items.map((it,i)=>{
+    const c = itemColor(it);
+    // No image in Square means no image here — a colour band and the item's
+    // own name carry the tile instead of an invented initial.
+    const img = it.image_url
+      ? '<span class="tile-img" style="background-image:url(' + esc(it.image_url) + ')"></span>'
+      : '';
+    const abbr = it.abbreviation
+      ? '<span class="tile-abbr">' + esc(String(it.abbreviation).slice(0,5)) + '</span>'
+      : '';
+    const opts = (it.modifier_list_ids||[]).length || it.variations.length > 1;
+    const fam = (it.family && it.fam_n > 1) ? '<span class="tile-tag">' + esc(it.family) + '</span>' : '';
+    const tag = (fam || opts)
+      ? '<span class="tile-tags">' + fam + (opts ? '<span class="tile-opt">Options</span>' : '') + '</span>'
+      : '';
+    return '<button class="tile" type="button" data-i="' + i + '" style="--c:' + c + ';--tint:' + tint(c, 0.12) + '">'
+      + abbr + img
+      + '<span class="tile-b">'
+      +   '<span class="tile-n">' + esc(it.name) + '</span>'
+      +   tag
+      +   '<span class="tile-p">' + priceLabel(it) + '</span>'
+      + '</span></button>';
+  }).join('');
+}
+
+/* ══ SHEETS ════════════════════════════════════════════════════════ */
+let sheetState = null;
+
+function openSheet(html, wide, color){
+  const el = $('#sheet');
+  el.className = 'sheet' + (wide ? ' wide' : '');
+  el.style.setProperty('--c', color || 'transparent');
+  el.innerHTML = html;
+  $('#sheetBg').classList.add('show');
+}
+function closeSheet(){
+  $('#sheetBg').classList.remove('show');
+  $('#sheet').innerHTML = '';
+  sheetState = null;
+}
+
+/* ── item options ──────────────────────────────────────────────── */
+function openItem(it){
+  const priced = it.variations.filter(v => v.price_cents != null && v.price_cents > 0);
+  const st = {
+    kind: 'item',
+    item: it,
+    varId: (priced[0] || it.variations[0] || {}).id,
+    sel: {},                 // listId -> [modifierId]
+    qty: 1,
+    note: '',
+    customCents: null,       // set when the chosen variation has no catalog price
+    keypad: ''
+  };
+  // Square's on_by_default modifiers start checked, same as the register.
+  (it.modifier_list_ids||[]).forEach(ml=>{
+    const list = S.mods[ml.id]; if(!list) return;
+    st.sel[ml.id] = list.modifiers.filter(m => m.on_by_default).map(m => m.id);
+  });
+  sheetState = st;
+  drawItem();
+}
+
+function stVariation(){
+  const st = sheetState;
+  return (st.item.variations.find(v => v.id === st.varId)) || st.item.variations[0] || {};
+}
+function stUnitCents(){
+  const st = sheetState;
+  const v = stVariation();
+  const base = (v.price_cents != null && v.price_cents > 0) ? v.price_cents : (st.customCents || 0);
+  let mods = 0;
+  Object.keys(st.sel).forEach(listId=>{
+    const list = S.mods[listId]; if(!list) return;
+    st.sel[listId].forEach(id=>{
+      const m = list.modifiers.find(m => m.id === id);
+      if(m) mods += Number(m.price_cents||0);
+    });
+  });
+  return base + mods;
+}
+function stMissing(){
+  const st = sheetState;
+  const gaps = [];
+  (st.item.modifier_list_ids||[]).forEach(ml=>{
+    const list = S.mods[ml.id]; if(!list) return;
+    const n = (st.sel[ml.id]||[]).length;
+    if(ml.min != null && n < ml.min) gaps.push(list.name);
+  });
+  return gaps;
+}
+
+function drawItem(){
+  const st = sheetState, it = st.item;
+  const v = stVariation();
+  const needsPrice = !(v.price_cents != null && v.price_cents > 0);
+
+  let body = '';
+
+  if(it.variations.length > 1){
+    body += '<div class="grp"><div class="grp-h">Size / variation</div><div class="opts">'
+      + it.variations.map(vv=>
+          '<button class="opt' + (vv.id===st.varId?' on':'') + '" type="button" data-var="' + esc(vv.id) + '">'
+          + '<span>' + esc(vv.name || 'Regular') + '</span>'
+          + '<span class="p">' + ((vv.price_cents!=null&&vv.price_cents>0) ? usd(vv.price_cents) + (vv.sold_by_weight?' /lb':'') : 'open price') + '</span>'
+          + '</button>').join('')
+      + '</div></div>';
+  }
+
+  if(needsPrice){
+    // A variable-price item sent with its catalog id would ring in at $0 and
+    // fail the Square order, so it goes on as an open line at the price keyed
+    // here — the same rule the manager console follows.
+    body += '<div class="grp"><div class="grp-h">Price <span class="req">needed — this item has no set price in Square</span></div>'
+      + '<div class="kp-out" id="kpOut">' + usd(st.customCents || 0) + '</div>'
+      + '<div class="kp" id="kp">'
+      + [1,2,3,4,5,6,7,8,9].map(n=>'<button type="button" data-k="'+n+'">'+n+'</button>').join('')
+      + '<button type="button" data-k="00">00</button><button type="button" data-k="0">0</button>'
+      + '<button type="button" data-k="del">←</button>'
+      + '</div></div>';
+  }
+
+  (it.modifier_list_ids||[]).forEach(ml=>{
+    const list = S.mods[ml.id];
+    if(!list || !list.modifiers.length) return;
+    const single = list.selection_type === 'SINGLE';
+    const need = (ml.min != null && ml.min > 0);
+    const chosen = st.sel[ml.id] || [];
+    body += '<div class="grp"><div class="grp-h">' + esc(list.name)
+      + (need ? '<span class="req">pick ' + (single ? 'one' : 'at least ' + ml.min) + '</span>' : '')
+      + (!single && ml.max ? '<span class="lim">up to ' + ml.max + '</span>' : '')
+      + '</div><div class="opts">'
+      + list.modifiers.map(m=>
+          '<button class="opt' + (chosen.includes(m.id)?' on':'') + '" type="button" data-mod="' + esc(m.id) + '" data-list="' + esc(ml.id) + '">'
+          + '<span>' + esc(m.name) + '</span>'
+          + (Number(m.price_cents) ? '<span class="p">+' + usd(m.price_cents) + '</span>' : '')
+          + '</button>').join('')
+      + '</div></div>';
+  });
+
+  const step = v.sold_by_weight ? 0.25 : 1;
+  body += '<div class="grp"><div class="grp-h">' + (v.sold_by_weight ? 'Weight (lb)' : 'Quantity') + '</div>'
+    + '<div class="qtyrow"><div class="step">'
+    + '<button type="button" data-q="-">−</button>'
+    + '<span class="q">' + (v.sold_by_weight ? st.qty.toFixed(2) : st.qty) + '</span>'
+    + '<button type="button" data-q="+">+</button>'
+    + '</div><div class="big$">' + usd(Math.round(stUnitCents() * st.qty)) + '</div></div>'
+    + '<div class="fine">Steps of ' + (v.sold_by_weight ? '0.25 lb' : '1') + '.</div></div>';
+
+  body += '<div class="grp"><div class="grp-h">Note for the kitchen</div>'
+    + '<input class="txt" id="itNote" value="' + esc(st.note) + '" placeholder="e.g. cut in halves, no rosemary" /></div>';
+
+  const gaps = stMissing();
+  openSheet(
+    '<div class="sheet-h"><div><h2>' + esc(it.name) + '</h2>'
+    + (it.description ? '<div class="s">' + esc(String(it.description).slice(0,140)) + '</div>' : '')
+    + '</div><button class="sheet-x" type="button" data-x="1">×</button></div>'
+    + '<div class="sheet-b">' + body + '</div>'
+    + '<div class="sheet-f"><button class="btn btn-gold btn-lg" type="button" data-add="1"'
+    + ((gaps.length || (needsPrice && !st.customCents)) ? ' disabled' : '') + '>'
+    + (gaps.length ? 'Choose ' + esc(gaps[0])
+       : (needsPrice && !st.customCents) ? 'Enter a price'
+       : 'Add to order · ' + usd(Math.round(stUnitCents() * st.qty)))
+    + '</button></div>',
+    false, itemColor(it)
+  );
+}
+
+function itemSheetTap(e){
+  const st = sheetState; if(!st || st.kind !== 'item') return;
+  const t = e.target.closest('button'); if(!t) return;
+
+  if(t.dataset.x){ closeSheet(); return; }
+
+  if(t.dataset.var){ st.varId = t.dataset.var; st.customCents = null; drawItem(); return; }
+
+  if(t.dataset.k){
+    const k = t.dataset.k;
+    let s = String(st.customCents == null ? '' : st.customCents);
+    if(k === 'del') s = s.slice(0,-1);
+    else s = (s + k).replace(/^0+/,'').slice(0,7);
+    st.customCents = s ? Number(s) : null;
+    drawItem(); return;
+  }
+
+  if(t.dataset.mod){
+    const listId = t.dataset.list, id = t.dataset.mod;
+    const list = S.mods[listId];
+    const ml = (st.item.modifier_list_ids||[]).find(m => m.id === listId) || {};
+    let cur = st.sel[listId] || [];
+    if(list && list.selection_type === 'SINGLE'){
+      cur = cur.includes(id) && !(ml.min > 0) ? [] : [id];
+    } else if(cur.includes(id)){
+      cur = cur.filter(x => x !== id);
+    } else {
+      if(ml.max != null && cur.length >= ml.max) cur = cur.slice(1);
+      cur = cur.concat(id);
+    }
+    st.sel[listId] = cur;
+    drawItem(); return;
+  }
+
+  if(t.dataset.q){
+    const v = stVariation();
+    const step = v.sold_by_weight ? 0.25 : 1;
+    st.note = ($('#itNote') || {}).value || st.note;
+    st.qty = Math.max(step, Math.round((st.qty + (t.dataset.q === '+' ? step : -step)) * 100) / 100);
+    drawItem(); return;
+  }
+
+  if(t.dataset.add){
+    st.note = ($('#itNote') || {}).value || '';
+    addFromSheet();
+  }
+}
+
+function addFromSheet(){
+  const st = sheetState, it = st.item, v = stVariation();
+  const hasCatalogPrice = (v.price_cents != null && v.price_cents > 0);
+  const mods = [];
+  Object.keys(st.sel).forEach(listId=>{
+    const list = S.mods[listId]; if(!list) return;
+    st.sel[listId].forEach(id=>{
+      const m = list.modifiers.find(m => m.id === id);
+      if(m) mods.push({ catalog_object_id: m.id, name: m.name, price_cents: Number(m.price_cents||0) });
+    });
+  });
+  addLine({
+    // No catalog id on an open-price line — Square would price it at $0.
+    catalog_object_id: hasCatalogPrice ? v.id : null,
+    name: it.name + (v.name && v.name !== 'Regular' ? ' · ' + v.name : ''),
+    unit_price_cents: stUnitCents(),
+    sold_by_weight: !!v.sold_by_weight,
+    modifiers: mods,
+    quantity: st.qty,
+    note: st.note
+  });
+  closeSheet();
+  toast('Added ' + it.name);
+}
+
+/* ── open (custom) item ────────────────────────────────────────── */
+function openCustom(){
+  sheetState = { kind:'custom', name:'', cents:null };
+  drawCustom();
+}
+function drawCustom(){
+  const st = sheetState;
+  openSheet(
+    '<div class="sheet-h"><div><h2>Open item</h2><div class="s">Anything not in Square — a grazing table, a delivery fee, a special board.</div></div>'
+    + '<button class="sheet-x" type="button" data-x="1">×</button></div>'
+    + '<div class="sheet-b">'
+    + '<div class="grp"><label class="fld"><span>What is it</span>'
+    + '<input class="txt" id="cuName" value="' + esc(st.name) + '" placeholder="Grazing table, 40 people" /></label></div>'
+    + '<div class="grp"><div class="grp-h">Price</div>'
+    + '<div class="kp-out">' + usd(st.cents || 0) + '</div>'
+    + '<div class="kp">'
+    + [1,2,3,4,5,6,7,8,9].map(n=>'<button type="button" data-k="'+n+'">'+n+'</button>').join('')
+    + '<button type="button" data-k="00">00</button><button type="button" data-k="0">0</button>'
+    + '<button type="button" data-k="del">←</button>'
+    + '</div></div></div>'
+    + '<div class="sheet-f"><button class="btn btn-gold btn-lg" type="button" data-cuadd="1"' + (st.cents ? '' : ' disabled') + '>'
+    + (st.cents ? 'Add · ' + usd(st.cents) : 'Enter a price') + '</button></div>'
+  );
+}
+function customSheetTap(e){
+  const st = sheetState; if(!st || st.kind !== 'custom') return;
+  const t = e.target.closest('button'); if(!t) return;
+  if(t.dataset.x){ closeSheet(); return; }
+  if(t.dataset.k){
+    st.name = ($('#cuName')||{}).value || st.name;
+    let s = String(st.cents == null ? '' : st.cents);
+    if(t.dataset.k === 'del') s = s.slice(0,-1);
+    else s = (s + t.dataset.k).replace(/^0+/,'').slice(0,7);
+    st.cents = s ? Number(s) : null;
+    drawCustom(); return;
+  }
+  if(t.dataset.cuadd){
+    const name = (($('#cuName')||{}).value || '').trim() || 'Open item';
+    addLine({ catalog_object_id:null, name, unit_price_cents: st.cents, quantity:1, note:'', modifiers:[] });
+    closeSheet();
+    toast('Added ' + name);
+  }
+}
+
+/* ══ CART ══════════════════════════════════════════════════════════ */
+function lineKey(l){
+  return [l.catalog_object_id || ('open:' + l.name + ':' + l.unit_price_cents),
+          (l.modifiers||[]).map(m=>m.catalog_object_id).sort().join(','),
+          l.note || ''].join('|');
+}
+function addLine(line){
+  line.key = lineKey(line);
+  const hit = S.cart.find(l => l.key === line.key);
+  if(hit) hit.quantity = Math.round((Number(hit.quantity) + Number(line.quantity)) * 100) / 100;
+  else S.cart.push(line);
+  drawCart();
+}
+const cartTotal = () => S.cart.reduce((s,l)=> s + Math.round(l.unit_price_cents * Number(l.quantity||0)), 0);
+
+function drawCart(){
+  const box = $('#cartLines');
+  const n = S.cart.reduce((s,l)=> s + (l.sold_by_weight ? 1 : Number(l.quantity||0)), 0);
+  const total = cartTotal();
+
+  if(!S.cart.length){
+    box.innerHTML = '<div class="empty"><b>Nothing added yet</b>Tap an item to start the order.</div>';
+  } else {
+    box.innerHTML = S.cart.map((l,i)=>{
+      const modTxt = (l.modifiers||[]).map(m => m.name + (m.price_cents ? ' (+' + usd(m.price_cents) + ')' : '')).join(' · ');
+      return '<div class="cl">'
+        + '<div class="cl-top"><span class="cl-n">' + esc(l.name)
+        +   (l.sold_by_weight ? ' <em>per lb</em>' : '') + '</span>'
+        +   '<span class="cl-t">' + usd(Math.round(l.unit_price_cents * Number(l.quantity||0))) + '</span></div>'
+        + (modTxt ? '<div class="cl-sub">' + esc(modTxt) + '</div>' : '')
+        + '<div class="cl-sub">' + qtyTxt(l) + ' × ' + usd(l.unit_price_cents) + '</div>'
+        + (l.note ? '<div class="cl-note">“' + esc(l.note) + '”</div>' : '')
+        + '<div class="cl-bot"><div class="step">'
+        +   '<button type="button" data-dec="' + i + '">−</button>'
+        +   '<span class="q">' + qtyTxt(l) + '</span>'
+        +   '<button type="button" data-inc="' + i + '">+</button>'
+        + '</div><div class="cl-act">'
+        +   '<button type="button" data-note="' + i + '" title="Note">✎</button>'
+        +   '<button type="button" data-rm="' + i + '" title="Remove">🗑</button>'
+        + '</div></div></div>';
+    }).join('');
+  }
+
+  $('#cartCount').textContent = S.cart.length ? (n + ' item' + (n===1?'':'s')) : 'Nothing added yet';
+  $('#est').textContent = usd(total);
+  $('#barCount').textContent = n + ' item' + (n===1?'':'s');
+  $('#barTotal').textContent = usd(total);
+  $('#btnCheckout').disabled = !S.cart.length;
+}
+
+function cartTap(e){
+  const t = e.target.closest('button'); if(!t) return;
+  const i = Number(t.dataset.dec ?? t.dataset.inc ?? t.dataset.rm ?? t.dataset.note);
+  if(Number.isNaN(i)) return;
+  const l = S.cart[i]; if(!l) return;
+  const step = l.sold_by_weight ? 0.25 : 1;
+
+  if(t.dataset.rm != null){ S.cart.splice(i,1); drawCart(); return; }
+  if(t.dataset.inc != null){ l.quantity = Math.round((Number(l.quantity)+step)*100)/100; drawCart(); return; }
+  if(t.dataset.dec != null){
+    const next = Math.round((Number(l.quantity)-step)*100)/100;
+    if(next < step) S.cart.splice(i,1); else l.quantity = next;
+    drawCart(); return;
+  }
+  if(t.dataset.note != null){
+    sheetState = { kind:'note', i };
+    openSheet(
+      '<div class="sheet-h"><div><h2>Note</h2><div class="s">' + esc(l.name) + '</div></div>'
+      + '<button class="sheet-x" type="button" data-x="1">×</button></div>'
+      + '<div class="sheet-b"><label class="fld"><span>Goes on the kitchen ticket</span>'
+      + '<input class="txt" id="lnNote" value="' + esc(l.note||'') + '" placeholder="e.g. extra crackers" /></label></div>'
+      + '<div class="sheet-f"><button class="btn btn-gold btn-lg" type="button" data-nsave="1">Save note</button></div>'
+    );
+    setTimeout(()=>{ const el = $('#lnNote'); if(el) el.focus(); }, 80);
+  }
+}
+
+/* ══ CHECKOUT ══════════════════════════════════════════════════════ */
+function openCheckout(){
+  if(!S.cart.length) return;
+  const d = new Date(Date.now() + 7*86400000);
+  sheetState = {
+    kind:'checkout',
+    asap: true,
+    date: ymd(d),
+    time: '12:00',
+    name:'', phone:'', email:'', notes:''
+  };
+  drawCheckout();
+}
+
+function grabCheckout(){
+  const st = sheetState;
+  ['name','phone','email','notes'].forEach(k=>{ const el = $('#ck_'+k); if(el) st[k] = el.value; });
+  const dd = $('#ck_date'), tt = $('#ck_time');
+  if(dd) st.date = dd.value;
+  if(tt) st.time = tt.value;
+}
+
+function drawCheckout(){
+  const st = sheetState;
+  const total = cartTotal();
+  const noDevice = !S.devices.length;
+  const today = new Date();
+  const quick = [1,2,3,7].map(n=>{
+    const d = new Date(Date.now() + n*86400000);
+    return '<button class="opt' + (st.date===ymd(d)?' on':'') + '" type="button" data-day="' + ymd(d) + '">'
+      + esc(n===1 ? 'Tomorrow' : fmtDay(d)) + '</button>';
+  }).join('');
+
+  openSheet(
+    '<div class="sheet-h"><div><h2>Review &amp; charge</h2><div class="s">'
+    + S.cart.length + ' line' + (S.cart.length===1?'':'s') + ' · ' + usd(total) + ' before tax</div></div>'
+    + '<button class="sheet-x" type="button" data-x="1">×</button></div>'
+
+    + '<div class="sheet-b">'
+
+    + '<div class="grp"><div class="grp-h">When is it for</div><div class="when">'
+    +   '<button class="opt' + (st.asap?' on':'') + '" type="button" data-when="asap">'
+    +     '<span class="t">Today</span><span class="d">Ready as soon as it is made</span></button>'
+    +   '<button class="opt' + (!st.asap?' on':'') + '" type="button" data-when="sched">'
+    +     '<span class="t">Pick a day</span><span class="d">Catering &amp; holiday pre-orders</span></button>'
+    + '</div>'
+    + (st.asap ? '' :
+        '<div style="margin-top:14px;"><div class="days">' + quick + '</div>'
+        + '<div class="row2">'
+        + '<label class="fld"><span>Pickup date</span><input class="txt" type="date" id="ck_date" value="' + esc(st.date) + '" min="' + ymd(today) + '" /></label>'
+        + '<label class="fld"><span>Pickup time</span><input class="txt" type="time" id="ck_time" value="' + esc(st.time) + '" /></label>'
+        + '</div></div>')
+    + '</div>'
+
+    + '<div class="grp"><div class="grp-h">Customer</div><div class="stack">'
+    + '<label class="fld"><span>Name — goes on the ticket</span><input class="txt" id="ck_name" value="' + esc(st.name) + '" placeholder="Jane Doe" autocomplete="off" /></label>'
+    + '<div class="row2">'
+    + '<label class="fld"><span>Phone</span><input class="txt" id="ck_phone" inputmode="tel" value="' + esc(st.phone) + '" placeholder="(901) 555-0134" autocomplete="off" /></label>'
+    + '<label class="fld"><span>Email (optional)</span><input class="txt" id="ck_email" type="email" value="' + esc(st.email) + '" placeholder="jane@example.com" autocomplete="off" /></label>'
+    + '</div></div></div>'
+
+    + '<div class="grp"><label class="fld"><span>Note for the kitchen</span>'
+    + '<input class="txt" id="ck_notes" value="' + esc(st.notes) + '" placeholder="Ring the bell at the catering door." /></label></div>'
+
+    + '<div class="grp"><div class="grp-h">Order</div>'
+    + S.cart.map(l =>
+        '<div class="cl"><div class="cl-top"><span class="cl-n">' + qtyTxt(l) + ' × ' + esc(l.name) + '</span>'
+        + '<span class="cl-t">' + usd(Math.round(l.unit_price_cents*Number(l.quantity||0))) + '</span></div>'
+        + ((l.modifiers||[]).length ? '<div class="cl-sub">' + esc(l.modifiers.map(m=>m.name).join(' · ')) + '</div>' : '')
+        + (l.note ? '<div class="cl-note">“' + esc(l.note) + '”</div>' : '')
+        + '</div>').join('')
+    + '</div>'
+
+    + '</div>'
+
+    + '<div class="sheet-f">'
+    + '<div class="tot"><span>Before tax</span><b>' + usd(total) + '</b></div>'
+    + '<div class="fine">' + (noDevice
+        ? '<b style="color:#A52B1E;">No Square Terminal is paired.</b> Pair one in the manager console under Catering → Pre-Orders → Terminals.'
+        : 'Square applies tax and shows the final total on the Terminal. The kitchen ticket prints the moment the card clears.')
+      + '</div>'
+    + '<button class="btn btn-gold btn-lg" style="margin-top:12px;" type="button" data-charge="1"' + (noDevice ? ' disabled' : '') + '>Charge on Terminal</button>'
+    + '</div>', true
+  );
+}
+
+function checkoutTap(e){
+  const st = sheetState; if(!st || st.kind !== 'checkout') return;
+  const t = e.target.closest('button'); if(!t) return;
+  if(t.dataset.x){ closeSheet(); return; }
+  if(t.dataset.when){ grabCheckout(); st.asap = t.dataset.when === 'asap'; drawCheckout(); return; }
+  if(t.dataset.day){ grabCheckout(); st.date = t.dataset.day; drawCheckout(); return; }
+  if(t.dataset.charge){ grabCheckout(); charge(); }
+}
+
+async function charge(){
+  if(S.busy) return;
+  const st = sheetState;
+  const name = (st.name||'').trim();
+  if(!name){ toast('The order needs a customer name.', true); const el=$('#ck_name'); if(el) el.focus(); return; }
+
+  let pickup = null;
+  if(!st.asap){
+    if(!st.date){ toast('Pick a pickup day.', true); return; }
+    const dt = new Date(st.date + 'T' + (st.time || '12:00'));
+    if(isNaN(dt)){ toast('That pickup time did not parse.', true); return; }
+    if(dt < new Date()){ toast('That pickup time is in the past.', true); return; }
+    pickup = dt.toISOString();
+  }
+
+  S.busy = true;
+  const btn = $('#sheet').querySelector('[data-charge]');
+  if(btn){ btn.disabled = true; btn.textContent = 'Creating the order…'; }
+
+  try{
+    const res = await fn({
+      action: 'create',
+      asap: st.asap,
+      customer_name: name,
+      customer_phone: (st.phone||'').trim() || null,
+      customer_email: (st.email||'').trim() || null,
+      pickup_at: pickup,
+      notes: (st.notes||'').trim() || null,
+      items: S.cart.map(l => ({
+        catalog_object_id: l.catalog_object_id || undefined,
+        name: l.name,
+        quantity: l.quantity,
+        unit_price_cents: l.unit_price_cents,
+        note: l.note || undefined,
+        modifiers: (l.modifiers||[]).map(m => ({ catalog_object_id: m.catalog_object_id }))
+      })),
+      actor: 'order-pad'
+    });
+    closeSheet();
+    openPay(res.preorder);
+  }catch(e){
+    toast(e.message, true);
+    if(btn){ btn.disabled = false; btn.textContent = 'Charge on Terminal'; }
+  }finally{
+    S.busy = false;
+  }
+}
+
+/* ══ PAYMENT ═══════════════════════════════════════════════════════ */
+let POLL = null;
+
+function openPay(po){
+  $('#payBg').classList.add('show');
+  drawPay(po, 'Hand the Terminal over — waiting for a tap or dip.');
+  clearInterval(POLL);
+  POLL = setInterval(()=> pollPay(po.id), 2200);
+}
+function closePay(){
+  clearInterval(POLL); POLL = null;
+  $('#payBg').classList.remove('show');
+  $('#pay').innerHTML = '';
+}
+function drawPay(po, msg, state){
+  const paid = state === 'paid', dead = state === 'dead';
+  $('#pay').className = 'pay' + (paid ? ' ok' : (dead ? ' bad' : ''));
+  $('#pay').innerHTML =
+    '<div class="pay-amt">' + usd(po.total_cents) + '</div>'
+    + '<div class="pay-who">' + esc(po.customer_name) + ' · '
+    +   (po.asap ? 'today' : 'pickup ' + fmtWhen(po.pickup_at)) + '</div>'
+    + (paid ? '<div class="pay-tick">✓</div>' : (dead ? '' : '<div class="spin"></div>'))
+    + '<div class="pay-msg">' + esc(msg) + '</div>'
+    + '<div class="pay-btns">'
+    + (paid
+        ? '<button class="btn btn-gold" type="button" data-pay="sheet">Print sheet</button>'
+          + '<button class="btn btn-dark" type="button" data-pay="done">New order</button>'
+        : (dead
+            ? '<button class="btn btn-gold" type="button" data-pay="retry">Try the card again</button>'
+              + '<button class="btn" type="button" data-pay="close">Close</button>'
+            : '<button class="btn" type="button" data-pay="cancel">Cancel the charge</button>'))
+    + '</div>';
+  $('#pay')._po = po;
+}
+async function pollPay(id){
+  try{
+    const { preorder, checkout } = await fn({ action:'checkout_status', id });
+    const stat = checkout && checkout.status;
+    if(stat === 'COMPLETED'){
+      clearInterval(POLL); POLL = null;
+      drawPay(preorder, 'Paid. The kitchen ticket is printing now.', 'paid');
+      S.cart = []; drawCart();
+    } else if(stat === 'CANCELED'){
+      clearInterval(POLL); POLL = null;
+      drawPay(preorder, checkout.cancel_reason ? ('Canceled: ' + checkout.cancel_reason)
+        : 'Canceled at the Terminal. The order is saved — you can try the card again.', 'dead');
+    } else if(stat === 'IN_PROGRESS'){
+      drawPay(preorder, 'Card reader is active — waiting on the customer.');
+    }
+  }catch(e){ /* transient — keep polling */ }
+}
+async function payTap(e){
+  const t = e.target.closest('button'); if(!t || !t.dataset.pay) return;
+  const po = $('#pay')._po;
+  const what = t.dataset.pay;
+  if(what === 'done' || what === 'close'){ closePay(); return; }
+  if(what === 'sheet'){ printSheet(po); return; }
+  if(what === 'cancel'){
+    try{
+      const r = await fn({ action:'cancel_checkout', id: po.id });
+      clearInterval(POLL); POLL = null;
+      drawPay(r.preorder, 'Canceled. The order is saved — you can try the card again.', 'dead');
+    }catch(err){ toast(err.message, true); }
+    return;
+  }
+  if(what === 'retry'){
+    try{ const r = await fn({ action:'retry_charge', id: po.id }); openPay(r.preorder); }
+    catch(err){ toast(err.message, true); }
+  }
+}
+
+/* ══ ORDERS LIST ═══════════════════════════════════════════════════ */
+async function openOrders(){
+  sheetState = { kind:'orders', rows: [] };
+  openSheet(
+    '<div class="sheet-h"><div><h2>Orders</h2><div class="s">Everything still coming up</div></div>'
+    + '<button class="sheet-x" type="button" data-x="1">×</button></div>'
+    + '<div class="sheet-b" id="ordBody"><div class="empty">Loading…</div></div>', true
+  );
+  try{
+    const { preorders } = await fn({ action:'list', upcoming:true });
+    sheetState.rows = preorders;
+    drawOrders();
+  }catch(e){
+    const b = $('#ordBody'); if(b) b.innerHTML = '<div class="empty"><b>Could not load orders</b>' + esc(e.message) + '</div>';
+  }
+}
+function drawOrders(){
+  const rows = sheetState.rows || [];
+  const b = $('#ordBody'); if(!b) return;
+  if(!rows.length){ b.innerHTML = '<div class="empty"><b>Nothing on the books</b>New orders show up here.</div>'; return; }
+  b.innerHTML = rows.map(p=>{
+    const out = Math.ceil((new Date(p.pickup_at) - new Date())/86400000);
+    const pill = p.payment_status === 'paid' ? '<span class="pill pill-ok">Paid</span>'
+      : p.payment_status === 'pending' ? '<span class="pill pill-warn">Awaiting tap</span>'
+      : p.payment_status === 'refunded' ? '<span class="pill pill-warn">Refunded</span>'
+      : '<span class="pill pill-bad">Unpaid</span>';
+    return '<div class="ord">'
+      + '<div class="ord-top"><div>'
+      +   '<div class="ord-w">' + esc(p.customer_name) + '</div>'
+      +   '<div class="ord-s">' + (p.asap ? 'Today · walk-up' : fmtWhen(p.pickup_at) + ' · ' + (out<=0 ? 'today' : out + ' day' + (out===1?'':'s') + ' out')) + '</div>'
+      +   '<div class="ord-s">' + (p.items||[]).length + ' line' + ((p.items||[]).length===1?'':'s') + ' · ' + esc(p.customer_phone||'no phone') + '</div>'
+      + '</div><div style="text-align:right;"><div class="ord-t">' + usd(p.total_cents) + '</div><div style="margin-top:6px;">' + pill + '</div></div></div>'
+      + '<div class="ord-btns">'
+      +   '<button class="btn" type="button" data-osheet="' + esc(p.id) + '">Print sheet</button>'
+      +   (p.payment_status !== 'paid' && p.status !== 'canceled' ? '<button class="btn btn-gold" type="button" data-ocharge="' + esc(p.id) + '">Charge</button>' : '')
+      +   (p.status !== 'canceled' ? '<button class="btn btn-wax" type="button" data-ocancel="' + esc(p.id) + '">Cancel</button>' : '')
+      + '</div></div>';
+  }).join('');
+}
+async function ordersTap(e){
+  const st = sheetState; if(!st || st.kind !== 'orders') return;
+  const t = e.target.closest('button'); if(!t) return;
+  if(t.dataset.x){ closeSheet(); return; }
+  const row = id => (st.rows||[]).find(r => r.id === id);
+
+  if(t.dataset.osheet){ printSheet(row(t.dataset.osheet)); return; }
+  if(t.dataset.ocharge){
+    try{ const r = await fn({ action:'retry_charge', id:t.dataset.ocharge }); closeSheet(); openPay(r.preorder); }
+    catch(err){ toast(err.message, true); }
+    return;
+  }
+  if(t.dataset.ocancel){
+    const p = row(t.dataset.ocancel);
+    const warn = p && p.payment_status === 'paid'
+      ? 'Refund ' + usd(p.paid_cents) + ' to ' + p.customer_name + ' and cancel?\n\nThe kitchen ticket already printed when it was paid — Square cannot un-print it. Pull the sheet from the binder too.'
+      : 'Cancel this order?';
+    if(!confirm(warn)) return;
+    const reason = prompt('Reason (goes on the refund):', 'Customer canceled') || '';
+    try{ await fn({ action:'cancel', id:p.id, reason }); toast('Canceled.'); openOrders(); }
+    catch(err){ toast(err.message, true); }
+  }
+}
+
+/* ── printable sheet (8.5x11 for the binder) ───────────────────── */
+function printSheet(po){
+  if(!po) return;
+  const lines = (po.items||[]).map(l=>{
+    const mods = (l.modifiers||[]).map(m=>m.name).filter(Boolean).join(', ');
+    return '<tr><td>' + esc(l.name)
+      + (mods ? '<div class="n">' + esc(mods) + '</div>' : '')
+      + (l.note ? '<div class="n">' + esc(l.note) + '</div>' : '')
+      + '</td><td class="c">' + esc(l.quantity) + '</td><td class="r">'
+      + usd(Math.round((l.unit_price_cents||0) * Number(l.quantity||0))) + '</td></tr>';
+  }).join('');
+  const w = window.open('', '_blank', 'width=850,height=1100');
+  if(!w){ toast('Allow pop-ups on this tablet to print.', true); return; }
+  w.document.write(
+    '<!doctype html><html><head><meta charset="utf-8"><title>Order — ' + esc(po.customer_name) + '</title><style>'
+    + 'body{font-family:Georgia,serif;margin:0;padding:44px 52px;color:#111;}'
+    + 'h1{font-size:15px;letter-spacing:3px;text-transform:uppercase;margin:0;font-family:Arial,sans-serif;}'
+    + '.gold{color:#E0A21C;font-size:11px;letter-spacing:4px;text-transform:uppercase;font-family:Arial,sans-serif;margin-top:2px;}'
+    + '.when{border:2px solid #111;padding:14px 18px;margin:22px 0;}'
+    + '.when b{display:block;font-size:26px;font-family:Arial,sans-serif;}'
+    + '.meta{display:flex;gap:40px;margin:16px 0 24px;font-size:13px;}'
+    + 'table{width:100%;border-collapse:collapse;font-size:14px;}'
+    + 'th{text-align:left;border-bottom:2px solid #111;padding:8px 4px;font-family:Arial,sans-serif;font-size:11px;letter-spacing:1px;text-transform:uppercase;}'
+    + 'td{border-bottom:1px solid #ddd;padding:9px 4px;vertical-align:top;}'
+    + 'td.c{text-align:center;width:70px;} td.r{text-align:right;width:100px;}'
+    + '.n{font-size:12px;color:#666;font-style:italic;margin-top:3px;}'
+    + '.tot{text-align:right;font-size:18px;font-family:Arial,sans-serif;margin-top:14px;}'
+    + '.notes{margin-top:26px;border:1px dashed #999;padding:14px;min-height:70px;font-size:13px;}'
+    + '.foot{margin-top:30px;font-size:11px;color:#777;font-family:Arial,sans-serif;}'
+    + '</style></head><body>'
+    + '<h1>GREYS</h1><div class="gold">' + (po.asap ? 'Counter Order' : 'Pre-Order') + '</div>'
+    + '<div class="when"><span style="font-size:11px;letter-spacing:2px;font-family:Arial,sans-serif;text-transform:uppercase;color:#666;">Pickup</span><b>'
+    +   (po.asap ? 'Today — as soon as ready' : fmtWhen(po.pickup_at)) + '</b></div>'
+    + '<div class="meta"><div><b>' + esc(po.customer_name) + '</b><br>' + esc(po.customer_phone||'—') + '<br>' + esc(po.customer_email||'') + '</div>'
+    +   '<div>' + (po.payment_status==='paid' ? '<b>PAID IN FULL</b>' : '<b>BALANCE DUE</b>') + '<br>' + usd(po.total_cents) + '<br>Order ' + esc(String(po.id).slice(0,8)) + '</div></div>'
+    + '<table><thead><tr><th>Item</th><th class="c">Qty</th><th class="r">Total</th></tr></thead><tbody>' + lines + '</tbody></table>'
+    + '<div class="tot">Total <b>' + usd(po.total_cents) + '</b></div>'
+    + '<div class="notes"><b style="font-family:Arial,sans-serif;font-size:11px;letter-spacing:1px;">NOTES</b><br>' + esc(po.notes||'') + '</div>'
+    + '<div class="foot">The kitchen ticket printed when this order was paid. This sheet is the working copy.</div>'
+    + '</body></html>'
+  );
+  w.document.close();
+  setTimeout(()=>{ try{ w.print(); }catch(e){} }, 350);
+}
+
+/* ══ DEVICES ═══════════════════════════════════════════════════════ */
+async function loadDevices(){
+  try{
+    const { devices } = await fn({ action:'devices' });
+    S.devices = devices || [];
+  }catch(e){ S.devices = []; }
+  const on = S.devices.length;
+  $('#termName').textContent = on ? S.devices[0].label : 'none paired';
+  $('#term').classList.toggle('bad', !on);
+}
+
+/* ══ WIRING ════════════════════════════════════════════════════════ */
+function openCart(open){
+  $('#cart').classList.toggle('open', open);
+  $('#cartShade').classList.toggle('show', open);
+}
+
+let searchT = null;
+function wire(){
+  $('#signin').addEventListener('click', signIn);
+  $('#pw').addEventListener('keydown', e=>{ if(e.key === 'Enter') signIn(); });
+  $('#btnLock').addEventListener('click', lock);
+  $('#btnRefresh').addEventListener('click', ()=> loadCatalog(true));
+  $('#btnOrders').addEventListener('click', openOrders);
+  $('#btnCustom').addEventListener('click', openCustom);
+  $('#btnCheckout').addEventListener('click', ()=>{ openCart(false); openCheckout(); });
+  $('#btnClear').addEventListener('click', ()=>{
+    if(!S.cart.length) return;
+    if(confirm('Clear the whole order?')){ S.cart = []; drawCart(); }
+  });
+  $('#btnOpenCart').addEventListener('click', ()=> openCart(true));
+  $('#cartShade').addEventListener('click', ()=> openCart(false));
+
+  $('#sortbar').addEventListener('click', e=>{
+    const b = e.target.closest('[data-sort]');
+    if(b && b.dataset.sort !== S.sort) setSort(b.dataset.sort);
+  });
+
+  $('#rail').addEventListener('click', e=>{
+    const b = e.target.closest('[data-cat]'); if(!b) return;
+    S.cat = b.dataset.cat; S.q = ''; $('#q').value = ''; $('#qx').classList.add('hide');
+    renderRail(); renderGrid();
+    $('#gridwrap').scrollTop = 0;
+  });
+
+  $('#grid').addEventListener('click', e=>{
+    const b = e.target.closest('.tile'); if(!b) return;
+    const it = (window.__VIS || [])[Number(b.dataset.i)];
+    if(it) openItem(it);
+  });
+
+  $('#q').addEventListener('input', ()=>{
+    const v = $('#q').value.trim();
+    $('#qx').classList.toggle('hide', !v);
+    clearTimeout(searchT);
+    searchT = setTimeout(()=>{ S.q = v; renderGrid(); $('#gridwrap').scrollTop = 0; }, 160);
+  });
+  $('#qx').addEventListener('click', ()=>{
+    $('#q').value = ''; $('#qx').classList.add('hide'); S.q = ''; renderGrid(); $('#q').blur();
+  });
+
+  $('#cartLines').addEventListener('click', cartTap);
+
+  // One delegated handler per overlay; each sheet renderer owns its own taps.
+  $('#sheet').addEventListener('click', e=>{
+    const t = e.target.closest('button');
+    if(t && t.dataset.x){ closeSheet(); return; }
+    if(t && t.dataset.nsave != null){
+      const l = S.cart[sheetState.i];
+      if(l){ l.note = ($('#lnNote')||{}).value || ''; l.key = lineKey(l); drawCart(); }
+      closeSheet(); return;
+    }
+    if(!sheetState) return;
+    if(sheetState.kind === 'item')     itemSheetTap(e);
+    else if(sheetState.kind === 'custom')   customSheetTap(e);
+    else if(sheetState.kind === 'checkout') checkoutTap(e);
+    else if(sheetState.kind === 'orders')   ordersTap(e);
+  });
+  $('#sheetBg').addEventListener('click', e=>{ if(e.target === $('#sheetBg')) closeSheet(); });
+  $('#pay').addEventListener('click', payTap);
+
+  document.addEventListener('keydown', e=>{
+    if(e.key === 'Escape'){ if($('#sheetBg').classList.contains('show')) closeSheet(); else openCart(false); }
+  });
+
+  // A tablet left on the counter should not sleep mid-order if the browser
+  // lets us say so. Harmless where it is unsupported.
+  if(navigator.wakeLock){
+    const keep = ()=> navigator.wakeLock.request('screen').catch(()=>{});
+    keep();
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) keep(); });
+  }
+}
+
+/* ── boot ──────────────────────────────────────────────────────── */
+async function start(){
+  $('#lock').classList.add('hide');
+  $('#app').classList.remove('hide');
+  drawCart();
+  await Promise.all([ loadCatalog(false), loadDevices() ]);
+}
+
+async function boot(){
+  wire();
+  // The tablet keeps whatever sort the counter last chose.
+  try{
+    const saved = localStorage.getItem(SORT_KEY);
+    if(saved && ['grouped','az','price-up','price-down'].includes(saved)) S.sort = saved;
+  }catch(e){}
+  renderSort();
+  drawCart();
+  let session = null;
+  try{ const { data } = await sb.auth.getSession(); session = data ? data.session : null; }catch(e){}
+  if(session) await start();
+  else setTimeout(()=>{ const el = $('#pw'); if(el) el.focus(); }, 120);
+}
+
+window.__OP = { S, boot, start, applyCatalog, landingCat, buildFamilies, sortItems, addLine, drawCart, openItem, openCheckout, openPay };
+boot();
+
+})();
+</script>
+</body>
+</html>
