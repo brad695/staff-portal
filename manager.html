@@ -719,6 +719,12 @@
                          font-weight:400; text-transform:none; letter-spacing:0; font-size:0.86rem; cursor:pointer; }
     #panel-plu .hotwrap input{ width:18px; height:18px; min-width:18px; flex:none; margin:0; padding:0; }
 
+    /* amount + unit share one field. flex:1 on the number keeps the unit select
+       from collapsing the box on narrow laptops. */
+    #panel-plu .nwrap{ display:flex; gap:6px; }
+    #panel-plu .nwrap input{ flex:1; min-width:0; }
+    #panel-plu .nwrap select{ flex:0 0 82px; }
+
     #panel-plu .sq-hint{ font-size:0.76rem; color:var(--sub); margin-top:9px; line-height:1.6; }
     #panel-plu .sq-hint b{ color:var(--ink); font-family:ui-monospace,Menlo,monospace; }
     #panel-plu .notice{ margin-top:12px; padding:10px 13px; border-radius:var(--r); font-size:0.84rem; display:none; line-height:1.5; }
@@ -898,6 +904,13 @@
           <label class="fld">Price per lb ($)
             <input id="pf_ppl" type="number" step="0.01" min="0" inputmode="decimal" placeholder="24.99" />
           </label>
+          <label class="fld span2">Net Weight
+            <span class="nwrap">
+              <input id="pf_nwamt" type="number" step="0.001" min="0" inputmode="decimal" placeholder="8" />
+              <select id="pf_nwunit"></select>
+            </span>
+            <span class="fnote" id="pf_nwNote"></span>
+          </label>
           <label class="fld">Barcode <a class="mini" id="pf_genBarcode">generate</a>
             <input id="pf_barcode" class="mono" inputmode="numeric" placeholder="Scan, type, or generate" />
             <span class="fnote" id="pf_barcodeNote"></span>
@@ -942,9 +955,9 @@
       <div class="bulk-wrap">
         <table class="bulk">
           <thead>
-            <tr><th>PLU</th><th>Name</th><th>Marketing</th><th>Category</th><th>Price</th><th>Per lb</th><th>Barcode</th><th>DateCodeGenie</th><th>Square</th><th></th></tr>
+            <tr><th>PLU</th><th>Name</th><th>Marketing</th><th>Category</th><th>Price</th><th>Per lb</th><th>Net wt</th><th>Barcode</th><th>DateCodeGenie</th><th>Square</th><th></th></tr>
           </thead>
-          <tbody id="pluBody"><tr><td colspan="10" class="empty-row">Loading…</td></tr></tbody>
+          <tbody id="pluBody"><tr><td colspan="11" class="empty-row">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -7811,6 +7824,12 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
   const CATEGORIES = ["Cheese","Charcuterie","Specialty","Sandwiches","Jams","Retail","Catering","NY BUTCHER BOARD","COCORICO"];
   const PRINTER_PROFILES = ["Greys Cheese Label","No Weight Item","Greys Sandwiches","No Weight 2x4","Small sticker",
     "Charcuterie 2x4","Cheesemas Sticker","Flight Sticker","No Weight w/Date","Cheese Case Sticker","QR CODE"];
+  // DateCodeGenie stores net weight as free text ("8 OZ", "1 LB"). We keep the
+  // amount and the unit apart in the form and join them on save so the strings
+  // stay consistent — DCG will happily accept "8oz", "8 ounces" and "8 Oz" as
+  // three different labels otherwise.
+  const NET_UNITS = ["LB","OZ","G","KG","EA"];
+  const DEFAULT_UNIT = "LB";
 
   let items = [], nextPlu = null, overridePlu = false, editingId = null;
 
@@ -7826,6 +7845,22 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
   });
   const optionsHtml = (list, sel) => list.map(v =>
     '<option value="'+esc(v)+'"'+(v===sel?' selected':'')+'>'+esc(v)+'</option>').join('');
+
+  /* ---------- net weight ---------- */
+  // "8 OZ" -> {amt:'8', unit:'OZ'}. Anything we can't parse keeps its text in
+  // the amount box rather than being silently dropped.
+  function splitWeight(v){
+    const raw = String(v ?? '').trim();
+    if (!raw) return { amt:'', unit:DEFAULT_UNIT };
+    const m = raw.match(/^([\d.]+)\s*([A-Za-z]*)$/);
+    if (!m) return { amt:raw, unit:DEFAULT_UNIT };
+    const unit = m[2].toUpperCase();
+    return { amt:m[1], unit: NET_UNITS.includes(unit) ? unit : DEFAULT_UNIT };
+  }
+  const joinWeight = (amt, unit) => {
+    const a = String(amt ?? '').trim();
+    return a ? a + ' ' + (unit || DEFAULT_UNIT) : null;
+  };
 
   /* ---------- UPC-A ---------- */
   function upcCheckDigit(first11){
@@ -7950,6 +7985,11 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     $('pf_pluNote').textContent = overridePlu ? 'Manual — must not already be in use'
       : mode.kind === 'barcode' ? 'Skipped — barcode identifies this item' : 'Next available number';
 
+    const nw = joinWeight($('pf_nwamt').value, $('pf_nwunit').value);
+    const nwNote = $('pf_nwNote');
+    nwNote.className = 'fnote' + (nw ? ' good' : '');
+    nwNote.textContent = nw ? 'Label prints ' + nw : 'Optional — what the DateCodeGenie label prints';
+
     const bc = $('pf_barcode').value.trim(), note = $('pf_barcodeNote');
     if (!bc){ note.className='fnote'; note.textContent='Optional — if set, no PLU is used'; }
     else if (/^\d{12}$/.test(bc)){
@@ -7982,11 +8022,12 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     const q = $('pluSearch').value.trim().toLowerCase();
     const filtered = !q ? items : items.filter(i =>
       (i.name||'').toLowerCase().includes(q) || (i.marketing_name||'').toLowerCase().includes(q) ||
-      pad5(i.plu).includes(q) || (i.barcode||'').includes(q));
+      pad5(i.plu).includes(q) || (i.barcode||'').includes(q) ||
+      (i.net_weight||'').toLowerCase().includes(q));
 
     const body = $('pluBody');
     if (!filtered.length){
-      body.innerHTML = '<tr><td colspan="10" class="empty-row">'+(items.length?'No matches.':'No items yet.')+'</td></tr>';
+      body.innerHTML = '<tr><td colspan="11" class="empty-row">'+(items.length?'No matches.':'No items yet.')+'</td></tr>';
       return;
     }
 
@@ -7996,6 +8037,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
           'value="'+esc(val ?? '')+'" placeholder="'+ph+'" />';
         const catList = (CATEGORIES.includes(i.category) || !i.category) ? CATEGORIES : [i.category].concat(CATEGORIES);
         const profList = (PRINTER_PROFILES.includes(i.printer_profile) || !i.printer_profile) ? PRINTER_PROFILES : [i.printer_profile].concat(PRINTER_PROFILES);
+        const w = splitWeight(i.net_weight);
         const pluEdit = hasPlu(i.plu) ? pad5(i.plu)
           : '<span class="none">—</span> <button type="button" class="btn btn-ghost btn-sm" data-assignplu="'+i.id+'">assign PLU</button>';
         return '<tr class="dirty">'+
@@ -8005,6 +8047,8 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
           '<td data-l="Category"><select id="pe_category">'+optionsHtml(catList, i.category||'Cheese')+'</select></td>'+
           '<td data-l="Price">'+inp('pe_price',i.price,'Price','number')+'</td>'+
           '<td data-l="Per lb">'+inp('pe_ppl',i.price_per_lb,'Per lb','number')+'</td>'+
+          '<td data-l="Net wt"><span class="nwrap">'+inp('pe_nwamt',w.amt,'Net wt','number')+
+            '<select id="pe_nwunit">'+optionsHtml(NET_UNITS, w.unit)+'</select></span></td>'+
           '<td data-l="Barcode">'+inp('pe_barcode',i.barcode,'Barcode')+'</td>'+
           '<td data-l="Printer"><select id="pe_printer">'+optionsHtml(profList, i.printer_profile||'Greys Cheese Label')+'</select></td>'+
           '<td data-l="Hot buttons"><label class="hotwrap"><input id="pe_hot" type="checkbox"'+(i.hot_buttons!==false?' checked':'')+' /><span>Enabled</span></label></td>'+
@@ -8028,6 +8072,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
         '<td data-l="Category">'+(i.category?esc(i.category):'—')+'</td>'+
         '<td data-l="Price">'+money(i.price)+'</td>'+
         '<td data-l="Per lb">'+money(i.price_per_lb)+'</td>'+
+        '<td data-l="Net wt">'+(i.net_weight?esc(i.net_weight):'—')+'</td>'+
         '<td class="mono" data-l="Barcode">'+(i.barcode?esc(i.barcode):'—')+'</td>'+
         '<td data-l="DateCodeGenie">'+statusPill(i.dcg_status, i.dcg_error)+'</td>'+
         '<td data-l="Square">'+squareCell(i)+'</td>'+
@@ -8058,6 +8103,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
         marketing_name: $('pf_marketing').value.trim() || null,
         price: $('pf_price').value === '' ? null : Number($('pf_price').value),
         price_per_lb: $('pf_ppl').value === '' ? null : Number($('pf_ppl').value),
+        net_weight: joinWeight($('pf_nwamt').value, $('pf_nwunit').value),
         barcode: mode.barcode || null,
         plu: (mode.kind==='plu' && overridePlu && mode.plu) ? Number(mode.plu) : null,
         assign_plu: mode.kind === 'plu',
@@ -8074,7 +8120,8 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
         : [it.dcg_status, it.square_status].includes('skipped') ? 'warn' : 'ok';
       setNotice(worst, 'Saved ' + it.name + ' as ' + (hasPlu(it.plu) ? 'PLU ' + pad5(it.plu) : 'barcode ' + it.barcode) + '. ' +
         part('DateCodeGenie', it.dcg_status, it.dcg_error) + ' · ' + part('Square', it.square_status, it.square_error));
-      ['pf_name','pf_marketing','pf_price','pf_ppl','pf_barcode','pf_plu'].forEach(id => $(id).value = '');
+      ['pf_name','pf_marketing','pf_price','pf_ppl','pf_nwamt','pf_barcode','pf_plu'].forEach(id => $(id).value = '');
+      $('pf_nwunit').value = DEFAULT_UNIT;
       $('pf_category').value = 'Cheese'; $('pf_printer').value = 'Greys Cheese Label'; $('pf_hot').checked = true;
       overridePlu = false; $('pf_plu').disabled = true; $('pf_pluToggle').textContent = 'override';
       await load();
@@ -8113,8 +8160,9 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     renderForm();
   });
 
-  ['pf_barcode','pf_plu','pf_name','pf_marketing','pf_price','pf_ppl'].forEach(id =>
+  ['pf_barcode','pf_plu','pf_name','pf_marketing','pf_price','pf_ppl','pf_nwamt'].forEach(id =>
     $(id).addEventListener('input', renderForm));
+  $('pf_nwunit').addEventListener('change', renderForm);
   $('pluSearch').addEventListener('input', render);
 
   /* ---------- table actions ---------- */
@@ -8151,6 +8199,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
           marketing_name: $('pe_marketing').value,
           price: $('pe_price').value === '' ? null : Number($('pe_price').value),
           price_per_lb: $('pe_ppl').value === '' ? null : Number($('pe_ppl').value),
+          net_weight: joinWeight($('pe_nwamt').value, $('pe_nwunit').value),
           barcode: $('pe_barcode').value,
           category: $('pe_category').value,
           printer_profile: $('pe_printer').value,
@@ -8223,8 +8272,8 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
       return a.plu - b.plu;
     });
     const rows = [
-      ['PLU','Name','Marketing Name','Price','Price per lb','Barcode','Category','Printer Profile','Hot Buttons','DCG Status','Square Status','Square Pricing','Square Item ID'],
-      ...sorted.map(i => [pad5(i.plu), i.name, i.marketing_name||'', i.price ?? '', i.price_per_lb ?? '',
+      ['PLU','Name','Marketing Name','Price','Price per lb','Net Weight','Barcode','Category','Printer Profile','Hot Buttons','DCG Status','Square Status','Square Pricing','Square Item ID'],
+      ...sorted.map(i => [pad5(i.plu), i.name, i.marketing_name||'', i.price ?? '', i.price_per_lb ?? '', i.net_weight||'',
         i.barcode||'', i.category||'', i.printer_profile||'', i.hot_buttons !== false ? 'x':'',
         i.dcg_status, i.square_status, priceMode(i).label, i.square_item_id||''])
     ];
@@ -8237,6 +8286,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
 
   $('pf_category').innerHTML = optionsHtml(CATEGORIES, 'Cheese');
   $('pf_printer').innerHTML = optionsHtml(PRINTER_PROFILES, 'Greys Cheese Label');
+  $('pf_nwunit').innerHTML = optionsHtml(NET_UNITS, DEFAULT_UNIT);
 
   window.pluInit = load;
 })();
