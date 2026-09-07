@@ -351,6 +351,141 @@
       .sect.more{ display:none; }
     }
 </style>
+<style id="theme-v3">
+/* ═══════════════════════════════════════════════════════════════════
+   THEME v3 — gray canvas · white cards · colored section tiles
+   Loaded LAST on purpose: every rule here overrides the base sheet above
+   at equal specificity, so the original CSS is untouched. Delete this one
+   <style> block to get the old look back.
+   --sc / --sc-soft are set per section button by the nav script;
+   --accent / --accent-soft follow whichever section is open.
+   ═══════════════════════════════════════════════════════════════════ */
+:root{
+  --canvas:#f1f3f6;
+  --card:#ffffff; --paper:#ffffff;
+  --line:#e3e6ea; --line-soft:#eef0f3;
+  --ink:#161a1f; --sub:#67717d; --rind:#161a1f; --navy:#161a1f;
+  --r:8px; --r-card:14px;
+  --shadow:0 1px 2px rgba(18,26,38,.05), 0 2px 8px rgba(18,26,38,.06);
+  --shadow-lg:0 2px 4px rgba(18,26,38,.05), 0 14px 30px rgba(18,26,38,.10);
+  --accent:#b45309; --accent-soft:#fdf1e3;
+}
+body{ background:var(--canvas); color:var(--ink); }
+
+/* ── header ── */
+header{ background:#fff; border-bottom:1px solid var(--line); box-shadow:0 1px 2px rgba(18,26,38,.05);
+  position:relative; z-index:60; padding:14px 26px; }
+header h1{ font-size:1.16rem; letter-spacing:-.4px; }
+.head-link{ border:1px solid var(--line); border-radius:8px; color:#4a5462; background:#fff; padding:7px 13px; }
+.head-link:hover{ background:#f5f6f8; border-color:#c9cfd7; color:var(--ink); }
+
+/* ── shell ── */
+#consoleView{ background:var(--canvas); }
+.tabs{ background:#fff; border-right:1px solid var(--line); width:238px; padding:14px 10px; gap:3px;
+  min-height:100vh; }  /* min-height keeps the white column full-bleed; the rail stays sticky */
+
+/* ── section rail: each icon is a colored tile ── */
+.sect{ border-left:none; border-radius:10px; padding:9px 10px; gap:11px; min-height:50px;
+  color:#4a5462; font-weight:700; font-size:.79rem; letter-spacing:0; text-transform:none; }
+.sect .ico{ width:32px; height:32px; border-radius:9px; display:inline-flex; align-items:center;
+  justify-content:center; font-size:1rem; flex:none; background:var(--sc-soft,#fdf1e3);
+  box-shadow:inset 0 0 0 1px rgba(18,26,38,.06); transition:background .14s; }
+.sect:hover{ background:#f5f6f8; color:var(--ink); }
+.sect.on{ background:var(--sc-soft,#fdf1e3); color:var(--ink); border-left-color:transparent; }
+.sect.on .ico{ background:var(--sc,#b45309); box-shadow:none; }
+.sect.more .ico{ background:#eef0f3; }
+
+/* ── sub-tabs ── */
+.subbar{ background:transparent; border-bottom:none; }
+.subgrp{ padding:16px 26px 8px; gap:8px; }
+.subbar .tab{ background:#fff; border:1px solid var(--line); border-radius:999px; color:#5a6472;
+  font-weight:700; font-size:.74rem; letter-spacing:.2px; box-shadow:0 1px 1px rgba(18,26,38,.04); }
+.subbar .tab:hover{ background:#fff; border-color:#c9cfd7; color:var(--ink); }
+.subbar .tab.active{ background:var(--accent); border-color:var(--accent); color:#fff;
+  box-shadow:0 2px 8px rgba(18,26,38,.18); }
+
+/* ── panels & cards ── */
+.panel{ padding:8px 26px 40px; }
+.section-card{ background:var(--card); border:1px solid var(--line); border-radius:var(--r-card);
+  box-shadow:var(--shadow); padding:22px 24px; margin-bottom:18px; }
+.section-card h2{ font-size:1.02rem; display:flex; align-items:center; flex-wrap:wrap; gap:9px; }
+.section-card h2::before{ content:''; width:4px; height:17px; border-radius:3px;
+  background:var(--accent); flex:none; }
+.section-card .hint{ color:var(--sub); }
+
+/* ── buttons ── */
+.btn{ border-radius:8px; padding:9px 16px; transition:background .12s, border-color .12s, filter .12s; }
+.btn-gold{ background:var(--accent); color:#fff; }
+.btn-gold:hover{ background:var(--accent); color:#fff; filter:brightness(.92); }
+.btn-navy{ background:#1f2937; color:#fff; }
+.btn-navy:hover{ background:#111827; color:#fff; }
+.btn-ghost{ background:#fff; border:1px solid var(--line); color:#3f4854; }
+.btn-ghost:hover{ background:#f5f6f8; border-color:#c9cfd7; }
+.btn-wax{ background:#fff; border:1px solid #f3ccc6; color:#b3261e; }
+.btn-wax:hover{ background:#fdf1ef; }
+
+/* ── lists, tables, boxes ── */
+.bulk-wrap, .rec-list, .table-scroll{ border:1px solid var(--line); border-radius:var(--r-card);
+  box-shadow:var(--shadow); background:#fff; overflow:hidden; }
+table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid var(--line); }
+.rec-row:hover{ background:#f7f8fa; }
+.res-day{ background:#f7f8fa; }
+.csv-box{ border:1px dashed #ccd2da; border-radius:var(--r-card); background:#f7f8fa; }
+.ob-sub{ border:1px solid var(--line); border-radius:var(--r-card); box-shadow:var(--shadow); }
+
+/* ── inputs ── */
+.rf input, .rf select, .rf textarea, .loc-sel, .login-card input, .chip, .rec-radio{
+  border-radius:8px; border:1px solid #d8dce2; }
+.chip, .rec-radio{ border-radius:999px; }
+.rf input:focus, .rf select:focus, .rf textarea:focus, .login-card input:focus{
+  border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); outline:none; }
+.chip.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.chip:hover{ border-color:#c9cfd7; }
+.rec-radio.on{ border-color:var(--accent); background:var(--accent-soft); }
+.rec-radio.on::before{ color:var(--accent); }
+
+/* ── modals / login ── */
+.login-card{ border:1px solid var(--line); border-top:none; border-radius:var(--r-card);
+  box-shadow:var(--shadow-lg); padding:32px; }
+.rec-card{ border-radius:var(--r-card); border-top:none; box-shadow:var(--shadow-lg); }
+.rec-card::before{ content:''; display:block; height:4px; border-radius:4px; width:44px;
+  background:var(--accent); margin-bottom:14px; }
+
+/* ── pills & tags ── */
+.pill, .badge, .tag{ border-radius:999px; }
+
+/* ── colored stat tiles ── */
+#panel-cheese .metrics{ gap:14px; }
+#panel-cheese .metric{ border-radius:var(--r-card); box-shadow:var(--shadow); padding:16px 18px; }
+#panel-cheese .metrics .metric:nth-child(4n+1){ background:#eef1fe; border:1px solid #dde3fd; }
+#panel-cheese .metrics .metric:nth-child(4n+1) .v{ color:#3730a3; }
+#panel-cheese .metrics .metric:nth-child(4n+2){ background:#e9f7f1; border:1px solid #d5ede3; }
+#panel-cheese .metrics .metric:nth-child(4n+2) .v{ color:#065f46; }
+#panel-cheese .metrics .metric:nth-child(4n+3){ background:#fdf3e2; border:1px solid #f6e3c4; }
+#panel-cheese .metrics .metric:nth-child(4n+3) .v{ color:#92400e; }
+#panel-cheese .metrics .metric:nth-child(4n+4){ background:#fdeef1; border:1px solid #f8dbe1; }
+#panel-cheese .metrics .metric:nth-child(4n+4) .v{ color:#9f1239; }
+#panel-cheese .metric .k{ color:#5a6472; }
+.po-devbadge{ border:1px solid var(--line); border-radius:var(--r-card); background:#fff;
+  box-shadow:var(--shadow); padding:10px 16px; }
+
+/* ── phone ── */
+@media (max-width:820px){
+  .tabs{ background:#fff; border-top:1px solid var(--line); border-right:none; width:100%;
+    min-height:0; max-height:none;
+    box-shadow:0 -2px 14px rgba(18,26,38,.10); padding:5px 5px calc(3px + env(safe-area-inset-bottom)); }
+  header h1{ font-size:1rem; }
+  .head-actions{ gap:5px; }
+  .head-link{ padding:6px 10px; font-size:.72rem; }
+  .sect{ border-radius:10px; min-height:0; }
+  .sect .ico{ width:28px; height:28px; border-radius:8px; font-size:1.05rem; }
+  .sect.on{ background:var(--sc-soft,#fdf1e3); border-top-color:transparent; }
+  .subgrp{ padding:12px 14px 6px; }
+  .panel{ padding:4px 14px 34px; }
+  .section-card{ padding:16px 15px; border-radius:12px; }
+  header{ padding:12px 14px; }
+}
+</style>
 </head>
 <body>
 
@@ -429,7 +564,7 @@
         <strong style="font-size:0.82rem;">Import CSV:</strong>
         <input type="file" id="itemsCsv" accept=".csv,text/csv" onchange="csvPick('items')" />
         <span style="font-size:0.8rem;color:var(--sub);">into</span>
-        <select class="loc-sel" id="itemsCsvLoc"><option value="memphis">Memphis</option><option value="nashville">Nashville</option><option value="franklin">Franklin</option></select>
+        <select class="loc-sel" id="itemsCsvLoc"><option value="memphis">Memphis</option><option value="nashville">Nashville</option></select>
         <button class="btn btn-navy btn-sm" onclick="csvImport('items')">Import rows</button>
         <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('items')">⬇ Template</button>
         <span class="csv-status" id="itemsCsvStatus">Columns: type, title, date, time, end_date, repeat, repeat_until, details</span>
@@ -458,7 +593,7 @@
       <h2>🗓️ Reservations</h2>
       <div class="hint">Live from Wix. <strong>Add</strong> a phone-in or walk-in booking (created confirmed — the guest gets Wix's confirmation if you enter contact info), or <strong>click a reservation</strong> to change its time, party size, guest info, or cancel it. Requests still get approved or declined on the staff page.</div>
       <div class="toolbar">
-        <select class="loc-sel" id="resLoc" onchange="loadResys()"><option value="memphis">Memphis</option><option value="nashville">Nashville</option><option value="franklin">Franklin</option></select>
+        <select class="loc-sel" id="resLoc" onchange="loadResys()"><option value="memphis">Memphis</option><option value="nashville">Nashville</option></select>
         <div class="rf"><label>From</label><input type="date" id="resFrom" onchange="loadResys()"></div>
         <div class="rf"><label>To</label><input type="date" id="resTo" onchange="loadResys()"></div>
         <div class="rf"><label>Status</label><select id="resStatus" onchange="renderResys()">
@@ -496,7 +631,7 @@
       <h2>🗓️ Time-Off Requests</h2>
       <div class="hint">Approve, deny, or delete. Approved requests appear on the staff schedule and calendar.</div>
       <div class="toolbar">
-        <select class="loc-sel" id="timeoffLoc" onchange="kindLoc('timeoff',this.value)"><option value="memphis">Memphis</option><option value="nashville">Nashville</option><option value="franklin">Franklin</option></select>
+        <select class="loc-sel" id="timeoffLoc" onchange="kindLoc('timeoff',this.value)"><option value="memphis">Memphis</option><option value="nashville">Nashville</option></select>
       </div>
       <div id="toList"><div class="to-empty">Loading…</div></div>
     </div>
@@ -514,7 +649,7 @@
         <strong style="font-size:0.82rem;">Import CSV:</strong>
         <input type="file" id="schedulesCsv" accept=".csv,text/csv" onchange="csvPick('schedules')" />
         <span style="font-size:0.8rem;color:var(--sub);">into</span>
-        <select class="loc-sel" id="schedulesCsvLoc"><option value="memphis">Memphis</option><option value="nashville">Nashville</option><option value="franklin">Franklin</option></select>
+        <select class="loc-sel" id="schedulesCsvLoc"><option value="memphis">Memphis</option><option value="nashville">Nashville</option></select>
         <button class="btn btn-navy btn-sm" onclick="csvImport('schedules')">Import rows</button>
         <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('schedules')">⬇ Template</button>
         <span class="csv-status" id="schedulesCsvStatus">Columns: name, date, end_date, note</span>
@@ -537,7 +672,7 @@
     </div>
     <div class="section-card">
       <h2>🗓️ Weekly Schedule — all locations</h2>
-      <div class="hint">All three schedules for the week below. <strong>Nashville and Franklin share one staff pool</strong> — both grids show the combined roster, and a shift belongs to the grid you add it on. Click any cell to add a shift; <strong>drag a shift</strong> to another day or employee to copy it there (the original stays put); click one to edit, delete or copy it. Approved time off shows as a red <strong>OFF</strong> badge, and staff availability shows as grey <strong>unavail</strong> / green <strong>★</strong> chips. Edits stay private until you hit <strong>📣 Publish &amp; notify</strong> — that emails everyone whose week changed. Staff open their schedule at <strong>schedule.html</strong> with their employee ID.</div>
+      <div class="hint">Both schedules for the week below. A shift belongs to the grid you add it on. Click any cell to add a shift; <strong>drag a shift</strong> to another day or employee to copy it there (the original stays put); click one to edit, delete or copy it. Approved time off shows as a red <strong>OFF</strong> badge, and staff availability shows as grey <strong>unavail</strong> / green <strong>★</strong> chips. Edits stay private until you hit <strong>📣 Publish &amp; notify</strong> — that emails everyone whose week changed. Staff open their schedule at <strong>schedule.html</strong> with their employee ID.</div>
       <div class="toolbar">
         <button class="btn btn-ghost btn-sm" onclick="sgMove(-1)">‹ Prev</button>
         <strong id="sgLabel" style="min-width:190px;text-align:center;"></strong>
@@ -562,7 +697,7 @@
         <strong style="font-size:0.82rem;">Import CSV:</strong>
         <input type="file" id="employeesCsv" accept=".csv,text/csv" onchange="csvPick('employees')" />
         <span style="font-size:0.8rem;color:var(--sub);">into</span>
-        <select class="loc-sel" id="employeesCsvLoc"><option value="memphis">Memphis</option><option value="nashville">Nashville</option><option value="franklin">Franklin</option></select>
+        <select class="loc-sel" id="employeesCsvLoc"><option value="memphis">Memphis</option><option value="nashville">Nashville</option></select>
         <button class="btn btn-navy btn-sm" onclick="csvImport('employees')">Import rows</button>
         <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('employees')">⬇ Template</button>
         <span class="csv-status" id="employeesCsvStatus">Columns: name, employee_id, role, active</span>
@@ -657,7 +792,7 @@
       <div class="rec-fields">
         <div class="rf full"><label>Title</label><input type="text" id="annTitle" placeholder="e.g. Holiday hours next week"></div>
         <div class="rf full"><label>Message</label><textarea id="annBody" placeholder="Details…"></textarea></div>
-        <div class="rf"><label>Location</label><select id="annLoc"><option value="all">All locations</option><option value="memphis">Memphis</option><option value="nashville">Nashville + Franklin</option></select></div>
+        <div class="rf"><label>Location</label><select id="annLoc"><option value="all">All locations</option><option value="memphis">Memphis</option><option value="nashville">Nashville</option></select></div>
       </div>
       <div class="row-actions">
         <button class="btn btn-gold" onclick="annSend()">Send announcement</button>
@@ -669,7 +804,7 @@
       <div class="hint">Sends a one-off text to every active employee with a mobile number on file — nothing is posted to the staff page. Staff add their own number on the schedule page under Notifications.</div>
       <div class="rec-fields">
         <div class="rf full"><label>Message</label><textarea id="smsBody" placeholder="e.g. We're slammed tonight — anyone free to pick up a shift, text me back!"></textarea></div>
-        <div class="rf"><label>Location</label><select id="smsLoc"><option value="all">All locations</option><option value="memphis">Memphis</option><option value="nashville">Nashville + Franklin</option></select></div>
+        <div class="rf"><label>Location</label><select id="smsLoc"><option value="all">All locations</option><option value="memphis">Memphis</option><option value="nashville">Nashville</option></select></div>
       </div>
       <div class="row-actions">
         <button class="btn btn-gold" onclick="smsSend()">Send text</button>
@@ -1135,10 +1270,13 @@ let SESSION = null; // Supabase auth session for the signed-in admin
 
 // ── LOCATIONS — each editor has its own selector ──
 const LOC_LABELS = { memphis:'Memphis', nashville:'Nashville', franklin:'Franklin' };
-const LOC_KEYS = ['memphis','nashville','franklin'];
+// Franklin closed — dropped from LOC_KEYS so it gets no selector, chip or
+// schedule grid. LOC_LABELS keeps the key so legacy rows still read 'Franklin',
+// and LOC_GROUPS.nashville still pulls the Franklin staff into the Nashville grid.
+const LOC_KEYS = ['memphis','nashville'];
 // Nashville & Franklin share one staff pool — their grids both show the combined roster.
 const LOC_GROUPS = { memphis:['memphis'], nashville:['nashville','franklin'], franklin:['nashville','franklin'] };
-const DEF_LOC = (function(){ const v = localStorage.getItem('greys_loc'); return LOC_LABELS[v] ? v : 'memphis'; })();
+const DEF_LOC = (function(){ const v = localStorage.getItem('greys_loc'); return LOC_KEYS.includes(v) ? v : 'memphis'; })();
 const LOCS = { items: DEF_LOC, schedules: DEF_LOC, employees: DEF_LOC, timeoff: DEF_LOC };
 function kindLoc(kind, v){
   if(!LOC_LABELS[v]) return;
@@ -1495,7 +1633,7 @@ const SCHEMA = {
     label:'content',
     fields:[
       {k:'type', label:'Type', type:'select', options:['note','special','info']},
-      {k:'location', label:'Location', type:'select', options:['memphis','nashville','franklin'], names:LOC_LABELS},
+      {k:'location', label:'Location', type:'select', options:['memphis','nashville'], names:LOC_LABELS},
       {k:'title', label:'Title', type:'text', full:true, ph:'Title shown on the portal'},
       {k:'date', label:'Date', type:'date'},
       {k:'time', label:'Time', type:'time'},
@@ -1535,7 +1673,7 @@ const SCHEMA = {
     fixed:{ type:'event' },
     fields:[
       {k:'title', label:'Event title', type:'text', full:true, ph:'Shown on the staff portal'},
-      {k:'location', label:'Location', type:'select', options:['memphis','nashville','franklin'], names:LOC_LABELS},
+      {k:'location', label:'Location', type:'select', options:['memphis','nashville'], names:LOC_LABELS},
       {k:'date', label:'Date', type:'date'},
       {k:'time', label:'Start time', type:'time'},
       {k:'blockTo', label:'End time', type:'time'},
@@ -1579,7 +1717,7 @@ const SCHEMA = {
     label:'schedule entry',
     fields:[
       {k:'name', label:'Title', type:'text', full:true, ph:'Schedule title'},
-      {k:'location', label:'Location', type:'select', options:['memphis','nashville','franklin'], names:LOC_LABELS},
+      {k:'location', label:'Location', type:'select', options:['memphis','nashville'], names:LOC_LABELS},
       {k:'date', label:'Date', type:'date'},
       {k:'endDate', label:'End date (optional)', type:'date'},
       {k:'note', label:'Note', type:'textarea', full:true, ph:'Note shown with the schedule'}
@@ -1612,7 +1750,7 @@ const SCHEMA = {
       {k:'contact_phone', label:'Mobile (for texts — clear to stop them)', type:'text', ph:'901-555-1234'},
       {k:'role', label:'Role', type:'text', ph:'Server / Kitchen / Bar'},
       {k:'active', label:'Status', type:'select', options:['active','inactive']},
-      {k:'location', label:'Location', type:'select', options:['memphis','nashville','franklin'], names:LOC_LABELS}
+      {k:'location', label:'Location', type:'select', options:['memphis','nashville'], names:LOC_LABELS}
     ],
     defaults:{ active:'active' },
     valid:r=> !r.name ? 'A name is required.' : '',
@@ -2342,7 +2480,7 @@ async function loadAnnouncements(){
     const rows = data||[];
     if(!rows.length){ el.innerHTML='<div class="rec-empty">Nothing sent yet.</div>'; return; }
     el.innerHTML = rows.map(r=>{
-      const locLabel = r.location==='all' ? 'All locations' : (r.location==='memphis' ? 'Memphis' : 'Nashville + Franklin');
+      const locLabel = r.location==='all' ? 'All locations' : (r.location==='memphis' ? 'Memphis' : 'Nashville');
       return '<div class="rec-row" style="cursor:default;"><div class="rec-main">'
         +'<div class="rec-title"><span class="tag tag-loc">'+locLabel+'</span>'+esc(r.title)+'</div>'
         +'<div class="rec-meta">'+fmtDT(r.created_at)+' &nbsp;·&nbsp; ✉ sent to '+r.sent_count+' &nbsp;·&nbsp; '+esc((r.body||'').length>120?r.body.slice(0,120)+'…':(r.body||''))+'</div>'
@@ -2671,7 +2809,7 @@ const timeLeft = (iso) => {
   if (h) return `${h}h ${m}m`;
   return `${m}m`;
 };
-const LOCATIONS = ["Memphis", "Nashville", "Franklin"];
+const LOCATIONS = ["Memphis", "Nashville"];
 const GROUP_NAMES = [
   "Cheddar",
   "Gouda",
@@ -3921,7 +4059,7 @@ function BulkAdd({ onCancel, onSave }) {
 }
 
 function AdminCustomers({ events, regs, go }) {
-  const [loc, setLoc] = useState("all"); // all | Memphis | Nashville | Franklin
+  const [loc, setLoc] = useState("all"); // all | Memphis | Nashville
   const [q, setQ] = useState("");
   const [open, setOpen] = useState({}); // email -> expanded?
   const [sort, setSort] = useState({ key: "name", dir: 1 }); // dir: 1 asc, -1 desc
@@ -4613,7 +4751,7 @@ function AdminPromos({ promos, uses, events, onSave, onDelete }) {
 }
 function AdminDash({ events, regs, soldFor, revenueFor, go, onDelete, onArchive, onArchiveAll }) {
   const [classFilter, setClassFilter] = useState("upcoming"); // upcoming|past|all|archived
-  const [locFilter, setLocFilter] = useState("all"); // all | Memphis | Nashville | Franklin
+  const [locFilter, setLocFilter] = useState("all"); // all | Memphis | Nashville
   const locEvents =
     locFilter === "all"
       ? events
@@ -8322,7 +8460,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
   window.pluInit = load;
 })();
 
-window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "subject": "Cheese with soul & story — 10% off every board", "html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>10% Off All Cheeseboards | GREYS Fine Cheeses</title>\n</head>\n<body style=\"margin:0; padding:0; background-color:#EEF1F5;\">\n<!-- Preheader (hidden preview text) -->\n<div style=\"display:none; max-height:0; overflow:hidden; font-size:1px; color:#EEF1F5;\">\nCheese with soul &amp; story — and 10% off every board, online only.\n</div>\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#EEF1F5;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:600px; max-width:100%; background-color:#3E4C63; border-radius:10px; overflow:hidden;\">\n\n  <!-- Header -->\n  <tr><td align=\"center\" style=\"padding:28px 20px 8px;\">\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:26px; letter-spacing:2px; color:#FFFFFF;\">GREYS</div>\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:11px; letter-spacing:4px; color:#F2C230; text-transform:uppercase; padding-top:2px;\">Fine Cheeses</div>\n  </td></tr>\n\n  <!-- Hero -->\n  <tr><td style=\"padding:18px 24px 0;\">\n    <img src=\"https://vdvtrevhqalmjwhjhjug.supabase.co/storage/v1/object/public/email-assets/hero-spread.jpg\" width=\"552\" alt=\"A GREYS charcuterie and cheese spread\" style=\"width:100%; height:auto; display:block; border-radius:8px;\">\n  </td></tr>\n\n  <tr><td align=\"center\" style=\"padding:22px 32px 4px;\">\n    <div style=\"font-family:Georgia, 'Times New Roman', serif; font-style:italic; font-size:20px; color:#F2C230;\">Cheese with soul &amp; story</div>\n  </td></tr>\n\n  <!-- Story -->\n  <tr><td style=\"padding:12px 36px 0; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:22px; color:#DDE3EC;\">\n    <p style=\"margin:0 0 14px;\">We're the only specialty cheese shop in Memphis, Nashville &amp; Franklin — founded in 2019 by Jackie and Kurt Mullican with a simple mission: real food, made by small producers who care deeply for their herds and their land.</p>\n    <p style=\"margin:0 0 14px;\">We travel to creameries across the US, Europe, and South America to hand-pick every wheel in our case. When you order a GREYS board, you're not just getting cheese — you're supporting the incredible people who make it.</p>\n  </td></tr>\n\n  <!-- Two photos -->\n  <tr><td style=\"padding:8px 24px 0;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n    <tr>\n      <td width=\"49%\" style=\"padding-right:6px;\"><img src=\"https://vdvtrevhqalmjwhjhjug.supabase.co/storage/v1/object/public/email-assets/creamery-cave.jpg\" width=\"270\" alt=\"Visiting a cheese aging cave\" style=\"width:100%; height:auto; display:block; border-radius:8px;\"></td>\n      <td width=\"49%\" style=\"padding-left:6px;\"><img src=\"https://vdvtrevhqalmjwhjhjug.supabase.co/storage/v1/object/public/email-assets/creamery-farm.jpg\" width=\"270\" alt=\"At the farm with our producers\" style=\"width:100%; height:auto; display:block; border-radius:8px;\"></td>\n    </tr>\n    </table>\n  </td></tr>\n\n  <tr><td style=\"padding:16px 36px 0; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:22px; color:#DDE3EC;\">\n    <p style=\"margin:0;\">Every board is built by our trained cheesemongers — a curated mix of artisan cheeses, charcuterie, and accoutrements, styled to steal the show at your next dinner, party, or night in.</p>\n  </td></tr>\n\n  <!-- Offer block -->\n  <tr><td style=\"padding:24px 24px 0;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#354156; border:2px solid #F2C230; border-radius:10px;\">\n    <tr><td align=\"center\" style=\"padding:24px 20px;\">\n      <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:13px; letter-spacing:3px; color:#F2C230; text-transform:uppercase;\">This week only</div>\n      <div style=\"font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:30px; color:#FFFFFF; padding:8px 0 4px;\">10% Off All Cheeseboards</div>\n      <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:14px; color:#DDE3EC; padding-bottom:14px;\">The Demi &bull; The Gathering &bull; Custom Platters</div>\n      <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:14px; color:#FFFFFF;\">Use code</div>\n      <div style=\"font-family:'Courier New', Courier, monospace; font-weight:bold; font-size:26px; letter-spacing:4px; color:#F2C230; padding:6px 0 16px;\">BOARD10</div>\n      <!-- Button -->\n      <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n        <td style=\"background-color:#F2C230; border-radius:6px;\">\n          <a href=\"https://greyscheese.com\" style=\"display:inline-block; padding:13px 34px; font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:15px; color:#3E4C63; text-decoration:none;\">Order Your Board</a>\n        </td>\n      </tr></table>\n      <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:12px; color:#B9C2D0; padding-top:12px;\">Online orders only</div>\n    </td></tr>\n    </table>\n  </td></tr>\n\n  <!-- Boards teaser -->\n  <tr><td style=\"padding:22px 24px 0;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n    <tr>\n      <td width=\"49%\" valign=\"top\" style=\"padding-right:6px;\">\n        <img src=\"https://vdvtrevhqalmjwhjhjug.supabase.co/storage/v1/object/public/email-assets/boards-table.jpg\" width=\"270\" alt=\"Styled GREYS cheeseboards on a table\" style=\"width:100%; height:auto; display:block; border-radius:8px;\">\n      </td>\n      <td width=\"49%\" valign=\"top\" style=\"padding-left:6px; font-family:Arial, Helvetica, sans-serif; color:#FFFFFF;\">\n        <div style=\"font-size:14px; font-weight:bold; padding:4px 0 2px;\">The Demi Board &mdash; <span style=\"color:#F2C230;\">$50</span></div>\n        <div style=\"font-size:12px; color:#C7CFDC; line-height:17px;\">Dinner for 2 or appetizer for 4</div>\n        <div style=\"font-size:14px; font-weight:bold; padding:12px 0 2px;\">The Gathering Board &mdash; <span style=\"color:#F2C230;\">$99</span></div>\n        <div style=\"font-size:12px; color:#C7CFDC; line-height:17px;\">Dinner for 6 or appetizer for 12</div>\n        <div style=\"font-size:14px; font-weight:bold; padding:12px 0 2px;\">Custom Platters &mdash; <span style=\"color:#F2C230;\">from $150</span></div>\n        <div style=\"font-size:12px; color:#C7CFDC; line-height:17px;\">Pick your cheeses &amp; charcuterie &bull; serves 20&ndash;60</div>\n      </td>\n    </tr>\n    </table>\n  </td></tr>\n\n  <!-- Footer -->\n  <tr><td align=\"center\" style=\"padding:26px 24px 26px;\">\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:12px; letter-spacing:2px; color:#F2C230; text-transform:uppercase;\">Memphis &bull; Nashville &bull; Franklin</div>\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:11px; color:#8E99AC; padding-top:10px; line-height:17px;\">\n      GREYS Fine Cheeses &bull; Discount applies to online cheeseboard orders only.<br>\n      GREYS Fine Cheeses &bull; {{POSTAL_ADDRESS}}<br><a href=\"{{UNSUBSCRIBE_URL}}\" style=\"color:#8E99AC;\">Unsubscribe</a>\n    </div>\n  </td></tr>\n\n</table>\n</td></tr>\n</table>\n</body>\n</html>\n"}, {"name": "Cheeseboard promo — B (direct, 10OFFBOARDS)", "subject": "10% off all cheeseboards. Code inside.", "html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>10% Off All Cheeseboards | GREYS Fine Cheeses</title>\n</head>\n<body style=\"margin:0; padding:0; background-color:#EEF1F5;\">\n<!-- Preheader (hidden preview text) -->\n<div style=\"display:none; max-height:0; overflow:hidden; font-size:1px; color:#EEF1F5;\">\n10% off every cheeseboard. Code 10OFFBOARDS. Online only.\n</div>\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#EEF1F5;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:600px; max-width:100%; background-color:#3E4C63; border-radius:10px; overflow:hidden;\">\n\n  <!-- Header -->\n  <tr><td align=\"center\" style=\"padding:26px 20px 6px;\">\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:24px; letter-spacing:2px; color:#FFFFFF;\">GREYS</div>\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:10px; letter-spacing:4px; color:#F2C230; text-transform:uppercase; padding-top:2px;\">Fine Cheeses</div>\n  </td></tr>\n\n  <!-- Offer -->\n  <tr><td align=\"center\" style=\"padding:16px 32px 0;\">\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:34px; line-height:40px; color:#FFFFFF;\">10% Off<br>All Cheeseboards</div>\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:15px; color:#DDE3EC; padding:10px 0 0;\">Use code</div>\n    <div style=\"font-family:'Courier New', Courier, monospace; font-weight:bold; font-size:26px; letter-spacing:3px; color:#F2C230; padding:4px 0 2px;\">10OFFBOARDS</div>\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:13px; letter-spacing:2px; color:#F2C230; text-transform:uppercase; padding-bottom:16px;\">Online only</div>\n    <!-- Button -->\n    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n      <td style=\"background-color:#F2C230; border-radius:6px;\">\n        <a href=\"https://greyscheese.com\" style=\"display:inline-block; padding:14px 40px; font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:16px; color:#3E4C63; text-decoration:none;\">Order Now</a>\n      </td>\n    </tr></table>\n  </td></tr>\n\n  <!-- Single image -->\n  <tr><td style=\"padding:22px 24px 0;\">\n    <img src=\"https://vdvtrevhqalmjwhjhjug.supabase.co/storage/v1/object/public/email-assets/board-close.jpg\" width=\"552\" alt=\"A GREYS cheeseboard\" style=\"width:100%; height:auto; display:block; border-radius:8px;\">\n  </td></tr>\n\n  <!-- Prices -->\n  <tr><td style=\"padding:16px 40px 0;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"font-family:Arial, Helvetica, sans-serif;\">\n    <tr>\n      <td style=\"padding:9px 0; border-bottom:1px solid #4C5A73; color:#FFFFFF; font-size:14px; font-weight:bold;\">The Demi Board <span style=\"font-weight:normal; color:#C7CFDC; font-size:12px;\">&mdash; feeds 2&ndash;4</span></td>\n      <td align=\"right\" style=\"padding:9px 0; border-bottom:1px solid #4C5A73; color:#F2C230; font-size:16px; font-weight:bold;\">$50</td>\n    </tr>\n    <tr>\n      <td style=\"padding:9px 0; border-bottom:1px solid #4C5A73; color:#FFFFFF; font-size:14px; font-weight:bold;\">The Gathering Board <span style=\"font-weight:normal; color:#C7CFDC; font-size:12px;\">&mdash; feeds 6&ndash;12</span></td>\n      <td align=\"right\" style=\"padding:9px 0; border-bottom:1px solid #4C5A73; color:#F2C230; font-size:16px; font-weight:bold;\">$99</td>\n    </tr>\n    <tr>\n      <td style=\"padding:9px 0; color:#FFFFFF; font-size:14px; font-weight:bold;\">Custom Platters <span style=\"font-weight:normal; color:#C7CFDC; font-size:12px;\">&mdash; serves 20&ndash;60</span></td>\n      <td align=\"right\" style=\"padding:9px 0; color:#F2C230; font-size:16px; font-weight:bold;\">from $150</td>\n    </tr>\n    </table>\n  </td></tr>\n\n  <!-- Footer -->\n  <tr><td align=\"center\" style=\"padding:24px 24px 24px;\">\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:11px; letter-spacing:2px; color:#F2C230; text-transform:uppercase;\">Memphis &bull; Nashville &bull; Franklin</div>\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:11px; color:#8E99AC; padding-top:8px; line-height:17px;\">\n      Discount applies to online cheeseboard orders only.<br>\n      GREYS Fine Cheeses &bull; {{POSTAL_ADDRESS}}<br><a href=\"{{UNSUBSCRIBE_URL}}\" style=\"color:#8E99AC;\">Unsubscribe</a>\n    </div>\n  </td></tr>\n\n</table>\n</td></tr>\n</table>\n</body>\n</html>\n"}];
+window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "subject": "Cheese with soul & story — 10% off every board", "html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>10% Off All Cheeseboards | GREYS Fine Cheeses</title>\n</head>\n<body style=\"margin:0; padding:0; background-color:#EEF1F5;\">\n<!-- Preheader (hidden preview text) -->\n<div style=\"display:none; max-height:0; overflow:hidden; font-size:1px; color:#EEF1F5;\">\nCheese with soul &amp; story — and 10% off every board, online only.\n</div>\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#EEF1F5;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:600px; max-width:100%; background-color:#3E4C63; border-radius:10px; overflow:hidden;\">\n\n  <!-- Header -->\n  <tr><td align=\"center\" style=\"padding:28px 20px 8px;\">\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:26px; letter-spacing:2px; color:#FFFFFF;\">GREYS</div>\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:11px; letter-spacing:4px; color:#F2C230; text-transform:uppercase; padding-top:2px;\">Fine Cheeses</div>\n  </td></tr>\n\n  <!-- Hero -->\n  <tr><td style=\"padding:18px 24px 0;\">\n    <img src=\"https://vdvtrevhqalmjwhjhjug.supabase.co/storage/v1/object/public/email-assets/hero-spread.jpg\" width=\"552\" alt=\"A GREYS charcuterie and cheese spread\" style=\"width:100%; height:auto; display:block; border-radius:8px;\">\n  </td></tr>\n\n  <tr><td align=\"center\" style=\"padding:22px 32px 4px;\">\n    <div style=\"font-family:Georgia, 'Times New Roman', serif; font-style:italic; font-size:20px; color:#F2C230;\">Cheese with soul &amp; story</div>\n  </td></tr>\n\n  <!-- Story -->\n  <tr><td style=\"padding:12px 36px 0; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:22px; color:#DDE3EC;\">\n    <p style=\"margin:0 0 14px;\">We're the only specialty cheese shop in Memphis &amp; Nashville — founded in 2019 by Jackie and Kurt Mullican with a simple mission: real food, made by small producers who care deeply for their herds and their land.</p>\n    <p style=\"margin:0 0 14px;\">We travel to creameries across the US, Europe, and South America to hand-pick every wheel in our case. When you order a GREYS board, you're not just getting cheese — you're supporting the incredible people who make it.</p>\n  </td></tr>\n\n  <!-- Two photos -->\n  <tr><td style=\"padding:8px 24px 0;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n    <tr>\n      <td width=\"49%\" style=\"padding-right:6px;\"><img src=\"https://vdvtrevhqalmjwhjhjug.supabase.co/storage/v1/object/public/email-assets/creamery-cave.jpg\" width=\"270\" alt=\"Visiting a cheese aging cave\" style=\"width:100%; height:auto; display:block; border-radius:8px;\"></td>\n      <td width=\"49%\" style=\"padding-left:6px;\"><img src=\"https://vdvtrevhqalmjwhjhjug.supabase.co/storage/v1/object/public/email-assets/creamery-farm.jpg\" width=\"270\" alt=\"At the farm with our producers\" style=\"width:100%; height:auto; display:block; border-radius:8px;\"></td>\n    </tr>\n    </table>\n  </td></tr>\n\n  <tr><td style=\"padding:16px 36px 0; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:22px; color:#DDE3EC;\">\n    <p style=\"margin:0;\">Every board is built by our trained cheesemongers — a curated mix of artisan cheeses, charcuterie, and accoutrements, styled to steal the show at your next dinner, party, or night in.</p>\n  </td></tr>\n\n  <!-- Offer block -->\n  <tr><td style=\"padding:24px 24px 0;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#354156; border:2px solid #F2C230; border-radius:10px;\">\n    <tr><td align=\"center\" style=\"padding:24px 20px;\">\n      <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:13px; letter-spacing:3px; color:#F2C230; text-transform:uppercase;\">This week only</div>\n      <div style=\"font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:30px; color:#FFFFFF; padding:8px 0 4px;\">10% Off All Cheeseboards</div>\n      <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:14px; color:#DDE3EC; padding-bottom:14px;\">The Demi &bull; The Gathering &bull; Custom Platters</div>\n      <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:14px; color:#FFFFFF;\">Use code</div>\n      <div style=\"font-family:'Courier New', Courier, monospace; font-weight:bold; font-size:26px; letter-spacing:4px; color:#F2C230; padding:6px 0 16px;\">BOARD10</div>\n      <!-- Button -->\n      <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n        <td style=\"background-color:#F2C230; border-radius:6px;\">\n          <a href=\"https://greyscheese.com\" style=\"display:inline-block; padding:13px 34px; font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:15px; color:#3E4C63; text-decoration:none;\">Order Your Board</a>\n        </td>\n      </tr></table>\n      <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:12px; color:#B9C2D0; padding-top:12px;\">Online orders only</div>\n    </td></tr>\n    </table>\n  </td></tr>\n\n  <!-- Boards teaser -->\n  <tr><td style=\"padding:22px 24px 0;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n    <tr>\n      <td width=\"49%\" valign=\"top\" style=\"padding-right:6px;\">\n        <img src=\"https://vdvtrevhqalmjwhjhjug.supabase.co/storage/v1/object/public/email-assets/boards-table.jpg\" width=\"270\" alt=\"Styled GREYS cheeseboards on a table\" style=\"width:100%; height:auto; display:block; border-radius:8px;\">\n      </td>\n      <td width=\"49%\" valign=\"top\" style=\"padding-left:6px; font-family:Arial, Helvetica, sans-serif; color:#FFFFFF;\">\n        <div style=\"font-size:14px; font-weight:bold; padding:4px 0 2px;\">The Demi Board &mdash; <span style=\"color:#F2C230;\">$50</span></div>\n        <div style=\"font-size:12px; color:#C7CFDC; line-height:17px;\">Dinner for 2 or appetizer for 4</div>\n        <div style=\"font-size:14px; font-weight:bold; padding:12px 0 2px;\">The Gathering Board &mdash; <span style=\"color:#F2C230;\">$99</span></div>\n        <div style=\"font-size:12px; color:#C7CFDC; line-height:17px;\">Dinner for 6 or appetizer for 12</div>\n        <div style=\"font-size:14px; font-weight:bold; padding:12px 0 2px;\">Custom Platters &mdash; <span style=\"color:#F2C230;\">from $150</span></div>\n        <div style=\"font-size:12px; color:#C7CFDC; line-height:17px;\">Pick your cheeses &amp; charcuterie &bull; serves 20&ndash;60</div>\n      </td>\n    </tr>\n    </table>\n  </td></tr>\n\n  <!-- Footer -->\n  <tr><td align=\"center\" style=\"padding:26px 24px 26px;\">\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:12px; letter-spacing:2px; color:#F2C230; text-transform:uppercase;\">Memphis &bull; Nashville</div>\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:11px; color:#8E99AC; padding-top:10px; line-height:17px;\">\n      GREYS Fine Cheeses &bull; Discount applies to online cheeseboard orders only.<br>\n      GREYS Fine Cheeses &bull; {{POSTAL_ADDRESS}}<br><a href=\"{{UNSUBSCRIBE_URL}}\" style=\"color:#8E99AC;\">Unsubscribe</a>\n    </div>\n  </td></tr>\n\n</table>\n</td></tr>\n</table>\n</body>\n</html>\n"}, {"name": "Cheeseboard promo — B (direct, 10OFFBOARDS)", "subject": "10% off all cheeseboards. Code inside.", "html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>10% Off All Cheeseboards | GREYS Fine Cheeses</title>\n</head>\n<body style=\"margin:0; padding:0; background-color:#EEF1F5;\">\n<!-- Preheader (hidden preview text) -->\n<div style=\"display:none; max-height:0; overflow:hidden; font-size:1px; color:#EEF1F5;\">\n10% off every cheeseboard. Code 10OFFBOARDS. Online only.\n</div>\n\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#EEF1F5;\">\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\n\n<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:600px; max-width:100%; background-color:#3E4C63; border-radius:10px; overflow:hidden;\">\n\n  <!-- Header -->\n  <tr><td align=\"center\" style=\"padding:26px 20px 6px;\">\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:24px; letter-spacing:2px; color:#FFFFFF;\">GREYS</div>\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:10px; letter-spacing:4px; color:#F2C230; text-transform:uppercase; padding-top:2px;\">Fine Cheeses</div>\n  </td></tr>\n\n  <!-- Offer -->\n  <tr><td align=\"center\" style=\"padding:16px 32px 0;\">\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:34px; line-height:40px; color:#FFFFFF;\">10% Off<br>All Cheeseboards</div>\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:15px; color:#DDE3EC; padding:10px 0 0;\">Use code</div>\n    <div style=\"font-family:'Courier New', Courier, monospace; font-weight:bold; font-size:26px; letter-spacing:3px; color:#F2C230; padding:4px 0 2px;\">10OFFBOARDS</div>\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:13px; letter-spacing:2px; color:#F2C230; text-transform:uppercase; padding-bottom:16px;\">Online only</div>\n    <!-- Button -->\n    <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n      <td style=\"background-color:#F2C230; border-radius:6px;\">\n        <a href=\"https://greyscheese.com\" style=\"display:inline-block; padding:14px 40px; font-family:Arial, Helvetica, sans-serif; font-weight:bold; font-size:16px; color:#3E4C63; text-decoration:none;\">Order Now</a>\n      </td>\n    </tr></table>\n  </td></tr>\n\n  <!-- Single image -->\n  <tr><td style=\"padding:22px 24px 0;\">\n    <img src=\"https://vdvtrevhqalmjwhjhjug.supabase.co/storage/v1/object/public/email-assets/board-close.jpg\" width=\"552\" alt=\"A GREYS cheeseboard\" style=\"width:100%; height:auto; display:block; border-radius:8px;\">\n  </td></tr>\n\n  <!-- Prices -->\n  <tr><td style=\"padding:16px 40px 0;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"font-family:Arial, Helvetica, sans-serif;\">\n    <tr>\n      <td style=\"padding:9px 0; border-bottom:1px solid #4C5A73; color:#FFFFFF; font-size:14px; font-weight:bold;\">The Demi Board <span style=\"font-weight:normal; color:#C7CFDC; font-size:12px;\">&mdash; feeds 2&ndash;4</span></td>\n      <td align=\"right\" style=\"padding:9px 0; border-bottom:1px solid #4C5A73; color:#F2C230; font-size:16px; font-weight:bold;\">$50</td>\n    </tr>\n    <tr>\n      <td style=\"padding:9px 0; border-bottom:1px solid #4C5A73; color:#FFFFFF; font-size:14px; font-weight:bold;\">The Gathering Board <span style=\"font-weight:normal; color:#C7CFDC; font-size:12px;\">&mdash; feeds 6&ndash;12</span></td>\n      <td align=\"right\" style=\"padding:9px 0; border-bottom:1px solid #4C5A73; color:#F2C230; font-size:16px; font-weight:bold;\">$99</td>\n    </tr>\n    <tr>\n      <td style=\"padding:9px 0; color:#FFFFFF; font-size:14px; font-weight:bold;\">Custom Platters <span style=\"font-weight:normal; color:#C7CFDC; font-size:12px;\">&mdash; serves 20&ndash;60</span></td>\n      <td align=\"right\" style=\"padding:9px 0; color:#F2C230; font-size:16px; font-weight:bold;\">from $150</td>\n    </tr>\n    </table>\n  </td></tr>\n\n  <!-- Footer -->\n  <tr><td align=\"center\" style=\"padding:24px 24px 24px;\">\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:11px; letter-spacing:2px; color:#F2C230; text-transform:uppercase;\">Memphis &bull; Nashville</div>\n    <div style=\"font-family:Arial, Helvetica, sans-serif; font-size:11px; color:#8E99AC; padding-top:8px; line-height:17px;\">\n      Discount applies to online cheeseboard orders only.<br>\n      GREYS Fine Cheeses &bull; {{POSTAL_ADDRESS}}<br><a href=\"{{UNSUBSCRIBE_URL}}\" style=\"color:#8E99AC;\">Unsubscribe</a>\n    </div>\n  </td></tr>\n\n</table>\n</td></tr>\n</table>\n</body>\n</html>\n"}];
 
 /* ═══════════════════════════════════════════════════════════════════════
    MARKETING — Email Campaigns
@@ -9789,6 +9927,28 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   };
   const PRIMARY = ['Staff','Tickets & Classes','Cheese Case','Catering'];
 
+  // One color per section. `sc` paints that section's icon tile in the rail;
+  // when the section is open it also becomes --accent for the whole console
+  // (active sub-tab, primary buttons, card rules, focus rings). Every `sc` is
+  // dark enough to carry white text — check that before swapping one out.
+  const COLORS = {
+    'Staff':                  { sc:'#4f46e5', soft:'#eef1fe' },
+    'Events & Reservations':  { sc:'#0f766e', soft:'#e6f4f2' },
+    'Tickets & Classes':      { sc:'#7c3aed', soft:'#f2ecfe' },
+    'Cheese Case':            { sc:'#b45309', soft:'#fdf1e3' },
+    'Marketing':              { sc:'#be123c', soft:'#fdeef1' },
+    'Catering':               { sc:'#047857', soft:'#e7f5ef' },
+    'Cheese Club':            { sc:'#1d4ed8', soft:'#eaf0fe' }
+  };
+  const FALLBACK = { sc:'#b45309', soft:'#fdf1e3' };
+  const colorOf = n => COLORS[n] || FALLBACK;
+
+  function paintSect(el, name){
+    const c = colorOf(name);
+    el.style.setProperty('--sc', c.sc);
+    el.style.setProperty('--sc-soft', c.soft);
+  }
+
   function build(){
     const rail = document.querySelector('.tabs');
     const main = document.querySelector('.main');
@@ -9834,6 +9994,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
                   + '<span class="lbl lbl-desk"></span><span class="lbl lbl-phone"></span>';
       b.querySelector('.lbl-desk').textContent  = m.desk  || g.name;
       b.querySelector('.lbl-phone').textContent = m.phone || g.name;
+      paintSect(b, g.name);
       b.addEventListener('click', ()=> openSection(i, true));
       rail.appendChild(b);
       g.btn = b;
@@ -9857,6 +10018,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       b.type = 'button'; b.className = 'sect'; b.dataset.s = i;
       b.innerHTML = '<span class="ico">'+m.ico+'</span><span class="lbl"></span>';
       b.querySelector('.lbl').textContent = g.name;   // full name, there's room
+      paintSect(b, g.name);
       b.addEventListener('click', ()=>{ closeMore(); openSection(i, true); });
       sheet.appendChild(b);
       g.sheetBtn = b;
@@ -9886,6 +10048,10 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       if(g.sheetBtn) g.sheetBtn.classList.toggle('on', on);
       g.strip.classList.toggle('on', on);
     });
+    // the open section's color becomes the console accent
+    const c = colorOf(G.groups[i].name);
+    document.documentElement.style.setProperty('--accent', c.sc);
+    document.documentElement.style.setProperty('--accent-soft', c.soft);
     G.more.classList.toggle('on', !G.groups[i].btn.classList.contains('hide-mobile') ? false : true);
     if(fire){
       const g = G.groups[i];

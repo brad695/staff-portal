@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-<meta name="theme-color" content="#E0A21C" />
+<meta name="theme-color" content="#ffffff" />
 <title>GREYS · Order Pad</title>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -320,6 +320,87 @@ button{ cursor:pointer; background:none; border:none; touch-action:manipulation;
   .body{ grid-template-columns:244px minmax(0,1fr) 400px; }
   .grid{ grid-template-columns:repeat(auto-fill,minmax(158px,1fr)); }
 }
+</style>
+<style id="theme-v3">
+/* ═══════════════════════════════════════════════════════════════════
+   THEME v3 — brings the order pad onto the same system as manager.html,
+   index.html and schedule.html: gray canvas, white cards, the shared
+   amber accent, softer corners. Loaded LAST so it beats the base sheet
+   above at equal specificity; the original CSS is untouched. Delete
+   this one block to revert.
+   NOTE: item tiles are NOT restyled here. Their color comes from
+   Square's own label_color (or the pad's category color) as inline
+   --c / --tint, and that stays the source of truth.
+   ═══════════════════════════════════════════════════════════════════ */
+:root{
+  --paper:#f1f3f6; --card:#ffffff; --cream:#f1f3f6;
+  --gold:#b45309; --gold-soft:#fdf1e3;
+  --wax:#b3261e; --green:#047857;
+  --ink:#161a1f; --sub:#67717d;
+  --line:#e3e6ea; --line-soft:#eef0f3;
+  --rail:#f7f8fa;
+  --r:10px;
+  --shadow:0 1px 2px rgba(18,26,38,.05), 0 2px 8px rgba(18,26,38,.06);
+}
+body{ background:var(--paper); color:var(--ink); }
+
+/* ── top bar: the 3px gold rule becomes a hairline + shadow ── */
+.bar{ border-bottom:1px solid var(--line); box-shadow:0 1px 2px rgba(18,26,38,.05); z-index:5; }
+.brand span{ color:var(--gold); }
+.search input{ background:#f7f8fa; }
+.search input:focus{ background:#fff; box-shadow:0 0 0 3px var(--gold-soft); }
+.chip, .term{ background:#fff; border:1px solid var(--line); }
+.chip:active{ background:#f5f6f8; }
+
+/* ── buttons: gold now carries white text ── */
+.btn{ border-radius:10px; }
+.btn-gold{ background:var(--gold); border-color:var(--gold); color:#fff; }
+.btn-dark{ background:#1f2937; border-color:#1f2937; color:#fff; }
+.btn-wax{ background:#fff; border-color:#f3ccc6; color:var(--wax); }
+.sortb{ border-radius:10px; }
+.sortb.on{ background:#1f2937; border-color:#1f2937; color:#fff; }
+.pill-ok{ background:#e7f5ef; color:#047857; }
+.pill-warn{ background:#fdf3e2; color:#92400e; }
+.pill-bad{ background:#fdeef1; color:#be123c; }
+
+/* ── category rail ── */
+.rail{ background:var(--rail); border-right:1px solid var(--line); }
+.rail-b{ color:#4a5462; border-radius:0 10px 10px 0; margin-right:8px; }
+.rail-b:active{ background:#eef0f3; }
+.rail-b.active{ background:#fff; color:var(--ink); border-left-color:var(--gold);
+  box-shadow:0 1px 2px rgba(18,26,38,.06); }
+.rail-sep{ color:#8a93a0; }
+
+/* ── item grid ── */
+.gridwrap{ background:#fff; }
+.gridhead{ background:#fff; border-bottom:1px solid var(--line); }
+.tile{ box-shadow:0 1px 2px rgba(18,26,38,.05); }
+.tile-img{ background-color:#f2f4f7; }
+.tile-p{ color:var(--ink); }
+
+/* ── cart ── */
+.cart{ background:var(--cream); border-left:1px solid var(--line); }
+.cart-h, .cart-f{ background:#fff; }
+.cart-h{ border-bottom:1px solid var(--line); }
+.cart-f{ border-top:1px solid var(--line); }
+.step, .cl-act button{ background:#fff; border:1px solid var(--line); border-radius:10px; }
+.step button:active{ background:var(--gold-soft); }
+.cl-note{ color:#92400e; }
+
+/* ── lock screen ── */
+.lock{ background:var(--paper); }
+.lock-card{ border-radius:14px; border-top:1px solid var(--line); box-shadow:var(--shadow);
+  overflow:hidden; position:relative; }
+/* the old 5px top border bulged past the new rounded corners — clip it instead */
+.lock-card::before{ content:''; position:absolute; top:0; left:0; right:0; height:5px;
+  background:var(--gold); }
+.lock-card .sub{ color:var(--gold); }
+
+/* ── inputs, options, keypad ── */
+.fld input, .fld textarea, input.txt{ border-radius:10px; border:1px solid #d8dce2; }
+.opt.on{ border-color:var(--gold); background:var(--gold-soft); }
+.kp button:active{ background:var(--gold-soft); }
+.spin{ border-top-color:var(--gold); }
 </style>
 </head>
 <body>
@@ -705,7 +786,7 @@ const allItems = () => S.groups.reduce((a,g)=> a.concat(g.items), []);
 /* ── category rail ─────────────────────────────────────────────── */
 function renderRail(){
   const total = allItems().length;
-  let html = '<button class="rail-b' + (S.cat==='__all'?' active':'') + '" data-cat="__all" style="--c:#E0A21C">'
+  let html = '<button class="rail-b' + (S.cat==='__all'?' active':'') + '" data-cat="__all" style="--c:#b45309">'
            + '<span class="rail-dot"></span><span class="n">All items</span><span class="c">' + total + '</span></button>'
            + '<div class="rail-sep">Categories</div>';
   html += S.groups.map(g =>

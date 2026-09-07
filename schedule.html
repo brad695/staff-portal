@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <meta name="theme-color" content="#0c2637"/>
+  <meta name="theme-color" content="#ffffff"/>
   <title>Schedule - GREYS</title>
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -148,6 +148,78 @@
     .ann-body{ font-size:0.84rem; color:var(--sub); margin-top:2px; white-space:pre-wrap; }
     .ann-when{ font-size:0.72rem; color:var(--sub); margin-top:3px; }
   </style>
+<style id="theme-v3">
+/* ═══════════════════════════════════════════════════════════════════
+   THEME v3 — same system as manager.html and index.html: gray canvas,
+   white cards, the shared seven-color palette. Loaded LAST so it beats
+   the base sheet above at equal specificity; the original CSS is
+   untouched. Delete this one block to get the deep-blue app back.
+   ═══════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#f1f3f6; --surface:#ffffff;
+  --ink:#161a1f; --sub:#67717d; --line:#e3e6ea;
+  --accent:#b45309; --accent-soft:#fdf1e3; --wax:#b3261e;
+  --shadow:0 1px 2px rgba(18,26,38,.05), 0 2px 8px rgba(18,26,38,.06);
+  --mint:#e7f5ef;  --mint-i:#047857;
+  --butter:#fdf3e2;--butter-i:#92400e;
+  --offbg:#fdeef1; --offink:#be123c;
+}
+body, .app{ background:var(--bg); color:var(--ink); }
+
+/* ── top bar ── */
+.topbar{ background:#fff; border-bottom:1px solid var(--line);
+  box-shadow:0 1px 2px rgba(18,26,38,.05); }
+.topbar .brand{ color:var(--ink); }
+.topbar .loc{ color:var(--sub); }
+.top-link{ color:#4a5462; background:#fff; border:1px solid var(--line); border-radius:10px; }
+.top-link:hover{ color:var(--ink); background:#f5f6f8; }
+
+/* ── location switcher ── */
+.loc-tab{ background:#fff; border:1px solid var(--line); color:#5a6472; border-radius:10px;
+  box-shadow:0 1px 1px rgba(18,26,38,.04); }
+.loc-tab.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+
+/* ── week nav: was white text on the navy ── */
+.wk-nav{ color:var(--ink); }
+.wk-btn{ background:#fff; border:1px solid var(--line); box-shadow:0 1px 2px rgba(18,26,38,.05); color:var(--ink); }
+.wk-today{ background:#fff; border:1px solid var(--line); color:#4a5462; border-radius:10px; }
+.wk-today:hover{ background:#f5f6f8; color:var(--ink); }
+.foot-note{ color:var(--sub); }
+.foot-note a{ color:var(--accent); }
+
+/* ── cards ── */
+.card{ background:#fff; border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); }
+.card h3 i{ color:var(--accent); }
+.my-day .dw{ color:var(--accent); }
+
+/* ── colored chips, from the shared palette ── */
+.loc-tag.memphis  { background:#eef1fe; color:#4f46e5; }
+.loc-tag.nashville{ background:#eaf0fe; color:#1d4ed8; }
+.loc-tag.franklin { background:#eef0f3; color:#475569; }
+.td-badge.special{ background:#e7f5ef; color:#047857; }
+.td-badge.event  { background:#fdeef1; color:#be123c; }
+.sh{ background:#e7f5ef; color:#047857; }
+.sh.oncall, .oncall-pill, .ro-pending{ background:#fdf3e2; color:#92400e; }
+.cell-off, .off-pill, .ro-denied, .btn-no{ background:#fdeef1; color:#be123c; }
+.ro-approved, .btn-yes{ background:#e7f5ef; color:#047857; }
+
+/* ── grid ── */
+.grid-wrap{ border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); background:#fff; }
+table.grid th{ background:#f7f8fa; color:#5a6472; }
+table.grid th.today, table.grid td.today{ background:var(--accent-soft); }
+tr.me td{ background:#f7f8fa; }
+tr.me td.emp{ background:#eef0f3; }
+
+/* ── controls ── */
+.btn{ border-radius:10px; }
+.btn-primary{ background:var(--accent); color:#fff; }
+#loginCard input, .ro-f input, .av-row select, .av-row input[type=time]{
+  background:#fff; border:1px solid #d8dce2; border-radius:10px; }
+#loginCard input:focus, .ro-f input:focus{ outline:none; border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-soft); }
+.sw-btn{ background:#fff; border:1px solid var(--line); color:#4a5462; }
+.sw-btn:hover{ border-color:var(--accent); color:var(--accent); }
+</style>
 </head>
 <body>
 <div class="app">
@@ -166,7 +238,6 @@
   <div class="loc-bar" id="locBar">
     <button class="loc-tab" data-loc="memphis" onclick="setLoc('memphis')">Memphis</button>
     <button class="loc-tab" data-loc="nashville" onclick="setLoc('nashville')">Nashville</button>
-    <button class="loc-tab" data-loc="franklin" onclick="setLoc('franklin')">Franklin</button>
   </div>
 
   <!-- SCHEDULE (public — no login needed) -->
@@ -301,7 +372,9 @@ async function fn(action, payload){
 }
 
 const LOC_LABELS = { memphis:'Memphis', nashville:'Nashville', franklin:'Franklin' };
-// Nashville & Franklin share one staff pool — staff there see both sites' shifts together.
+// Franklin closed — no location tab any more, but the label/group/short maps keep
+// their franklin keys so an employee still filed under franklin sees their shifts
+// (and the FRK tag) inside the Nashville view.
 const LOC_GROUPS = { memphis:['memphis'], nashville:['nashville','franklin'], franklin:['nashville','franklin'] };
 const LOC_SHORT = { memphis:'MEM', nashville:'NSH', franklin:'FRK' };
 let LOC = (function(){ const v = localStorage.getItem('greys_loc'); return LOC_LABELS[v] ? v : 'memphis'; })();

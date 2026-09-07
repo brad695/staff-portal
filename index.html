@@ -308,6 +308,101 @@
       @page { margin:14mm; }
     }
   </style>
+<style id="theme-v3">
+/* ═══════════════════════════════════════════════════════════════════
+   THEME v3 — matches manager.html: gray canvas, white cards, colored tiles.
+   Loaded LAST on purpose, so it overrides the base sheet above at equal
+   specificity. The original CSS is untouched — delete this one <style>
+   block to get the deep-blue app back.
+   The palette is the manager's seven section colors; each home tile owns
+   one via --tile-bg / --tile-br / --tile-ic on its own id.
+   ═══════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#f1f3f6; --surface:#ffffff;
+  --ink:#161a1f; --sub:#67717d; --line:#e3e6ea;
+  --accent:#b45309; --accent-soft:#fdf1e3; --wax:#b3261e;
+  --shadow:0 1px 2px rgba(18,26,38,.05), 0 2px 8px rgba(18,26,38,.06);
+  --tile:#ffffff; --tile-line:#e3e6ea; --tile-ink:#161a1f;
+  --r:16px;
+  /* the old chip tints were translucent white for a navy background; re-cut
+     opaque, with the ink colors dark enough to read on them */
+  --lav:#f2ecfe;   --lav-i:#7c3aed;
+  --mint:#e7f5ef;  --mint-i:#047857;
+  --sky:#e6f0fb;   --sky-i:#0369a1;
+  --peach:#fdf1e3; --peach-i:#b45309;
+  --pink:#fdeef1;  --pink-i:#be123c;
+  --butter:#fdf3e2;--butter-i:#92400e;
+  --gray:#eef0f3;  --gray-i:#475569;
+}
+body, .app{ background:var(--bg); color:var(--ink); }
+
+/* ── top bar ── */
+.topbar{ background:#fff; border-bottom:1px solid var(--line);
+  box-shadow:0 1px 2px rgba(18,26,38,.05); margin-bottom:0; }
+.topbar .brand{ color:var(--ink); }
+.topbar .loc{ color:var(--sub); }
+.top-link{ color:#4a5462; background:#fff; border:1px solid var(--line); border-radius:10px; }
+.top-link:hover{ color:var(--ink); background:#f5f6f8; }
+.icon-btn, .back-btn, .cal-nav{ background:#fff; border:1px solid var(--line);
+  box-shadow:0 1px 2px rgba(18,26,38,.05); color:var(--ink); }
+
+/* ── location switcher ── */
+.loc-bar{ padding-top:14px; }
+.loc-tab{ background:#fff; border:1px solid var(--line); color:#5a6472; border-radius:10px;
+  box-shadow:0 1px 1px rgba(18,26,38,.04); }
+.loc-tab.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+
+/* ── headings that used to sit on the navy ── */
+.home-head h1, .sec-head h2, .res-group-title, #view-calendar .cal-bar h3{ color:var(--ink); }
+.home-head .when, .res-group-empty, .section-label, .res-stats, .cal-legend,
+.empty, .fg label{ color:var(--sub); }
+.sec-head{ background:var(--bg); }
+
+/* ── colored home tiles ── */
+.tiles{ gap:12px; }
+.tile{ background:var(--tile-bg,#fff); border:1px solid var(--tile-br,var(--line));
+  border-radius:14px; box-shadow:var(--shadow); }
+.tile .tl{ color:var(--ink); }
+.tile .ic{ border-radius:10px; background:var(--tile-ic,#94a3b8); color:#fff; }
+.tile .ic i{ color:#fff; }
+.tile:active{ transform:scale(.97); }
+.tile.on{ border-color:var(--tile-ic,var(--accent));
+  box-shadow:0 0 0 2px var(--tile-ic,var(--accent)), var(--shadow); }
+.badge-soon{ background:var(--gray); color:var(--gray-i); }
+
+#tile-specials    { --tile-bg:#fdeef1; --tile-br:#f8dbe1; --tile-ic:#be123c; }
+#tile-resys       { --tile-bg:#e6f4f2; --tile-br:#d2e8e5; --tile-ic:#0f766e; }
+#tile-calendar    { --tile-bg:#f2ecfe; --tile-br:#e5d9fc; --tile-ic:#7c3aed; }
+#tile-myshifts    { --tile-bg:#eef1fe; --tile-br:#dde3fd; --tile-ic:#4f46e5; }
+#tile-events      { --tile-bg:#eaf0fe; --tile-br:#d8e2fc; --tile-ic:#1d4ed8; }
+#tile-stuff       { --tile-bg:#eef0f3; --tile-br:#e0e4ea; --tile-ic:#475569; }
+#tile-cheese-entry{ --tile-bg:#fdf3e2; --tile-br:#f6e3c4; --tile-ic:#b45309; }
+#tile-catering    { --tile-bg:#e7f5ef; --tile-br:#d5ede3; --tile-ic:#047857; }
+#tile-orderpad    { --tile-bg:#e6f0fb; --tile-br:#d3e4f6; --tile-ic:#0369a1; }
+
+/* ── cards & panels ── */
+.card, .res-card, .form-card, .ag-day, .cal-grid, .cal-detail, .home-preview,
+.note-card, .req-item, .info-card{ background:#fff; border:1px solid var(--line);
+  border-radius:14px; box-shadow:var(--shadow); }
+.info-card{ border-radius:12px; }
+.cal-day.other{ background:#f7f8fa; }
+.cal-day.other .cal-daynum{ color:#9aa3ad; }
+
+/* ── controls ── */
+.btn{ border-radius:10px; }
+.btn-primary, .btn-approve, .cal-today, .botbar .home-btn{ background:var(--accent); color:#fff; }
+.botbar .home-btn{ box-shadow:0 6px 20px rgba(18,26,38,.22); }
+.cal-print{ background:#fff; border:1px solid var(--line); box-shadow:none; color:#4a5462; }
+.btn-decline{ background:#fff; border:1px solid #f3ccc6; color:var(--wax); }
+.field input, .field select, .field textarea, .fg input, .fg select{
+  background:#fff; border:1px solid #d8dce2; border-radius:10px; }
+.field input:focus, .field select:focus, .field textarea:focus,
+.fg input:focus, .fg select:focus{ outline:none; border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-soft); }
+.pv-title i, .pv-all, .pv-day, .c-day, .info-card .il, .info-card .iv a,
+.res-contact a, .req{ color:var(--accent); }
+@keyframes flash{ 0%,100%{ box-shadow:var(--shadow);} 25%{ box-shadow:0 0 0 3px var(--accent-soft), var(--shadow);} }
+</style>
 </head>
 <body>
 <div class="app">
@@ -328,7 +423,6 @@
   <div class="loc-bar" id="locBar">
     <button class="loc-tab" data-loc="memphis" onclick="setLoc('memphis')">Memphis</button>
     <button class="loc-tab" data-loc="nashville" onclick="setLoc('nashville')">Nashville</button>
-    <button class="loc-tab" data-loc="franklin" onclick="setLoc('franklin')">Franklin</button>
   </div>
 
   <!-- ══ HOME ══ -->
@@ -754,7 +848,7 @@ async function loadReservations(){
     renderReservations(recs);
   }catch(err){ state.style.display='block'; state.innerHTML='⚠️ Could not load reservations.'; }
 }
-// Approve / decline a REQUESTED reservation (Nashville & Franklin take manual-approval requests).
+// Approve / decline a REQUESTED reservation (Nashville takes manual-approval requests).
 // The edge function only allows REQUESTED → RESERVED/DECLINED, and Wix notifies the guest.
 async function resDecide(id, approve, btn){
   let reason='';
