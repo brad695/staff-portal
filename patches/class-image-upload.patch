@@ -1,0 +1,113 @@
+--- a/manager.html
++++ b/manager.html
+@@ -5221,6 +5221,49 @@
+     setImageBusy(false);
+   };
+ 
++  // Same path Social Posts uses: pick a local image/*, park it in the public
++  // social-assets bucket, and keep the permanent public URL on imageUrl.
++  const uploadImageFile = async (file) => {
++    if (!file) return;
++    if (!file.type || !String(file.type).startsWith("image/")) {
++      setImageMsg("Choose an image file (JPEG, PNG, WebP, etc.).");
++      return;
++    }
++    if (file.size > 25 * 1024 * 1024) {
++      setImageMsg("That image is over 25 MB — shrink it first.");
++      return;
++    }
++    if (!db) {
++      setImageMsg("Storage is unavailable right now.");
++      return;
++    }
++    setImageBusy(true);
++    setImageMsg("Uploading…");
++    try {
++      const ext = (file.name.split(".").pop() || "jpg")
++        .toLowerCase()
++        .replace(/[^a-z0-9]/g, "");
++      const path =
++        new Date().toISOString().slice(0, 10) +
++        "/" +
++        Math.random().toString(36).slice(2, 10) +
++        "." +
++        ext;
++      const { error } = await db.storage
++        .from("social-assets")
++        .upload(path, file, { contentType: file.type, upsert: false });
++      if (error) throw new Error(error.message || "Upload failed");
++      const { data } = db.storage.from("social-assets").getPublicUrl(path);
++      if (!data || !data.publicUrl) throw new Error("Could not get a public URL.");
++      setImageUrl(data.publicUrl);
++      setImageIn("");
++      setImageMsg("Uploaded — this copy is permanent.");
++    } catch (e) {
++      setImageMsg("Upload failed: " + String((e && e.message) || e));
++    }
++    setImageBusy(false);
++  };
++
+   const addRow = () =>
+     setAddOns((a) => [...a, { id: uid("ao"), name: "", priceStr: "" }]);
+   const rmRow = (id) => setAddOns((a) => a.filter((x) => x.id !== id));
+@@ -5442,13 +5485,13 @@
+         </>
+       )}
+ 
+-      <label className="cc-label">Class image</label>
++      <label className="cc-label">{isClass ? "Class image" : "Event image"}</label>
+       {imageUrl ? (
+         <div className="cc-classimg">
+           <img src={imageUrl} alt="" />
+           <div className="cc-classimg-side">
+             <p className="cc-hint" style={{ margin: 0 }}>
+-              Shown on the ticket site card for this class.
++              Shown on the ticket site card for this {noun}.
+             </p>
+             <button className="cc-mini danger" onClick={() => { setImageUrl(""); setImageMsg(""); }}>
+               Remove image
+@@ -5457,24 +5500,39 @@
+         </div>
+       ) : (
+         <p className="cc-hint">
+-          No image — the site will fall back to a generic class photo.
++          No image — the site will fall back to a generic {noun} photo.
+         </p>
+       )}
+       <div className="cc-giftrow">
++        <label className="cc-mini" style={{ cursor: imageBusy ? "default" : "pointer", margin: 0 }}>
++          {imageBusy ? "Working…" : "Upload"}
++          <input
++            type="file"
++            accept="image/*"
++            style={{ display: "none" }}
++            disabled={imageBusy}
++            onChange={(e) => {
++              const f = e.target.files && e.target.files[0];
++              e.target.value = "";
++              uploadImageFile(f);
++            }}
++          />
++        </label>
+         <input
+           className="cc-input"
+-          placeholder="Paste a Canva or image link…"
++          placeholder="…or paste a Canva or image link"
+           value={imageIn}
+           onChange={(e) => setImageIn(e.target.value)}
+         />
+         <button className="cc-mini" onClick={importImage} disabled={imageBusy}>
+-          {imageBusy ? "Importing…" : imageUrl ? "Replace" : "Import"}
++          {imageBusy ? "Working…" : imageUrl ? "Replace" : "Import"}
+         </button>
+       </div>
+       {imageMsg && <p className="cc-hint">{imageMsg}</p>}
+       <p className="cc-hint">
+-        The link is copied into our own storage, so it keeps working after Canva's
+-        own link expires. Portrait (4:5) images fit the card best.
++        Upload a photo from your device, or paste a Canva/image link and Import.
++        Either way it is copied into our own storage so it keeps working after
++        Canva's own link expires. Portrait (4:5) images fit the card best.
+       </p>
+ 
+       <label className="cc-check cc-featured-check">
