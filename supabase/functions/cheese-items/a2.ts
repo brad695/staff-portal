@@ -143,8 +143,9 @@ export function buildVariation(
     stockable: true,
   };
   if (priced) vd.price_money = { amount: Math.round(Number(amount) * 100), currency: "USD" };
-  
+  // Explicit null so switching to EA clears a weight unit the item already had.
   vd.measurement_unit_id = byWeight ? unitId : null;
+  if (item._track_inventory === true) vd.track_inventory = true;
 
   return {
     type: "ITEM_VARIATION",
