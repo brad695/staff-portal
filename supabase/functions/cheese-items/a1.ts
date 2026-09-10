@@ -7,8 +7,6 @@ export const supabase = createClient(
 
 export const DCG_BASE = "https://www.datecodegenie.com/api/menu";
 
-export const SQUARE_TAX_FOOD = "B5BSOZ3MBXTFWX4T4EPJ5YHB";      
-export const SQUARE_TAX_PREPARED = "2K7XWRVWVXBTAJQIHHQOLFCN";  
 
 export const SQUARE_UNIT_IDS: Record<string, string> = {
   LB: "RGKK6J7EYZPQVHJQSA4PNE5C",
@@ -31,22 +29,111 @@ export function unitOf(item: Record<string, unknown>): string {
   return VALID_UNITS.has(u) ? u : DEFAULT_UNIT;
 }
 
-export const PREPARED_CATEGORIES = new Set(["Catering", "Cheeseboards", "Dine In", "Prepared"]);
+export const SQUARE_TAX_FOOD = "B5BSOZ3MBXTFWX4T4EPJ5YHB";      // TN Food 6.75%, additive
+export const SQUARE_TAX_PREPARED = "2K7XWRVWVXBTAJQIHHQOLFCN";  // TN Standard / prepared 9.75%, additive
+export const SQUARE_TAX_STANDARD = SQUARE_TAX_PREPARED;
+export const SQUARE_TAX_SALES_INCL = "MTLGRH6TG7GJMAEVCJGFQRIR"; // TN Sales Tax 9.75%, inclusive
+export const SQUARE_TAX_LBD_INCL = "DTD3GXE53SAZEZWQDYWALVSJ";   // TN Liquor by the Drink 15%, inclusive
 
+export const PREPARED_CATEGORIES = new Set([
+  "Catering",
+  "Catering and Large Cheeseboards",
+  "Cheeseboards",
+  "Dine In",
+  "Prepared",
+  "Prepared & Ready-to-Go",
+]);
+
+/** Non-food retail / beer → Standard 9.75% additive (Beer sampled live 2026-09). */
+export const STANDARD_CATEGORIES = new Set([
+  "Beer",
+  "Retail Wine",
+  "Books & Gifts",
+  "Cheese Tools & Serveware",
+  "Merch & Apparel",
+  "Drinks",
+  "Retail Goods",
+  "Memphis Retail",
+]);
+
+/** Dine-in wine glass/bottle → tax-in Sales + LBD. */
+export const WINE_DINE_IN_CATEGORIES = new Set([
+  "Wine",
+  "Wine GLS",
+  "Wine BTL",
+]);
+
+export type TaxPreset = "auto" | "food" | "standard" | "wine_dine_in" | "retail_wine";
+
+export function taxIdsForPreset(preset: string | null | undefined): string[] | null {
+  const p = String(preset ?? "").trim().toLowerCase();
+  if (!p || p === "auto") return null;
+  if (p === "food") return [SQUARE_TAX_FOOD];
+  if (p === "standard" || p === "prepared" || p === "retail_wine") return [SQUARE_TAX_STANDARD];
+  if (p === "wine_dine_in" || p === "wine") return [SQUARE_TAX_SALES_INCL, SQUARE_TAX_LBD_INCL];
+  return null;
+}
+
+/** Returns Square tax_ids for a category (multi-tax for dine-in Wine). */
+export function taxIdsForCategory(
+  category: unknown,
+  taxPreset?: string | null,
+): string[] {
+  const envOverride = Deno.env.get("SQUARE_TAX_ID");
+  if (envOverride) return [envOverride];
+
+  const fromPreset = taxIdsForPreset(taxPreset);
+  if (fromPreset) return fromPreset;
+
+  const cat = String(category ?? "").trim();
+  if (WINE_DINE_IN_CATEGORIES.has(cat)) {
+    return [SQUARE_TAX_SALES_INCL, SQUARE_TAX_LBD_INCL];
+  }
+  if (STANDARD_CATEGORIES.has(cat) || PREPARED_CATEGORIES.has(cat)) {
+    return [SQUARE_TAX_STANDARD];
+  }
+  // Cheese + edible retail food (Charcuterie, Specialty, Jams, Crackers, Butter & Dairy, …)
+  return [SQUARE_TAX_FOOD];
+}
+
+/** @deprecated Prefer taxIdsForCategory — kept for any leftover single-id callers. */
 export function taxIdForCategory(category: unknown): string {
-  const override = Deno.env.get("SQUARE_TAX_ID");
-  if (override) return override;
-  return PREPARED_CATEGORIES.has(String(category ?? "").trim())
-    ? SQUARE_TAX_PREPARED
-    : SQUARE_TAX_FOOD;
+  return taxIdsForCategory(category)[0] ?? SQUARE_TAX_FOOD;
 }
 
 export const SQUARE_CATEGORY_IDS: Record<string, string> = {
+  // Regular catalog categories (live Greys Square, 2026-09)
   "Cheese": "3GBLBLAWUAPBIS4ADJVEMGFM",
   "Charcuterie": "FIAA5ZKGX4XFQNLHFV5ZUA22",
   "Specialty": "IJ74AFAIE5RS2TBX3ABGA3YJ",
   "Jams": "6WPR62AH6UUOCPVONDFFZNKG",
+  // UI alias + live Square name
   "Catering": "CZYRPS4GN2NRWS5FPL3K3AJW",
+  "Catering and Large Cheeseboards": "CZYRPS4GN2NRWS5FPL3K3AJW",
+  "Wine": "AMOCXSALVCYH6N52ZDPVZWTQ",
+  "Retail Wine": "GCLZO4EKJZG6XN5RJBLACON2",
+  "Wine GLS": "EXP6VEBKROIUFJ6ZEOS3KQSQ",
+  "Wine BTL": "K3ZHA4M5HMDXVB6BCKEEP3F4",
+  "Beer": "NGEH4EUVYH3MAZPUITRR6KCK",
+  "Retail Goods": "VBK7IEVEGA6R3TWYHMTS6OFJ",
+  "Crackers": "G6CP42ALSXSCNXJIOLDT3UPI",
+  "Butter & Dairy": "CBVZKKDTNMCWY6TAZFLYLRVU",
+  "Books & Gifts": "R7IBNTLJSOYUCYSZCUGQVJZL",
+  "Cheese Tools & Serveware": "5UTFJSPXASFNZLOZFT4GJQ3X",
+  "Chocolate, Candy & Cookies": "BPQHLQVPGN7FTTBJYJUDGCY2",
+  "Drinks": "JCXE6HQSFTDFRY6RVLX5DYWL",
+  "Honey & Syrups": "LG4NEZ5Q7EXLIE3M2QCAYC47",
+  "Merch & Apparel": "P35N5Z23W2ZYN2TY4XDBVVRT",
+  "Oils & Vinegars": "OBZNT3RLPIQAI6IXHDKGQEQE",
+  "Olives, Tapenade & Antipasti": "JF3IJDW2PFA3CIBBZD7HPLS7",
+  "Pantry & Pasta": "AELG2VI3BPF3AHK4HDVRR4KT",
+  "Pickles & Condiments": "SFWMZI3VWHHESI5GEUSX2O7E",
+  "Prepared & Ready-to-Go": "5W42YZO7X52T5VIEHWP4YXXZ",
+  "Salt, Pepper & Spice": "RYNZ6RNK4LWBPZXIXDS7NRNJ",
+  "Snacks": "MYGJUZDFHXVRY3TWGNBMNDX2",
+  "Tinned Fish & Caviar": "4OTQPRYZBRFBC7UY5LI454SV",
+  "Dine In": "ZEQKXN2KSG4EJFGUGQ5EMZ6R",
+  "Memphis Retail": "K6GGAWH5QMAFUSTPDPZHYSDW",
 };
 
 export const cors = {

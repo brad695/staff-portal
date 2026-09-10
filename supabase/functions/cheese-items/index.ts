@@ -92,6 +92,8 @@ Deno.serve(async (req) => {
       if (patched) row = patched;
     }
 
+    if ("tax_preset" in body) row = { ...row, _tax_preset: body.tax_preset };
+    if (Array.isArray(body.tax_ids)) row = { ...row, _tax_ids: body.tax_ids };
     const updated = await syncItem(row, { dcg: !retail, square: true });
     return json({ item: updated });
   }
@@ -171,12 +173,17 @@ Deno.serve(async (req) => {
         .eq("id", id)
         .select()
         .single();
-      const row = marked ?? { ...saved, dcg_status: "skipped", dcg_error: DCG_SKIP_MSG };
+      let row: Record<string, unknown> = marked ?? { ...saved, dcg_status: "skipped", dcg_error: DCG_SKIP_MSG };
+      if ("tax_preset" in body) row = { ...row, _tax_preset: body.tax_preset };
+      if (Array.isArray(body.tax_ids)) row = { ...row, _tax_ids: body.tax_ids };
       const updated = await syncItem(row, { dcg: false, square: true });
       return json({ item: updated });
     }
 
-    const updated = await syncItem(saved, { dcg: !retail, square: true });
+    let syncRow: Record<string, unknown> = saved;
+    if ("tax_preset" in body) syncRow = { ...syncRow, _tax_preset: body.tax_preset };
+    if (Array.isArray(body.tax_ids)) syncRow = { ...syncRow, _tax_ids: body.tax_ids };
+    const updated = await syncItem(syncRow, { dcg: !retail, square: true });
     return json({ item: updated });
   }
 

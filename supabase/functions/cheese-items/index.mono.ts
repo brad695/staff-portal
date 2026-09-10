@@ -36,7 +36,10 @@ const DCG_BASE = "https://www.datecodegenie.com/api/menu";
 // TN: unprepared food 4% state + 2.75% Shelby = 6.75%; prepared food 7% + 2.75% = 9.75%.
 // A cheeseboard is prepared food even though the cheeses on it are not. (TN DoR SUT-53/54.)
 const SQUARE_TAX_FOOD = "B5BSOZ3MBXTFWX4T4EPJ5YHB";      // TN Food 6.75%, additive
-const SQUARE_TAX_PREPARED = "2K7XWRVWVXBTAJQIHHQOLFCN";  // TN Prepared Food 9.75%, additive
+const SQUARE_TAX_PREPARED = "2K7XWRVWVXBTAJQIHHQOLFCN";  // TN Standard / prepared 9.75%, additive
+const SQUARE_TAX_STANDARD = SQUARE_TAX_PREPARED;
+const SQUARE_TAX_SALES_INCL = "MTLGRH6TG7GJMAEVCJGFQRIR"; // TN Sales Tax 9.75%, inclusive
+const SQUARE_TAX_LBD_INCL = "DTD3GXE53SAZEZWQDYWALVSJ";   // TN Liquor by the Drink 15%, inclusive
 
 // Unit of measure -> Square MEASUREMENT_UNIT id. LB predates this map; the rest were created
 // 2026-09-03. Precision = decimal places the register accepts for the weight.
@@ -81,14 +84,61 @@ function unitOf(item: Record<string, unknown>): string {
   return VALID_UNITS.has(u) ? u : DEFAULT_UNIT;
 }
 
-const PREPARED_CATEGORIES = new Set(["Catering", "Cheeseboards", "Dine In", "Prepared"]);
+const PREPARED_CATEGORIES = new Set([
+  "Catering",
+  "Catering and Large Cheeseboards",
+  "Cheeseboards",
+  "Dine In",
+  "Prepared",
+  "Prepared & Ready-to-Go",
+]);
+
+const STANDARD_CATEGORIES = new Set([
+  "Beer",
+  "Retail Wine",
+  "Books & Gifts",
+  "Cheese Tools & Serveware",
+  "Merch & Apparel",
+  "Drinks",
+  "Retail Goods",
+  "Memphis Retail",
+]);
+
+const WINE_DINE_IN_CATEGORIES = new Set([
+  "Wine",
+  "Wine GLS",
+  "Wine BTL",
+]);
+
+function taxIdsForPreset(preset: string | null | undefined): string[] | null {
+  const p = String(preset ?? "").trim().toLowerCase();
+  if (!p || p === "auto") return null;
+  if (p === "food") return [SQUARE_TAX_FOOD];
+  if (p === "standard" || p === "prepared" || p === "retail_wine") return [SQUARE_TAX_STANDARD];
+  if (p === "wine_dine_in" || p === "wine") return [SQUARE_TAX_SALES_INCL, SQUARE_TAX_LBD_INCL];
+  return null;
+}
+
+function taxIdsForCategory(
+  category: unknown,
+  taxPreset?: string | null,
+): string[] {
+  const envOverride = Deno.env.get("SQUARE_TAX_ID");
+  if (envOverride) return [envOverride];
+  const fromPreset = taxIdsForPreset(taxPreset);
+  if (fromPreset) return fromPreset;
+  const cat = String(category ?? "").trim();
+  if (WINE_DINE_IN_CATEGORIES.has(cat)) {
+    return [SQUARE_TAX_SALES_INCL, SQUARE_TAX_LBD_INCL];
+  }
+  if (STANDARD_CATEGORIES.has(cat) || PREPARED_CATEGORIES.has(cat)) {
+    return [SQUARE_TAX_STANDARD];
+  }
+  return [SQUARE_TAX_FOOD];
+}
 
 function taxIdForCategory(category: unknown): string {
-  const override = Deno.env.get("SQUARE_TAX_ID");
-  if (override) return override;
-  return PREPARED_CATEGORIES.has(String(category ?? "").trim())
-    ? SQUARE_TAX_PREPARED
-    : SQUARE_TAX_FOOD;
+  return taxIdsForCategory(category)[0] ?? SQUARE_TAX_FOOD;
 }
 
 const SQUARE_CATEGORY_IDS: Record<string, string> = {
@@ -97,6 +147,31 @@ const SQUARE_CATEGORY_IDS: Record<string, string> = {
   "Specialty": "IJ74AFAIE5RS2TBX3ABGA3YJ",
   "Jams": "6WPR62AH6UUOCPVONDFFZNKG",
   "Catering": "CZYRPS4GN2NRWS5FPL3K3AJW",
+  "Catering and Large Cheeseboards": "CZYRPS4GN2NRWS5FPL3K3AJW",
+  "Wine": "AMOCXSALVCYH6N52ZDPVZWTQ",
+  "Retail Wine": "GCLZO4EKJZG6XN5RJBLACON2",
+  "Wine GLS": "EXP6VEBKROIUFJ6ZEOS3KQSQ",
+  "Wine BTL": "K3ZHA4M5HMDXVB6BCKEEP3F4",
+  "Beer": "NGEH4EUVYH3MAZPUITRR6KCK",
+  "Retail Goods": "VBK7IEVEGA6R3TWYHMTS6OFJ",
+  "Crackers": "G6CP42ALSXSCNXJIOLDT3UPI",
+  "Butter & Dairy": "CBVZKKDTNMCWY6TAZFLYLRVU",
+  "Books & Gifts": "R7IBNTLJSOYUCYSZCUGQVJZL",
+  "Cheese Tools & Serveware": "5UTFJSPXASFNZLOZFT4GJQ3X",
+  "Chocolate, Candy & Cookies": "BPQHLQVPGN7FTTBJYJUDGCY2",
+  "Drinks": "JCXE6HQSFTDFRY6RVLX5DYWL",
+  "Honey & Syrups": "LG4NEZ5Q7EXLIE3M2QCAYC47",
+  "Merch & Apparel": "P35N5Z23W2ZYN2TY4XDBVVRT",
+  "Oils & Vinegars": "OBZNT3RLPIQAI6IXHDKGQEQE",
+  "Olives, Tapenade & Antipasti": "JF3IJDW2PFA3CIBBZD7HPLS7",
+  "Pantry & Pasta": "AELG2VI3BPF3AHK4HDVRR4KT",
+  "Pickles & Condiments": "SFWMZI3VWHHESI5GEUSX2O7E",
+  "Prepared & Ready-to-Go": "5W42YZO7X52T5VIEHWP4YXXZ",
+  "Salt, Pepper & Spice": "RYNZ6RNK4LWBPZXIXDS7NRNJ",
+  "Snacks": "MYGJUZDFHXVRY3TWGNBMNDX2",
+  "Tinned Fish & Caviar": "4OTQPRYZBRFBC7UY5LI454SV",
+  "Dine In": "ZEQKXN2KSG4EJFGUGQ5EMZ6R",
+  "Memphis Retail": "K6GGAWH5QMAFUSTPDPZHYSDW",
 };
 
 const cors = {
@@ -395,7 +470,12 @@ async function pushToSquare(item: Record<string, unknown>) {
   try {
     const isUpdate = !!item.square_item_id;
     const categoryId = await resolveCategoryId((item.category as string) ?? "Cheese", token);
-    const taxId = taxIdForCategory(item.category);
+    const explicitTaxIds = Array.isArray(item._tax_ids)
+      ? (item._tax_ids as unknown[]).map((x) => String(x)).filter(Boolean)
+      : [];
+    const mappedTaxIds = explicitTaxIds.length
+      ? explicitTaxIds
+      : taxIdsForCategory(item.category, item._tax_preset as string | undefined);
 
     let existing: Record<string, unknown> | null = null;
     if (isUpdate) {
@@ -422,9 +502,13 @@ async function pushToSquare(item: Record<string, unknown>) {
     // Only the first variation is ours to manage; anything added in the dashboard rides along.
     const variations = [variation, ...existingVariations.slice(1)];
 
-    const taxIds = (existingItemData.tax_ids as string[] | undefined)?.length
-      ? existingItemData.tax_ids as string[]
-      : (taxId ? [taxId] : undefined);
+    const forceTax = explicitTaxIds.length > 0 ||
+      (item._tax_preset != null && String(item._tax_preset).trim() !== "" &&
+        String(item._tax_preset).trim().toLowerCase() !== "auto");
+    const existingTaxes = (existingItemData.tax_ids as string[] | undefined) ?? [];
+    const taxIds = (!isUpdate || forceTax || !existingTaxes.length)
+      ? mappedTaxIds
+      : existingTaxes;
 
     const categories = categoryId
       ? [{ id: categoryId }]
@@ -445,7 +529,7 @@ async function pushToSquare(item: Record<string, unknown>) {
           ...existingItemData,
           name: String(item.marketing_name || item.name),
           is_taxable: true,
-          ...(taxIds ? { tax_ids: taxIds } : {}),
+          ...((taxIds && taxIds.length) ? { tax_ids: taxIds } : {}),
           ...(categories ? { categories } : {}),
           product_type: productType,
           variations,
@@ -623,6 +707,8 @@ Deno.serve(async (req) => {
       if (patched) row = patched;
     }
 
+    if ("tax_preset" in body) row = { ...row, _tax_preset: body.tax_preset };
+    if (Array.isArray(body.tax_ids)) row = { ...row, _tax_ids: body.tax_ids };
     const updated = await syncItem(row, { dcg: !retail, square: true });
     return json({ item: updated });
   }
@@ -702,12 +788,17 @@ Deno.serve(async (req) => {
         .eq("id", id)
         .select()
         .single();
-      const row = marked ?? { ...saved, dcg_status: "skipped", dcg_error: DCG_SKIP_MSG };
+      let row: Record<string, unknown> = marked ?? { ...saved, dcg_status: "skipped", dcg_error: DCG_SKIP_MSG };
+      if ("tax_preset" in body) row = { ...row, _tax_preset: body.tax_preset };
+      if (Array.isArray(body.tax_ids)) row = { ...row, _tax_ids: body.tax_ids };
       const updated = await syncItem(row, { dcg: false, square: true });
       return json({ item: updated });
     }
 
-    const updated = await syncItem(saved, { dcg: !retail, square: true });
+    let syncRow: Record<string, unknown> = saved;
+    if ("tax_preset" in body) syncRow = { ...syncRow, _tax_preset: body.tax_preset };
+    if (Array.isArray(body.tax_ids)) syncRow = { ...syncRow, _tax_ids: body.tax_ids };
+    const updated = await syncItem(syncRow, { dcg: !retail, square: true });
     return json({ item: updated });
   }
 

@@ -2,7 +2,7 @@ import {
   VALID_UNITS,
   json,
   supabase,
-  taxIdForCategory
+  taxIdsForCategory
 } from "./a1.ts";
 import {
   buildVariation,
@@ -21,7 +21,12 @@ export async function pushToSquare(item: Record<string, unknown>) {
   try {
     const isUpdate = !!item.square_item_id;
     const categoryId = await resolveCategoryId((item.category as string) ?? "Cheese", token);
-    const taxId = taxIdForCategory(item.category);
+    const explicitTaxIds = Array.isArray(item._tax_ids)
+      ? (item._tax_ids as unknown[]).map((x) => String(x)).filter(Boolean)
+      : [];
+    const mappedTaxIds = explicitTaxIds.length
+      ? explicitTaxIds
+      : taxIdsForCategory(item.category, item._tax_preset as string | undefined);
 
     let existing: Record<string, unknown> | null = null;
     if (isUpdate) {
@@ -48,9 +53,15 @@ export async function pushToSquare(item: Record<string, unknown>) {
     
     const variations = [variation, ...existingVariations.slice(1)];
 
-    const taxIds = (existingItemData.tax_ids as string[] | undefined)?.length
-      ? existingItemData.tax_ids as string[]
-      : (taxId ? [taxId] : undefined);
+    // CREATE: always assign mapped/override tax_ids.
+    // UPDATE: keep existing taxes unless caller sent tax_preset / tax_ids.
+    const forceTax = explicitTaxIds.length > 0 ||
+      (item._tax_preset != null && String(item._tax_preset).trim() !== "" &&
+        String(item._tax_preset).trim().toLowerCase() !== "auto");
+    const existingTaxes = (existingItemData.tax_ids as string[] | undefined) ?? [];
+    const taxIds = (!isUpdate || forceTax || !existingTaxes.length)
+      ? mappedTaxIds
+      : existingTaxes;
 
     const categories = categoryId
       ? [{ id: categoryId }]
@@ -71,7 +82,7 @@ export async function pushToSquare(item: Record<string, unknown>) {
           ...existingItemData,
           name: String(item.marketing_name || item.name),
           is_taxable: true,
-          ...(taxIds ? { tax_ids: taxIds } : {}),
+          ...((taxIds && taxIds.length) ? { tax_ids: taxIds } : {}),
           ...(categories ? { categories } : {}),
           product_type: productType,
           variations,

@@ -1079,6 +1079,10 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
           <label class="fld">Category
             <select id="pf_category"></select>
           </label>
+          <label class="fld" id="pf_taxFld" hidden>Tax treatment
+            <select id="pf_tax"></select>
+            <span class="fnote" id="pf_taxNote"></span>
+          </label>
           <label class="fld retail-hide" id="pf_printerFld">Default Printer Profile
             <select id="pf_printer"></select>
           </label>
@@ -8040,8 +8044,35 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
 (function(){
   const PLU_FN = SB_URL + '/functions/v1/cheese-items';
   const CHEESE_CATEGORIES = ["Cheese","Charcuterie","Specialty","Sandwiches","Jams","Retail","Catering","NY BUTCHER BOARD","COCORICO"];
-  const RETAIL_CATEGORIES = ["Wine","Retail Wine","Wine BTL","Wine GLS","Crackers","Butter & Dairy","Books & Gifts",
-    "Charcuterie","Specialty","Jams","Retail","Sandwiches","Catering","Cheese"];
+  const RETAIL_CATEGORIES = [
+    "Wine","Retail Wine","Wine GLS","Wine BTL","Beer",
+    "Crackers","Butter & Dairy","Books & Gifts",
+    "Charcuterie","Specialty","Jams",
+    "Cheese Tools & Serveware","Chocolate, Candy & Cookies","Drinks",
+    "Honey & Syrups","Merch & Apparel","Oils & Vinegars",
+    "Olives, Tapenade & Antipasti","Pantry & Pasta",
+    "Pickles & Condiments","Prepared & Ready-to-Go",
+    "Salt, Pepper & Spice","Snacks","Tinned Fish & Caviar",
+    "Retail Goods","Catering and Large Cheeseboards","Cheese"
+  ];
+  const TAX_PRESETS = [
+    { value:'auto', label:'Auto from category' },
+    { value:'food', label:'Food 6.75%' },
+    { value:'standard', label:'Standard 9.75%' },
+    { value:'wine_dine_in', label:'Wine dine-in (tax-in Sales+LBD)' },
+    { value:'retail_wine', label:'Retail wine (Standard 9.75%)' },
+  ];
+  const taxHintForCategory = (cat) => {
+    if (cat === 'Wine' || cat === 'Wine GLS' || cat === 'Wine BTL')
+      return 'Auto → Wine dine-in (Sales tax-in + Liquor-by-Drink tax-in)';
+    if (cat === 'Retail Wine' || cat === 'Beer')
+      return 'Auto → Standard 9.75% additive';
+    if (cat === 'Prepared & Ready-to-Go' || cat === 'Catering and Large Cheeseboards' || cat === 'Dine In')
+      return 'Auto → Standard 9.75% additive';
+    if (['Books & Gifts','Cheese Tools & Serveware','Merch & Apparel','Drinks','Retail Goods'].includes(cat))
+      return 'Auto → Standard 9.75% additive';
+    return 'Auto → Food 6.75% additive';
+  };
   const CATEGORIES = CHEESE_CATEGORIES; // default; form uses categoriesForKind()
   const PRINTER_PROFILES = ["Greys Cheese Label","No Weight Item","Greys Sandwiches","No Weight 2x4","Small sticker",
     "Charcuterie 2x4","Cheesemas Sticker","Flight Sticker","No Weight w/Date","Cheese Case Sticker","QR CODE"];
@@ -8196,6 +8227,18 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     return { kind:'plu', plu:pad5(nextPlu), barcode };
   }
 
+  function updateTaxNote(){
+    const note = $('pf_taxNote');
+    if (!note) return;
+    if (entryKind !== 'retail'){ note.textContent = ''; return; }
+    const preset = ($('pf_tax') && $('pf_tax').value) || 'auto';
+    if (preset === 'auto') note.textContent = taxHintForCategory($('pf_category').value);
+    else {
+      const hit = TAX_PRESETS.find(t => t.value === preset);
+      note.textContent = hit ? ('Using: ' + hit.label) : '';
+    }
+  }
+
   function applyEntryKindUI(){
     const retail = entryKind === 'retail';
     document.querySelectorAll('#pluKindSwitch button').forEach(b => {
@@ -8213,6 +8256,14 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     const cats = categoriesForKind(entryKind);
     const cur = $('pf_category').value;
     $('pf_category').innerHTML = optionsHtml(cats, cats.includes(cur) ? cur : cats[0]);
+    const taxFld = $('pf_taxFld');
+    if (taxFld) taxFld.hidden = !retail;
+    if ($('pf_tax') && !$('pf_tax').options.length) {
+      $('pf_tax').innerHTML = TAX_PRESETS.map(t =>
+        '<option value="'+esc(t.value)+'">'+esc(t.label)+'</option>').join('');
+      $('pf_tax').value = 'auto';
+    }
+    updateTaxNote();
     if (retail){
       $('pf_unit').value = 'EA';
       $('pf_ppl').value = '';
@@ -8400,6 +8451,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
         plu: (mode.kind==='plu' && overridePlu && mode.plu) ? Number(mode.plu) : null,
         assign_plu: mode.kind === 'plu',
         category: $('pf_category').value,
+        tax_preset: retail ? (($('pf_tax') && $('pf_tax').value) || 'auto') : undefined,
         printer_profile: retail ? null : $('pf_printer').value,
         hot_buttons: retail ? false : $('pf_hot').checked,
         item_kind: retail ? 'retail' : 'cheese',
@@ -8464,6 +8516,8 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     $(id).addEventListener('input', renderForm));
   ['pf_unit','pf_locMem','pf_locNash'].forEach(id =>
     $(id).addEventListener('change', renderForm));
+  if ($('pf_category')) $('pf_category').addEventListener('change', () => { updateTaxNote(); renderForm(); });
+  if ($('pf_tax')) $('pf_tax').addEventListener('change', () => { updateTaxNote(); renderForm(); });
   $('pluSearch').addEventListener('input', render);
 
   /* ---------- table actions ---------- */
@@ -8586,6 +8640,11 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
   });
 
   $('pf_category').innerHTML = optionsHtml(CHEESE_CATEGORIES, 'Cheese');
+  if ($('pf_tax')) {
+    $('pf_tax').innerHTML = TAX_PRESETS.map(t =>
+      '<option value="'+esc(t.value)+'">'+esc(t.label)+'</option>').join('');
+    $('pf_tax').value = 'auto';
+  }
   $('pf_printer').innerHTML = optionsHtml(PRINTER_PROFILES, 'Greys Cheese Label');
   $('pf_unit').innerHTML = optionsHtml(UNITS, DEFAULT_UNIT);
 
