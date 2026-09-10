@@ -532,7 +532,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab" onclick="tkTab(this,'customers')">Customers</div>
     <div class="tab" onclick="tkTab(this,'promos')">Promo Codes</div>
     <div class="tab-head">Cheese Case</div>
-    <div class="tab" onclick="mtab('plu')">🧀 New Cheese Entry</div>
+    <div class="tab" onclick="mtab('plu')">🧀 New Case Entry</div>
     <div class="tab-head">Marketing</div>
     <div class="tab" onclick="mtab('campaigns')">✉️ Email Campaigns</div>
     <div class="tab" onclick="mtab('social')">📣 Social Posts</div>
@@ -828,6 +828,15 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     #panel-plu .plu-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap; }
     #panel-plu .plu-badge{ background:var(--navy); color:#fff; border-radius:var(--r); padding:9px 18px; text-align:center; min-width:140px; }
     #panel-plu .plu-badge.bc{ background:#2b4a63; }
+    #panel-plu .kind-switch{ display:inline-flex; gap:6px; margin:12px 0 4px; flex-wrap:wrap; }
+    #panel-plu .kind-switch button{ border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:999px;
+      padding:7px 14px; font:inherit; font-size:0.78rem; font-weight:700; cursor:pointer; }
+    #panel-plu .kind-switch button.on{ background:var(--navy); color:#fff; border-color:var(--navy); }
+    #panel-plu .kind-badge{ display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; font-size:0.62rem;
+      font-weight:700; letter-spacing:0.3px; text-transform:uppercase; vertical-align:middle; }
+    #panel-plu .kind-badge.cheese{ background:#eef3f8; color:#2b4a63; }
+    #panel-plu .kind-badge.retail{ background:#fdf5e0; color:#8a6d1a; }
+    #panel-plu .fld.retail-hide[hidden], #panel-plu .retail-hide[hidden]{ display:none !important; }
     #panel-plu .plu-badge .lbl{ font-size:0.6rem; text-transform:uppercase; letter-spacing:1px; opacity:.75; }
     #panel-plu .plu-badge .num{ font-size:1.35rem; font-family:ui-monospace,Menlo,monospace; font-weight:700; line-height:1.25; }
     #panel-plu .plu-badge .num.sm{ font-size:0.95rem; }
@@ -1021,8 +1030,12 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="section-card">
       <div class="plu-top">
         <div>
-          <h2>🧀 New Cheese Entry</h2>
-          <div class="hint" style="margin-bottom:0;">Adds to the running PLU list, then pushes to DateCodeGenie for labels and Square for the register.</div>
+          <h2 id="pluTitle">🧀 New Case Entry</h2>
+          <div class="hint" id="pluHint" style="margin-bottom:0;">Cheese goes to DateCodeGenie + Square. Wine/Retail goes to the PLU list + Square only (no DateCodeGenie).</div>
+          <div class="kind-switch" id="pluKindSwitch" role="group" aria-label="Item kind">
+            <button type="button" class="on" data-kind="cheese">Cheese</button>
+            <button type="button" data-kind="retail">Wine / Retail</button>
+          </div>
         </div>
         <div class="plu-badge" id="pluBadge">
           <div class="lbl" id="pluBadgeLabel">Next PLU</div>
@@ -1048,7 +1061,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
             <select id="pf_unit"></select>
             <span class="fnote" id="pf_unitNote"></span>
           </label>
-          <div class="fld">Stores
+          <div class="fld retail-hide" id="pf_storesFld">Stores
             <span class="locwrap">
               <label><input id="pf_locMem" type="checkbox" checked /><span>Memphis</span></label>
               <label><input id="pf_locNash" type="checkbox" checked /><span>Nashville</span></label>
@@ -1066,10 +1079,10 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
           <label class="fld">Category
             <select id="pf_category"></select>
           </label>
-          <label class="fld">Default Printer Profile
+          <label class="fld retail-hide" id="pf_printerFld">Default Printer Profile
             <select id="pf_printer"></select>
           </label>
-          <label class="fld">Hot Buttons
+          <label class="fld retail-hide" id="pf_hotFld">Hot Buttons
             <span class="hotwrap"><input id="pf_hot" type="checkbox" checked /><span>Enable in the app</span></span>
           </label>
         </div>
@@ -1099,9 +1112,9 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       <div class="bulk-wrap">
         <table class="bulk">
           <thead>
-            <tr><th>PLU</th><th>Name</th><th>Marketing</th><th>Category</th><th>Price</th><th>Per unit</th><th>Unit</th><th>Barcode</th><th>DateCodeGenie</th><th>Square</th><th></th></tr>
+            <tr><th>PLU</th><th>Kind</th><th>Name</th><th>Marketing</th><th>Category</th><th>Price</th><th>Per unit</th><th>Unit</th><th>Barcode</th><th>DateCodeGenie</th><th>Square</th><th></th></tr>
           </thead>
-          <tbody id="pluBody"><tr><td colspan="11" class="empty-row">Loading…</td></tr></tbody>
+          <tbody id="pluBody"><tr><td colspan="12" class="empty-row">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -7961,14 +7974,17 @@ function viewNoAdmin(){return $(`<div class="empty">This area is for store opera
 document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e.target.id==='ccModalBg') window.ccCloseModal(); });
 
 /* ═══════════════════════════════════════════════════════════════════════
-   CHEESE CASE — new cheese entry + running PLU list
-   Ported from the standalone CheeseEntry page. Writes go through the
-   cheese-items edge function (service role); reads come straight from the
-   table under the signed-in manager's session.
+   CHEESE CASE — new case / item entry + running PLU list
+   Cheese: DateCodeGenie + Square. Wine/Retail: Square only (item_kind=retail).
+   Writes go through the cheese-items edge function (service role); reads come
+   straight from the table under the signed-in manager's session.
    ═══════════════════════════════════════════════════════════════════════ */
 (function(){
   const PLU_FN = SB_URL + '/functions/v1/cheese-items';
-  const CATEGORIES = ["Cheese","Charcuterie","Specialty","Sandwiches","Jams","Retail","Catering","NY BUTCHER BOARD","COCORICO"];
+  const CHEESE_CATEGORIES = ["Cheese","Charcuterie","Specialty","Sandwiches","Jams","Retail","Catering","NY BUTCHER BOARD","COCORICO"];
+  const RETAIL_CATEGORIES = ["Wine","Retail Wine","Wine BTL","Wine GLS","Crackers","Butter & Dairy","Books & Gifts",
+    "Charcuterie","Specialty","Jams","Retail","Sandwiches","Catering","Cheese"];
+  const CATEGORIES = CHEESE_CATEGORIES; // default; form uses categoriesForKind()
   const PRINTER_PROFILES = ["Greys Cheese Label","No Weight Item","Greys Sandwiches","No Weight 2x4","Small sticker",
     "Charcuterie 2x4","Cheesemas Sticker","Flight Sticker","No Weight w/Date","Cheese Case Sticker","QR CODE"];
   // Unit of measure. This is a SQUARE concept, not a DateCodeGenie one:
@@ -7985,7 +8001,10 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     ? String(i.unit_of_measure).toUpperCase() : DEFAULT_UNIT;
   const DCG_LOCATIONS = { MEMPHIS:'24755', NASHVILLE:'28711' };
 
-  let items = [], nextPlu = null, overridePlu = false, editingId = null;
+  let items = [], nextPlu = null, overridePlu = false, editingId = null, entryKind = 'cheese';
+  const categoriesForKind = (kind) => kind === 'retail' ? RETAIL_CATEGORIES : CHEESE_CATEGORIES;
+  const isRetailItem = (i) => (i && (i.item_kind === 'retail' || i.item_kind === 'wine')) || false;
+  const kindLabel = (i) => isRetailItem(i) ? 'Wine/Retail' : 'Cheese';
 
   const $ = (id) => document.getElementById(id);
   const hasPlu = (v) => v !== null && v !== undefined && v !== '';
@@ -8113,8 +8132,41 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     const barcode = $('pf_barcode').value.trim();
     const manual = $('pf_plu').value.trim();
     if (overridePlu && manual) return { kind:'plu', plu:manual, barcode };
+    // Wine/Retail: barcode is optional additive; PLU still auto-assigns.
+    if (entryKind === 'retail') return { kind:'plu', plu:pad5(nextPlu), barcode };
     if (barcode) return { kind:'barcode', plu:null, barcode };
     return { kind:'plu', plu:pad5(nextPlu), barcode };
+  }
+
+  function applyEntryKindUI(){
+    const retail = entryKind === 'retail';
+    document.querySelectorAll('#pluKindSwitch button').forEach(b => {
+      b.classList.toggle('on', b.dataset.kind === entryKind);
+    });
+    $('pluTitle').textContent = retail ? '🍷 New Wine / Retail Entry' : '🧀 New Case Entry';
+    $('pluHint').textContent = retail
+      ? 'Adds to the running PLU list and Square only. DateCodeGenie is skipped. Barcode optional.'
+      : 'Cheese goes to DateCodeGenie + Square. Wine/Retail goes to the PLU list + Square only (no DateCodeGenie).';
+    ['pf_storesFld','pf_printerFld','pf_hotFld'].forEach(id => {
+      const el = $(id); if (el) el.hidden = retail;
+    });
+    const pplFld = $('pf_ppl').closest('label.fld');
+    if (pplFld) pplFld.hidden = retail;
+    const cats = categoriesForKind(entryKind);
+    const cur = $('pf_category').value;
+    $('pf_category').innerHTML = optionsHtml(cats, cats.includes(cur) ? cur : cats[0]);
+    if (retail){
+      $('pf_unit').value = 'EA';
+      $('pf_ppl').value = '';
+      $('pf_printer').value = 'No Weight Item';
+      $('pf_hot').checked = false;
+      if (!overridePlu){ $('pf_plu').disabled = true; }
+    } else {
+      if (!$('pf_unit').value) $('pf_unit').value = DEFAULT_UNIT;
+      $('pf_printer').value = 'Greys Cheese Label';
+      $('pf_hot').checked = true;
+    }
+    renderForm();
   }
 
   function renderForm(){
@@ -8138,7 +8190,8 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     }
     $('pf_pluNote').className = 'fnote';
     $('pf_pluNote').textContent = overridePlu ? 'Manual — must not already be in use'
-      : mode.kind === 'barcode' ? 'Skipped — barcode identifies this item' : 'Next available number';
+      : mode.kind === 'barcode' ? 'Skipped — barcode identifies this item'
+      : (entryKind === 'retail' ? 'Next available number (Square SKU)' : 'Next available number');
 
     const unit = $('pf_unit').value || DEFAULT_UNIT;
     $('pf_pplLabel').textContent = unit === 'EA' ? 'Price per lb ($) — not used'
@@ -8156,7 +8209,12 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
       : 'Pick at least one store';
 
     const bc = $('pf_barcode').value.trim(), note = $('pf_barcodeNote');
-    if (!bc){ note.className='fnote'; note.textContent='Optional — if set, no PLU is used'; }
+    if (!bc){
+      note.className='fnote';
+      note.textContent = entryKind === 'retail'
+        ? 'Optional — wine/retail often has no barcode; PLU still assigns'
+        : 'Optional — if set, no PLU is used';
+    }
     else if (/^\d{12}$/.test(bc)){
       const ok = upcIsValid(bc);
       note.className = 'fnote ' + (ok ? 'good' : 'bad');
@@ -8187,11 +8245,12 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     const q = $('pluSearch').value.trim().toLowerCase();
     const filtered = !q ? items : items.filter(i =>
       (i.name||'').toLowerCase().includes(q) || (i.marketing_name||'').toLowerCase().includes(q) ||
-      pad5(i.plu).includes(q) || (i.barcode||'').includes(q));
+      pad5(i.plu).includes(q) || (i.barcode||'').includes(q) ||
+      kindLabel(i).toLowerCase().includes(q) || (i.category||'').toLowerCase().includes(q));
 
     const body = $('pluBody');
     if (!filtered.length){
-      body.innerHTML = '<tr><td colspan="11" class="empty-row">'+(items.length?'No matches.':'No items yet.')+'</td></tr>';
+      body.innerHTML = '<tr><td colspan="12" class="empty-row">'+(items.length?'No matches.':'No items yet.')+'</td></tr>';
       return;
     }
 
@@ -8204,11 +8263,14 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
         const u = unitOf(i);
         const pluEdit = hasPlu(i.plu) ? pad5(i.plu)
           : '<span class="none">—</span> <button type="button" class="btn btn-ghost btn-sm" data-assignplu="'+i.id+'">assign PLU</button>';
+        const allCats = Array.from(new Set(CHEESE_CATEGORIES.concat(RETAIL_CATEGORIES).concat(i.category ? [i.category] : [])));
+        const catList2 = allCats;
         return '<tr class="dirty">'+
           '<td class="plu" data-l="PLU">'+pluEdit+'</td>'+
+          '<td data-l="Kind"><span class="kind-badge '+(isRetailItem(i)?'retail':'cheese')+'">'+esc(kindLabel(i))+'</span></td>'+
           '<td data-l="Name">'+inp('pe_name',i.name,'Name')+'</td>'+
           '<td data-l="Marketing">'+inp('pe_marketing',i.marketing_name,'Marketing name')+'</td>'+
-          '<td data-l="Category"><select id="pe_category">'+optionsHtml(catList, i.category||'Cheese')+'</select></td>'+
+          '<td data-l="Category"><select id="pe_category">'+optionsHtml(catList2, i.category||'Cheese')+'</select></td>'+
           '<td data-l="Price">'+inp('pe_price',i.price,'Price','number')+'</td>'+
           '<td data-l="Per lb">'+inp('pe_ppl',i.price_per_lb,'Per lb','number')+'</td>'+
           '<td data-l="Unit"><select id="pe_unit">'+optionsHtml(UNITS, u)+'</select></td>'+
@@ -8222,7 +8284,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
       }
 
       const btns = ['<button type="button" class="btn btn-ghost btn-sm" data-edit="'+i.id+'">Edit</button>'];
-      if (i.dcg_status === 'error' || i.dcg_status === 'skipped')
+      if (!isRetailItem(i) && (i.dcg_status === 'error' || i.dcg_status === 'skipped'))
         btns.push('<button type="button" class="btn btn-ghost btn-sm" data-retry="'+i.id+'" data-target="dcg">→ DCG</button>');
       if (i.square_status === 'error' || i.square_status === 'skipped')
         btns.push('<button type="button" class="btn btn-ghost btn-sm" data-retry="'+i.id+'" data-target="square">→ Square</button>');
@@ -8230,8 +8292,12 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
         i.hot_buttons !== false ? 'hot buttons on' : 'hot buttons off',
         storeNames(i.dcg_locations)].join(' · ');
 
+      const dcgPill = isRetailItem(i)
+        ? statusPill(i.dcg_status === 'synced' ? 'synced' : 'skipped', i.dcg_error || 'Not sent — wine/retail is Square only')
+        : statusPill(i.dcg_status, i.dcg_error);
       return '<tr>'+
         '<td class="plu" data-l="PLU">'+(hasPlu(i.plu) ? pad5(i.plu) : '<span class="none">—</span>')+'</td>'+
+        '<td data-l="Kind"><span class="kind-badge '+(isRetailItem(i)?'retail':'cheese')+'">'+esc(kindLabel(i))+'</span></td>'+
         '<td data-l="Name" title="'+esc(meta)+'">'+esc(i.name)+'</td>'+
         '<td data-l="Marketing">'+(i.marketing_name?esc(i.marketing_name):'—')+'</td>'+
         '<td data-l="Category">'+(i.category?esc(i.category):'—')+'</td>'+
@@ -8239,7 +8305,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
         '<td data-l="Per lb">'+money(i.price_per_lb)+'</td>'+
         '<td data-l="Unit">'+esc(unitOf(i))+'</td>'+
         '<td class="mono" data-l="Barcode">'+(i.barcode?esc(i.barcode):'—')+'</td>'+
-        '<td data-l="DateCodeGenie">'+statusPill(i.dcg_status, i.dcg_error)+'</td>'+
+        '<td data-l="DateCodeGenie">'+dcgPill+'</td>'+
         '<td data-l="Square">'+squareCell(i)+'</td>'+
         '<td class="td-actions" data-l="">'+btns.join(' ')+'</td>'+
       '</tr>';
@@ -8258,40 +8324,48 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     if (mode.barcode && items.some(i => i.barcode === mode.barcode)){
       setNotice('err','Barcode ' + mode.barcode + ' is already on another item.'); return;
     }
-    if (!chosenLocations().length){ setNotice('err','Pick at least one store.'); return; }
+    if (entryKind !== 'retail' && !chosenLocations().length){ setNotice('err','Pick at least one store.'); return; }
 
     const btn = $('pluSubmit');
     btn.disabled = true; btn.textContent = 'Saving…';
     setNotice(null,'');
     try {
+      const retail = entryKind === 'retail';
       const res = await fetch(PLU_FN, { method:'POST', headers:authHeaders(), body: JSON.stringify({
         action:'add', name,
         marketing_name: $('pf_marketing').value.trim() || null,
         price: $('pf_price').value === '' ? null : Number($('pf_price').value),
-        price_per_lb: $('pf_ppl').value === '' ? null : Number($('pf_ppl').value),
-        unit_of_measure: $('pf_unit').value || DEFAULT_UNIT,
-        dcg_locations: chosenLocations(),
+        price_per_lb: retail ? null : ($('pf_ppl').value === '' ? null : Number($('pf_ppl').value)),
+        unit_of_measure: retail ? 'EA' : ($('pf_unit').value || DEFAULT_UNIT),
+        dcg_locations: retail ? undefined : chosenLocations(),
         barcode: mode.barcode || null,
         plu: (mode.kind==='plu' && overridePlu && mode.plu) ? Number(mode.plu) : null,
         assign_plu: mode.kind === 'plu',
         category: $('pf_category').value,
-        printer_profile: $('pf_printer').value,
-        hot_buttons: $('pf_hot').checked
+        printer_profile: retail ? null : $('pf_printer').value,
+        hot_buttons: retail ? false : $('pf_hot').checked,
+        item_kind: retail ? 'retail' : 'cheese',
+        skip_dcg: retail
       })});
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || 'HTTP ' + res.status);
       const it = data.item;
-      const part = (label, st, err) => st === 'synced' ? label + ' ✓'
-        : st === 'error' ? label + ' failed (' + (err||'error') + ')' : label + ' not sent (key not set up)';
+      const retailSaved = isRetailItem(it) || retail;
+      const part = (label, st, err) => {
+        if (label === 'DateCodeGenie' && retailSaved && st === 'skipped') return 'DateCodeGenie skipped (wine/retail)';
+        return st === 'synced' ? label + ' ✓'
+          : st === 'error' ? label + ' failed (' + (err||'error') + ')' : label + ' not sent (key not set up)';
+      };
       const worst = [it.dcg_status, it.square_status].includes('error') ? 'err'
-        : [it.dcg_status, it.square_status].includes('skipped') ? 'warn' : 'ok';
+        : (!retailSaved && [it.dcg_status, it.square_status].includes('skipped')) ? 'warn'
+        : (retailSaved && it.square_status === 'skipped') ? 'warn' : 'ok';
       setNotice(worst, 'Saved ' + it.name + ' as ' + (hasPlu(it.plu) ? 'PLU ' + pad5(it.plu) : 'barcode ' + it.barcode) + '. ' +
         part('DateCodeGenie', it.dcg_status, it.dcg_error) + ' · ' + part('Square', it.square_status, it.square_error));
       ['pf_name','pf_marketing','pf_price','pf_ppl','pf_barcode','pf_plu'].forEach(id => $(id).value = '');
-      $('pf_unit').value = DEFAULT_UNIT;
+      $('pf_unit').value = retail ? 'EA' : DEFAULT_UNIT;
       $('pf_locMem').checked = true; $('pf_locNash').checked = true;
-      $('pf_category').value = 'Cheese'; $('pf_printer').value = 'Greys Cheese Label'; $('pf_hot').checked = true;
       overridePlu = false; $('pf_plu').disabled = true; $('pf_pluToggle').textContent = 'override';
+      applyEntryKindUI();
       await load();
       $('pf_name').focus();
     } catch(err){
@@ -8441,8 +8515,8 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
       return a.plu - b.plu;
     });
     const rows = [
-      ['PLU','Name','Marketing Name','Price','Price per unit','Unit','Barcode','Category','Printer Profile','Hot Buttons','DCG Status','Square Status','Square Pricing','Square Item ID'],
-      ...sorted.map(i => [pad5(i.plu), i.name, i.marketing_name||'', i.price ?? '', i.price_per_lb ?? '', unitOf(i),
+      ['PLU','Kind','Name','Marketing Name','Price','Price per unit','Unit','Barcode','Category','Printer Profile','Hot Buttons','DCG Status','Square Status','Square Pricing','Square Item ID'],
+      ...sorted.map(i => [pad5(i.plu), kindLabel(i), i.name, i.marketing_name||'', i.price ?? '', i.price_per_lb ?? '', unitOf(i),
         i.barcode||'', i.category||'', i.printer_profile||'', i.hot_buttons !== false ? 'x':'',
         i.dcg_status, i.square_status, priceMode(i).label, i.square_item_id||''])
     ];
@@ -8453,9 +8527,17 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     a.click();
   });
 
-  $('pf_category').innerHTML = optionsHtml(CATEGORIES, 'Cheese');
+  $('pf_category').innerHTML = optionsHtml(CHEESE_CATEGORIES, 'Cheese');
   $('pf_printer').innerHTML = optionsHtml(PRINTER_PROFILES, 'Greys Cheese Label');
   $('pf_unit').innerHTML = optionsHtml(UNITS, DEFAULT_UNIT);
+
+  $('pluKindSwitch').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-kind]');
+    if (!btn) return;
+    entryKind = btn.dataset.kind === 'retail' ? 'retail' : 'cheese';
+    applyEntryKindUI();
+  });
+  applyEntryKindUI();
 
   window.pluInit = load;
 })();
