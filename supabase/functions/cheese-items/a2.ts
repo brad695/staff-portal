@@ -12,6 +12,7 @@ import {
   unitOf
 } from "./a1.ts";
 
+
 export async function pushToDcg(item: Record<string, unknown>) {
   if (isRetailKind(item)) {
     return { status: "skipped", error: DCG_SKIP_MSG };
@@ -36,7 +37,7 @@ export async function pushToDcg(item: Record<string, unknown>) {
         ...fields,
         uuid: item.id,
         applied_to_restaurants: locs.length > 1 ? locs.map(Number) : Number(locs[0]),
-        override: {},
+        override: {}, 
       }
       : fields;
 
@@ -53,7 +54,7 @@ export async function pushToDcg(item: Record<string, unknown>) {
       try {
         const data = JSON.parse(text);
         dcgId = data?.data?.menu_item?.id ?? data?.data?.id ?? data?.id;
-      } catch { /* ignore */ }
+      } catch {  }
       if (!dcgId) return { status: "error", error: "DCG created the item but returned no id" };
     }
 
@@ -126,7 +127,7 @@ export function buildVariation(
   opts: { id: string; version?: number },
 ) {
   const unit = unitOf(item);
-  const unitId = SQUARE_UNIT_IDS[unit];
+  const unitId = SQUARE_UNIT_IDS[unit]; 
   const perUnit = item.price_per_lb == null ? null : Number(item.price_per_lb);
   const flat = item.price == null ? null : Number(item.price);
   const byWeight = !!unitId && perUnit != null && Number.isFinite(perUnit) && perUnit > 0;
@@ -142,6 +143,7 @@ export function buildVariation(
     stockable: true,
   };
   if (priced) vd.price_money = { amount: Math.round(Number(amount) * 100), currency: "USD" };
+  
   vd.measurement_unit_id = byWeight ? unitId : null;
 
   return {

@@ -7,8 +7,8 @@ export const supabase = createClient(
 
 export const DCG_BASE = "https://www.datecodegenie.com/api/menu";
 
-export const SQUARE_TAX_FOOD = "B5BSOZ3MBXTFWX4T4EPJ5YHB";
-export const SQUARE_TAX_PREPARED = "2K7XWRVWVXBTAJQIHHQOLFCN";
+export const SQUARE_TAX_FOOD = "B5BSOZ3MBXTFWX4T4EPJ5YHB";      
+export const SQUARE_TAX_PREPARED = "2K7XWRVWVXBTAJQIHHQOLFCN";  
 
 export const SQUARE_UNIT_IDS: Record<string, string> = {
   LB: "RGKK6J7EYZPQVHJQSA4PNE5C",
@@ -114,6 +114,8 @@ export async function loadMaps() {
   printerMap = Object.fromEntries(
     (profiles.data ?? []).map((r) => [r.printer_profile, r.printer_profile_id]),
   );
+  
+  
   gramConversion = settings.data?.dcg_gram_conversion !== false;
 }
 
@@ -121,7 +123,7 @@ export function dcgUnitPrice(item: Record<string, unknown>, perUnit: number | un
   if (perUnit === undefined) return undefined;
   if (!gramConversion || item.dcg_gram_priced !== true) return perUnit;
   const grams = GRAMS_PER_UNIT[unitOf(item)];
-  if (!grams || grams === 1) return perUnit;
+  if (!grams || grams === 1) return perUnit; 
   return Number((Number(perUnit) / grams).toFixed(7));
 }
 

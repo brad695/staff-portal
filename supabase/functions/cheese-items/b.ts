@@ -45,6 +45,7 @@ export async function pushToSquare(item: Record<string, unknown>) {
       version: existingVariation?.version as number | undefined,
     });
 
+    
     const variations = [variation, ...existingVariations.slice(1)];
 
     const taxIds = (existingItemData.tax_ids as string[] | undefined)?.length
@@ -55,6 +56,8 @@ export async function pushToSquare(item: Record<string, unknown>) {
       ? [{ id: categoryId }]
       : (existingItemData.categories as unknown[] | undefined);
 
+    
+    
     const productType = (existingItemData.product_type as string | undefined) ?? "REGULAR";
 
     const body = {
@@ -86,7 +89,7 @@ export async function pushToSquare(item: Record<string, unknown>) {
     let squareId: string | undefined;
     try {
       squareId = JSON.parse(text)?.catalog_object?.id;
-    } catch { /* ignore */ }
+    } catch {  }
     return { status: "synced", square_item_id: squareId ?? (item.square_item_id as string | undefined) };
   } catch (e) {
     return { status: "error", error: String(e).slice(0, 500) };
@@ -164,3 +167,4 @@ export async function nextStoreBarcode(): Promise<{ barcode: string; item_number
   while (used.has(n) && n < 99999) n++;
   return { barcode: buildStoreBarcode(n), item_number: n };
 }
+

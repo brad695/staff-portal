@@ -60,6 +60,7 @@ Deno.serve(async (req) => {
     });
     if (error) return json({ error: error.message }, 400);
 
+    
     let row = item;
     const extra: Record<string, unknown> = {};
     extra.item_kind = retail ? "retail" : "cheese";
@@ -77,7 +78,7 @@ Deno.serve(async (req) => {
     } else if (retail) {
       extra.unit_of_measure = "EA";
     }
-
+    
     if (retail) {
       extra.dcg_gram_priced = false;
       extra.dcg_status = "skipped";
@@ -116,6 +117,8 @@ Deno.serve(async (req) => {
       if (!u) return json({ error: "unit of measure must be LB, OZ, G, KG or EA" }, 400);
       patch.unit_of_measure = u;
     }
+    
+    
     if ("dcg_gram_priced" in body) patch.dcg_gram_priced = body.dcg_gram_priced === true;
     if ("barcode" in body) {
       const bc = String(body.barcode ?? "").trim() || null;
