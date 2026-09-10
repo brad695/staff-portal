@@ -1,0 +1,11 @@
+--- a/manager.html
++++ b/manager.html
+@@ -532,7 +532,7 @@
+     <div class="tab" onclick="tkTab(this,'customers')">Customers</div>
+     <div class="tab" onclick="tkTab(this,'promos')">Promo Codes</div>
+     <div class="tab-head">Cheese Case</div>
+-    <div class="tab" onclick="mtab('plu')">🧀 New Cheese Entry</div>
++    <div class="tab" onclick="mtab('plu')">🧀 New Case Entry</div>
+     <div class="tab-head">Marketing</div>
+     <div class="tab" onclick="mtab('campaigns')">✉️ Email Campaigns</div>
+     <div class="tab" onclick="mtab('social')">📣 Social Posts</div>
