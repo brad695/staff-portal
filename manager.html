@@ -1089,6 +1089,17 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
           <label class="fld retail-hide" id="pf_hotFld">Hot Buttons
             <span class="hotwrap"><input id="pf_hot" type="checkbox" checked /><span>Enable in the app</span></span>
           </label>
+          <label class="fld" id="pf_invFld">Inventory
+            <span class="hotwrap"><input id="pf_track_inv" type="checkbox" /><span>Track inventory</span></span>
+            <span class="fnote">Square inventory. Default ON for Wine/Retail, OFF for Cheese. Memphis/Nashville qty below when on.</span>
+          </label>
+          <div class="fld span2" id="pf_invQtyFld">Starting on-hand qty
+            <span class="locwrap" style="flex-wrap:wrap;gap:12px 18px;">
+              <label>Memphis <input id="pf_qty_mem" type="number" min="0" step="1" inputmode="numeric" placeholder="skip" style="width:88px;margin-left:6px;" /></label>
+              <label>Nashville <input id="pf_qty_nash" type="number" min="0" step="1" inputmode="numeric" placeholder="skip" style="width:88px;margin-left:6px;" /></label>
+            </span>
+            <span class="fnote">Blank skips that location. 0 is a valid count.</span>
+          </div>
         </div>
         <div class="row-actions">
           <button type="submit" class="btn btn-gold" id="pluSubmit">Save</button>
@@ -8239,6 +8250,12 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     }
   }
 
+  function updateInvQtyVisibility(){
+    const on = $('pf_track_inv') && $('pf_track_inv').checked;
+    const fld = $('pf_invQtyFld');
+    if (fld) fld.hidden = !on;
+  }
+
   function applyEntryKindUI(){
     const retail = entryKind === 'retail';
     document.querySelectorAll('#pluKindSwitch button').forEach(b => {
@@ -8246,7 +8263,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     });
     $('pluTitle').textContent = retail ? '🍷 New Wine / Retail Entry' : '🧀 New Case Entry';
     $('pluHint').textContent = retail
-      ? 'Adds to the running PLU list and Square only. DateCodeGenie is skipped. Barcode optional.'
+      ? 'Square-only settings (name, price, unit, category, tax, barcode, PLU, inventory). DateCodeGenie is never used.'
       : 'Cheese goes to DateCodeGenie + Square. Wine/Retail goes to the PLU list + Square only (no DateCodeGenie).';
     ['pf_storesFld','pf_printerFld','pf_hotFld'].forEach(id => {
       const el = $(id); if (el) el.hidden = retail;
@@ -8264,6 +8281,8 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
       $('pf_tax').value = 'auto';
     }
     updateTaxNote();
+    if ($('pf_track_inv')) $('pf_track_inv').checked = retail; // ON for Wine/Retail, OFF for Cheese
+    updateInvQtyVisibility();
     if (retail){
       $('pf_unit').value = 'EA';
       $('pf_ppl').value = '';
@@ -8455,7 +8474,17 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
         printer_profile: retail ? null : $('pf_printer').value,
         hot_buttons: retail ? false : $('pf_hot').checked,
         item_kind: retail ? 'retail' : 'cheese',
-        skip_dcg: retail
+        skip_dcg: retail,
+        track_inventory: !!( $('pf_track_inv') && $('pf_track_inv').checked ),
+        inventory_qty: (function(){
+          if (!$('pf_track_inv') || !$('pf_track_inv').checked) return undefined;
+          const q = {};
+          const mem = $('pf_qty_mem') && $('pf_qty_mem').value;
+          const nash = $('pf_qty_nash') && $('pf_qty_nash').value;
+          if (mem !== '' && mem != null) q.memphis = Number(mem);
+          if (nash !== '' && nash != null) q.nashville = Number(nash);
+          return Object.keys(q).length ? q : undefined;
+        })()
       })});
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || 'HTTP ' + res.status);
@@ -8466,12 +8495,17 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
         return st === 'synced' ? label + ' ✓'
           : st === 'error' ? label + ' failed (' + (err||'error') + ')' : label + ' not sent (key not set up)';
       };
+      const invWarn = (it.square_status === 'synced' && it.square_error) ? it.square_error : '';
       const worst = [it.dcg_status, it.square_status].includes('error') ? 'err'
+        : invWarn ? 'warn'
         : (!retailSaved && [it.dcg_status, it.square_status].includes('skipped')) ? 'warn'
         : (retailSaved && it.square_status === 'skipped') ? 'warn' : 'ok';
+      const sqPart = (it.square_status === 'synced' && invWarn)
+        ? ('Square ✓ (' + invWarn + ')')
+        : part('Square', it.square_status, it.square_error);
       setNotice(worst, 'Saved ' + it.name + ' as ' + (hasPlu(it.plu) ? 'PLU ' + pad5(it.plu) : 'barcode ' + it.barcode) + '. ' +
-        part('DateCodeGenie', it.dcg_status, it.dcg_error) + ' · ' + part('Square', it.square_status, it.square_error));
-      ['pf_name','pf_marketing','pf_price','pf_ppl','pf_barcode','pf_plu'].forEach(id => $(id).value = '');
+        part('DateCodeGenie', it.dcg_status, it.dcg_error) + ' · ' + sqPart);
+      ['pf_name','pf_marketing','pf_price','pf_ppl','pf_barcode','pf_plu','pf_qty_mem','pf_qty_nash'].forEach(id => { if ($(id)) $(id).value = ''; });
       $('pf_unit').value = retail ? 'EA' : DEFAULT_UNIT;
       $('pf_locMem').checked = true; $('pf_locNash').checked = true;
       overridePlu = false; $('pf_plu').disabled = true; $('pf_pluToggle').textContent = 'override';
@@ -8518,6 +8552,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     $(id).addEventListener('change', renderForm));
   if ($('pf_category')) $('pf_category').addEventListener('change', () => { updateTaxNote(); renderForm(); });
   if ($('pf_tax')) $('pf_tax').addEventListener('change', () => { updateTaxNote(); renderForm(); });
+  if ($('pf_track_inv')) $('pf_track_inv').addEventListener('change', () => { updateInvQtyVisibility(); renderForm(); });
   $('pluSearch').addEventListener('input', render);
 
   /* ---------- table actions ---------- */
