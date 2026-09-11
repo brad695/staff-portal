@@ -1,0 +1,20 @@
+--- a/manager.html
++++ b/manager.html
+@@ -1089,6 +1089,17 @@
+           <label class="fld retail-hide" id="pf_hotFld">Hot Buttons
+             <span class="hotwrap"><input id="pf_hot" type="checkbox" checked /><span>Enable in the app</span></span>
+           </label>
++          <label class="fld" id="pf_invFld">Inventory
++            <span class="hotwrap"><input id="pf_track_inv" type="checkbox" /><span>Track inventory</span></span>
++            <span class="fnote">Square inventory. Default ON for Wine/Retail, OFF for Cheese. Memphis/Nashville qty below when on.</span>
++          </label>
++          <div class="fld span2" id="pf_invQtyFld">Starting on-hand qty
++            <span class="locwrap" style="flex-wrap:wrap;gap:12px 18px;">
++              <label>Memphis <input id="pf_qty_mem" type="number" min="0" step="1" inputmode="numeric" placeholder="skip" style="width:88px;margin-left:6px;" /></label>
++              <label>Nashville <input id="pf_qty_nash" type="number" min="0" step="1" inputmode="numeric" placeholder="skip" style="width:88px;margin-left:6px;" /></label>
++            </span>
++            <span class="fnote">Blank skips that location. 0 is a valid count.</span>
++          </div>
+         </div>
+         <div class="row-actions">
+           <button type="submit" class="btn btn-gold" id="pluSubmit">Save</button>
