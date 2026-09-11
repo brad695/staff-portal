@@ -60,7 +60,6 @@ Deno.serve(async (req) => {
     });
     if (error) return json({ error: error.message }, 400);
 
-    
     let row = item;
     const extra: Record<string, unknown> = {};
     extra.item_kind = retail ? "retail" : "cheese";
@@ -78,7 +77,6 @@ Deno.serve(async (req) => {
     } else if (retail) {
       extra.unit_of_measure = "EA";
     }
-    
     if (retail) {
       extra.dcg_gram_priced = false;
       extra.dcg_status = "skipped";
@@ -94,6 +92,10 @@ Deno.serve(async (req) => {
 
     if ("tax_preset" in body) row = { ...row, _tax_preset: body.tax_preset };
     if (Array.isArray(body.tax_ids)) row = { ...row, _tax_ids: body.tax_ids };
+    if (body.track_inventory === true) row = { ...row, _track_inventory: true };
+    if (body.inventory_qty && typeof body.inventory_qty === "object") {
+      row = { ...row, _inventory_qty: body.inventory_qty };
+    }
     const updated = await syncItem(row, { dcg: !retail, square: true });
     return json({ item: updated });
   }
@@ -119,8 +121,6 @@ Deno.serve(async (req) => {
       if (!u) return json({ error: "unit of measure must be LB, OZ, G, KG or EA" }, 400);
       patch.unit_of_measure = u;
     }
-    
-    
     if ("dcg_gram_priced" in body) patch.dcg_gram_priced = body.dcg_gram_priced === true;
     if ("barcode" in body) {
       const bc = String(body.barcode ?? "").trim() || null;
@@ -176,6 +176,7 @@ Deno.serve(async (req) => {
       let row: Record<string, unknown> = marked ?? { ...saved, dcg_status: "skipped", dcg_error: DCG_SKIP_MSG };
       if ("tax_preset" in body) row = { ...row, _tax_preset: body.tax_preset };
       if (Array.isArray(body.tax_ids)) row = { ...row, _tax_ids: body.tax_ids };
+      if (body.track_inventory === true) row = { ...row, _track_inventory: true };
       const updated = await syncItem(row, { dcg: false, square: true });
       return json({ item: updated });
     }
@@ -183,6 +184,7 @@ Deno.serve(async (req) => {
     let syncRow: Record<string, unknown> = saved;
     if ("tax_preset" in body) syncRow = { ...syncRow, _tax_preset: body.tax_preset };
     if (Array.isArray(body.tax_ids)) syncRow = { ...syncRow, _tax_ids: body.tax_ids };
+    if (body.track_inventory === true) syncRow = { ...syncRow, _track_inventory: true };
     const updated = await syncItem(syncRow, { dcg: !retail, square: true });
     return json({ item: updated });
   }
