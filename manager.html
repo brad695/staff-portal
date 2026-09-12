@@ -1184,10 +1184,10 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
         <label class="fld">Customer name *
           <input id="po_name" placeholder="Jane Doe" autocomplete="off" />
         </label>
-        <label class="fld">Phone
+        <label class="fld">Phone or email *
           <input id="po_phone" inputmode="tel" placeholder="(901) 555-0134" autocomplete="off" />
         </label>
-        <label class="fld">Email
+        <label class="fld">Phone or email *
           <input id="po_email" type="email" placeholder="jane@example.com" autocomplete="off" />
         </label>
         <label class="fld">Pickup date *
@@ -9794,6 +9794,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     err('');
     const name = $('#po_name').value.trim();
     if(!name) return err('Customer name is required.');
+    const phone = $('#po_phone').value.trim();
+    const email = $('#po_email').value.trim();
+    if(!phone && !email) return err('Phone or email is required.');
     const pickup = pickupISO();
     if(!pickup) return err('Pick a pickup date and time.');
     if(new Date(pickup) < new Date()) return err('That pickup time is in the past.');
@@ -9805,8 +9808,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       const res = await poFn({
         action:'create',
         customer_name: name,
-        customer_phone: $('#po_phone').value.trim() || null,
-        customer_email: $('#po_email').value.trim() || null,
+        customer_phone: phone || null,
+        customer_email: email || null,
         pickup_at: pickup,
         notes: $('#po_notes').value.trim() || null,
         items: CART.map(l=>({
@@ -10014,7 +10017,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 
   /* ---------- wiring ---------- */
   window.poInit = function(){
-    if(window._poWired) { loadDevices(); loadQuick(); return; }
+    if(window._poWired) { loadDevices(); loadQuick(true); return; }
     window._poWired = true;
 
     // default the date to a week out — catering is rarely same-day
@@ -10052,7 +10055,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       if(e.target.closest('#poModAdd')) return commitMod();
       if(e.target.closest('#poModCancel')) return closeMod();
     });
-    loadQuick();
+    loadQuick(true);
 
     $('#poResults').addEventListener('click', e=>{
       const r = e.target.closest('.po-res'); if(!r) return;
