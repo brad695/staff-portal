@@ -98,6 +98,8 @@
     .cell-off{ background:var(--offbg); color:var(--offink); border-radius:8px; padding:4px 6px; font-weight:800; text-transform:uppercase; font-size:0.66rem; text-align:center; }
     .sh.oncall{ background:#fdebc4; color:#92400e; }
     .oncall-pill{ display:inline-block; background:#fdebc4; color:#92400e; font-size:0.66rem; font-weight:800; text-transform:uppercase; padding:3px 9px; border-radius:20px; }
+    .sh.offsite{ background:#dbeafe; color:#1d4ed8; }
+    .offsite-pill{ display:inline-block; background:#dbeafe; color:#1d4ed8; font-size:0.66rem; font-weight:800; text-transform:uppercase; padding:3px 9px; border-radius:20px; }
     .grid-empty{ text-align:center; color:var(--sub); padding:30px 10px; font-size:0.88rem; }
     .foot-note{ color:#b9c5d1; font-size:0.78rem; padding:2px 22px 16px; }
     .foot-note a{ color:var(--accent); font-weight:700; text-decoration:none; }
@@ -200,6 +202,7 @@ body, .app{ background:var(--bg); color:var(--ink); }
 .td-badge.event  { background:#fdeef1; color:#be123c; }
 .sh{ background:#e7f5ef; color:#047857; }
 .sh.oncall, .oncall-pill, .ro-pending{ background:#fdf3e2; color:#92400e; }
+.sh.offsite, .offsite-pill{ background:#e8f0fd; color:#1d4ed8; }
 .cell-off, .off-pill, .ro-denied, .btn-no{ background:#fdeef1; color:#be123c; }
 .ro-approved, .btn-yes{ background:#e7f5ef; color:#047857; }
 
@@ -387,9 +390,9 @@ function iso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0
 function mondayOf(d){ const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); const dow=(x.getDay()+6)%7; x.setDate(x.getDate()-dow); return x; }
 function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
 function fmtTime(t){ if(!t) return ''; const [h,m]=t.split(':').map(Number); const ap=h>=12?'p':'a'; const hh=((h+11)%12)+1; return hh+(m?':'+String(m).padStart(2,'0'):'')+ap; }
-function shiftHours(s){ if(shKind(s)!=='shift') return 0; const [h1,m1]=s.start_time.split(':').map(Number); const [h2,m2]=s.end_time.split(':').map(Number); let hrs=(h2+m2/60)-(h1+m1/60); if(hrs<=0) hrs+=24; return hrs; }
-// managers can schedule 'oncall' and 'off' entries alongside regular shifts
-function shKind(s){ return s.kind==='oncall'||s.kind==='off' ? s.kind : 'shift'; }
+function shiftHours(s){ const k=shKind(s); if(k!=='shift'&&k!=='offsite') return 0; if(k==='offsite'&&!shHasTimes(s)) return 0; const [h1,m1]=s.start_time.split(':').map(Number); const [h2,m2]=s.end_time.split(':').map(Number); let hrs=(h2+m2/60)-(h1+m1/60); if(hrs<=0) hrs+=24; return hrs; }
+// managers can schedule 'oncall', 'offsite' and 'off' entries alongside regular shifts
+function shKind(s){ return s.kind==='oncall'||s.kind==='off'||s.kind==='offsite' ? s.kind : 'shift'; }
 function shHasTimes(s){ return !(String(s.start_time).slice(0,5)==='00:00' && String(s.end_time).slice(0,5)==='00:00'); }
 function normName(s){ return String(s||'').trim().toLowerCase(); }
 function idPat(s){ return String(s).replace(/([\\%_])/g, '\\$1'); } // literal match for ilike
@@ -583,6 +586,13 @@ function render(){
           (s.note?'<div class="my-note">'+esc(s.note)+'</div>':'')+'</div></div>');
         return;
       }
+      if(kind==='offsite'){
+        rows.push('<div class="my-row">'+dayCell+'<div class="my-main">'+
+          '<span class="offsite-pill">Offsite</span>'+(shHasTimes(s)?' <span class="my-time" style="font-size:0.85rem;">'+fmtTime(s.start_time)+' – '+fmtTime(s.end_time)+'</span>':'')+locTag+
+          (s.role?'<div class="my-role">'+esc(s.role)+'</div>':'')+
+          (s.note?'<div class="my-note">'+esc(s.note)+'</div>':'')+'</div></div>');
+        return;
+      }
       const swapBtn = s.date>=todayIso ? '<button class="sw-btn" onclick="swapOpen('+s.id+')">Swap</button>' : '';
       rows.push('<div class="my-row">'+dayCell+'<div class="my-main">'+
         '<div class="my-time">'+fmtTime(s.start_time)+' – '+fmtTime(s.end_time)+locTag+'</div>'+
@@ -615,6 +625,7 @@ function render(){
         const kind = shKind(s);
         if(kind==='off'){ bits.push('<div class="cell-off">Off</div>'); return; }
         if(kind==='oncall'){ bits.push('<div class="sh oncall">On call'+(shHasTimes(s)?' '+fmtTime(s.start_time)+'–'+fmtTime(s.end_time):'')+locTag+'</div>'); return; }
+        if(kind==='offsite'){ bits.push('<div class="sh offsite">Offsite'+(shHasTimes(s)?' '+fmtTime(s.start_time)+'–'+fmtTime(s.end_time):'')+locTag+(s.role?'<span class="r">'+esc(s.role)+'</span>':'')+'</div>'); return; }
         bits.push('<div class="sh">'+fmtTime(s.start_time)+'–'+fmtTime(s.end_time)+locTag+(s.role?'<span class="r">'+esc(s.role)+'</span>':'')+'</div>');
       });
       return '<td'+cls+'>'+bits.join('')+'</td>';

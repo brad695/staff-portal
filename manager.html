@@ -124,6 +124,8 @@
     .tag-info{ background:#fdebc4; color:#92400e; }
     .tag-loc{ background:#ebebeb; color:#666666; }
     .tag-off2{ background:#e8e8e8; color:#777; }
+    .tag-confirmed{ background:#d1fae5; color:#065f46; }
+    .tag-tentative{ background:#fdebc4; color:#92400e; }
     .rec-fields{ display:grid; grid-template-columns:1fr 1fr; gap:12px 14px; margin:14px 0; }
     .rf{ display:flex; flex-direction:column; gap:5px; }
     .rf.full{ grid-column:1 / -1; }
@@ -782,6 +784,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
         <select id="shKindSel" onchange="shKindUI()" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r);font-family:inherit;margin-top:3px;background:#fff;">
           <option value="shift">Shift (regular hours)</option>
           <option value="oncall">On call</option>
+          <option value="offsite">Offsite (catering, market, event)</option>
           <option value="off">Off — scheduled day off</option>
         </select></label>
       <div id="shTimesWrap" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
@@ -1750,11 +1753,16 @@ const SCHEMA = {
       {k:'endDate', label:'End date (multi-day)', type:'date'},
       {k:'repeat', label:'Repeat', type:'select', options:['none','weekly','biweekly','monthly']},
       {k:'repeatUntil', label:'Repeat until', type:'date', showIf:v=>v.repeat && v.repeat!=='none'},
+      {k:'status', label:'Booking status', type:'radio', full:true, options:['none','confirmed','tentative'],
+        names:{ none:'Not set', confirmed:'✅ Confirmed', tentative:'❓ Tentative' }},
+      {k:'archived', label:'Visibility', type:'radio', full:true, options:['live','archived'],
+        names:{ live:'Show on the staff portal', archived:'📦 Archived (hidden)' }},
       {k:'blockScope', label:'🚫 Wix reservations', type:'radio', full:true, options:['none','window','day'],
         names:{ none:'Do not block', window:'Block during event', day:'Block all day' }},
       {k:'body', label:'Details', type:'textarea', full:true, ph:'Details shown on the portal'}
     ],
-    defaults:{ blockScope:'none', repeat:'none' },
+    defaults:{ blockScope:'none', repeat:'none', status:'none', archived:'live' },
+    archivable:true,
     rowFilter:r=> (r.type||'note')==='event',
     valid:r=> !r.title ? 'A title is required.'
       : !r.date ? 'Events need a date.'
@@ -1762,9 +1770,13 @@ const SCHEMA = {
       : '',
     map:r=>({ id:r.id, type:'event', title:r.title, date:r.date||'', time:(r.time||'').slice(0,5), endDate:r.end_date||'',
       repeat:r.repeat||'none', repeatUntil:r.repeat_until||'', body:r.body||'', location:r.location||'memphis',
-      blockScope:r.block_scope||'none', blockTo:(r.block_to||'').slice(0,5) }),
+      blockScope:r.block_scope||'none', blockTo:(r.block_to||'').slice(0,5), status:r.status||'none',
+      archived:r.archived===true?'archived':'live' }),
     rowTitle:r=>r.title,
     rowTags:r=>'<span class="tag tag-event">event</span>'
+      +(r.status==='confirmed' ? '<span class="tag tag-confirmed">✅ confirmed</span>'
+        : r.status==='tentative' ? '<span class="tag tag-tentative">❓ tentative</span>' : '')
+      +(r.archived==='archived' ? '<span class="tag tag-off2">📦 archived</span>' : '')
       +(r.blockScope==='day' ? '<span class="tag tag-special">🚫 all day</span>'
         : r.blockScope==='window' ? '<span class="tag tag-special">🚫 '+esc((r.time||''))+'–'+esc((r.blockTo||''))+'</span>' : ''),
     rowMeta:r=>{
@@ -1777,9 +1789,9 @@ const SCHEMA = {
       if(r.body) bits.push(esc(r.body.length>100 ? r.body.slice(0,100)+'…' : r.body));
       return bits.join(' &nbsp;·&nbsp; ');
     },
-    csvHeader:['title','date','time','end_date','repeat','repeat_until','details'],
-    csvRowToObj:c=>({ type:'event', title:c[0]||'', date:c[1]||'', time:c[2]||'', endDate:c[3]||'', repeat:(c[4]||'none').toLowerCase().trim(), repeatUntil:c[5]||'', body:c[6]||'' }),
-    sample:[['Wine & Cheese Tasting','2026-09-18','18:30','','none','','Six wines paired with our cheese flight']],
+    csvHeader:['title','date','time','end_date','repeat','repeat_until','status','details'],
+    csvRowToObj:c=>({ type:'event', title:c[0]||'', date:c[1]||'', time:c[2]||'', endDate:c[3]||'', repeat:(c[4]||'none').toLowerCase().trim(), repeatUntil:c[5]||'', status:(c[6]||'none').toLowerCase().trim(), body:c[7]||'' }),
+    sample:[['Wine & Cheese Tasting','2026-09-18','18:30','','none','','confirmed','Six wines paired with our cheese flight']],
     addAction:'add-item', updateAction:'update-item', deleteAction:'delete-item', bulkAction:'bulk-add-items'
   },
   schedules: {
@@ -1867,21 +1879,32 @@ async function loadKind(kind){
   renderKind(kind);
 }
 function setFilter(kind, v){ FILTER[kind]=v; renderKind(kind); }
+// Archived rows are hidden until the 📦 chip is on, which then shows ONLY them.
+const SHOW_ARCH = {};
+function setArch(kind, v){ SHOW_ARCH[kind]=v; renderKind(kind); }
 
 function renderKind(kind){
   const S = SCHEMA[kind];
   // location filter chips with counts
   const counts = {};
-  ROWS[kind].forEach(r=>{ counts[r.location]=(counts[r.location]||0)+1; });
-  document.getElementById(S.chips).innerHTML = ['all'].concat(LOC_KEYS).map(l=>{
-    const label = l==='all' ? 'All · '+ROWS[kind].length : LOC_LABELS[l]+' · '+(counts[l]||0);
-    return '<button class="chip'+(FILTER[kind]===l?' on':'')+'" onclick="setFilter(\''+kind+'\',\''+l+'\')">'+label+'</button>';
+  const live = S.archivable ? ROWS[kind].filter(r=>r.archived!=='archived') : ROWS[kind];
+  live.forEach(r=>{ counts[r.location]=(counts[r.location]||0)+1; });
+  let chipHtml = ['all'].concat(LOC_KEYS).map(l=>{
+    const label = l==='all' ? 'All · '+live.length : LOC_LABELS[l]+' · '+(counts[l]||0);
+    const on = (!SHOW_ARCH[kind] && FILTER[kind]===l) ? ' on' : '';
+    return '<button class="chip'+on+'" onclick="setArch(\''+kind+'\',false);setFilter(\''+kind+'\',\''+l+'\')">'+label+'</button>';
   }).join('');
+  if(S.archivable){
+    const nArch = ROWS[kind].filter(r=>r.archived==='archived').length;
+    chipHtml += '<button class="chip'+(SHOW_ARCH[kind]?' on':'')+'" onclick="setArch(\''+kind+'\','+(!SHOW_ARCH[kind])+')">📦 Archived · '+nArch+'</button>';
+  }
+  document.getElementById(S.chips).innerHTML = chipHtml;
   // rows
-  const rows = ROWS[kind].filter(r=>FILTER[kind]==='all'||r.location===FILTER[kind]);
+  const pool = S.archivable ? ROWS[kind].filter(r=>(r.archived==='archived')===!!SHOW_ARCH[kind]) : ROWS[kind];
+  const rows = pool.filter(r=>SHOW_ARCH[kind]||FILTER[kind]==='all'||r.location===FILTER[kind]);
   const el = document.getElementById(S.list);
   if(!rows.length){
-    el.innerHTML = '<div class="rec-empty">Nothing here yet — click "＋ Add" above or import a CSV below.</div>';
+    el.innerHTML = '<div class="rec-empty">'+(SHOW_ARCH[kind] ? 'Nothing archived yet.' : 'Nothing here yet — click "＋ Add" above or import a CSV below.')+'</div>';
     return;
   }
   el.innerHTML = rows.map(r=>{
@@ -2228,13 +2251,16 @@ function sgRender(){
           });
           g.shifts.filter(s=>s.employee_id===emp.id && s.date===di).forEach(s=>{
             const kind = sgKind(s);
-            if(kind==='shift') hrs+=sgHours(s);
             const noTimes = String(s.start_time).slice(0,5)==='00:00' && String(s.end_time).slice(0,5)==='00:00';
+            // offsite is worked time, but only counts hours when times were entered
+            if(kind==='shift' || (kind==='offsite' && !noTimes)) hrs+=sgHours(s);
             const style = kind==='off' ? 'background:#f6dad4;color:#9f2d20;'
                         : kind==='oncall' ? 'background:#fdebc4;color:#92400e;'
+                        : kind==='offsite' ? 'background:#dbeafe;color:#1d4ed8;'
                         : 'background:#d1fae5;color:#065f46;';
             const label = kind==='off' ? '<span style="text-transform:uppercase;font-size:0.68rem;letter-spacing:0.4px;">Off</span>'
                         : kind==='oncall' ? '<span style="text-transform:uppercase;font-size:0.68rem;letter-spacing:0.4px;">On call</span>'+(noTimes?'':'<span style="display:block;font-weight:600;font-size:0.68rem;">'+sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time)+'</span>')
+                        : kind==='offsite' ? '<span style="text-transform:uppercase;font-size:0.68rem;letter-spacing:0.4px;">Offsite</span>'+(noTimes?'':'<span style="display:block;font-weight:600;font-size:0.68rem;">'+sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time)+'</span>')
                         : sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time);
             bits.push('<div draggable="true" ondragstart="sgDrag(event,\''+loc+'\','+s.id+')" onclick="event.stopPropagation();openShift(\''+loc+'\','+emp.id+',\''+di+'\','+s.id+')" style="'+style+'border-radius:2px;padding:3px 6px;margin:2px 0;font-size:0.74rem;font-weight:700;cursor:grab;line-height:1.3;" title="Drag to copy · click to edit">'
               +label
@@ -2276,6 +2302,7 @@ function printGrid(loc){
         if(kind==='off'){ bits.push('<div class="off">OFF</div>'); return; }
         const noTimes = String(s.start_time).slice(0,5)==='00:00' && String(s.end_time).slice(0,5)==='00:00';
         if(kind==='oncall'){ bits.push('<div class="psh"><em>On call</em>'+(noTimes?'':' '+sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time))+(s.role?'<br><small>'+esc(s.role)+'</small>':'')+'</div>'); return; }
+        if(kind==='offsite'){ bits.push('<div class="psh"><em>Offsite</em>'+(noTimes?'':' '+sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time))+(s.role?'<br><small>'+esc(s.role)+'</small>':'')+'</div>'); if(!noTimes) hrs+=sgHours(s); return; }
         hrs+=sgHours(s);
         bits.push('<div class="psh">'+sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time)+(s.role?'<br><small>'+esc(s.role)+'</small>':'')+'</div>');
       });
@@ -2362,26 +2389,33 @@ async function shCopy(){
 }
 function shClose(){ document.getElementById('shiftModal').style.display='none'; SH_CTX=null; }
 // normalize a shift row's kind (older rows have none)
-function sgKind(s){ return s && (s.kind==='oncall'||s.kind==='off') ? s.kind : 'shift'; }
+// shift = regular hours · oncall = on call · offsite = working away from the shop · off = day off
+function sgKind(s){ return s && (s.kind==='oncall'||s.kind==='off'||s.kind==='offsite') ? s.kind : 'shift'; }
 function shKindUI(){
   const kind = document.getElementById('shKindSel').value;
   document.getElementById('shTimesWrap').style.display = kind==='off' ? 'none' : 'grid';
   document.getElementById('shRoleWrap').style.display = kind==='off' ? 'none' : 'block';
-  const opt = kind==='oncall' ? ' (optional)' : '';
+  // on-call and offsite may run all day — times optional for both
+  const opt = (kind==='oncall'||kind==='offsite') ? ' (optional)' : '';
   document.getElementById('shStartLbl').textContent = 'START'+opt;
   document.getElementById('shEndLbl').textContent = 'END'+opt;
   const saveBtn = document.querySelector('#shiftModal .btn-gold');
-  if(saveBtn) saveBtn.textContent = kind==='off' ? 'Save day off' : (kind==='oncall' ? 'Save on-call' : 'Save shift');
+  if(saveBtn) saveBtn.textContent = kind==='off' ? 'Save day off'
+    : kind==='oncall' ? 'Save on-call'
+    : kind==='offsite' ? 'Save offsite' : 'Save shift';
+  const roleIn = document.getElementById('shRole');
+  if(roleIn) roleIn.placeholder = kind==='offsite' ? 'Catering, Farmers market, Delivery…' : 'Server, Kitchen, Bar…';
 }
-// Gather modal fields; off/oncall may omit times (stored as 00:00–00:00)
+// Gather modal fields; off/oncall/offsite may omit times (stored as 00:00–00:00)
 function shGather(){
   const kind = document.getElementById('shKindSel').value;
   let start=document.getElementById('shStart').value, end=document.getElementById('shEnd').value;
   if(kind==='shift'){
     if(!start||!end) return { err:'Start and end times are required.' };
   } else if(kind==='off'){ start='00:00'; end='00:00'; }
-  else { // on call: both or neither
-    if(!!start !== !!end) return { err:'Set both start and end for on-call hours, or leave both blank.' };
+  else { // on call / offsite: both or neither
+    const what = kind==='offsite' ? 'offsite' : 'on-call';
+    if(!!start !== !!end) return { err:'Set both start and end for '+what+' hours, or leave both blank.' };
     if(!start){ start='00:00'; end='00:00'; }
   }
   return { kind, start, end };
@@ -2880,18 +2914,65 @@ const timeLeft = (iso) => {
   return `${m}m`;
 };
 const LOCATIONS = ["Memphis", "Nashville"];
-const GROUP_NAMES = [
-  "Cheddar",
-  "Gouda",
-  "Swiss",
-  "Alpine",
-  "Brie",
-  "Comte",
-  "Blue",
-  "Goat",
-  "Sheep",
-  "Cow",
-];
+// ---------------------------------------------------------------------------
+// TABLE LAYOUTS — one named list of tables per shop.
+// A "table" is a cheese-named seat group. Each location gets its own list so a
+// shop can be re-arranged without touching the others. Nashville is a copy of
+// Memphis for now; edit the Nashville array below (rename, add or remove
+// tables) and the customer table picker, the manager group dropdowns and the
+// table-hold logic all follow automatically. Nothing else needs to change.
+// Tables already booked under an old name keep working — GROUP_NAMES below is
+// the union of every layout, and that is what reads existing registrations.
+// ---------------------------------------------------------------------------
+const TABLE_LAYOUTS = {
+  Memphis: [
+    "Cheddar",
+    "Gouda",
+    "Swiss",
+    "Alpine",
+    "Brie",
+    "Comte",
+    "Blue",
+    "Goat",
+    "Sheep",
+    "Cow",
+  ],
+  // ↓ Nashville: same as Memphis for now. Change this list when the Nashville
+  //   floor plan changes — no other edit is needed.
+  Nashville: [
+    "Cheddar",
+    "Gouda",
+    "Swiss",
+    "Alpine",
+    "Brie",
+    "Comte",
+    "Blue",
+    "Goat",
+    "Sheep",
+    "Cow",
+  ],
+  // archived (store closed) — kept so old bookings still read correctly
+  Franklin: [
+    "Cheddar",
+    "Gouda",
+    "Swiss",
+    "Alpine",
+    "Brie",
+    "Comte",
+    "Blue",
+    "Goat",
+    "Sheep",
+    "Cow",
+  ],
+};
+// The tables offered at a location. Unknown/blank location falls back to Memphis.
+const tablesFor = (loc) => TABLE_LAYOUTS[loc] || TABLE_LAYOUTS.Memphis;
+// Every table name used anywhere, in Memphis order then whatever the other
+// layouts add. Read-side code (existing bookings, group summaries) uses this so
+// a table renamed out of a layout never disappears from an old registration.
+const GROUP_NAMES = Object.values(TABLE_LAYOUTS)
+  .flat()
+  .filter((n, i, a) => a.indexOf(n) === i);
 const SITE_URL = "https://tickets.greyscheese.com";
 const linkBase = () => {
   if (SITE_URL) return SITE_URL.replace(/\/+$/, "");
@@ -3578,6 +3659,7 @@ function App() {
                       ? events.find((e) => e.id === view.eventId)
                       : null
                   }
+                  sold={view.eventId ? soldFor(view.eventId) : 0}
                   kind={view.kind || "class"}
                   onCancel={() => go("admin")}
                   onSave={async (evs) => {
@@ -3966,7 +4048,7 @@ function classesFromCsv(text) {
       time: get("time") || "18:00",
       durationMin: Number(get("duration")) || 90,
       price: Math.round(parseFloat(get("price") || "0") * 100),
-      capacity: Number(get("capacity")) || 12,
+      capacity: Number(get("capacity")) || 20,
       location: normLoc(get("location")),
       addOns,
     });
@@ -3997,7 +4079,7 @@ function BulkAdd({ onCancel, onSave }) {
     time: "18:00",
     duration: "90",
     price: "",
-    capacity: "12",
+    capacity: "20",
     desc: "",
   });
   const [rows, setRows] = useState([blank(), blank(), blank()]);
@@ -4018,7 +4100,7 @@ function BulkAdd({ onCancel, onSave }) {
         time: r.time.trim() || "18:00",
         durationMin: Number(r.duration) || 90,
         price: Math.round(parseFloat(r.price || "0") * 100),
-        capacity: Number(r.capacity) || 12,
+        capacity: Number(r.capacity) || 20,
         location,
         addOns: [],
       }));
@@ -4033,7 +4115,7 @@ function BulkAdd({ onCancel, onSave }) {
       <h2 className="cc-h2">Add multiple classes</h2>
       <p className="cc-hint">
         Type each class on a row. Title and date are required; the rest default
-        to 6:00 PM · 90 min · 12 seats. Add upgrades/description later by editing
+        to 6:00 PM · 90 min · 20 tickets. Add upgrades/description later by editing
         a class.
       </p>
       <label className="cc-label">Location (applies to all rows below)</label>
@@ -5486,7 +5568,7 @@ function AdminHome({ go }) {
   );
 }
 
-function AdminEdit({ ev, kind, onCancel, onSave }) {
+function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
   // Events differ from classes: a table option (party size > 1) and an optional
   // group/table dropdown. Editing an existing record uses its stored kind.
   const editKind = ev ? ev.kind || (ev.partySize > 1 ? "event_tabled" : "class") : null;
@@ -5499,7 +5581,9 @@ function AdminEdit({ ev, kind, onCancel, onSave }) {
   const [time, setTime] = useState(ev?.time || "18:00");
   const [duration, setDuration] = useState(ev?.durationMin || 90);
   const [price, setPrice] = useState(ev ? (ev.price / 100).toString() : "");
-  const [capacity, setCapacity] = useState(ev?.capacity || 12);
+  // Tickets available = how many seats can be sold for this class. 20 is the
+  // house default; every existing class is currently set to 20.
+  const [capacity, setCapacity] = useState(ev?.capacity || 20);
   const [location, setLocation] = useState(ev?.location || LOCATIONS[0]);
   const [partySize, setPartySize] = useState(ev?.partySize > 1 ? ev.partySize : 4);
   // Events are either "single" tickets or a "tabled" event (class-style tables).
@@ -5604,6 +5688,14 @@ function AdminEdit({ ev, kind, onCancel, onSave }) {
     const validDates = [...new Set(dates.filter(Boolean))];
     if (!title.trim() || validDates.length === 0 || !price) {
       setErr("Title, at least one date, and price are required.");
+      return;
+    }
+    // Tickets available can never go below what is already sold — that would
+    // leave paid customers without a seat.
+    if (ev && Number(capacity) < sold) {
+      setErr(
+        `${sold} ticket${sold === 1 ? " is" : "s are"} already sold, so tickets available cannot be less than ${sold}.`
+      );
       return;
     }
     const cleanAddOns = addOns
@@ -5748,13 +5840,22 @@ function AdminEdit({ ev, kind, onCancel, onSave }) {
           />
         </div>
         <div>
-          <label className="cc-label">Capacity (total seats)</label>
+          <label className="cc-label">Tickets available</label>
           <input
             className="cc-input"
             type="number"
+            min={ev ? Math.max(1, sold) : 1}
             value={capacity}
             onChange={(e) => setCapacity(e.target.value)}
           />
+          <p className="cc-hint" style={{ margin: "4px 0 0" }}>
+            {ev
+              ? `How many can be sold in total. ${sold} sold so far — ${Math.max(
+                  0,
+                  (Number(capacity) || 0) - sold
+                )} still available.`
+              : "How many can be sold in total. Default is 20."}
+          </p>
         </div>
       </div>
 
@@ -6267,7 +6368,7 @@ function RegEditor({ reg, ev, onCancel, onSave }) {
             onChange={(e) => setGroup(e.target.value)}
           >
             <option value="">No group</option>
-            {GROUP_NAMES.map((n) => (
+            {tablesFor(ev && ev.location).map((n) => (
               <option key={n} value={n}>
                 {n}
               </option>
@@ -6396,7 +6497,7 @@ function CompAdd({ ev, onCancel, onSave }) {
               onChange={(e) => setG(i, { group: e.target.value })}
             >
               <option value="">No group</option>
-              {GROUP_NAMES.map((n) => (
+              {tablesFor(ev && ev.location).map((n) => (
                 <option key={n} value={n}>
                   {n}
                 </option>

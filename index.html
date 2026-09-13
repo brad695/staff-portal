@@ -211,7 +211,16 @@
     .t-order{ background:rgba(4,120,87,0.13); color:#047857; }
     .t-delivery{ background:rgba(180,83,9,0.13); color:#b45309; }
     .ag-sub{ font-size:0.78rem; color:var(--sub); margin-top:2px; }
+    /* expandable agenda rows: title only until tapped */
+    .ag-body{ flex:1; min-width:0; }
+    .ag-row.ag-x{ cursor:pointer; }
+    .ag-chev{ font-style:normal; font-size:0.66rem; color:var(--sub); margin-left:6px; display:inline-block; transition:transform .15s ease; }
+    .ag-row.open .ag-chev{ transform:rotate(180deg); }
+    .ag-det{ display:none; font-size:0.82rem; color:var(--sub); margin-top:6px; padding:7px 0 3px 10px; border-left:2px solid var(--line); white-space:pre-wrap; }
+    .ag-row.open .ag-det{ display:block; }
+    .ag-det .k{ font-weight:700; color:var(--ink); }
     .ag-unpaid{ color:#be123c; font-weight:700; }
+    .ag-ok, .ag-tent{ font-size:0.78rem; }
     .ag-strike{ text-decoration:line-through; color:var(--sub); }
 
     /* time off form */
@@ -310,6 +319,8 @@
                 border-radius:8px !important; margin-bottom:10px !important;
                 break-inside:avoid; page-break-inside:avoid; }
       .ag-date, .ag-row, .empty { color:#000 !important; }
+      .ag-det { display:block !important; color:#333 !important; }
+      .ag-chev { display:none !important; }
       .ag-today { background:#000 !important; color:#fff !important; }
 
       @page { margin:14mm; }
@@ -679,14 +690,14 @@ window.addEventListener('DOMContentLoaded', () => { loadItems(); loadSchedules()
 
 // ═══ CONTENT ITEMS (notes · specials · events) ═══
 let _notes=[], _specials=[], _events=[], _info=[];
-function mapItem(r){ return { id:r.id, type:r.type||'note', title:r.title||'', body:r.body||'', date:r.date||'', time:r.time||'', endDate:r.end_date||'', repeat:r.repeat||'none', repeatUntil:r.repeat_until||'' }; }
+function mapItem(r){ return { id:r.id, type:r.type||'note', title:r.title||'', body:r.body||'', date:r.date||'', time:r.time||'', endDate:r.end_date||'', repeat:r.repeat||'none', repeatUntil:r.repeat_until||'', status:r.status||'none', archived:r.archived===true }; }
 async function loadItems(){
   try{
     const { data } = await sb.from('portal_items').select('*').eq('location', LOC).order('id');
     const items = (data||[]).map(mapItem);
     _notes = items.filter(i=>i.type==='note');
     _specials = items.filter(i=>i.type==='special');
-    _events = items.filter(i=>i.type==='event').map(e=>({ id:e.id, name:e.title, date:e.date, time:e.time, endDate:e.endDate, desc:e.body, repeat:e.repeat, repeatUntil:e.repeatUntil }));
+    _events = items.filter(i=>i.type==='event' && !i.archived).map(e=>({ id:e.id, name:e.title, date:e.date, time:e.time, endDate:e.endDate, desc:e.body, repeat:e.repeat, repeatUntil:e.repeatUntil, status:e.status }));
     _info = items.filter(i=>i.type==='info');
   }catch(e){ _notes=[]; _specials=[]; _events=[]; _info=[]; }
   renderNotes();
@@ -1064,8 +1075,13 @@ function ordRow(o){
   // line count, so only the cap itself is evidence something was left out.
   const shown = (o.items||[]).length;
   const more  = shown >= 6 ? ' \u2026' : '';
-  const sub   = names ? '<div class="ag-sub">'+esc(names)+more+(o.channel?' \u00b7 '+esc(o.channel):'')+'</div>' : '';
-  return agRow(meta.tag, meta.label, esc(when)+' \u00b7 '+esc(o.name)+money+paid+sub);
+  // item names and channel moved into the expandable detail
+  const detail = agDetail([
+    ['Items', names ? names+more : ''],
+    ['Channel', o.channel || ''],
+    ['Total', o.total_cents ? '$'+(o.total_cents/100).toFixed(2)+(o.paid?' (paid)':' (unpaid)') : '']
+  ]);
+  return agRow(meta.tag, meta.label, esc(when)+' \u00b7 '+esc(o.name)+money+paid, detail);
 }
 async function renderCalendar(){
   const y=_calYear, m=_calMonth;
@@ -1074,13 +1090,34 @@ async function renderCalendar(){
   await loadCalMonth(y,m);
   const mS=fmt(new Date(y,m,1)), mE=fmt(new Date(y,m+1,0));
   await Promise.all([ loadCalClasses(mS,mE), loadCalOrders(mS,mE) ]);
-  _calData.ev={}; _events.forEach(ev=>occurrences(ev,mS,mE).forEach(d=>{(_calData.ev[d]=_calData.ev[d]||[]).push({name:ev.name,time:ev.time});}));
-  _calData.sp={}; _specials.forEach(s=>{ if((s.repeat||'none')==='none'&&s.endDate&&s.endDate>s.date){ spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sp[k]=_calData.sp[k]||[]).push(s.title);}); } else { occurrences(s,mS,mE).forEach(d=>{(_calData.sp[d]=_calData.sp[d]||[]).push(s.title);}); } });
-  _calData.sch={}; _schedules.forEach(s=>{ if(!s.date) return; spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sch[k]=_calData.sch[k]||[]).push(s.name);}); });
-  _calData.off={}; approvedTimeOff().forEach(r=>{ if(!r.date) return; spanDays(r.date,r.endDate,mS,mE,k=>{(_calData.off[k]=_calData.off[k]||[]).push(r.name);}); });
+  _calData.ev={}; _events.forEach(ev=>occurrences(ev,mS,mE).forEach(d=>{(_calData.ev[d]=_calData.ev[d]||[]).push({name:ev.name,time:ev.time,desc:ev.desc,status:ev.status,endDate:ev.endDate,repeat:ev.repeat});}));
+  _calData.sp={}; _specials.forEach(s=>{ if((s.repeat||'none')==='none'&&s.endDate&&s.endDate>s.date){ spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sp[k]=_calData.sp[k]||[]).push(s);}); } else { occurrences(s,mS,mE).forEach(d=>{(_calData.sp[d]=_calData.sp[d]||[]).push(s);}); } });
+  _calData.sch={}; _schedules.forEach(s=>{ if(!s.date) return; spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sch[k]=_calData.sch[k]||[]).push(s);}); });
+  _calData.off={}; approvedTimeOff().forEach(r=>{ if(!r.date) return; spanDays(r.date,r.endDate,mS,mE,k=>{(_calData.off[k]=_calData.off[k]||[]).push(r);}); });
   renderAgenda(y,m);
 }
-function agRow(tag,label,text){ return '<div class="ag-row"><span class="ag-tag '+tag+'">'+label+'</span><span>'+text+'</span></div>'; }
+// Build the expandable body from label/value pairs, skipping the empty ones.
+function agDetail(pairs){
+  const out=(pairs||[]).filter(p=>p[1]!==undefined&&p[1]!==null&&String(p[1]).trim()!=='')
+    .map(p=>'<div><span class="k">'+p[0]+':</span> '+esc(String(p[1]))+'</div>').join('');
+  return out;
+}
+function statusChip(st){
+  return st==='confirmed' ? ' <span class="ag-ok">\u2705</span>'
+       : st==='tentative' ? ' <span class="ag-tent">\u2753</span>' : '';
+}
+let _agSeq=0;
+function agToggle(id){ const el=document.getElementById(id); if(el) el.classList.toggle('open'); }
+// One agenda line. `detail` is optional: when present the row shows the title
+// only and opens to the full details on tap.
+function agRow(tag,label,text,detail){
+  const head='<span class="ag-tag '+tag+'">'+label+'</span>';
+  if(!detail) return '<div class="ag-row">'+head+'<span class="ag-body">'+text+'</span></div>';
+  const id='agx'+(++_agSeq);
+  return '<div class="ag-row ag-x" id="'+id+'" onclick="agToggle(\''+id+'\')">'+head
+    +'<span class="ag-body"><span>'+text+'<i class="ag-chev">\u25be</i></span>'
+    +'<div class="ag-det">'+detail+'</div></span></div>';
+}
 function renderAgenda(y,m){
   const list=document.getElementById(_calTarget.list); if(!list) return;
   const dim=new Date(y,m+1,0).getDate(), today=fmt(new Date()), can=['CANCELLED','CANCELED','DECLINED','NO_SHOW'];
@@ -1093,14 +1130,25 @@ function renderAgenda(y,m){
     any=true;
     const dl=new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
     let rows='';
-    sp.forEach(t=>rows+=agRow('t-special','Special',esc(t)));
+    sp.forEach(t=>rows+=agRow('t-special','Special',esc(t.title||t),agDetail([
+      ['Details', t.body], ['Time', t.time?fmtTime(t.time):''],
+      ['Runs', (t.repeat&&t.repeat!=='none')?repeatLabel(t.repeat):'']
+    ])));
     ord.forEach(o=>rows+=ordRow(o));
-    ev.forEach(e=>rows+=agRow('t-event','Event',esc(e.name)+(e.time?' · '+fmtTime(e.time):'')));
+    ev.forEach(e=>rows+=agRow('t-event','Event',esc(e.name)+(e.time?' · '+fmtTime(e.time):'')+statusChip(e.status),agDetail([
+      ['Details', e.desc], ['Status', e.status==='confirmed'?'Confirmed':e.status==='tentative'?'Tentative':''],
+      ['Through', (e.endDate&&e.endDate!==date)?fmtDisplay(e.endDate):''],
+      ['Runs', (e.repeat&&e.repeat!=='none')?repeatLabel(e.repeat):'']
+    ])));
     cls.forEach(c=>rows+=agRow('t-class', c.kind==='class'?'Class':'Ticketed',
       (c.time?fmtTime(c.time)+' · ':'')+esc(c.title)+(c.capacity?' · 🎟 '+c.booked+'/'+c.capacity+' booked':'')));
     res.forEach(r=>{ const c=can.includes(r.status); const txt=esc(r.time)+' · '+esc(r.name)+' · 👥'+esc(r.party); rows+=agRow(c?'t-cancel':'t-res', c?'Cancelled':'Reserved', c?'<span class="ag-strike">'+txt+'</span>':txt); });
-    sch.forEach(n=>rows+=agRow('t-sched','Schedule',esc(n)));
-    off.forEach(n=>rows+=agRow('t-off','Time Off',esc(n)));
+    sch.forEach(n=>rows+=agRow('t-sched','Schedule',esc(n.name||n),agDetail([
+      ['Notes', n.note], ['Through', (n.endDate&&n.endDate!==date)?fmtDisplay(n.endDate):'']
+    ])));
+    off.forEach(n=>rows+=agRow('t-off','Time Off',esc(n.name||n),agDetail([
+      ['Reason', n.note], ['Through', (n.endDate&&n.endDate!==date)?fmtDisplay(n.endDate):'']
+    ])));
     html+='<div class="ag-day"><div class="ag-date">'+dl+(date===today?'<span class="ag-today">Today</span>':'')+'</div>'+rows+'</div>';
   }
   list.innerHTML = any ? html : '<div class="empty"><span class="ic">📅</span>Nothing scheduled this month.</div>';
