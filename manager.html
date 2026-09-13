@@ -207,58 +207,6 @@
     .po-split{ display:grid; grid-template-columns:1fr 1fr; gap:26px; margin-top:24px; }
     .po-h{ font-size:0.7rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--sub); font-weight:800; margin-bottom:10px; }
     .po-search{ width:100%; }
-    /* Touch / iPad-friendly catering form controls (panel-preorders only) */
-    #panel-preorders label.fld{
-      display:flex; flex-direction:column; gap:6px;
-      font-size:0.72rem; font-weight:700; color:var(--ink);
-      text-transform:uppercase; letter-spacing:0.4px;
-    }
-    #panel-preorders label.fld input,
-    #panel-preorders .po-search,
-    #panel-preorders .po-custom input,
-    #panel-preorders .po-pair input,
-    #panel-preorders .po-qty,
-    #panel-preorders .po-note{
-      border:1px solid var(--line); border-radius:var(--r);
-      padding:12px 14px; min-height:48px;
-      font-family:inherit; font-size:16px; font-weight:400;
-      line-height:1.25; width:100%; background:#fff; color:var(--ink);
-      text-transform:none; letter-spacing:0;
-      -webkit-appearance:none; appearance:none;
-    }
-    #panel-preorders label.fld input:focus,
-    #panel-preorders .po-search:focus,
-    #panel-preorders .po-custom input:focus,
-    #panel-preorders .po-pair input:focus,
-    #panel-preorders .po-qty:focus,
-    #panel-preorders .po-note:focus{
-      outline:none; border-color:var(--cheddar);
-    }
-    #panel-preorders .po-qty{ width:88px; min-width:88px; flex:none; }
-    #panel-preorders .po-note{ flex:1; width:auto; min-width:0; }
-    #panel-preorders .po-custom{
-      grid-template-columns:1fr 120px auto; gap:10px; align-items:stretch;
-    }
-    #panel-preorders .po-pair{
-      grid-template-columns:1fr auto; gap:10px; align-items:stretch; max-width:560px;
-    }
-    #panel-preorders .po-custom .btn,
-    #panel-preorders .po-pair .btn,
-    #panel-preorders .po-mod-foot .btn,
-    #panel-preorders .po-listhead .btn{
-      min-height:48px; padding:12px 18px; font-size:0.95rem;
-    }
-    #panel-preorders .po-subtab{ min-height:44px; padding:10px 18px; font-size:0.9rem; }
-    #panel-preorders .po-opt{ min-height:44px; padding:10px 16px; font-size:0.9rem; }
-    #panel-preorders .po-qtab{ min-height:40px; padding:8px 16px; font-size:0.85rem; }
-    #panel-preorders .po-charge{ min-height:52px; padding:16px; font-size:1.05rem; }
-    #panel-preorders .po-x{
-      min-width:44px; min-height:44px; font-size:1.4rem; padding:8px;
-      display:inline-flex; align-items:center; justify-content:center;
-    }
-    #panel-preorders .po-res{
-      min-height:44px; padding:12px 14px; font-size:0.95rem; align-items:center;
-    }
     /* quick-add buttons — live from the Square catering categories */
     .po-quick{ margin-bottom:16px; }
     .po-qtabs{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
@@ -578,6 +526,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab" onclick="tkTab(this,'admin')">Dashboard</div>
     <div class="tab" onclick="tkTab(this,'edit',{kind:'class'})">＋ Add Class</div>
     <div class="tab" onclick="tkTab(this,'edit',{kind:'event'})">＋ Add Ticketed Event</div>
+    <div class="tab" onclick="tkTab(this,'home')">🏠 Front Page</div>
     <div class="tab" onclick="tkTab(this,'report')">Accounting</div>
     <div class="tab" onclick="tkTab(this,'bulk')">Bulk Add Classes</div>
     <div class="tab" onclick="tkTab(this,'holds')">Reserved Tables</div>
@@ -1236,10 +1185,10 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
         <label class="fld">Customer name *
           <input id="po_name" placeholder="Jane Doe" autocomplete="off" />
         </label>
-        <label class="fld">Phone or email *
+        <label class="fld">Phone
           <input id="po_phone" inputmode="tel" placeholder="(901) 555-0134" autocomplete="off" />
         </label>
-        <label class="fld">Phone or email *
+        <label class="fld">Email
           <input id="po_email" type="email" placeholder="jane@example.com" autocomplete="off" />
         </label>
         <label class="fld">Pickup date *
@@ -3561,6 +3510,7 @@ function App() {
               {view.name === "report" && (
                 <AdminReport events={events} regs={regs} />
               )}
+              {view.name === "home" && <AdminHome go={go} />}
               {view.name === "bulk" && (
                 <AdminBulk
                   go={go}
@@ -4849,6 +4799,11 @@ function AdminDash({ events, regs, soldFor, revenueFor, go, onDelete, onArchive,
           <p className="cc-eyebrow">Dashboard</p>
           <h2 className="cc-h2">Classes &amp; events</h2>
         </div>
+        {/* The words around the schedule on tickets.greyscheese.com are edited
+            here too — it is the same page to whoever is looking at it. */}
+        <button className="cc-btn cc-btn-ghost" onClick={() => go("home")}>
+          🏠 Edit front page
+        </button>
       </div>
 
       <div className="cc-reg-head">
@@ -5226,6 +5181,255 @@ function AdminBulk({ onImport, go }) {
           go("admin");
         }}
       />
+    </div>
+  );
+}
+
+
+/* ═══════════ FRONT PAGE EDITOR ═══════════
+   The words on tickets.greyscheese.com's landing page used to be hardcoded in
+   that site's index.html, so fixing a typo meant an edit, a build and a deploy.
+   They now live in public.site_content under the key 'ticket_home'; the ticket
+   site fetches that row on load and falls back to its own built-in text if the
+   row is missing, a field is blank, or the request fails.
+
+   KEEP IN STEP: HOME_COPY_DEFAULTS below is a copy of the constant of the same
+   name in the Ticket Site's index.html. They are duplicated on purpose — each
+   page has to be able to stand up without the other — but if you change the
+   wording of one, change both, or Revert here will hand back stale text.
+   Field KEYS must match exactly; the site ignores anything it does not know. */
+const HOME_COPY_DEFAULTS = {
+  eyebrow: "On the schedule",
+  title: "Classes and Events",
+  pick_line: "Pick a location above to see upcoming events and classes.",
+  intro:
+    "At Greys, we are all about education! We want to see our turophiles (cheese lovers) expand their knowledge of all things cheese. Learn about different styles, flavors, terroir and how to perfectly pair your cheeses. Learn to enjoy cheese with chocolate, wine, bourbon and much more! The possibilities with cheese are endless! We are committed to visiting cheese creameries in the US and around the world and bringing back knowledge to share with our mongers and turophiles. There are endless opportunities for learning when it comes to cheese, and the best part of our job is sharing it with you!",
+  outro:
+    "We offer classes in all our locations every week. Make it a date night, Girls Night Out, or just nerd out with us solo at one of our classes. You can also find us at food festivals or collaborating with others like restaurants, breweries and lots more! Can't make it to one of our classes? Want to host a class in your venue? We have options for you. With our new in-home tasting experience you can host your own experience at home or hire one of our cheesemongers for a guided experience at your venue. Contact us at info@greyscheese.com and let us bring the cheese knowledge to your venue.",
+  section_title: "Corporate & Team Building Workshops",
+  section_body:
+    "Host a cheese class for your clients or employees! Learning about cheese and charcuterie is actually quite fun! Our expert cheesemongers will bring the knowledge to your events. Whether you have a small group or large corporate event, our cheesemongers will guide you on a cheese tasting. We can teach your group about cheese basics with our cheese 101 experience, learn how to make the perfect cheese and charcuterie board or learn about how to pair cheese with wine, beer and so much more. We can customize your event and work with small or large budgets. Contact us at info@greyscheese.com for more information.",
+};
+
+const HOME_FIELDS = [
+  {
+    key: "eyebrow",
+    label: "Small line above the title",
+    hint: 'The chosen shop is added after it automatically, so this reads "On the schedule · Memphis".',
+  },
+  { key: "title", label: "Big title" },
+  {
+    key: "pick_line",
+    label: "Line above the location photos",
+    hint: "Only shows before a shop is picked.",
+  },
+  {
+    key: "intro",
+    label: "Opening paragraphs",
+    rows: 9,
+    hint: "Leave a blank line between paragraphs. Email addresses and web links turn into working links on their own — just type them.",
+  },
+  { key: "outro", label: "Paragraphs under the photo strip", rows: 9 },
+  { key: "section_title", label: "Bottom section heading" },
+  { key: "section_body", label: "Bottom section paragraphs", rows: 9 },
+];
+
+/* Same plain-text-to-paragraphs rendering the ticket site does, so the preview
+   below is what the page will actually look like rather than an approximation.
+   Nothing typed here is ever treated as HTML. */
+const FP_LINKS =
+  /(https?:\/\/[^\s<>()]+[^\s<>().,;:!?]|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/g;
+function fpText(text) {
+  return String(text == null ? "" : text)
+    .split(FP_LINKS)
+    .map((piece, i) => {
+      if (!piece) return null;
+      if (i % 2 === 0) return piece;
+      return (
+        <span key={i} className="cc-fp-link">
+          {piece}
+        </span>
+      );
+    });
+}
+function fpParagraphs(text) {
+  return String(text == null ? "" : text)
+    .split(/\n\s*\n/)
+    .map((para) => para.trim())
+    .filter(Boolean)
+    .map((para, i) => <p key={i}>{fpText(para)}</p>);
+}
+
+function AdminHome({ go }) {
+  const [copy, setCopy] = useState(HOME_COPY_DEFAULTS);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState(null);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    let live = true;
+    db.from("site_content")
+      .select("data, updated_at")
+      .eq("key", "ticket_home")
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!live) return;
+        if (error) setErr("Couldn't load the saved text: " + error.message);
+        else if (data && data.data) {
+          setCopy({ ...HOME_COPY_DEFAULTS, ...data.data });
+          setSavedAt(data.updated_at || null);
+        }
+        setLoading(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const set = (k, v) => {
+    setCopy((c) => ({ ...c, [k]: v }));
+    setMsg("");
+  };
+
+  // A blank field is not an error — the site falls back to its built-in text —
+  // but say so, because a blank box looks like lost work.
+  const blanks = HOME_FIELDS.filter((f) => !String(copy[f.key] || "").trim());
+
+  const save = async () => {
+    setSaving(true);
+    setErr("");
+    setMsg("");
+    let who = "manager";
+    try {
+      const { data } = await db.auth.getUser();
+      if (data && data.user && data.user.email) who = data.user.email;
+    } catch (e) {}
+    const { error } = await db.from("site_content").upsert(
+      {
+        key: "ticket_home",
+        data: copy,
+        updated_at: new Date().toISOString(),
+        updated_by: who,
+      },
+      { onConflict: "key" }
+    );
+    setSaving(false);
+    if (error) {
+      setErr("Couldn't save: " + error.message);
+      return;
+    }
+    setSavedAt(new Date().toISOString());
+    setMsg("Saved. The live page picks it up the next time someone loads it.");
+  };
+
+  if (loading) return <div className="cc-empty">Loading the front page text…</div>;
+
+  return (
+    <div className="cc-fp">
+      <button className="cc-back" onClick={() => go("admin")}>
+        ‹ Back to classes &amp; events
+      </button>
+      <div className="cc-dash-head">
+        <div>
+          <p className="cc-eyebrow">Ticket site</p>
+          <h2 className="cc-h2">Front page</h2>
+        </div>
+        <a
+          className="cc-btn cc-btn-ghost"
+          href="https://tickets.greyscheese.com"
+          target="_blank"
+          rel="noreferrer"
+        >
+          View the live page ↗
+        </a>
+      </div>
+      <p className="cc-hint cc-fp-lede">
+        This is the wording customers see on tickets.greyscheese.com before they
+        pick a shop. Classes and dates come from the schedule — this is only the
+        text around them. Saving takes effect immediately; there is nothing to
+        deploy.
+        {savedAt ? " Last saved " + new Date(savedAt).toLocaleString("en-US") + "." : ""}
+      </p>
+
+      <div className="cc-fp-cols">
+        <div className="cc-fp-form">
+          {HOME_FIELDS.map((f) => (
+            <div key={f.key}>
+              <label className="cc-label">{f.label}</label>
+              {f.rows ? (
+                <textarea
+                  className="cc-input cc-textarea cc-fp-area"
+                  rows={f.rows}
+                  value={copy[f.key] || ""}
+                  onChange={(e) => set(f.key, e.target.value)}
+                />
+              ) : (
+                <input
+                  className="cc-input"
+                  value={copy[f.key] || ""}
+                  onChange={(e) => set(f.key, e.target.value)}
+                />
+              )}
+              {f.hint && <p className="cc-hint">{f.hint}</p>}
+            </div>
+          ))}
+        </div>
+
+        <div className="cc-fp-prev">
+          <p className="cc-fp-prev-lab">Preview</p>
+          <div className="cc-fp-page">
+            <p className="cc-fp-eyebrow">{copy.eyebrow} · Memphis</p>
+            <h1 className="cc-fp-h1">{copy.title}</h1>
+            <div className="cc-fp-tiles">
+              <span>Memphis</span>
+              <span>Nashville</span>
+            </div>
+            <p className="cc-fp-pick">{copy.pick_line}</p>
+            {fpParagraphs(copy.intro)}
+            <div className="cc-fp-strip">
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
+            {fpParagraphs(copy.outro)}
+            <h3 className="cc-fp-h3">{copy.section_title}</h3>
+            {fpParagraphs(copy.section_body)}
+          </div>
+        </div>
+      </div>
+
+      {blanks.length > 0 && (
+        <p className="cc-hint cc-fp-warn">
+          Left empty: {blanks.map((f) => f.label.toLowerCase()).join(", ")}. The
+          site will show its original wording there.
+        </p>
+      )}
+      {err && <div className="cc-err">{err}</div>}
+      {msg && <div className="cc-fp-ok">{msg}</div>}
+
+      <div className="cc-edit-actions">
+        <button
+          className="cc-btn cc-btn-ghost"
+          onClick={() => {
+            if (
+              window.confirm(
+                "Put every box back to the original wording? Nothing is saved until you press Save."
+              )
+            ) {
+              setCopy(HOME_COPY_DEFAULTS);
+              setMsg("");
+            }
+          }}
+        >
+          Revert to the original wording
+        </button>
+        <button className="cc-btn cc-btn-wax" disabled={saving} onClick={save}>
+          {saving ? "Saving…" : "Save front page"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -6907,6 +7111,36 @@ select.cc-input{appearance:auto;-webkit-appearance:auto;cursor:pointer;}
 
 /* edit */
 .cc-edit{max-width:640px;}
+
+/* front page editor: form on the left, live preview on the right */
+.cc-fp{max-width:1080px;}
+.cc-fp-lede{margin:0 0 18px;max-width:70ch;}
+.cc-fp-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:26px;align-items:start;}
+.cc-fp-form .cc-label:first-child{margin-top:0;}
+.cc-fp-area{min-height:150px;line-height:1.55;}
+.cc-fp-prev{position:sticky;top:70px;}
+.cc-fp-prev-lab{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:#666666;margin:0 0 8px;}
+.cc-fp-page{border:2px solid #111111;background:#ffffff;padding:22px;max-height:66vh;overflow:auto;}
+.cc-fp-page p{font-size:13px;line-height:1.6;color:#333333;margin:0 0 12px;}
+.cc-fp-eyebrow{font-size:11px!important;letter-spacing:.1em;text-transform:uppercase;color:#666666!important;margin:0 0 4px!important;}
+.cc-fp-h1{font-family:'Archivo',sans-serif;font-weight:800;font-size:26px;line-height:1.1;margin:0 0 18px;color:#111111;}
+.cc-fp-h3{font-family:'Archivo',sans-serif;font-weight:800;font-size:15px;margin:20px 0 8px;color:#111111;}
+.cc-fp-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 14px;}
+.cc-fp-tiles span{background:#EEF1F4;border:1px solid #C8D2DC;height:64px;display:flex;
+  align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#5A6B7A;}
+.cc-fp-pick{font-weight:700;color:#111111!important;}
+.cc-fp-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 0 14px;}
+.cc-fp-strip span{background:#EEF1F4;border:1px solid #C8D2DC;aspect-ratio:1/1;display:block;}
+.cc-fp-link{color:#A52B1E;text-decoration:underline;}
+.cc-fp-warn{color:#B97F0E;font-weight:600;}
+.cc-fp-ok{border:2px solid #5E6B47;color:#5E6B47;background:#F4F6F0;padding:10px 12px;
+  font-size:13px;font-weight:600;margin:14px 0 0;}
+@media (max-width:900px){
+  .cc-fp-cols{grid-template-columns:1fr;}
+  .cc-fp-prev{position:static;}
+  .cc-fp-page{max-height:none;}
+}
 /* class artwork + featured pin (event editor) */
 .cc-classimg{display:flex;gap:14px;align-items:flex-start;margin:0 0 10px;}
 .cc-classimg img{width:104px;aspect-ratio:4/5;object-fit:cover;flex:none;
@@ -9846,9 +10080,6 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     err('');
     const name = $('#po_name').value.trim();
     if(!name) return err('Customer name is required.');
-    const phone = $('#po_phone').value.trim();
-    const email = $('#po_email').value.trim();
-    if(!phone && !email) return err('Phone or email is required.');
     const pickup = pickupISO();
     if(!pickup) return err('Pick a pickup date and time.');
     if(new Date(pickup) < new Date()) return err('That pickup time is in the past.');
@@ -9860,8 +10091,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       const res = await poFn({
         action:'create',
         customer_name: name,
-        customer_phone: phone || null,
-        customer_email: email || null,
+        customer_phone: $('#po_phone').value.trim() || null,
+        customer_email: $('#po_email').value.trim() || null,
         pickup_at: pickup,
         notes: $('#po_notes').value.trim() || null,
         items: CART.map(l=>({
@@ -10069,7 +10300,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 
   /* ---------- wiring ---------- */
   window.poInit = function(){
-    if(window._poWired) { loadDevices(); loadQuick(true); return; }
+    if(window._poWired) { loadDevices(); loadQuick(); return; }
     window._poWired = true;
 
     // default the date to a week out — catering is rarely same-day
@@ -10107,7 +10338,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       if(e.target.closest('#poModAdd')) return commitMod();
       if(e.target.closest('#poModCancel')) return closeMod();
     });
-    loadQuick(true);
+    loadQuick();
 
     $('#poResults').addEventListener('click', e=>{
       const r = e.target.closest('.po-res'); if(!r) return;

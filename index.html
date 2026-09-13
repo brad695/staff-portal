@@ -205,6 +205,13 @@
     .t-event{ background:rgba(230,90,150,0.18); color:#f27cb1; } .t-special{ background:rgba(46,196,150,0.16); color:#4fd6a0; }
     .t-class{ background:rgba(214,170,50,0.20); color:#e8c765; }
     .t-sched{ background:rgba(236,138,94,0.20); color:#f0a274; } .t-off{ background:rgba(224,104,91,0.18); color:#f0897c; }
+    /* Square future orders. Inked darker than the tags above because these
+       land on the white agenda card and have to be readable at a glance. */
+    .t-pickup{ background:rgba(29,78,216,0.13); color:#1d4ed8; }
+    .t-order{ background:rgba(4,120,87,0.13); color:#047857; }
+    .t-delivery{ background:rgba(180,83,9,0.13); color:#b45309; }
+    .ag-sub{ font-size:0.78rem; color:var(--sub); margin-top:2px; }
+    .ag-unpaid{ color:#be123c; font-weight:700; }
     .ag-strike{ text-decoration:line-through; color:var(--sub); }
 
     /* time off form */
@@ -981,7 +988,7 @@ function renderReservations(recs){
 
 // ═══ CALENDAR ═══
 let _calYear=new Date().getFullYear(), _calMonth=new Date().getMonth(), _selDay=null;
-let _calData={ res:{}, ev:{}, sp:{}, sch:{}, off:{}, cls:{} };
+let _calData={ res:{}, ev:{}, sp:{}, sch:{}, off:{}, cls:{}, ord:{} };
 let _calTarget={ label:'calMonthLabel', list:'agendaList' };   // where the calendar renders: full view or inline home preview
 async function loadCalMonth(y,m){
   _calData.res={};
@@ -1017,13 +1024,56 @@ async function loadCalClasses(mS,mE){
     Object.values(_calData.cls).forEach(a=>a.sort((x,y)=>(x.time||'').localeCompare(y.time||'')));
   }catch(e){ _calData.cls={}; }
 }
+// ── SQUARE FUTURE ORDERS (mirror kept by the square-orders function) ──
+// Everything with a pickup or delivery date: Square Online / third-party
+// online orders, scheduled POS orders, and the counter catering pre-orders.
+// The function de-dupes a portal pre-order against its own Square twin, so a
+// catering order booked at the counter appears once, not twice.
+const ORDERS_URL = SB_URL + '/functions/v1/square-orders';
+async function loadCalOrders(mS,mE){
+  _calData.ord={};
+  try{
+    const res = await fetch(ORDERS_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_KEY },
+      body: JSON.stringify({ action:'feed', from:mS, to:mE, loc:LOC })
+    });
+    if(!res.ok) return;
+    const data = await res.json();
+    (data.orders||[]).forEach(o=>{ if(!o.at) return;
+      const d = fmt(new Date(o.at));
+      (_calData.ord[d]=_calData.ord[d]||[]).push(o);
+    });
+    Object.values(_calData.ord).forEach(a=>a.sort((x,y)=>Date.parse(x.at)-Date.parse(y.at)));
+  }catch(e){ _calData.ord={}; }
+}
+// One agenda line per order: when, who, what it is worth, and whether the
+// money is already in. Item names go on a second, quieter line.
+function ordRow(o){
+  const meta = {
+    delivery: { tag:'t-delivery', label:'Delivery' },
+    catering: { tag:'t-order',    label:'Catering' },
+    order:    { tag:'t-order',    label:'Order'    },
+    pickup:   { tag:'t-pickup',   label:'Pickup'   }
+  }[o.kind] || { tag:'t-pickup', label:'Pickup' };
+  const when = new Date(o.at).toLocaleTimeString('en-US',{ hour:'numeric', minute:'2-digit' });
+  const money = o.total_cents ? ' · $'+(o.total_cents/100).toFixed(2) : '';
+  const paid  = o.total_cents ? (o.paid ? '' : ' · <span class="ag-unpaid">unpaid</span>') : '';
+  const names = (o.items||[]).map(i=>(Number(i.qty)>1 ? i.qty+'\u00d7 ' : '')+i.name).join(', ');
+  // The feed sends at most six line names. item_count is a quantity, not a
+  // line count, so only the cap itself is evidence something was left out.
+  const shown = (o.items||[]).length;
+  const more  = shown >= 6 ? ' \u2026' : '';
+  const sub   = names ? '<div class="ag-sub">'+esc(names)+more+(o.channel?' \u00b7 '+esc(o.channel):'')+'</div>' : '';
+  return agRow(meta.tag, meta.label, esc(when)+' \u00b7 '+esc(o.name)+money+paid+sub);
+}
 async function renderCalendar(){
   const y=_calYear, m=_calMonth;
   const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const labelEl=document.getElementById(_calTarget.label); if(labelEl) labelEl.textContent=months[m]+' '+y;
   await loadCalMonth(y,m);
   const mS=fmt(new Date(y,m,1)), mE=fmt(new Date(y,m+1,0));
-  await loadCalClasses(mS,mE);
+  await Promise.all([ loadCalClasses(mS,mE), loadCalOrders(mS,mE) ]);
   _calData.ev={}; _events.forEach(ev=>occurrences(ev,mS,mE).forEach(d=>{(_calData.ev[d]=_calData.ev[d]||[]).push({name:ev.name,time:ev.time});}));
   _calData.sp={}; _specials.forEach(s=>{ if((s.repeat||'none')==='none'&&s.endDate&&s.endDate>s.date){ spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sp[k]=_calData.sp[k]||[]).push(s.title);}); } else { occurrences(s,mS,mE).forEach(d=>{(_calData.sp[d]=_calData.sp[d]||[]).push(s.title);}); } });
   _calData.sch={}; _schedules.forEach(s=>{ if(!s.date) return; spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sch[k]=_calData.sch[k]||[]).push(s.name);}); });
@@ -1038,12 +1088,13 @@ function renderAgenda(y,m){
   let html='', any=false;
   for(let d=startDay; d<=dim; d++){
     const date=fmt(new Date(y,m,d));
-    const res=_calData.res[date]||[], ev=_calData.ev[date]||[], sp=_calData.sp[date]||[], sch=_calData.sch[date]||[], off=_calData.off[date]||[], cls=_calData.cls[date]||[];
-    if(!(res.length||ev.length||sp.length||sch.length||off.length||cls.length)) continue;
+    const res=_calData.res[date]||[], ev=_calData.ev[date]||[], sp=_calData.sp[date]||[], sch=_calData.sch[date]||[], off=_calData.off[date]||[], cls=_calData.cls[date]||[], ord=_calData.ord[date]||[];
+    if(!(res.length||ev.length||sp.length||sch.length||off.length||cls.length||ord.length)) continue;
     any=true;
     const dl=new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
     let rows='';
     sp.forEach(t=>rows+=agRow('t-special','Special',esc(t)));
+    ord.forEach(o=>rows+=ordRow(o));
     ev.forEach(e=>rows+=agRow('t-event','Event',esc(e.name)+(e.time?' · '+fmtTime(e.time):'')));
     cls.forEach(c=>rows+=agRow('t-class', c.kind==='class'?'Class':'Ticketed',
       (c.time?fmtTime(c.time)+' · ':'')+esc(c.title)+(c.capacity?' · 🎟 '+c.booked+'/'+c.capacity+' booked':'')));
