@@ -215,6 +215,8 @@
       font-size:0.72rem; font-weight:700; color:var(--ink);
       text-transform:uppercase; letter-spacing:0.4px;
     }
+    #panel-preorders label.fld select,
+    #panel-preorders .po-pair select,
     #panel-preorders label.fld input,
     #panel-preorders .po-search,
     #panel-preorders .po-custom input,
@@ -228,6 +230,8 @@
       text-transform:none; letter-spacing:0;
       -webkit-appearance:none; appearance:none;
     }
+    #panel-preorders label.fld select:focus,
+    #panel-preorders .po-pair select:focus,
     #panel-preorders label.fld input:focus,
     #panel-preorders .po-search:focus,
     #panel-preorders .po-custom input:focus,
@@ -1237,6 +1241,9 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <!-- ── NEW ─────────────────────────────────────────── -->
     <div class="section-card po-view" id="poView-new">
       <div class="po-grid">
+        <label class="fld">Store *
+          <select id="po_loc"></select>
+        </label>
         <label class="fld">Customer name *
           <input id="po_name" placeholder="Jane Doe" autocomplete="off" />
         </label>
@@ -1307,6 +1314,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       <div class="hint">The Terminal API only works on a Square Terminal or Handheld — not a Register or Stand. Pair one here, once. The device ID is the serial number on the underside of the Terminal.</div>
       <div id="poDevices"><div class="rec-empty">Loading…</div></div>
       <div class="po-pair">
+        <select id="po_devloc" aria-label="Store"></select>
         <input id="po_devlabel" placeholder="Label (e.g. Catering Counter)" />
         <button class="btn btn-gold btn-sm" id="po_pair" type="button">Get pairing code</button>
       </div>
@@ -3463,18 +3471,122 @@ function App() {
     return saved;
   };
 
+  // Admin calls into square-ticket-pay. `list` and `refund` are the two
+  // admin-only actions; the function runs its own getUser() + is_app_admin()
+  // check on this token, so the signed-in manager session is what authorizes
+  // them. verify_jwt is false on that function, which is why the token has to
+  // ride in the Authorization header rather than being assumed.
+  const ticketFn = async (action, payload = {}) => {
+    const {
+      data: { session },
+    } = await db.auth.getSession();
+    const res = await fetch(SUPABASE_URL + "/functions/v1/square-ticket-pay", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_KEY,
+        Authorization:
+          "Bearer " + (session ? session.access_token : SUPABASE_KEY),
+      },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    let data = {};
+    try {
+      data = await res.json();
+    } catch (_) {}
+    if (!res.ok || data.error) {
+      throw new Error(data.error || `Request failed (${res.status})`);
+    }
+    return data;
+  };
+
+  // Refund a booking. This used to set registrations.refunded by hand, which
+  // freed the seat and told the customer they were refunded while Square never
+  // heard about it — the next stop being a chargeback. The money now moves
+  // first, and the SERVER owns every row it touches afterwards: the refund
+  // action writes ticket_payments and writes payment_status / refunded /
+  // refunded_at back onto the registration. So nothing here may write those
+  // columns on the happy path; we re-read the row instead of guessing at it.
+  //
+  // The browser never names an amount. Omitting amount_cents refunds whatever
+  // is left on the charge, which is what this button means.
   const refundReg = async (regId) => {
     if (!db) return;
+    const cur = regs.find((r) => r.id === regId);
+
+    // Find the charge behind this booking. `list` is the admin ledger read;
+    // a registration has at most one live ticket_payments row.
+    let pmt = null;
+    try {
+      const { payments } = await ticketFn(
+        "list",
+        cur && cur.eventId ? { event_id: cur.eventId } : {}
+      );
+      pmt = (payments || []).find(
+        (p) =>
+          p.registration_id === regId &&
+          (p.status === "paid" || p.status === "partially_refunded")
+      );
+    } catch (e) {
+      window.alert(
+        "Could not reach the payment service, so nothing was refunded.\n\n" +
+          e.message
+      );
+      return;
+    }
+
+    // Legacy, comp and TicketSpice bookings were never charged through Square,
+    // so there is no money to send back — but the seat still needs freeing.
+    if (!pmt) {
+      if (
+        !window.confirm(
+          "No Square charge is on file for this booking — it is a legacy, comp or off-site sale.\n\n" +
+            "Mark it refunded and free the seat anyway? NO money will move."
+        )
+      )
+        return;
+      const { data } = await db
+        .from("registrations")
+        .update({ refunded: true, refunded_at: new Date().toISOString() })
+        .eq("id", regId)
+        .select()
+        .single();
+      if (data) {
+        const saved = regFromRow(data);
+        setRegs((prev) => prev.map((r) => (r.id === regId ? saved : r)));
+      }
+      return;
+    }
+
+    let res;
+    try {
+      res = await ticketFn("refund", { payment_id: pmt.id });
+    } catch (e) {
+      // Square refused, or the write failed. The booking is untouched and the
+      // seat is still held, which is the safe direction to fail in.
+      window.alert("Square refused the refund, so nothing was refunded.\n\n" + e.message);
+      return;
+    }
+
     const { data } = await db
       .from("registrations")
-      .update({ refunded: true, refunded_at: new Date().toISOString() })
-      .eq("id", regId)
       .select()
+      .eq("id", regId)
       .single();
     if (data) {
       const saved = regFromRow(data);
       setRegs((prev) => prev.map((r) => (r.id === regId ? saved : r)));
     }
+
+    window.alert(
+      res.status === "refunded"
+        ? `Refunded ${money(pmt.total_cents)} to the card. The seat${
+            cur && cur.qty === 1 ? " is" : "s are"
+          } back on sale.`
+        : `Partial refund recorded — ${money(res.refunded_cents)} of ${money(
+            pmt.total_cents
+          )} returned.`
+    );
   };
 
   // Manager edits to a booking (guest names, seating, group, headcount).
@@ -6910,7 +7022,7 @@ function AdminDetail({ ev, regs, soldFor, go, onRefund, onUpdate, onAddComp }) {
                   onClick={() => {
                     if (
                       window.confirm(
-                        `Refund ${r.name}'s ${money(r.total)} payment? This frees ${r.qty} seat(s). At launch this issues a real refund to their card.`
+                        `Refund ${r.name}'s ${money(r.total)} payment? This sends the money back to their card in Square and frees ${r.qty} seat(s).`
                       )
                     )
                       onRefund(r.id);
@@ -9942,6 +10054,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 
   let CART = [];        // [{key,catalog_object_id,name,quantity,unit_price_cents,note}]
   let DEVICES = [];
+  let LOCS    = [];      // [{id,name,slug}] live from Square
   let POLL = null;      // checkout poll timer
   let PAIRPOLL = null;
 
@@ -10027,7 +10140,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     const grid = $('#poQGrid');
     grid.innerHTML = '<div class="po-hintline">Loading the catering menu…</div>';
     try{
-      const {groups, modifier_lists} = await poFn({action:'catalog_catering'});
+      const {groups, modifier_lists} = await poFn({action:'catalog_catering', loc: curLoc()});
       QUICK = groups || [];
       MODS  = modifier_lists || {};
       quickLoaded = true;
@@ -10240,12 +10353,13 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     if(!pickup) return err('Pick a pickup date and time.');
     if(new Date(pickup) < new Date()) return err('That pickup time is in the past.');
     if(!CART.length) return err('Add at least one item.');
-    if(!DEVICES.length) return err('No Square Terminal is paired yet — set one up under Terminals.');
+    if(!devicesAt(curLoc()).length) return err('No Square Terminal is paired at ' + locLabel(curLoc()) + ' yet — set one up under Terminals.');
 
     const btn = $('#po_charge'); btn.disabled = true; btn.textContent = 'Creating order…';
     try{
       const res = await poFn({
         action:'create',
+        loc: curLoc(),
         customer_name: name,
         customer_phone: phone || null,
         customer_email: email || null,
@@ -10351,7 +10465,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
                        : '<span class="pill pill-bad">Unpaid</span>';
             return '<tr>'
               + '<td><b>'+fmtWhen(p.pickup_at)+'</b><div class="po-sub">'+(out<=0?'today':(out+' day'+(out===1?'':'s')+' out'))+'</div></td>'
-              + '<td>'+esc(p.customer_name)+'<div class="po-sub">'+esc(p.customer_phone||'')+'</div></td>'
+              + '<td>'+esc(p.customer_name)+'<div class="po-sub">'+esc(p.customer_phone||'')+(p.loc_slug?' · '+esc(locLabel(p.loc_slug)):'')+'</div></td>'
               + '<td>'+(p.items||[]).length+'</td>'
               + '<td>'+usd(p.total_cents)+'</td>'
               + '<td>'+pill+'</td>'
@@ -10414,17 +10528,61 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     setTimeout(()=>{ try{ w.print(); }catch(e){} }, 350);
   }
 
+  /* ---------- which shop ---------- */
+  /* Every action here is per-store. A pre-order is created against ONE Square
+     location, and that decides which register rings it, which shop’s calendar
+     it lands on, and which Terminal can take the card. Before 2026-09-14 this
+     was hard-wired to Memphis, so a Nashville order was rung up in Memphis and
+     showed on both calendars. */
+  const FALLBACK_LOCS = [{slug:'memphis', name:'Memphis'}, {slug:'nashville', name:'Nashville'}];
+  const curLoc = ()=> ($('#po_loc') && $('#po_loc').value) || 'memphis';
+  function locName(id){
+    const l = LOCS.find(x=> x.id === id);
+    return l ? (l.name || l.slug || id) : (id || '—');
+  }
+  function locLabel(slug){
+    const l = LOCS.find(x=> x.slug === slug);
+    if(l) return l.name || l.slug;
+    return slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : 'Unassigned';
+  }
+  function fillLocSelects(){
+    const list = LOCS.length ? LOCS : FALLBACK_LOCS;
+    const opts = list.filter(l=> l.slug)
+      .map(l=> '<option value="'+esc(l.slug)+'">'+esc(l.name || l.slug)+'</option>').join('');
+    ['po_loc','po_devloc'].forEach(id=>{
+      const sel = $('#'+id); if(!sel) return;
+      const keep = sel.value;
+      sel.innerHTML = opts;
+      if(keep) sel.value = keep;
+      if(!sel.value) sel.selectedIndex = 0;
+    });
+  }
+  async function loadLocations(){
+    fillLocSelects();                 // the two open shops, so the form works offline
+    try{
+      const {locations} = await poFn({action:'locations'});
+      LOCS = (locations || []).filter(l=> l.slug);
+      fillLocSelects();
+    }catch(e){ /* keep the fallback */ }
+  }
+  /* A Terminal belongs to one shop — only the ones at THIS shop can take the tap. */
+  function devicesAt(slug){
+    const l = LOCS.find(x=> x.slug === slug);
+    return l ? DEVICES.filter(d=> d.location_id === l.id) : DEVICES;
+  }
+
   /* ---------- devices ---------- */
   async function loadDevices(){
     const box = $('#poDevices');
     try{
       const {devices} = await poFn({action:'devices'});
       DEVICES = devices;
-      $('#poDevName').textContent = devices.length ? devices[0].label : 'none paired';
-      $('#poDevBadge').classList.toggle('bad', !devices.length);
+      const here = devicesAt(curLoc());
+      $('#poDevName').textContent = here.length ? here[0].label : 'none paired at ' + locLabel(curLoc());
+      $('#poDevBadge').classList.toggle('bad', !here.length);
       box.innerHTML = devices.length
-        ? '<div class="table-scroll"><table><thead><tr><th>Label</th><th>Device ID (serial)</th><th>Status</th></tr></thead><tbody>'
-          + devices.map(d=>'<tr><td>'+esc(d.label)+'</td><td class="mono">'+esc(d.device_id)+'</td><td>'+(d.active?'<span class="pill pill-ok">Active</span>':'<span class="pill pill-mid">Off</span>')+'</td></tr>').join('')
+        ? '<div class="table-scroll"><table><thead><tr><th>Label</th><th>Store</th><th>Device ID (serial)</th><th>Status</th></tr></thead><tbody>'
+          + devices.map(d=>'<tr><td>'+esc(d.label)+'</td><td>'+esc(locName(d.location_id))+'</td><td class="mono">'+esc(d.device_id)+'</td><td>'+(d.active?'<span class="pill pill-ok">Active</span>':'<span class="pill pill-mid">Off</span>')+'</td></tr>').join('')
           + '</tbody></table></div>'
         : '<div class="rec-empty">No Terminal paired yet.</div>';
     }catch(e){ box.innerHTML = '<div class="rec-empty bad">'+esc(e.message)+'</div>'; }
@@ -10432,7 +10590,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   async function pair(){
     const label = $('#po_devlabel').value.trim() || 'Catering Counter';
     try{
-      const {device_code} = await poFn({action:'pair_device', label});
+      const loc = ($('#po_devloc') && $('#po_devloc').value) || curLoc();
+      const {device_code} = await poFn({action:'pair_device', label, loc});
       $('#poPairOut').innerHTML =
         '<div class="po-code"><div class="po-code-l">On the Terminal: <b>Sign in with a device code</b>, then enter</div>'
         + '<div class="po-code-n">'+esc(device_code.code)+'</div>'
@@ -10440,7 +10599,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       clearInterval(PAIRPOLL);
       PAIRPOLL = setInterval(async ()=>{
         try{
-          const {device_code:dc} = await poFn({action:'device_status', code_id: device_code.id, label});
+          const {device_code:dc} = await poFn({action:'device_status', code_id: device_code.id, label, loc});
           if(dc && dc.status === 'PAIRED'){
             clearInterval(PAIRPOLL);
             $('#poPairOut').innerHTML = '<div class="po-code ok">Paired. Device ID <b>'+esc(dc.device_id)+'</b></div>';
@@ -10463,6 +10622,15 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     const d = new Date(Date.now() + 7*86400000);
     $('#po_date').value = d.toISOString().slice(0,10);
     $('#po_date').min = new Date().toISOString().slice(0,10);
+
+    // Which shop is taking the order. Changing it reloads that shop’s catering
+    // menu and re-checks which Terminal can take the card.
+    loadLocations();
+    $('#po_loc').addEventListener('change', ()=>{
+      quickLoaded = false;
+      loadQuick(true);
+      loadDevices();
+    });
 
     $$('.po-subtab').forEach(b=> b.addEventListener('click', ()=> sub(b.dataset.po)));
     $('#po_search').addEventListener('input', onSearch);

@@ -95,6 +95,7 @@ button{ cursor:pointer; background:none; border:none; touch-action:manipulation;
 .chip{ min-height:var(--tap); padding:0 16px; border:1px solid var(--line); border-radius:var(--r); font-weight:700; font-size:0.85rem; background:#fff; white-space:nowrap; }
 .chip.icon{ width:var(--tap); padding:0; font-size:1.2rem; }
 .term{ display:flex; flex-direction:column; align-items:flex-start; padding:6px 12px; border:1px solid var(--line); border-radius:var(--r); line-height:1.25; }
+#storeSel{ font:inherit; font-weight:700; color:inherit; background:transparent; border:0; padding:0; margin:0; -webkit-appearance:none; appearance:none; }
 .term .l{ font-size:0.58rem; letter-spacing:1.4px; text-transform:uppercase; color:var(--sub); font-weight:800; }
 .term .v{ font-size:0.82rem; font-weight:800; white-space:nowrap; max-width:150px; overflow:hidden; text-overflow:ellipsis; }
 .term.bad{ border-color:#e6c4bf; } .term.bad .v{ color:var(--wax); }
@@ -428,6 +429,12 @@ body{ background:var(--paper); color:var(--ink); }
       <button class="clr hide" id="qx" type="button" aria-label="Clear search">×</button>
     </div>
     <div class="bar-right">
+      <div class="term" id="store"><span class="l">Store</span>
+        <select class="v" id="storeSel" aria-label="Which shop this tablet is in">
+          <option value="memphis">Memphis</option>
+          <option value="nashville">Nashville</option>
+        </select>
+      </div>
       <div class="term" id="term"><span class="l">Terminal</span><span class="v" id="termName">…</span></div>
       <button class="chip" id="btnOrders" type="button">Orders</button>
       <button class="chip icon" id="btnRefresh" type="button" title="Reload the menu from Square">↻</button>
@@ -518,7 +525,20 @@ const SB_URL = 'https://vdvtrevhqalmjwhjhjug.supabase.co';
 const SB_KEY = 'sb_publishable_LnlevWReed7K8cFk_f_Mxg_UywktQ5_';
 const FN_URL = SB_URL + '/functions/v1/square-preorders';
 const MANAGER_EMAIL = 'manager@greyscheese.com';
-const CACHE_KEY = 'greys_orderpad_catalog_v1';
+/* WHICH SHOP THIS TABLET IS IN.
+   The pad rings orders up on a Square location. Until 2026-09-14 that was
+   hard-wired to Memphis in the edge function, so a Nashville tablet created
+   Memphis orders. The choice lives in localStorage because it is a property
+   of the tablet, not of the person using it — set it once per device.
+   The catalog cache is keyed by store too: each shop has its own item list. */
+const LOC_KEY = 'greys_orderpad_loc';
+const LOCS = [{slug:'memphis', name:'Memphis'}, {slug:'nashville', name:'Nashville'}];
+function padLoc(){
+  try{ return localStorage.getItem(LOC_KEY) || 'memphis'; }catch(e){ return 'memphis'; }
+}
+function setPadLoc(v){ try{ localStorage.setItem(LOC_KEY, v); }catch(e){} }
+function locName(slug){ const l = LOCS.find(x=> x.slug === slug); return l ? l.name : slug; }
+const CACHE_KEY = () => 'greys_orderpad_catalog_v1_' + padLoc();
 const CACHE_TTL = 6 * 3600 * 1000;   // the catalog barely moves; ↻ forces a reload
 const SORT_KEY  = 'greys_orderpad_sort';
 
@@ -717,7 +737,7 @@ async function signIn(){
 
 async function lock(){
   try{ await sb.auth.signOut(); }catch(e){}
-  try{ localStorage.removeItem(CACHE_KEY); }catch(e){}
+  try{ localStorage.removeItem(CACHE_KEY()); }catch(e){}
   S.cart = []; S.groups = [];
   $('#app').classList.add('hide');
   $('#lock').classList.remove('hide');
@@ -728,7 +748,7 @@ async function lock(){
 /* ══ CATALOG ═══════════════════════════════════════════════════════ */
 function readCache(){
   try{
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(CACHE_KEY());
     if(!raw) return null;
     const c = JSON.parse(raw);
     if(!c || !c.at || (Date.now() - c.at) > CACHE_TTL) return null;
@@ -736,7 +756,7 @@ function readCache(){
   }catch(e){ return null; }
 }
 function writeCache(data){
-  try{ localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), data })); }catch(e){}
+  try{ localStorage.setItem(CACHE_KEY(), JSON.stringify({ at: Date.now(), data })); }catch(e){}
 }
 
 async function loadCatalog(force){
@@ -745,7 +765,7 @@ async function loadCatalog(force){
   $('#catName').textContent = 'Loading the menu…';
   $('#grid').innerHTML = '<div class="empty">Pulling every category from Square…</div>';
   try{
-    const data = await fn({ action:'catalog_browse' });
+    const data = await fn({ action:'catalog_browse', loc: padLoc() });
     writeCache(data);
     applyCatalog(data);
     if(force) toast('Menu reloaded — ' + (data.item_count || 0) + ' items.');
@@ -1352,6 +1372,7 @@ async function charge(){
   try{
     const res = await fn({
       action: 'create',
+      loc: padLoc(),
       asap: st.asap,
       customer_name: name,
       customer_phone: (st.phone||'').trim() || null,
@@ -1560,7 +1581,7 @@ function printSheet(po){
 /* ══ DEVICES ═══════════════════════════════════════════════════════ */
 async function loadDevices(){
   try{
-    const { devices } = await fn({ action:'devices' });
+    const { devices } = await fn({ action:'devices', loc: padLoc() });
     S.devices = devices || [];
   }catch(e){ S.devices = []; }
   const on = S.devices.length;
@@ -1580,6 +1601,16 @@ function wire(){
   $('#pw').addEventListener('keydown', e=>{ if(e.key === 'Enter') signIn(); });
   $('#btnLock').addEventListener('click', lock);
   $('#btnRefresh').addEventListener('click', ()=> loadCatalog(true));
+
+  // Changing the store changes which Square location the order is rung up at,
+  // which menu the pad shows, and which Terminal can take the card.
+  $('#storeSel').value = padLoc();
+  $('#storeSel').addEventListener('change', e=>{
+    setPadLoc(e.target.value);
+    toast('Now ringing up at ' + locName(padLoc()) + '.');
+    loadCatalog(true);
+    loadDevices();
+  });
   $('#btnOrders').addEventListener('click', openOrders);
   $('#btnCustom').addEventListener('click', openCustom);
   $('#btnCheckout').addEventListener('click', ()=>{ openCart(false); openCheckout(); });
