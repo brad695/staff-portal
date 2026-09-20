@@ -587,7 +587,6 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab" onclick="tkTab(this,'home')">🏠 Front Page</div>
     <div class="tab" onclick="tkTab(this,'report')">Accounting</div>
     <div class="tab" onclick="tkTab(this,'bulk')">Bulk Add Classes</div>
-    <div class="tab" onclick="tkTab(this,'holds')">Reserved Tables</div>
     <div class="tab" onclick="tkTab(this,'customers')">Customers</div>
     <div class="tab" onclick="tkTab(this,'promos')">Promo Codes</div>
     <div class="tab-head">Cheese Case</div>
@@ -2924,11 +2923,11 @@ const timeLeft = (iso) => {
 const LOCATIONS = ["Memphis", "Nashville"];
 // ---------------------------------------------------------------------------
 // TABLE LAYOUTS — one named list of tables per shop.
-// A "table" is a cheese-named seat group. Each location gets its own list so a
-// shop can be re-arranged without touching the others. Nashville is a copy of
-// Memphis for now; edit the Nashville array below (rename, add or remove
-// tables) and the customer table picker, the manager group dropdowns and the
-// table-hold logic all follow automatically. Nothing else needs to change.
+// A "table" is a named seat group. Each location gets its own list so a
+// shop can be re-arranged without touching the others. Memphis uses cheese
+// names; Nashville lists its real floor-plan spots from Square. Edit a
+// location's array below (rename, add or remove tables) and the customer
+// table picker and the manager group dropdowns follow automatically.
 // Tables already booked under an old name keep working — GROUP_NAMES below is
 // the union of every layout, and that is what reads existing registrations.
 // ---------------------------------------------------------------------------
@@ -2945,19 +2944,15 @@ const TABLE_LAYOUTS = {
     "Sheep",
     "Cow",
   ],
-  // ↓ Nashville: same as Memphis for now. Change this list when the Nashville
-  //   floor plan changes — no other edit is needed.
+  // ↓ Nashville: real floor plan from Square (Sep 2026). Booths seat 2 but
+  //   combine into a 4-top; couches seat 4; the 8 bar seats are singles.
+  //   Only 4-top spots are listed, since tabled events sell whole tables.
   Nashville: [
-    "Cheddar",
-    "Gouda",
-    "Swiss",
-    "Alpine",
-    "Brie",
-    "Comte",
-    "Blue",
-    "Goat",
-    "Sheep",
-    "Cow",
+    "Couch Tables 1",
+    "Couch Tables 2",
+    "Couch Tables 3",
+    "Booth Tables 1+2",
+    "Booth Tables 3+4",
   ],
   // archived (store closed) — kept so old bookings still read correctly
   Franklin: [
@@ -3797,20 +3792,6 @@ function App() {
                   }}
                 />
               )}
-              {view.name === "holds" && (
-                <AdminHolds
-                  holds={holds}
-                  events={events}
-                  bookedOnTable={bookedOnTable}
-                  go={go}
-                  onRelease={(id) =>
-                    updateHold(id, {
-                      status: "released",
-                      expires_at: new Date().toISOString(),
-                    })
-                  }
-                />
-              )}
               {view.name === "customers" && (
                 <AdminCustomers events={events} regs={regs} go={go} />
               )}
@@ -3830,100 +3811,9 @@ function App() {
   );
 }
 
-function AdminHolds({ holds, events, bookedOnTable, go, onRelease }) {
-  const evById = {};
-  (events || []).forEach((e) => (evById[e.id] = e));
-  const isLive = (h) =>
-    h.status === "held" && new Date(h.expiresAt) > new Date();
-  const sorted = [...(holds || [])].sort((a, b) =>
-    (b.createdAt || "").localeCompare(a.createdAt || "")
-  );
-  const live = sorted.filter(isLive);
-  const done = sorted.filter((h) => !isLive(h));
-  const copy = (h) => {
-    const link = groupLink(h.eventId, h.tableName);
-    if (navigator.clipboard) navigator.clipboard.writeText(link);
-    window.prompt("Share this link so the table fills its open seats:", link);
-  };
-  const Row = (h) => {
-    const ev = evById[h.eventId] || {};
-    const booked = bookedOnTable ? bookedOnTable(h.eventId, h.tableName) : 0;
-    const statusLabel =
-      h.status === "booked" || booked >= h.partySize
-        ? "Filled"
-        : h.status === "released"
-        ? "Released"
-        : new Date(h.expiresAt) <= new Date()
-        ? "Expired"
-        : "Holding";
-    return (
-      <div key={h.id} className="cc-holdcard">
-        <div className="cc-holdcard-head">
-          <div>
-            <b>{ev.title || "—"}</b>
-            <span className="cc-mono"> · {ev.date ? fmtDate(ev.date) : ""} {ev.time ? fmtTime(ev.time) : ""}</span>
-          </div>
-          <span className={"cc-holdstatus s-" + statusLabel.toLowerCase()}>
-            {statusLabel}
-          </span>
-        </div>
-        <div className="cc-holdcard-body">
-          <span>Table: <b>{h.tableName}</b></span>
-          <span>
-            Seats filled: <b>{booked}/{h.partySize}</b>
-          </span>
-          <span>Open: <b>{Math.max(0, h.partySize - booked)}</b></span>
-          {isLive(h) && <span>Time left: <b>{timeLeft(h.expiresAt)}</b></span>}
-        </div>
-        {isLive(h) && (
-          <div className="cc-holdcard-actions">
-            <button className="cc-mini" onClick={() => copy(h)}>
-              Copy share link
-            </button>
-            <button
-              className="cc-mini danger"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    "Release this table's held seats back to general availability?"
-                  )
-                )
-                  onRelease(h.id);
-              }}
-            >
-              Release
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  };
-  return (
-    <div>
-      <button className="cc-back" onClick={() => go("admin")}>
-        ← Dashboard
-      </button>
-      <h2 className="cc-h2">Reserved tables</h2>
-      <p className="cc-field-sub" style={{ marginBottom: "16px" }}>
-        Tables reserved with an open seat. Each holds its remaining seats for{" "}
-        {HOLD_HOURS} hours, then releases them automatically if not filled.
-      </p>
-
-      <h4 className="cc-reg-subhead">Active ({live.length})</h4>
-      {live.length === 0 && <div className="cc-empty">No tables holding right now.</div>}
-      {live.map(Row)}
-
-      {done.length > 0 && (
-        <>
-          <h4 className="cc-reg-subhead" style={{ marginTop: "20px" }}>
-            Past ({done.length})
-          </h4>
-          {done.map(Row)}
-        </>
-      )}
-    </div>
-  );
-}
+// AdminHolds (the Reserved Tables panel) — REMOVED 2026-09-19 with split
+// pay. Tabled events sell whole tables only now, so holds are never created;
+// old holds still count against past capacity via heldExtraSeats.
 
 function AdminLogin({ onUnlock }) {
   const [pw, setPw] = useState("");
@@ -5996,9 +5886,8 @@ function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
               />
               <span className="cc-modecard-h">Tabled event</span>
               <span className="cc-modecard-sub">
-                Guests sit at named tables (like class groups). A table can be
-                bought whole, or reserved with one seat and shared so others buy
-                the rest.
+                Guests sit at named tables (like class groups). Tables are
+                bought whole — one payment covers every seat.
               </span>
             </label>
           </div>
