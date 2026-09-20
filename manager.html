@@ -2979,6 +2979,13 @@ const TABLE_LAYOUTS = {
 };
 // The tables offered at a location. Unknown/blank location falls back to Memphis.
 const tablesFor = (loc) => TABLE_LAYOUTS[loc] || TABLE_LAYOUTS.Memphis;
+// EVENT SERIES — mirror of the ticket site's config. Dashboard rows for
+// matching events fold into one row per location with combined counts.
+const EVENT_SERIES = [
+  { id: "mahjong", match: /mahjong/i, title: "Mahjong Nights – Tannins & Tiles" },
+];
+const seriesFor = (ev) =>
+  EVENT_SERIES.find((sr) => sr.match.test(ev.title || ""));
 // Every table name used anywhere, in Memphis order then whatever the other
 // layouts add. Read-side code (existing bookings, group summaries) uses this so
 // a table renamed out of a layout never disappears from an old registration.
@@ -4916,6 +4923,7 @@ function AdminPromos({ promos, uses, events, onSave, onDelete }) {
 function AdminDash({ events, regs, soldFor, revenueFor, go, onDelete, onArchive, onArchiveAll }) {
   const [classFilter, setClassFilter] = useState("upcoming"); // upcoming|past|all|archived
   const [locFilter, setLocFilter] = useState("all"); // all | Memphis | Nashville
+  const [openSeries, setOpenSeries] = useState({}); // series rows expanded
   const locEvents =
     locFilter === "all"
       ? events
@@ -5016,7 +5024,23 @@ function AdminDash({ events, regs, soldFor, revenueFor, go, onDelete, onArchive,
               : "No classes yet."}
           </div>
         )}
-        {shownClasses.map((ev) => {
+        {(() => {
+          // Series dates (mahjong nights) fold into one row per location
+          // with combined seats sold; expand the row to work a single date.
+          const groups = [];
+          const singles = [];
+          shownClasses.forEach((ev) => {
+            const sr = seriesFor(ev);
+            if (!sr) return singles.push(ev);
+            const key = sr.id + "|" + (ev.location || "Memphis");
+            let g = groups.find((x) => x.key === key);
+            if (!g) {
+              g = { key, sr, location: ev.location || "Memphis", dates: [] };
+              groups.push(g);
+            }
+            g.dates.push(ev);
+          });
+          const renderRow = (ev) => {
           const sold = soldFor(ev.id);
           const pct = Math.min(100, Math.round((sold / ev.capacity) * 100));
           const past = ev.date < today;
@@ -5066,7 +5090,65 @@ function AdminDash({ events, regs, soldFor, revenueFor, go, onDelete, onArchive,
               </span>
             </div>
           );
-        })}
+          };
+          return (
+            <>
+              {groups.map((g) => {
+                const cap = g.dates.reduce((s2, e) => s2 + e.capacity, 0);
+                const gSold = g.dates.reduce((s2, e) => s2 + soldFor(e.id), 0);
+                const gRev = g.dates.reduce(
+                  (s2, e) => s2 + revenueFor(e.id),
+                  0
+                );
+                const gPct = cap
+                  ? Math.min(100, Math.round((gSold / cap) * 100))
+                  : 0;
+                const open = !!openSeries[g.key];
+                const flip = () =>
+                  setOpenSeries((prev) => ({ ...prev, [g.key]: !open }));
+                const a = g.dates[0];
+                const z = g.dates[g.dates.length - 1];
+                return (
+                  <React.Fragment key={g.key}>
+                    <div className="cc-tr">
+                      <span className="cc-td-title">
+                        <button className="cc-link" onClick={flip}>
+                          {open ? "▾" : "▸"} {g.sr.title}
+                        </button>
+                        <span className="cc-td-sub">
+                          📍 {g.location} · {g.dates.length}{" "}
+                          {g.dates.length === 1 ? "date" : "dates"} · series
+                        </span>
+                      </span>
+                      <span className="cc-mono">
+                        {fmtDate(a.date)} → {fmtDate(z.date)}
+                      </span>
+                      <span>
+                        <span className="cc-mono">
+                          {gSold}/{cap}
+                        </span>
+                        <span className="cc-bar">
+                          <span
+                            className="cc-bar-fill"
+                            style={{ width: gPct + "%" }}
+                          />
+                        </span>
+                      </span>
+                      <span className="cc-mono">{money(gRev)}</span>
+                      <span className="cc-td-actions">
+                        <button className="cc-mini" onClick={flip}>
+                          {open ? "Hide dates" : "Show dates"}
+                        </button>
+                      </span>
+                    </div>
+                    {open && g.dates.map((ev) => renderRow(ev))}
+                  </React.Fragment>
+                );
+              })}
+              {singles.map((ev) => renderRow(ev))}
+            </>
+          );
+        })()}
       </div>
     </div>
   );
