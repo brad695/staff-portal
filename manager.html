@@ -581,7 +581,9 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab" onclick="mtab('events')">Events</div>
     <div class="tab" onclick="mtab('resys')">Reservations</div>
     <div class="tab-head">Tickets &amp; Classes</div>
-    <div class="tab" onclick="tkTab(this,'admin')">Dashboard</div>
+    <div class="tab" onclick="tkTab(this,'admin')">Classes</div>
+    <div class="tab" onclick="tkTab(this,'mahjong')">🀄 Mahjong</div>
+    <div class="tab" onclick="tkTab(this,'ticketed')">Events</div>
     <div class="tab" onclick="tkTab(this,'edit',{kind:'class'})">＋ Add Class</div>
     <div class="tab" onclick="tkTab(this,'edit',{kind:'event'})">＋ Add Ticketed Event</div>
     <div class="tab" onclick="tkTab(this,'home')">🏠 Front Page</div>
@@ -2986,6 +2988,15 @@ const EVENT_SERIES = [
 ];
 const seriesFor = (ev) =>
   EVENT_SERIES.find((sr) => sr.match.test(ev.title || ""));
+// The dashboard is split three ways (sidebar: Classes · Mahjong · Events).
+// Mahjong = anything matching the series; Events = any non-class kind;
+// everything else is a class. dashFor() picks the list to return to after
+// editing or viewing an entry, so you land back where you came from.
+const sectionOf = (ev) =>
+  seriesFor(ev) ? "mahjong" : ev.kind && ev.kind !== "class" ? "event" : "class";
+const DASH_VIEW = { class: "admin", mahjong: "mahjong", event: "ticketed" };
+const dashFor = (ev, kind) =>
+  ev ? DASH_VIEW[sectionOf(ev)] : kind && kind !== "class" ? "ticketed" : "admin";
 // Every table name used anywhere, in Memphis order then whatever the other
 // layouts add. Read-side code (existing bookings, group summaries) uses this so
 // a table renamed out of a layout never disappears from an old registration.
@@ -3751,8 +3762,21 @@ function App() {
 
         {mode === "manager" && adminUnlocked && view.name !== "login" && (
           <div className="cc-admin-content">
-              {view.name === "admin" && (
+              {(view.name === "admin" ||
+                view.name === "mahjong" ||
+                view.name === "ticketed") && (
                 <AdminDash
+                  key={view.name}
+                  section={
+                    view.name === "mahjong"
+                      ? "mahjong"
+                      : view.name === "ticketed"
+                      ? "event"
+                      : "class"
+                  }
+                  onAddMany={async (list) => {
+                    for (const one of list) await saveEvent(one, false);
+                  }}
                   events={events}
                   regs={regs}
                   soldFor={soldFor}
@@ -3784,14 +3808,23 @@ function App() {
                   }
                   sold={view.eventId ? soldFor(view.eventId) : 0}
                   kind={view.kind || "class"}
-                  onCancel={() => go("admin")}
+                  onCancel={() =>
+                    go(
+                      dashFor(
+                        view.eventId
+                          ? events.find((e) => e.id === view.eventId)
+                          : null,
+                        view.kind
+                      )
+                    )
+                  }
                   onSave={async (evs) => {
                     const list = Array.isArray(evs) ? evs : [evs];
                     for (const one of list) {
                       const exists = events.some((e) => e.id === one.id);
                       await saveEvent(one, exists);
                     }
-                    go("admin");
+                    go(dashFor(list[0], view.kind));
                   }}
                 />
               )}
@@ -4477,7 +4510,11 @@ function AdminNav({ view, holds, go, onExit }) {
     (h) => h.status === "held" && new Date(h.expiresAt) > new Date()
   );
   const onDash =
-    view.name === "admin" || view.name === "edit" || view.name === "detail";
+    view.name === "admin" ||
+    view.name === "mahjong" ||
+    view.name === "ticketed" ||
+    view.name === "edit" ||
+    view.name === "detail";
   const onReport = view.name === "report";
   const onBulk = view.name === "bulk";
   const onHolds = view.name === "holds";
@@ -4920,10 +4957,256 @@ function AdminPromos({ promos, uses, events, onSave, onDelete }) {
     </div>
   );
 }
-function AdminDash({ events, regs, soldFor, revenueFor, go, onDelete, onArchive, onArchiveAll }) {
+// ── MAHJONG DATE PLANNER ──────────────────────────────────────────────────
+// Mahjong is an ongoing weekly night, not a one-off class, so adding dates is
+// "keep it going through <date>", not one form per night. Everything that is
+// not on this panel — title, description, add-ons, image, seats per table,
+// reservation block — is copied from the most recent Mahjong night at that
+// shop. Dates already on the schedule there are skipped, so running it twice
+// never double-books a night.
+const MAHJONG_TABLES = { Memphis: 4, Nashville: 5 }; // whole 4-tops each shop can sell
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const isoOf = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const plusDays = (iso, n) => {
+  const d = new Date(iso + "T12:00:00");
+  d.setDate(d.getDate() + n);
+  return isoOf(d);
+};
+const plusMonths = (iso, n) => {
+  const d = new Date(iso + "T12:00:00");
+  d.setMonth(d.getMonth() + n);
+  return isoOf(d);
+};
+const weekdayOf = (iso) => new Date(iso + "T12:00:00").getDay();
+
+function MahjongPlanner({ events, onCreate, onClose }) {
+  const today = todayStr();
+  const [loc, setLoc] = useState(LOCATIONS[0]);
+  const series = events
+    .filter((e) => seriesFor(e) && (e.location || "Memphis") === loc && !e.archived)
+    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  // Template = the latest night sold by the table (the old per-seat imports
+  // from TicketSpice are not a pattern to copy).
+  const tpl =
+    [...series].reverse().find((e) => (e.partySize || 1) > 1) ||
+    series[series.length - 1] ||
+    null;
+  const last = series.length ? series[series.length - 1].date : null;
+  const ps = tpl && tpl.partySize > 1 ? tpl.partySize : 4;
+
+  const [day, setDay] = useState(4);
+  const [time, setTime] = useState("17:30");
+  const [every, setEvery] = useState(1);
+  const [from, setFrom] = useState(today);
+  const [through, setThrough] = useState(plusMonths(today, 3));
+  const [tables, setTables] = useState(4);
+  const [priceStr, setPriceStr] = useState("25.00");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [skip, setSkip] = useState({}); // dates clicked off (holidays etc.)
+
+  // Re-seed from the shop's latest night whenever the shop changes, and after
+  // a batch is added (so "from" moves past what was just created).
+  useEffect(() => {
+    setDay(tpl ? weekdayOf(tpl.date) : 4);
+    setTime(tpl ? tpl.time : "17:30");
+    setTables(MAHJONG_TABLES[loc] || Math.max(1, Math.floor((tpl ? tpl.capacity : 16) / ps)));
+    setPriceStr(((tpl ? tpl.price : 2500) / 100).toFixed(2));
+    const start = last && last >= today ? plusDays(last, 1) : today;
+    setFrom(start);
+    setThrough(plusMonths(start, 3));
+    setSkip({});
+  }, [loc, series.length]);
+
+  const taken = new Set(series.map((e) => e.date));
+  const planned = [];
+  if (from && through && from <= through) {
+    let d = from;
+    for (let i = 0; i < 7 && weekdayOf(d) !== Number(day); i++) d = plusDays(d, 1);
+    while (d <= through && planned.length < 104) {
+      planned.push(d);
+      d = plusDays(d, 7 * Number(every || 1));
+    }
+  }
+  const open = planned.filter((d) => !taken.has(d));
+  const fresh = open.filter((d) => !skip[d]);
+  const skipped = planned.length - open.length;
+  const price = Math.round(parseFloat(priceStr || "0") * 100);
+  const nTables = Math.max(1, Number(tables) || 1);
+
+  const create = async () => {
+    if (!fresh.length) return;
+    if (!price) {
+      setMsg("Enter a price per seat.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Add ${fresh.length} Mahjong night${fresh.length === 1 ? "" : "s"} at ${loc}, ${WEEKDAYS[day]}s at ${fmtTime(time)}, ${nTables} tables each?`
+      )
+    )
+      return;
+    setBusy(true);
+    setMsg("");
+    const base = tpl
+      ? { ...tpl }
+      : {
+          title: "Mahjong – Tannins & Tiles",
+          blurb: "",
+          durationMin: 150,
+          addOns: [],
+          groupSeating: true,
+          blockScope: "none",
+          imageUrl: "",
+        };
+    const list = fresh.map((d) => ({
+      ...base,
+      id: uid("ev"),
+      date: d,
+      time,
+      price,
+      kind: "event_tabled",
+      partySize: ps,
+      groupSeating: true,
+      capacity: nTables * ps,
+      location: loc,
+      archived: false,
+      featured: false,
+      // keep the poster even if the newest night was made without one
+      imageUrl: base.imageUrl || (series.find((e) => e.imageUrl) || {}).imageUrl || "",
+    }));
+    try {
+      await onCreate(list);
+      setMsg(`Added ${list.length} night${list.length === 1 ? "" : "s"} at ${loc}. They're live on the ticket site now.`);
+    } catch (e) {
+      setMsg("Something failed partway: " + String((e && e.message) || e) + " — refresh and check the list below.");
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div className="cc-mj-plan">
+      <div className="cc-mj-plan-head">
+        <h4>Add future Mahjong nights</h4>
+        <button className="cc-mini" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      <p className="cc-hint">
+        {tpl
+          ? `Copies the title, description, add-ons and image from the ${fmtDate(tpl.date)} night at ${loc}. `
+          : `No Mahjong night at ${loc} yet — starts from the standard settings. `}
+        {last ? `Last night on the schedule here: ${fmtDate(last)}. ` : ""}
+        Dates already scheduled are skipped. Click a date below to leave it out.
+      </p>
+
+      <div className="cc-mj-grid">
+        <div>
+          <label className="cc-label">Shop</label>
+          <select className="cc-input" value={loc} onChange={(e) => setLoc(e.target.value)}>
+            {LOCATIONS.map((l) => (
+              <option key={l}>{l}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="cc-label">Night</label>
+          <select className="cc-input" value={day} onChange={(e) => setDay(Number(e.target.value))}>
+            {WEEKDAYS.map((w, i) => (
+              <option key={w} value={i}>
+                {w}s
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="cc-label">Start time</label>
+          <input className="cc-input" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+        </div>
+        <div>
+          <label className="cc-label">Repeat</label>
+          <select className="cc-input" value={every} onChange={(e) => setEvery(Number(e.target.value))}>
+            <option value={1}>Every week</option>
+            <option value={2}>Every other week</option>
+          </select>
+        </div>
+        <div>
+          <label className="cc-label">Starting</label>
+          <input className="cc-input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </div>
+        <div>
+          <label className="cc-label">Through</label>
+          <input className="cc-input" type="date" value={through} onChange={(e) => setThrough(e.target.value)} />
+          <div className="cc-mj-quick">
+            {[1, 3, 6].map((m) => (
+              <button key={m} type="button" className="cc-mini" onClick={() => setThrough(plusMonths(from || today, m))}>
+                +{m} mo
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label className="cc-label">Tables per night</label>
+          <input className="cc-input" type="number" min={1} value={tables} onChange={(e) => setTables(e.target.value)} />
+          <p className="cc-hint">
+            {nTables} × {ps} seats = {nTables * ps} seats
+          </p>
+        </div>
+        <div>
+          <label className="cc-label">Price per seat ($)</label>
+          <input className="cc-input" type="number" step="0.01" min={0} value={priceStr} onChange={(e) => setPriceStr(e.target.value)} />
+          <p className="cc-hint">{money(price * ps)} per table</p>
+        </div>
+      </div>
+
+      <div className="cc-mj-dates">
+        {open.length === 0 ? (
+          <span className="cc-hint">No new dates in that range.</span>
+        ) : (
+          open.map((d) => (
+            <button
+              key={d}
+              type="button"
+              className={"cc-mj-date" + (skip[d] ? " off" : "")}
+              title={skip[d] ? "Click to add this night back" : "Click to skip this night (holiday, private event…)"}
+              onClick={() => setSkip((k) => ({ ...k, [d]: !k[d] }))}
+            >
+              {skip[d] ? "✕ " : ""}
+              {fmtDate(d)}
+            </button>
+          ))
+        )}
+        {skipped > 0 && (
+          <span className="cc-hint">
+            {" "}
+            · {skipped} already scheduled, skipped
+          </span>
+        )}
+      </div>
+
+      {msg && <div className="cc-fp-ok">{msg}</div>}
+      <div className="cc-edit-actions">
+        <button className="cc-btn cc-btn-wax" disabled={busy || !fresh.length} onClick={create}>
+          {busy ? "Adding…" : `Add ${fresh.length} night${fresh.length === 1 ? "" : "s"}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const DASH_TEXT = {
+  class: { eyebrow: "Dashboard", h2: "Classes", list: "Class schedule", col: "Class", one: "class", many: "classes" },
+  mahjong: { eyebrow: "Ongoing series", h2: "Mahjong nights", list: "Mahjong schedule", col: "Night", one: "night", many: "nights" },
+  event: { eyebrow: "Dashboard", h2: "Ticketed events", list: "Event schedule", col: "Event", one: "event", many: "events" },
+};
+function AdminDash({ events: allEvents, section = "class", onAddMany, regs, soldFor, revenueFor, go, onDelete, onArchive, onArchiveAll }) {
+  const T = DASH_TEXT[section] || DASH_TEXT.class;
+  const events = allEvents.filter((e) => sectionOf(e) === section);
   const [classFilter, setClassFilter] = useState("upcoming"); // upcoming|past|all|archived
   const [locFilter, setLocFilter] = useState("all"); // all | Memphis | Nashville
   const [openSeries, setOpenSeries] = useState({}); // series rows expanded
+  const [planOpen, setPlanOpen] = useState(section === "mahjong");
   const locEvents =
     locFilter === "all"
       ? events
@@ -4949,18 +5232,40 @@ function AdminDash({ events, regs, soldFor, revenueFor, go, onDelete, onArchive,
     <div>
       <div className="cc-dash-head">
         <div>
-          <p className="cc-eyebrow">Dashboard</p>
-          <h2 className="cc-h2">Classes &amp; events</h2>
+          <p className="cc-eyebrow">{T.eyebrow}</p>
+          <h2 className="cc-h2">{T.h2}</h2>
         </div>
-        {/* The words around the schedule on tickets.greyscheese.com are edited
-            here too — it is the same page to whoever is looking at it. */}
-        <button className="cc-btn cc-btn-ghost" onClick={() => go("home")}>
-          🏠 Edit front page
-        </button>
+        <div className="cc-dash-btns">
+          {section === "mahjong" ? (
+            <button className="cc-btn cc-btn-wax" onClick={() => setPlanOpen((v) => !v)}>
+              {planOpen ? "Hide date planner" : "＋ Add future dates"}
+            </button>
+          ) : (
+            <button
+              className="cc-btn cc-btn-wax"
+              onClick={() => go("edit", { kind: section === "event" ? "event" : "class" })}
+            >
+              ＋ Add {T.one}
+            </button>
+          )}
+          {/* The words around the schedule on tickets.greyscheese.com are edited
+              here too — it is the same page to whoever is looking at it. */}
+          <button className="cc-btn cc-btn-ghost" onClick={() => go("home")}>
+            🏠 Edit front page
+          </button>
+        </div>
       </div>
 
+      {section === "mahjong" && planOpen && (
+        <MahjongPlanner
+          events={allEvents}
+          onCreate={onAddMany}
+          onClose={() => setPlanOpen(false)}
+        />
+      )}
+
       <div className="cc-reg-head">
-        <h4>Class schedule</h4>
+        <h4>{T.list}</h4>
         <div className="cc-reg-filter">
           <span>Location</span>
           <select
@@ -5007,7 +5312,7 @@ function AdminDash({ events, regs, soldFor, revenueFor, go, onDelete, onArchive,
 
       <div className="cc-table">
         <div className="cc-tr cc-tr-head">
-          <span>Class</span>
+          <span>{T.col}</span>
           <span>Date</span>
           <span>Seats</span>
           <span>Revenue</span>
@@ -5016,12 +5321,14 @@ function AdminDash({ events, regs, soldFor, revenueFor, go, onDelete, onArchive,
         {shownClasses.length === 0 && (
           <div className="cc-empty">
             {classFilter === "past"
-              ? "No past classes."
+              ? `No past ${T.many}.`
               : classFilter === "upcoming"
-              ? "No upcoming classes — add one above."
+              ? section === "mahjong"
+                ? "No upcoming Mahjong nights — use Add future dates above."
+                : `No upcoming ${T.many} — add one above.`
               : classFilter === "archived"
-              ? "Nothing archived yet — archive past classes to tidy this list."
-              : "No classes yet."}
+              ? `Nothing archived yet — archive past ${T.many} to tidy this list.`
+              : `No ${T.many} yet.`}
           </div>
         )}
         {(() => {
@@ -5050,7 +5357,7 @@ function AdminDash({ events, regs, soldFor, revenueFor, go, onDelete, onArchive,
                 <button className="cc-link" onClick={() => go("detail", { eventId: ev.id })}>
                   {ev.title}
                 </button>
-                <span className="cc-td-sub">📍 {ev.location || "Memphis"}{ev.blockScope === "day" ? " · 🚫 day blocked" : ev.blockScope === "window" ? " · 🚫 resys blocked" : ""}{ev.archived ? " · 📦 archived" : ""}</span>
+                <span className="cc-td-sub">📍 {ev.location || "Memphis"}{ev.partySize > 1 ? ` · ${Math.floor(ev.capacity / ev.partySize)} table${Math.floor(ev.capacity / ev.partySize) === 1 ? "" : "s"}` : ""}{ev.partySize > 1 && ev.capacity < ev.partySize ? " · ⚠️ too few seats to sell a table" : ""}{ev.blockScope === "day" ? " · 🚫 day blocked" : ev.blockScope === "window" ? " · 🚫 resys blocked" : ""}{ev.archived ? " · 📦 archived" : ""}</span>
               </span>
               <span className="cc-mono">{fmtDate(ev.date)} · {fmtTime(ev.time)}</span>
               <span>
@@ -5103,7 +5410,10 @@ function AdminDash({ events, regs, soldFor, revenueFor, go, onDelete, onArchive,
                 const gPct = cap
                   ? Math.min(100, Math.round((gSold / cap) * 100))
                   : 0;
-                const open = !!openSeries[g.key];
+                const open =
+                  section === "mahjong"
+                    ? openSeries[g.key] !== false
+                    : !!openSeries[g.key];
                 const flip = () =>
                   setOpenSeries((prev) => ({ ...prev, [g.key]: !open }));
                 const a = g.dates[0];
@@ -5487,8 +5797,141 @@ function fpParagraphs(text) {
     .map((para, i) => <p key={i}>{fpText(para)}</p>);
 }
 
+// ── FRONT PAGE PHOTOS ────────────────────────────────────────────────────
+// The four-photo strip and the two location tiles. Built-in pictures live
+// beside the ticket site; a replacement is uploaded to the public
+// social-assets bucket and saved as its URL in site_content 'ticket_home'
+// (photos:[{src,alt}] in strip order, tiles:{Memphis,Nashville}). A blank src
+// means "use the built-in picture" — the ticket site's homePhotosOf() /
+// homeTilesOf() read these, and fall back per slot.
+const TICKET_SITE_FILES = "https://tickets.greyscheese.com/";
+const HOME_PHOTO_DEFAULTS = [
+  { src: TICKET_SITE_FILES + "img-cheese-class.avif", alt: "Cheese plate workshop" },
+  { src: TICKET_SITE_FILES + "img-cheese-class-2.avif", alt: "Cheese class at GREYS" },
+  { src: TICKET_SITE_FILES + "img-cheese-chocolate.avif?v=2", alt: "Cheese and chocolate pairing" },
+  { src: TICKET_SITE_FILES + "nashville2.png", alt: "GREYS Nashville" },
+];
+const HOME_TILE_DEFAULTS = {
+  Memphis: TICKET_SITE_FILES + "img-workshops.avif",
+  Nashville: TICKET_SITE_FILES + "nashville3.png",
+};
+const blankPhotos = () => HOME_PHOTO_DEFAULTS.map(() => ({ src: "", alt: "" }));
+const blankTiles = () => {
+  const t = {};
+  Object.keys(HOME_TILE_DEFAULTS).forEach((k) => (t[k] = ""));
+  return t;
+};
+
+// One replaceable picture: thumbnail, upload from the computer, or paste a
+// link (Canva etc. — copied into our bucket, since Canva links expire).
+function FpPhotoSlot({ label, value, fallback, onChange, tall }) {
+  const [link, setLink] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const fileRef = useRef(null);
+  const custom = !!(value && value.trim());
+
+  const upload = async (file) => {
+    if (!file) return;
+    if (!file.type || !String(file.type).startsWith("image/")) {
+      setNote("Choose an image file (JPEG, PNG, WebP…).");
+      return;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      setNote("That image is over 25 MB — shrink it first.");
+      return;
+    }
+    setBusy(true);
+    setNote("Uploading…");
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const path =
+        "front-page/" +
+        new Date().toISOString().slice(0, 10) +
+        "-" +
+        Math.random().toString(36).slice(2, 10) +
+        "." +
+        ext;
+      const { error } = await db.storage
+        .from("social-assets")
+        .upload(path, file, { contentType: file.type, upsert: false });
+      if (error) throw new Error(error.message || "Upload failed");
+      const { data } = db.storage.from("social-assets").getPublicUrl(path);
+      if (!data || !data.publicUrl) throw new Error("Could not get a public URL.");
+      onChange(data.publicUrl);
+      setNote("Uploaded — press Save front page to publish it.");
+    } catch (e) {
+      setNote("Upload failed: " + String((e && e.message) || e));
+    }
+    setBusy(false);
+  };
+
+  const importLink = async () => {
+    const u = link.trim();
+    if (!u) return setNote("Paste an image link first.");
+    setBusy(true);
+    setNote("Importing…");
+    try {
+      const hosted = await window.emcHostImage(u, "social-assets", "front-page");
+      onChange(hosted);
+      setLink("");
+      setNote("Imported — press Save front page to publish it.");
+    } catch (e) {
+      setNote(String((e && e.message) || e));
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div className="cc-fp-slot">
+      <div className={"cc-fp-thumb" + (tall ? " tall" : "")}>
+        <img src={custom ? value : fallback} alt="" />
+        <span className={"cc-fp-tag" + (custom ? " on" : "")}>{custom ? "New" : "Original"}</span>
+      </div>
+      <div className="cc-fp-slot-side">
+        <b>{label}</b>
+        <div className="cc-fp-slot-btns">
+          <button type="button" className="cc-mini" disabled={busy} onClick={() => fileRef.current && fileRef.current.click()}>
+            {busy ? "Working…" : "Upload photo"}
+          </button>
+          {custom && (
+            <button type="button" className="cc-mini" disabled={busy} onClick={() => { onChange(""); setNote("Back to the original — press Save front page."); }}>
+              Use original
+            </button>
+          )}
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files && e.target.files[0];
+            e.target.value = "";
+            upload(f);
+          }}
+        />
+        <div className="cc-fp-slot-link">
+          <input
+            className="cc-input"
+            placeholder="…or paste a Canva / image link"
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+          />
+          <button type="button" className="cc-mini" disabled={busy || !link.trim()} onClick={importLink}>
+            Import
+          </button>
+        </div>
+        {note && <p className="cc-hint">{note}</p>}
+      </div>
+    </div>
+  );
+}
+
 function AdminHome({ go }) {
   const [copy, setCopy] = useState(HOME_COPY_DEFAULTS);
+  const [photos, setPhotos] = useState(blankPhotos);
+  const [tiles, setTiles] = useState(blankTiles);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState(null);
@@ -5505,7 +5948,16 @@ function AdminHome({ go }) {
         if (!live) return;
         if (error) setErr("Couldn't load the saved text: " + error.message);
         else if (data && data.data) {
-          setCopy({ ...HOME_COPY_DEFAULTS, ...data.data });
+          const { photos: sp, tiles: st, ...words } = data.data;
+          setCopy({ ...HOME_COPY_DEFAULTS, ...words });
+          if (Array.isArray(sp))
+            setPhotos(
+              HOME_PHOTO_DEFAULTS.map((_, i) => ({
+                src: (sp[i] && sp[i].src) || "",
+                alt: (sp[i] && sp[i].alt) || "",
+              }))
+            );
+          if (st && typeof st === "object") setTiles({ ...blankTiles(), ...st });
           setSavedAt(data.updated_at || null);
         }
         setLoading(false);
@@ -5536,7 +5988,7 @@ function AdminHome({ go }) {
     const { error } = await db.from("site_content").upsert(
       {
         key: "ticket_home",
-        data: copy,
+        data: { ...copy, photos, tiles },
         updated_at: new Date().toISOString(),
         updated_by: who,
       },
@@ -5610,21 +6062,71 @@ function AdminHome({ go }) {
             <p className="cc-fp-eyebrow">{copy.eyebrow} · Memphis</p>
             <h1 className="cc-fp-h1">{copy.title}</h1>
             <div className="cc-fp-tiles">
-              <span>Memphis</span>
-              <span>Nashville</span>
+              {Object.keys(HOME_TILE_DEFAULTS).map((l) => (
+                <span
+                  key={l}
+                  className="cc-fp-imgtile"
+                  style={{ backgroundImage: `url("${(tiles[l] || HOME_TILE_DEFAULTS[l]).replace(/"/g, "%22")}")` }}
+                >
+                  {l}
+                </span>
+              ))}
             </div>
             <p className="cc-fp-pick">{copy.pick_line}</p>
             {fpParagraphs(copy.intro)}
             <div className="cc-fp-strip">
-              <span />
-              <span />
-              <span />
-              <span />
+              {HOME_PHOTO_DEFAULTS.map((d, i) => (
+                <span
+                  key={i}
+                  className="cc-fp-imgtile"
+                  style={{ backgroundImage: `url("${((photos[i] && photos[i].src) || d.src).replace(/"/g, "%22")}")` }}
+                />
+              ))}
             </div>
             {fpParagraphs(copy.outro)}
             <h3 className="cc-fp-h3">{copy.section_title}</h3>
             {fpParagraphs(copy.section_body)}
           </div>
+        </div>
+      </div>
+
+      <div className="cc-fp-photos">
+        <h4>Photos</h4>
+        <p className="cc-hint">
+          Swap any picture on the front page. Upload from your computer or paste
+          a Canva link — it's copied into our own storage so it never expires.
+          Nothing changes on the live page until you press Save front page.
+        </p>
+        <p className="cc-fp-sub">Location tiles (the big photos you tap to pick a shop)</p>
+        <div className="cc-fp-slots">
+          {Object.keys(HOME_TILE_DEFAULTS).map((l) => (
+            <FpPhotoSlot
+              key={l}
+              label={l}
+              tall
+              value={tiles[l]}
+              fallback={HOME_TILE_DEFAULTS[l]}
+              onChange={(u) => {
+                setTiles((t) => ({ ...t, [l]: u }));
+                setMsg("");
+              }}
+            />
+          ))}
+        </div>
+        <p className="cc-fp-sub">Photo strip (four across, under the opening paragraphs)</p>
+        <div className="cc-fp-slots">
+          {HOME_PHOTO_DEFAULTS.map((d, i) => (
+            <FpPhotoSlot
+              key={i}
+              label={"Photo " + (i + 1)}
+              value={photos[i] && photos[i].src}
+              fallback={d.src}
+              onChange={(u) => {
+                setPhotos((arr) => arr.map((p, j) => (j === i ? { src: u, alt: u ? p.alt : "" } : p)));
+                setMsg("");
+              }}
+            />
+          ))}
         </div>
       </div>
 
@@ -5643,15 +6145,17 @@ function AdminHome({ go }) {
           onClick={() => {
             if (
               window.confirm(
-                "Put every box back to the original wording? Nothing is saved until you press Save."
+                "Put every box and photo back to the original? Nothing is saved until you press Save."
               )
             ) {
               setCopy(HOME_COPY_DEFAULTS);
+              setPhotos(blankPhotos());
+              setTiles(blankTiles());
               setMsg("");
             }
           }}
         >
-          Revert to the original wording
+          Revert to the original
         </button>
         <button className="cc-btn cc-btn-wax" disabled={saving} onClick={save}>
           {saving ? "Saving…" : "Save front page"}
@@ -6768,8 +7272,8 @@ function AdminDetail({ ev, regs, soldFor, go, onRefund, onUpdate, onAddComp }) {
   };
   return (
     <div>
-      <button className="cc-back cc-no-print" onClick={() => go("admin")}>
-        ← All classes
+      <button className="cc-back cc-no-print" onClick={() => go(ev ? dashFor(ev) : "admin")}>
+        ← {ev && sectionOf(ev) === "mahjong" ? "All Mahjong nights" : ev && sectionOf(ev) === "event" ? "All events" : "All classes"}
       </button>
       <div className="cc-dash-head">
         <div>
@@ -8038,6 +8542,48 @@ select.cc-input{appearance:auto;-webkit-appearance:auto;cursor:pointer;}
 .cc-report,.cc-edit,.cc-regcard,.cc-holdcard,.cc-seatpanel,.cc-rcpt,.cc-cust{background:#ffffff;border-color:#dddddd;color:#111111;}
 .cc-dash-head{border-color:#dddddd;}
 .cc-nav-badge{background:#A52B1E;color:#ffffff;}
+/* ---- front page photo editor (2026-09-21) ---- */
+.cc-fp-photos{background:#ffffff;border:1px solid #dddddd;border-radius:12px;padding:18px 20px;margin:22px 0 10px;color:#111111;}
+.cc-fp-photos h4{margin:0 0 4px;font-size:16px;color:#111111;}
+.cc-fp-sub{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#666666;margin:18px 0 10px;}
+.cc-fp-slots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+.cc-fp-slot{display:flex;gap:14px;align-items:flex-start;border:1px solid #eeeeee;border-radius:10px;padding:12px;}
+.cc-fp-thumb{position:relative;flex:none;width:110px;aspect-ratio:1/1;border-radius:8px;overflow:hidden;background:#f2f2f2;}
+.cc-fp-thumb.tall{aspect-ratio:4/5;}
+.cc-fp-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.cc-fp-tag{position:absolute;left:6px;top:6px;background:rgba(255,255,255,.92);color:#666666;font-size:10.5px;font-weight:700;border-radius:999px;padding:2px 8px;}
+.cc-fp-tag.on{background:#7c3aed;color:#ffffff;}
+.cc-fp-slot-side{display:flex;flex-direction:column;gap:8px;min-width:0;flex:1;}
+.cc-fp-slot-btns{display:flex;gap:6px;flex-wrap:wrap;}
+.cc-fp-slot-link{display:flex;gap:6px;}
+.cc-fp-slot-link .cc-input{padding:7px 10px;font-size:13px;min-width:0;}
+.cc-fp-tiles .cc-fp-imgtile,.cc-fp-strip .cc-fp-imgtile{background-size:cover;background-position:center;background-color:#eeeeee;}
+.cc-fp-tiles .cc-fp-imgtile{color:#ffffff;text-shadow:0 1px 3px rgba(0,0,0,.6);}
+@media (max-width:820px){.cc-fp-slots{grid-template-columns:1fr;}}
+/* ---- promo codes: off the old navy theme (2026-09-21) ---- */
+.cc-promo-form{background:#ffffff;border:1px solid #dddddd;color:#111111;border-radius:12px;}
+.cc-promo-form .cc-label{color:#666666;}
+.cc-scope-pick label{color:#111111;}
+.cc-chip-on{background:#ecfdf5;border-color:#047857;color:#047857;}
+.cc-chip-off{background:#f5f5f5;border-color:#dddddd;color:#666666;}
+.cc-table-promo details summary{color:#A52B1E;}
+.cc-table-promo .cc-td-sub{color:#666666;}
+.cc-giftrow{color:#111111;}
+.cc-btn-wax:hover,.cc-btn-wax:focus{color:#ffffff;}
+.cc-reg-head h4{color:#111111;}
+.cc-reg-filter span{color:#666666;}
+/* ---- dashboard header buttons + Mahjong planner ---- */
+.cc-dash-btns{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.cc-mj-plan{background:#ffffff;border:1px solid #dddddd;border-radius:12px;padding:18px 20px;margin:0 0 22px;color:#111111;}
+.cc-mj-plan-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px;}
+.cc-mj-plan-head h4{margin:0;font-size:16px;color:#111111;}
+.cc-mj-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 16px;margin-top:12px;}
+.cc-mj-grid .cc-hint{margin:4px 0 0;}
+.cc-mj-quick{display:flex;gap:6px;margin-top:6px;}
+.cc-mj-dates{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:14px 0 4px;}
+.cc-mj-date{background:#f5f3ff;border:1px solid #ddd6fe;color:#5b21b6;border-radius:999px;padding:4px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;}
+.cc-mj-date.off{background:#f5f5f5;border-color:#dddddd;color:#999999;text-decoration:line-through;}
+@media (max-width:820px){.cc-mj-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
 `}</style>
   );
 }
