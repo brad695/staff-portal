@@ -5314,7 +5314,7 @@ function AdminDash({ events: allEvents, section = "class", onAddMany, regs, sold
         <div className="cc-tr cc-tr-head">
           <span>{T.col}</span>
           <span>Date</span>
-          <span>Seats</span>
+          <span>{section === "mahjong" ? "Tables" : "Seats"}</span>
           <span>Revenue</span>
           <span></span>
         </div>
@@ -5357,12 +5357,14 @@ function AdminDash({ events: allEvents, section = "class", onAddMany, regs, sold
                 <button className="cc-link" onClick={() => go("detail", { eventId: ev.id })}>
                   {ev.title}
                 </button>
-                <span className="cc-td-sub">📍 {ev.location || "Memphis"}{ev.partySize > 1 ? ` · ${Math.floor(ev.capacity / ev.partySize)} table${Math.floor(ev.capacity / ev.partySize) === 1 ? "" : "s"}` : ""}{ev.partySize > 1 && ev.capacity < ev.partySize ? " · ⚠️ too few seats to sell a table" : ""}{ev.blockScope === "day" ? " · 🚫 day blocked" : ev.blockScope === "window" ? " · 🚫 resys blocked" : ""}{ev.archived ? " · 📦 archived" : ""}</span>
+                <span className="cc-td-sub">📍 {ev.location || "Memphis"}{ev.partySize > 1 && ev.capacity < ev.partySize ? " · ⚠️ no tables to sell" : ""}{ev.blockScope === "day" ? " · 🚫 day blocked" : ev.blockScope === "window" ? " · 🚫 resys blocked" : ""}{ev.archived ? " · 📦 archived" : ""}</span>
               </span>
               <span className="cc-mono">{fmtDate(ev.date)} · {fmtTime(ev.time)}</span>
               <span>
                 <span className="cc-mono">
-                  {sold}/{ev.capacity}
+                  {ev.partySize > 1
+                    ? `${Math.floor(sold / ev.partySize)}/${Math.floor(ev.capacity / ev.partySize)} tables`
+                    : `${sold}/${ev.capacity}`}
                 </span>
                 <span className="cc-bar">
                   <span
@@ -5435,7 +5437,9 @@ function AdminDash({ events: allEvents, section = "class", onAddMany, regs, sold
                       </span>
                       <span>
                         <span className="cc-mono">
-                          {gSold}/{cap}
+                          {g.dates[0].partySize > 1
+                            ? `${g.dates.reduce((s2, e) => s2 + Math.floor(soldFor(e.id) / e.partySize), 0)}/${g.dates.reduce((s2, e) => s2 + Math.floor(e.capacity / e.partySize), 0)} tables`
+                            : `${gSold}/${cap}`}
                         </span>
                         <span className="cc-bar">
                           <span
@@ -6180,7 +6184,11 @@ function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
   const [price, setPrice] = useState(ev ? (ev.price / 100).toString() : "");
   // Tickets available = how many seats can be sold for this class. 20 is the
   // house default; every existing class is currently set to 20.
-  const [capacity, setCapacity] = useState(ev?.capacity || 20);
+  // For a tabled event (Mahjong) this box is in TABLES, not seats; the row
+  // still stores seats (tables × seats per table) — see save().
+  const [capacity, setCapacity] = useState(
+    ev ? (ev.partySize > 1 ? Math.floor(ev.capacity / ev.partySize) : ev.capacity) : 20
+  );
   const [location, setLocation] = useState(ev?.location || LOCATIONS[0]);
   const [partySize, setPartySize] = useState(ev?.partySize > 1 ? ev.partySize : 4);
   // Events are either "single" tickets or a "tabled" event (class-style tables).
@@ -6281,6 +6289,12 @@ function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
   const addDate = () => setDates((a) => [...a, ""]);
   const rmDate = (i) => setDates((a) => a.filter((_, j) => j !== i));
 
+  // Tabled events are counted in tables everywhere staff see them.
+  const tabledNow = !isClass && eventType === "tabled";
+  const unitPs = tabledNow ? Math.max(2, Number(partySize) || 2) : 1;
+  const soldUnits = Math.ceil(sold / unitPs);
+  const unitWord = tabledNow ? "table" : "ticket";
+
   const save = () => {
     const validDates = [...new Set(dates.filter(Boolean))];
     if (!title.trim() || validDates.length === 0 || !price) {
@@ -6289,9 +6303,9 @@ function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
     }
     // Tickets available can never go below what is already sold — that would
     // leave paid customers without a seat.
-    if (ev && Number(capacity) < sold) {
+    if (ev && Number(capacity) < soldUnits) {
       setErr(
-        `${sold} ticket${sold === 1 ? " is" : "s are"} already sold, so tickets available cannot be less than ${sold}.`
+        `${soldUnits} ${unitWord}${soldUnits === 1 ? " is" : "s are"} already sold, so ${unitWord}s available cannot be less than ${soldUnits}.`
       );
       return;
     }
@@ -6315,7 +6329,7 @@ function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
       time,
       durationMin: Number(duration) || 90,
       price: Math.round(parseFloat(price) * 100),
-      capacity: Number(capacity) || 1,
+      capacity: (Number(capacity) || 1) * (tabled ? Math.max(2, Number(partySize) || 2) : 1),
       addOns: cleanAddOns,
       kind: kindOut,
       location,
@@ -6437,20 +6451,22 @@ function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
           />
         </div>
         <div>
-          <label className="cc-label">Tickets available</label>
+          <label className="cc-label">{tabledNow ? "Tables available" : "Tickets available"}</label>
           <input
             className="cc-input"
             type="number"
-            min={ev ? Math.max(1, sold) : 1}
+            min={ev ? Math.max(1, soldUnits) : 1}
             value={capacity}
             onChange={(e) => setCapacity(e.target.value)}
           />
           <p className="cc-hint" style={{ margin: "4px 0 0" }}>
             {ev
-              ? `How many can be sold in total. ${sold} sold so far — ${Math.max(
+              ? `How many ${unitWord}s can be sold in total. ${soldUnits} sold so far — ${Math.max(
                   0,
-                  (Number(capacity) || 0) - sold
+                  (Number(capacity) || 0) - soldUnits
                 )} still available.`
+              : tabledNow
+              ? "How many whole tables can be sold."
               : "How many can be sold in total. Default is 20."}
           </p>
         </div>
@@ -7310,7 +7326,14 @@ function AdminDetail({ ev, regs, soldFor, go, onRefund, onUpdate, onAddComp }) {
       )}
 
       <div className="cc-stats cc-no-print">
-        <Stat n={`${sold}/${ev.capacity}`} l="Seats filled" />
+        {ev.partySize > 1 ? (
+          <Stat
+            n={`${Math.floor(sold / ev.partySize)}/${Math.floor(ev.capacity / ev.partySize)}`}
+            l="Tables sold"
+          />
+        ) : (
+          <Stat n={`${sold}/${ev.capacity}`} l="Seats filled" />
+        )}
         <Stat n={active.length} l="Bookings" />
         <Stat n={money(rev)} l="Net revenue" />
         <Stat n={withSeat.length} l="Seating requests" />
