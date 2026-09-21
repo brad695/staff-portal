@@ -453,14 +453,22 @@ header h1{ font-size:1.16rem; letter-spacing:-.4px; }
 .sect.on .ico{ background:var(--sc,#b45309); box-shadow:none; }
 .sect.more .ico{ background:#eef0f3; }
 
-/* ── sub-tabs ── */
-.subbar{ background:transparent; border-bottom:none; }
-.subgrp{ padding:16px 26px 8px; gap:8px; }
-.subbar .tab{ background:#fff; border:1px solid var(--line); border-radius:999px; color:#5a6472;
-  font-weight:700; font-size:.74rem; letter-spacing:.2px; box-shadow:0 1px 1px rgba(18,26,38,.04); }
-.subbar .tab:hover{ background:#fff; border-color:#c9cfd7; color:var(--ink); }
-.subbar .tab.active{ background:var(--accent); border-color:var(--accent); color:#fff;
-  box-shadow:0 2px 8px rgba(18,26,38,.18); }
+/* ── sub-tabs: browser-style tabs (2026-09-21) ──
+   A darker strip with a baseline; inactive tabs are recessed gray, the active
+   tab takes the page colour, drops its bottom edge and sits over the baseline
+   so it runs straight into the page — like a Chrome tab. */
+.subbar{ background:#e3e7ec; border-bottom:none; box-shadow:inset 0 -1px 0 #cfd5dc; }
+.subgrp{ padding:10px 26px 0; gap:2px; align-items:flex-end; }
+.subbar .tab{ position:relative; background:transparent; border:1px solid transparent; border-bottom:none;
+  border-radius:10px 10px 0 0; color:#5a6472; font-weight:700; font-size:.74rem; letter-spacing:.2px;
+  box-shadow:none; padding:10px 18px; min-height:40px; white-space:nowrap; }
+.subbar .tab + .tab::before{ content:''; position:absolute; left:-2px; top:12px; bottom:12px; width:1px;
+  background:#c3cad3; }
+.subbar .tab:hover{ background:#eef1f4; color:var(--ink); }
+.subbar .tab:hover::before, .subbar .tab:hover + .tab::before,
+.subbar .tab.active::before, .subbar .tab.active + .tab::before{ opacity:0; }
+.subbar .tab.active{ background:var(--canvas); border-color:#cfd5dc; color:var(--ink); z-index:1;
+  box-shadow:inset 0 3px 0 var(--accent); margin-bottom:-1px; padding-bottom:11px; }
 
 /* ── panels & cards ── */
 .panel{ padding:8px 26px 40px; }
@@ -538,7 +546,8 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
   .sect{ border-radius:10px; min-height:0; }
   .sect .ico{ width:28px; height:28px; border-radius:8px; font-size:1.05rem; }
   .sect.on{ background:var(--sc-soft,#fdf1e3); border-top-color:transparent; }
-  .subgrp{ padding:12px 14px 6px; }
+  .subgrp{ padding:8px 10px 0; }
+  .subbar .tab{ padding:10px 14px; min-height:40px; }
   .panel{ padding:4px 14px 34px; }
   .section-card{ padding:16px 15px; border-radius:12px; }
   header{ padding:12px 14px; }
@@ -587,6 +596,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab" onclick="tkTab(this,'edit',{kind:'class'})">＋ Add Class</div>
     <div class="tab" onclick="tkTab(this,'edit',{kind:'event'})">＋ Add Ticketed Event</div>
     <div class="tab" onclick="tkTab(this,'home')">🏠 Front Page</div>
+    <div class="tab" onclick="tkTab(this,'confirm')">✉️ Confirmation Email</div>
     <div class="tab" onclick="tkTab(this,'report')">Accounting</div>
     <div class="tab" onclick="tkTab(this,'bulk')">Bulk Add Classes</div>
     <div class="tab" onclick="tkTab(this,'customers')">Customers</div>
@@ -3791,6 +3801,7 @@ function App() {
                 <AdminReport events={events} regs={regs} />
               )}
               {view.name === "home" && <AdminHome go={go} />}
+              {view.name === "confirm" && <AdminConfirmEmail go={go} />}
               {view.name === "bulk" && (
                 <AdminBulk
                   go={go}
@@ -6170,6 +6181,354 @@ function AdminHome({ go }) {
   );
 }
 
+/* ═══════════ CONFIRMATION EMAIL WORDING ═══════════
+   The email a customer gets after paying for a class or event. The wording
+   lives in public.site_content under the key 'ticket_confirm_email' and is
+   edited on the "✉️ Confirmation Email" tab in the staff portal (manager.html).
+   The receipt itself (tickets, add-ons, tax, fee, total, card) is always built
+   from the booking — only the words around it are editable.
+
+   KEEP IN STEP: this block is copied, byte for byte, in BOTH the Ticket Site's
+   index.html and staff-portal's manager.html, so the portal's preview is the
+   exact email customers get. Change one, change both.
+
+   Placeholders: {name} {class} {date} {time} {location} {code}.
+   Saved text is PLAIN TEXT, never HTML: blank line = new paragraph, email
+   addresses and web links become links on their own. A blank box falls back to
+   the default below (except "details", which may be left empty). */
+const CONFIRM_EMAIL_DEFAULTS = {
+  from_name: "GREYS {location}",
+  subject: "Your booking — {class}",
+  intro: "Hi {name}, your booking is confirmed. Confirmation code {code}.",
+  details: "",
+  share_title: "Share with your guests",
+  share_text: "Anyone with this link can see the full booking details:",
+  footer:
+    "All sales are final and non-refundable. Tickets may be transferred to someone else who uses your name at check-in.",
+};
+const CE_OPTIONAL = { details: true };
+const CE_LINKS =
+  /(https?:\/\/[^\s<>()]+[^\s<>().,;:!?]|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/g;
+const ceEsc = (v) =>
+  String(v == null ? "" : v)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+function ceCopy(saved) {
+  const c = {};
+  for (const k in CONFIRM_EMAIL_DEFAULTS) {
+    const s = saved && typeof saved[k] === "string" ? saved[k] : null;
+    c[k] = s != null && (s.trim() || CE_OPTIONAL[k]) ? s : CONFIRM_EMAIL_DEFAULTS[k];
+  }
+  return c;
+}
+// Plain-text fill for the subject line and sender name.
+function ceFillText(text, v) {
+  return String(text || "")
+    .replace(/\{(name|class|date|time|location|code)\}/g, (_, k) => (v[k] == null ? "" : String(v[k])))
+    .replace(/[\r\n]+/g, " ")
+    .trim();
+}
+// HTML fill: escape, linkify, then drop in the (escaped) booking values.
+function ceFillHtml(text, v) {
+  return ceEsc(text)
+    .split(CE_LINKS)
+    .map((piece, i) => {
+      if (i % 2 === 0) return piece;
+      const href = piece.indexOf("@") > 0 && !/^https?:/.test(piece) ? "mailto:" + piece : piece;
+      return `<a href="${href}" style="color:#7c1f15">${piece}</a>`;
+    })
+    .join("")
+    .replace(/\{(name|class|date|time|location|code)\}/g, (_, k) => {
+      const val = ceEsc(v[k] == null ? "" : v[k]);
+      return k === "code" ? "<b>" + val + "</b>" : val;
+    })
+    .replace(/\n/g, "<br>");
+}
+function ceParas(text, v, style) {
+  return String(text || "")
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => `<p style="${style}">${ceFillHtml(p, v)}</p>`)
+    .join("");
+}
+// saved = site_content data (or null) · v = booking values · parts.receipt =
+// the receipt table HTML · parts.share = the guest-share link (or "").
+function buildConfirmEmail(saved, v, parts) {
+  const c = ceCopy(saved);
+  parts = parts || {};
+  const P = "margin:0 0 12px;line-height:1.5";
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#06273a">
+      <h2 style="margin:0 0 4px">${ceEsc(v.class)}</h2>
+      <p style="margin:0 0 4px;color:#555">${ceEsc(v.date)} · ${ceEsc(v.time)}</p>
+      <p style="margin:0 0 16px;color:#555"><b>📍 GREYS ${ceEsc(v.location)}</b></p>
+      ${ceParas(c.intro, v, P)}
+      ${ceParas(c.details, v, P)}
+      ${parts.receipt || ""}
+      ${
+        parts.share
+          ? `<p style="margin:18px 0 4px"><b>${ceFillHtml(c.share_title, v)}</b></p>
+             <p style="margin:0 0 4px;color:#555">${ceFillHtml(c.share_text, v)}</p>
+             <p style="margin:0"><a href="${ceEsc(parts.share)}" style="color:#7c1f15">${ceEsc(parts.share)}</a></p>`
+          : ""
+      }
+      ${ceParas(c.footer, v, "color:#777;font-size:12px;margin:18px 0 0;line-height:1.5")}
+    </div>`;
+  return {
+    fromName: ceFillText(c.from_name, v).replace(/[<>"]/g, "") || "GREYS",
+    subject: ceFillText(c.subject, v) || "Your booking",
+    html,
+  };
+}
+
+const CONFIRM_EMAIL_FIELDS = [
+  {
+    key: "from_name",
+    label: "Sender name",
+    hint: "Shows as who the email is from. It always sends from info@greyscheese.com.",
+  },
+  { key: "subject", label: "Subject line" },
+  {
+    key: "intro",
+    label: "Opening message",
+    rows: 4,
+    hint: "Comes right under the class name, date and shop.",
+  },
+  {
+    key: "details",
+    label: "Extra info (optional)",
+    rows: 5,
+    hint: "Parking, what to bring, arrive-early notes… Leave empty to skip it.",
+  },
+  { key: "share_title", label: "Share-link heading" },
+  { key: "share_text", label: "Share-link line", hint: "The booking link is added under this automatically." },
+  { key: "footer", label: "Small print at the bottom", rows: 4 },
+];
+const CE_SAMPLE = {
+  name: "Jamie Smith",
+  class: "Cheese 101",
+  date: "Thursday, October 8, 2026",
+  time: "6:30 PM",
+  location: "Memphis",
+  code: "GRY-4821",
+};
+const CE_SAMPLE_RECEIPT = `
+      <p style="margin:14px 0 4px"><b>Itemized</b></p>
+      <p style="margin:12px 0 2px"><b>Jamie Smith</b></p><table style="width:100%;border-collapse:collapse;font-size:13px"><tr><td style="padding:2px 0;color:#333">General admission</td><td style="padding:2px 0;text-align:right">$45</td></tr></table>
+      <p style="margin:12px 0 2px"><b>Alex Smith</b></p><table style="width:100%;border-collapse:collapse;font-size:13px"><tr><td style="padding:2px 0;color:#333">General admission</td><td style="padding:2px 0;text-align:right">$45</td></tr></table>
+      <table style="width:100%;border-top:1px solid #ddd;margin-top:14px">
+        <tr><td style="padding:4px 0;color:#555">Tickets</td><td style="padding:4px 0;text-align:right"><b>2</b></td></tr>
+        <tr><td style="padding:4px 0;color:#555">Subtotal</td><td style="padding:4px 0;text-align:right"><b>$90</b></td></tr>
+        <tr><td style="padding:4px 0;color:#555">Sales tax</td><td style="padding:4px 0;text-align:right"><b>$8.78</b></td></tr>
+        <tr><td style="padding:4px 0;color:#555">Ticketing service fee</td><td style="padding:4px 0;text-align:right"><b>$5.40</b></td></tr>
+        <tr><td style="padding:4px 0;color:#555"><b>Total</b></td><td style="padding:4px 0;text-align:right"><b>$104.18</b></td></tr>
+      </table>`;
+const CE_SAMPLE_SHARE = "https://tickets.greyscheese.com/?booking=sample";
+const CE_SEND_URL =
+  "https://vdvtrevhqalmjwhjhjug.supabase.co/functions/v1/send-confirmation";
+
+function AdminConfirmEmail({ go }) {
+  const [copy, setCopy] = useState(CONFIRM_EMAIL_DEFAULTS);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [savedAt, setSavedAt] = useState(null);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  const [me, setMe] = useState("");
+
+  useEffect(() => {
+    let live = true;
+    db.auth
+      .getUser()
+      .then(({ data }) => live && data && data.user && setMe(data.user.email || ""))
+      .catch(() => {});
+    db.from("site_content")
+      .select("data, updated_at")
+      .eq("key", "ticket_confirm_email")
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!live) return;
+        if (error) setErr("Couldn't load the saved wording: " + error.message);
+        else if (data && data.data) {
+          setCopy(ceCopy(data.data));
+          setSavedAt(data.updated_at || null);
+        }
+        setLoading(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const set = (k, v) => {
+    setCopy((c) => ({ ...c, [k]: v }));
+    setMsg("");
+  };
+  const mail = buildConfirmEmail(copy, CE_SAMPLE, {
+    receipt: CE_SAMPLE_RECEIPT,
+    share: CE_SAMPLE_SHARE,
+  });
+  const blanks = CONFIRM_EMAIL_FIELDS.filter(
+    (f) => !CE_OPTIONAL[f.key] && !String(copy[f.key] || "").trim()
+  );
+
+  const save = async () => {
+    setSaving(true);
+    setErr("");
+    setMsg("");
+    const { error } = await db.from("site_content").upsert(
+      {
+        key: "ticket_confirm_email",
+        data: { ...copy },
+        updated_at: new Date().toISOString(),
+        updated_by: me || "manager",
+      },
+      { onConflict: "key" }
+    );
+    setSaving(false);
+    if (error) {
+      setErr("Couldn't save: " + error.message);
+      return;
+    }
+    setSavedAt(new Date().toISOString());
+    setMsg("Saved. The next booking gets the new wording.");
+  };
+
+  const sendTest = async () => {
+    if (!me) {
+      setErr("Couldn't tell who's signed in, so there's nowhere to send the test.");
+      return;
+    }
+    setSending(true);
+    setErr("");
+    setMsg("");
+    try {
+      const r = await fetch(CE_SEND_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: `${mail.fromName} <info@greyscheese.com>`,
+          to: me,
+          subject: "[TEST] " + mail.subject,
+          html: mail.html,
+        }),
+      });
+      if (!r.ok) throw new Error("the mail service answered " + r.status);
+      setMsg("Test sent to " + me + ". It uses the sample booking and what's on screen, saved or not.");
+    } catch (e) {
+      setErr("Test didn't send: " + e.message);
+    }
+    setSending(false);
+  };
+
+  if (loading) return <div className="cc-empty">Loading the email wording…</div>;
+
+  return (
+    <div className="cc-fp">
+      <button className="cc-back" onClick={() => go("admin")}>
+        ‹ Back to classes &amp; events
+      </button>
+      <div className="cc-dash-head">
+        <div>
+          <p className="cc-eyebrow">Ticket site</p>
+          <h2 className="cc-h2">Confirmation email</h2>
+        </div>
+      </div>
+      <p className="cc-hint cc-fp-lede">
+        The email customers get right after they pay for a class or event. The
+        receipt (tickets, tax, fee, total, card) is filled in from the booking
+        automatically — you're editing the words around it. Type{" "}
+        <b>{"{name}"}</b>, <b>{"{class}"}</b>, <b>{"{date}"}</b>, <b>{"{time}"}</b>,{" "}
+        <b>{"{location}"}</b> or <b>{"{code}"}</b> anywhere and it's swapped for that
+        booking's details. Leave a blank line between paragraphs; email addresses and
+        links turn into links on their own. Saving takes effect immediately.
+        {savedAt ? " Last saved " + new Date(savedAt).toLocaleString("en-US") + "." : ""}
+      </p>
+
+      <div className="cc-fp-cols">
+        <div className="cc-fp-form">
+          {CONFIRM_EMAIL_FIELDS.map((f) => (
+            <div key={f.key}>
+              <label className="cc-label">{f.label}</label>
+              {f.rows ? (
+                <textarea
+                  className="cc-input cc-textarea cc-ce-area"
+                  rows={f.rows}
+                  value={copy[f.key] || ""}
+                  onChange={(e) => set(f.key, e.target.value)}
+                />
+              ) : (
+                <input
+                  className="cc-input"
+                  value={copy[f.key] || ""}
+                  onChange={(e) => set(f.key, e.target.value)}
+                />
+              )}
+              {f.hint && <p className="cc-hint">{f.hint}</p>}
+            </div>
+          ))}
+        </div>
+
+        <div className="cc-fp-prev">
+          <p className="cc-fp-prev-lab">Preview — sample booking</p>
+          <div className="cc-ce-head">
+            <div>
+              <span>From</span> {mail.fromName} &lt;info@greyscheese.com&gt;
+            </div>
+            <div>
+              <span>Subject</span> {mail.subject}
+            </div>
+          </div>
+          <iframe
+            className="cc-ce-frame"
+            title="Email preview"
+            sandbox=""
+            srcDoc={
+              '<!doctype html><html><body style="margin:0;padding:18px;background:#fff">' +
+              mail.html +
+              "</body></html>"
+            }
+          />
+        </div>
+      </div>
+
+      {blanks.length > 0 && (
+        <p className="cc-hint cc-fp-warn">
+          Left empty: {blanks.map((f) => f.label.toLowerCase()).join(", ")}. The
+          email will use the original wording there.
+        </p>
+      )}
+      {err && <div className="cc-err">{err}</div>}
+      {msg && <div className="cc-fp-ok">{msg}</div>}
+
+      <div className="cc-edit-actions">
+        <button
+          className="cc-btn cc-btn-ghost"
+          onClick={() => {
+            if (window.confirm("Put every box back to the original wording? Nothing is saved until you press Save.")) {
+              setCopy(CONFIRM_EMAIL_DEFAULTS);
+              setMsg("");
+            }
+          }}
+        >
+          Revert to the original
+        </button>
+        <button className="cc-btn cc-btn-ghost" disabled={sending} onClick={sendTest}>
+          {sending ? "Sending…" : "Send me a test"}
+        </button>
+        <button className="cc-btn cc-btn-wax" disabled={saving} onClick={save}>
+          {saving ? "Saving…" : "Save email"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
   // Events differ from classes: a table option (party size > 1) and an optional
   // group/table dropdown. Editing an existing record uses its stored kind.
@@ -7918,6 +8277,11 @@ select.cc-input{appearance:auto;-webkit-appearance:auto;cursor:pointer;}
 .cc-fp-strip span{background:#EEF1F4;border:1px solid #C8D2DC;aspect-ratio:1/1;display:block;}
 .cc-fp-link{color:#A52B1E;text-decoration:underline;}
 .cc-fp-warn{color:#B97F0E;font-weight:600;}
+.cc-ce-area{min-height:90px;line-height:1.55;}
+.cc-ce-head{border:2px solid #111111;border-bottom:0;background:#F6F6F4;padding:10px 14px;font-size:13px;color:#111111;}
+.cc-ce-head div{margin:2px 0;word-break:break-word;}
+.cc-ce-head span{display:inline-block;width:62px;color:#666666;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
+.cc-ce-frame{display:block;width:100%;height:640px;border:2px solid #111111;background:#ffffff;}
 .cc-fp-ok{border:2px solid #5E6B47;color:#5E6B47;background:#F4F6F0;padding:10px 12px;
   font-size:13px;font-weight:600;margin:14px 0 0;}
 @media (max-width:900px){
