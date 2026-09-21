@@ -471,6 +471,10 @@ header h1{ font-size:1.16rem; letter-spacing:-.4px; }
   box-shadow:inset 0 3px 0 var(--accent); margin-bottom:-1px; padding-bottom:11px; }
 
 /* ── panels & cards ── */
+.jl-card{ padding:16px 18px; }
+.jl-card h2{ justify-content:space-between; }
+.jl-open{ margin-left:auto; font-size:.74rem; font-weight:700; color:var(--accent); text-decoration:none; }
+.jl-frame{ display:block; width:100%; height:calc(100vh - 190px); min-height:640px; border:1px solid var(--line); border-radius:10px; background:#fff; }
 .panel{ padding:8px 26px 40px; }
 .section-card{ background:var(--card); border:1px solid var(--line); border-radius:var(--r-card);
   box-shadow:var(--shadow); padding:22px 24px; margin-bottom:18px; }
@@ -603,6 +607,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab" onclick="tkTab(this,'promos')">Promo Codes</div>
     <div class="tab-head">Cheese Case</div>
     <div class="tab" onclick="mtab('plu')">🧀 New Case Entry</div>
+    <div class="tab" onclick="mtab('jamlabels')">🏷️ Jam Labels</div>
     <div class="tab-head">Marketing</div>
     <div class="tab" onclick="mtab('campaigns')">✉️ Email Campaigns</div>
     <div class="tab" onclick="mtab('social')">📣 Social Posts</div>
@@ -1196,6 +1201,14 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
   </div>
 
   <!-- ═══ MARKETING — EMAIL CAMPAIGNS (ported from EmailCampaigns.jsx) ═══ -->
+  <!-- Jam label maker: the Greys Label Studio (repo brad695/jam-labels), copied in as labels.html.
+       Loaded only when the tab is first opened so it costs nothing otherwise. -->
+  <div id="panel-jamlabels" class="panel">
+    <div class="section-card jl-card">
+      <h2>🏷️ Jam Labels <a class="jl-open" href="labels.html" target="_blank" rel="noopener">Open full screen ↗</a></h2>
+      <iframe id="jlFrame" class="jl-frame" title="Greys Label Studio" data-src="labels.html"></iframe>
+    </div>
+  </div>
   <div id="panel-campaigns" class="panel">
     <div class="section-card">
       <div class="emc-top">
@@ -1428,6 +1441,7 @@ async function enterConsole(session){
 async function logout(){ SESSION=null; await sb.auth.signOut(); location.reload(); }
 
 function mtab(name){
+  if (name === 'jamlabels') { const f = document.getElementById('jlFrame'); if (f && !f.src) f.src = f.dataset.src; }
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   const tab = document.querySelector('.tab[onclick*="'+name+'"]');
