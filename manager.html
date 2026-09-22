@@ -1650,7 +1650,10 @@ async function inqOpen(id){
   const r = INQ_CUR;
   document.getElementById('inqTitle').textContent = r.name + (r.experience_name ? ' — ' + r.experience_name : '');
   document.getElementById('inqMeta').innerHTML = [ '<a href="mailto:'+esc(r.email)+'">'+esc(r.email)+'</a>', r.phone?esc(r.phone):'',
-    r.preferred_date?'📅 '+fmtDisplay(r.preferred_date):'', r.party_size?'👥 '+r.party_size:'', '#'+esc(r.code) ].filter(Boolean).join(' · ');
+    r.preferred_date?'📅 '+fmtDisplay(r.preferred_date)+(r.preferred_time?' '+inqTime(r.preferred_time):''):'', r.party_size?'👥 '+r.party_size:'', '#'+esc(r.code) ].filter(Boolean).join(' · ')
+    + (r.hold_expires_at ? (new Date(r.hold_expires_at) > new Date()
+        ? '<div style="margin-top:4px;color:#92400e;">⏳ Held until '+esc(inqWhen(r.hold_expires_at))+' — sending the booking link restarts the 48 h.</div>'
+        : '<div style="margin-top:4px;color:#b91c1c;">Hold expired — the link still works if the time is open.</div>') : '');
   document.getElementById('inqStage').value = r.stage;
   document.getElementById('inqBody').value = '';
   document.getElementById('inqMsg').textContent = '';
@@ -1674,6 +1677,7 @@ async function inqThread(){
   }).join('') || '<div class="rec-empty">No messages.</div>';
   el.scrollTop = el.scrollHeight;
 }
+function inqTime(t){ const [h,m]=String(t).split(':').map(Number); return ((h%12)||12)+':'+String(m).padStart(2,'0')+(h>=12?' PM':' AM'); }
 function inqClose(){ document.getElementById('inqModal').style.display='none'; INQ_CUR=null; }
 function inqLink(){
   const r = INQ_CUR; if(!r) return INQ_SITE;
@@ -1682,6 +1686,9 @@ function inqLink(){
   if(r.experience_type_id) p.set('book', r.experience_type_id); else p.set('ask','');
   if(r.preferred_date) p.set('date', r.preferred_date);
   if(r.party_size) p.set('party', r.party_size);
+  // the slot they picked is held for them (48 h); the link pays for that same reservation
+  if(r.preferred_time) p.set('time', r.preferred_time);
+  if(r.reservation_id && r.reservation_code && r.hold_expires_at){ p.set('hold', r.reservation_id); p.set('hc', r.reservation_code); }
   if(first) p.set('first', first); if(rest.length) p.set('last', rest.join(' '));
   if(r.email) p.set('email', r.email); if(r.phone) p.set('phone', r.phone);
   return INQ_SITE + '?' + p.toString();

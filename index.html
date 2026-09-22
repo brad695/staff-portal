@@ -1192,11 +1192,14 @@ function renderAgenda(y,m){
     ])));
     cls.forEach(c=>rows+=agRow('t-class', c.kind==='class'?'Class':'Ticketed',
       (c.time?fmtTime(c.time)+' · ':'')+esc(c.title)+(c.capacity?' · 🎟 '+c.booked+'/'+c.capacity+' booked':'')));
-    exp.forEach(x=>rows+=agRow('t-exp','Experience',
+    exp.forEach(x=>{ const hold=x.status==='pending';
+      const hu=hold&&x.hold_expires_at?new Date(x.hold_expires_at).toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+      rows+=agRow('t-exp', hold?'On hold':'Experience',
       esc(x.time)+' · '+esc(x.experience)+' · '+esc(x.guest_name||'Guest')+' · 👥'+esc(x.party_size)
-        +(x.payment_status==='paid'?' <span class="ag-ok">\u2705</span>':''),
+        +(x.payment_status==='paid'?' <span class="ag-ok">\u2705</span>':hold?' <span class="ag-tent">\u23f3</span>':''),
       agDetail([['Time', x.time+(x.until?' – '+x.until:'')], ['Tables', x.tables||''],
-        ['Paid', x.payment_status==='paid'?'Yes':'Not yet'], ['Confirmation', x.code], ['Notes', x.notes]])+expThreadHtml(x)));
+        ['Status', hold?'Held for an inquiry until '+hu+' — not paid yet':''],
+        ['Paid', hold?'':(x.payment_status==='paid'?'Yes':'Not yet')], ['Confirmation', x.code], ['Notes', x.notes]])+expThreadHtml(x)); });
     res.forEach(r=>{ const c=can.includes(r.status); const txt=esc(r.time)+' · '+esc(r.name)+' · 👥'+esc(r.party); rows+=agRow(c?'t-cancel':'t-res', c?'Cancelled':'Reserved', c?'<span class="ag-strike">'+txt+'</span>':txt); });
     sch.forEach(n=>rows+=agRow('t-sched','Schedule',esc(n.name||n),agDetail([
       ['Notes', n.note], ['Through', (n.endDate&&n.endDate!==date)?fmtDisplay(n.endDate):'']
