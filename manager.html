@@ -616,6 +616,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab" onclick="tkTab(this,'promos')">Promo Codes</div>
     <div class="tab-head">Experiences</div>
     <div class="tab" onclick="tkTab(this,'experiences')">✨ Experiences</div>
+    <div class="tab" onclick="tkTab(this,'expbookings')">📅 Bookings</div>
     <div class="tab" onclick="mtab('inquiries')">💬 Inquiries <span id="inqBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
     <div class="tab-head">Cheese Case</div>
     <div class="tab" onclick="mtab('plu')">🧀 New Case Entry</div>
@@ -4229,6 +4230,7 @@ function App() {
               )}
               {view.name === "home" && <AdminHome go={go} />}
               {view.name === "experiences" && <AdminExperiences go={go} />}
+              {view.name === "expbookings" && <ExperienceBookings x={null} />}
               {view.name === "confirm" && <AdminConfirmEmail go={go} />}
               {view.name === "bulk" && (
                 <AdminBulk
@@ -5649,18 +5651,88 @@ const expBlank = () => ({ id: null, name: "", description: "", price_cents: 3000
   duration_min: 90, min_party: 2, max_party: 8, tables_needed: 2, lead_time_min: null, active: true,
   sort_order: 99, image_url: "" });
 
-// Bookings for one experience — the "detail" view, like a class's roster.
+// Booked experiences — one experience (x) or all of them (x = null, the Bookings tab).
+// Cancel / refund go through square-experience-pay, which checks the staff login.
+const EXP_PAY_URL = SUPABASE_URL + "/functions/v1/square-experience-pay";
+async function expStaffCall(action, body) {
+  const { data: { session } } = await db.auth.getSession();
+  const r = await fetch(EXP_PAY_URL + "?action=" + action, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (session ? session.access_token : SUPABASE_KEY) },
+    body: JSON.stringify(body),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.ok === false) throw new Error(d.error || "Something went wrong (" + r.status + ")");
+  return d;
+}
+
+function ExpCancelPanel({ r, onDone, onClose }) {
+  const paid = r.payment_status === "paid" || (r.payment_status === "refunded" && (r.refunded_cents || 0) < (r.total_cents || 0));
+  const left = (r.total_cents || 0) - (r.refunded_cents || 0);
+  const [mode, setMode] = useState(paid ? "refund_full" : "cancel"); // refund_full | refund_part | refund_keep | cancel
+  const [amt, setAmt] = useState((left / 100).toFixed(2));
+  const [reason, setReason] = useState("");
+  const [notify, setNotify] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const go = async () => {
+    setErr("");
+    const cents = mode === "refund_full" ? left : Math.round(Number(amt) * 100);
+    if (mode !== "cancel" && !(cents > 0 && cents <= left)) return setErr("Refund must be between $0.01 and " + money(left) + ".");
+    const what = mode === "cancel" ? "Cancel this booking" + (paid ? " WITHOUT a refund" : "")
+      : mode === "refund_keep" ? "Refund " + money(cents) + " and keep the booking"
+      : "Cancel and refund " + money(cents);
+    if (!window.confirm(what + "?")) return;
+    setBusy(true);
+    try {
+      const out = mode === "cancel"
+        ? await expStaffCall("cancel", { id: r.id, reason, notify })
+        : await expStaffCall("refund", { id: r.id, amount_cents: cents, reason, notify: mode !== "refund_keep" && notify, cancel: mode !== "refund_keep" });
+      onDone(out);
+    } catch (e) { setErr(String(e.message || e)); setBusy(false); }
+  };
+  return (
+    <div style={{ gridColumn: "1 / -1", background: "#fff7f5", border: "1px solid #f1c7bf", padding: 14, marginTop: 8 }}>
+      <b>Cancel / refund #{r.code}</b>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, margin: "8px 0" }}>
+        {paid && <label className="cc-check"><input type="radio" checked={mode === "refund_full"} onChange={() => setMode("refund_full")} /><span>Cancel and refund in full ({money(left)})</span></label>}
+        {paid && <label className="cc-check"><input type="radio" checked={mode === "refund_part"} onChange={() => setMode("refund_part")} /><span>Cancel and refund part</span></label>}
+        {paid && <label className="cc-check"><input type="radio" checked={mode === "refund_keep"} onChange={() => setMode("refund_keep")} /><span>Refund part, keep the booking</span></label>}
+        <label className="cc-check"><input type="radio" checked={mode === "cancel"} onChange={() => setMode("cancel")} /><span>{paid ? "Cancel with no refund" : r.status === "pending" ? "Release the hold" : "Cancel"}</span></label>
+      </div>
+      {(mode === "refund_part" || mode === "refund_keep") && (<>
+        <label className="cc-label">Refund amount ($)</label>
+        <input className="cc-input" type="number" min="0.01" step="0.01" max={(left / 100).toFixed(2)} value={amt} onChange={(e) => setAmt(e.target.value)} />
+      </>)}
+      <label className="cc-label">Reason / note (optional{mode !== "refund_keep" && notify ? " — included in their email" : ""})</label>
+      <input className="cc-input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Guest asked to cancel" />
+      {mode !== "refund_keep" && r.email && (
+        <label className="cc-check" style={{ marginTop: 8 }}><input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} /><span>Email {r.email} that it's cancelled</span></label>
+      )}
+      {err && <div className="cc-err" style={{ marginTop: 8 }}>{err}</div>}
+      <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+        <button className="cc-btn cc-btn-ghost" onClick={onClose} disabled={busy}>Never mind</button>
+        <button className="cc-btn cc-btn-wax" onClick={go} disabled={busy}>{busy ? "Working…" : mode === "cancel" ? (r.status === "pending" && !paid ? "Release hold" : "Cancel booking") : mode === "refund_keep" ? "Refund" : "Cancel & refund"}</button>
+      </div>
+    </div>
+  );
+}
+
 function ExperienceBookings({ x, onBack, onEdit }) {
   const [rows, setRows] = useState(null);
   const [filter, setFilter] = useState("upcoming"); // upcoming | past | cancelled | all
   const [tables, setTables] = useState({});
   const [inqs, setInqs] = useState({});
   const [err, setErr] = useState("");
+  const [open, setOpen] = useState(null); // booking id with the cancel/refund panel open
+  const [flash, setFlash] = useState("");
   const load = async () => {
     setErr("");
-    const { data, error } = await db.from("rb_reservations")
-      .select("id, code, guest_name, email, phone, party_size, starts_at, ends_at, status, payment_status, total_cents, notes, hold_expires_at, inquiry_id, external_id, created_at")
-      .eq("kind", "experience").eq("experience_type_id", x.id).order("starts_at", { ascending: true }).limit(500);
+    let q = db.from("rb_reservations")
+      .select("id, code, guest_name, email, phone, party_size, starts_at, ends_at, status, payment_status, total_cents, refunded_cents, notes, hold_expires_at, inquiry_id, external_id, created_at, cancel_reason, experience_type_id, rb_experience_types(name)")
+      .eq("kind", "experience").order("starts_at", { ascending: true }).limit(1000);
+    if (x) q = q.eq("experience_type_id", x.id);
+    const { data, error } = await q;
     if (error) { setErr(error.message); setRows([]); return; }
     setRows(data || []);
     const ids = (data || []).map((r) => r.id);
@@ -5670,11 +5742,11 @@ function ExperienceBookings({ x, onBack, onEdit }) {
       const iq = (data || []).map((r) => r.inquiry_id).filter(Boolean);
       if (iq.length) {
         const { data: qs } = await db.from("inquiries").select("id, code, stage").in("id", iq);
-        const m = {}; (qs || []).forEach((q) => { m[q.id] = q; }); setInqs(m);
+        const m = {}; (qs || []).forEach((q2) => { m[q2.id] = q2; }); setInqs(m);
       }
     }
   };
-  useEffect(() => { load(); }, [x.id]);
+  useEffect(() => { load(); }, [x ? x.id : "all"]);
 
   const now = Date.now();
   const live = (r) => r.status === "confirmed" || (r.status === "pending" && Date.parse(r.hold_expires_at || "") > now);
@@ -5685,35 +5757,36 @@ function ExperienceBookings({ x, onBack, onEdit }) {
     : live(r) && Date.parse(r.starts_at) >= now);
   if (filter === "past" || filter === "cancelled") list.reverse();
   const up = (rows || []).filter((r) => live(r) && Date.parse(r.starts_at) >= now);
-  const paidUp = up.filter((r) => r.payment_status === "paid");
+  const paidUp = up.filter((r) => r.payment_status === "paid" || (r.payment_status === "refunded" && r.status === "confirmed"));
   const when = (iso) => new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-  const statusOf = (r) => r.status === "confirmed" && r.payment_status === "paid" ? ["✅ Paid", "#15803d"]
+  const refundNote = (r) => (r.refunded_cents || 0) > 0 ? " · refunded " + money(r.refunded_cents) : "";
+  const statusOf = (r) => r.status === "confirmed" && (r.payment_status === "paid" || r.payment_status === "refunded") ? ["✅ Paid" + refundNote(r), "#15803d"]
     : r.status === "pending" && Date.parse(r.hold_expires_at || "") > now ? ["⏳ On hold till " + when(r.hold_expires_at), "#b45309"]
     : r.status === "pending" ? ["Hold expired", "#6b7280"]
-    : r.status === "cancelled" ? ["Cancelled", "#6b7280"]
+    : r.status === "cancelled" ? ["Cancelled" + refundNote(r) + (r.cancel_reason ? " — " + r.cancel_reason : ""), "#6b7280"]
     : [r.status + (r.payment_status === "paid" ? " · paid" : ""), "#374151"];
+  const canAct = (r) => r.status !== "cancelled" || ((r.payment_status === "paid" || r.payment_status === "refunded") && (r.refunded_cents || 0) < (r.total_cents || 0));
 
   return (
     <div>
-      <button className="cc-back" onClick={onBack}>← All experiences</button>
+      {onBack && <button className="cc-back" onClick={onBack}>← All experiences</button>}
       <div className="cc-dash-head">
         <div>
-          <p className="cc-eyebrow">Experience · {money(x.price_cents)}{x.per_person ? " / guest" : " / party"} · parties of {x.min_party}–{x.max_party}</p>
-          <h2 className="cc-h2">{x.name}</h2>
+          <p className="cc-eyebrow">{x ? "Experience · " + money(x.price_cents) + (x.per_person ? " / guest" : " / party") + " · parties of " + x.min_party + "–" + x.max_party : "Every experience · tickets.greyscheese.com/experiences"}</p>
+          <h2 className="cc-h2">{x ? x.name : "Booked experiences"}</h2>
         </div>
-        <div className="cc-dash-btns">
-          <button className="cc-btn cc-btn-ghost" onClick={onEdit}>Edit experience</button>
-        </div>
+        {x && onEdit && <div className="cc-dash-btns"><button className="cc-btn cc-btn-ghost" onClick={onEdit}>Edit experience</button></div>}
       </div>
       <p className="cc-hint" style={{ marginTop: 0 }}>
-        <b>{paidUp.length}</b> upcoming booked · <b>{up.length - paidUp.length}</b> on hold · <b>{money(paidUp.reduce((s, r) => s + (r.total_cents || 0), 0))}</b> upcoming paid
+        <b>{paidUp.length}</b> upcoming booked · <b>{up.length - paidUp.length}</b> on hold · <b>{money(paidUp.reduce((s, r) => s + (r.total_cents || 0) - (r.refunded_cents || 0), 0))}</b> upcoming paid
       </p>
       <div className="cc-dash-btns" style={{ margin: "10px 0 12px", flexWrap: "wrap" }}>
         {[["upcoming", "Upcoming"], ["past", "Past"], ["cancelled", "Cancelled / expired"], ["all", "All"]].map(([k, l]) => (
-          <button key={k} className={"cc-mini" + (filter === k ? " on" : "")} style={filter === k ? { background: "var(--accent,#a52b1e)", color: "#fff", borderColor: "var(--accent,#a52b1e)" } : null} onClick={() => setFilter(k)}>{l}</button>
+          <button key={k} className="cc-mini" style={filter === k ? { background: "var(--accent,#a52b1e)", color: "#fff", borderColor: "var(--accent,#a52b1e)" } : null} onClick={() => setFilter(k)}>{l}</button>
         ))}
         <button className="cc-mini" onClick={load}>↻ Refresh</button>
       </div>
+      {flash && <div className="cc-hint" style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", padding: "8px 12px", color: "#065f46" }}>{flash}</div>}
       {err && <div className="cc-err">{err}</div>}
       <div className="cc-table cc-table-expb">
         <div className="cc-tr cc-tr-head" style={{ background: "#111", color: "#fff" }}><span>When</span><span>Guest</span><span>Party</span><span>Status</span><span>Tables · code</span></div>
@@ -5723,7 +5796,7 @@ function ExperienceBookings({ x, onBack, onEdit }) {
           const [st, col] = statusOf(r); const q = r.inquiry_id && inqs[r.inquiry_id];
           return (
             <div key={r.id} className={"cc-tr" + (live(r) ? "" : " cc-tr-past")}>
-              <span className="cc-mono">{when(r.starts_at)}</span>
+              <span className="cc-mono">{when(r.starts_at)}{!x && <><br /><b style={{ fontFamily: "inherit" }}>{(r.rb_experience_types && r.rb_experience_types.name) || "Experience"}</b></>}</span>
               <span className="cc-td-title" style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left" }}>
                 <b>{r.guest_name || "Guest"}</b>
                 <span className="cc-td-sub">{[r.email && <a key="e" href={"mailto:" + r.email}>{r.email}</a>, r.phone && <a key="p" href={"tel:" + r.phone}>{r.phone}</a>].filter(Boolean).reduce((a, b, i) => i ? [...a, " · ", b] : [b], [])}</span>
@@ -5732,7 +5805,14 @@ function ExperienceBookings({ x, onBack, onEdit }) {
               </span>
               <span className="cc-mono">👥 {r.party_size}<br />{money(r.total_cents || 0)}</span>
               <span style={{ color: col, fontWeight: 700, fontSize: 13 }}>{st}</span>
-              <span className="cc-mono">{(tables[r.id] || []).join(", ") || "—"}<br /><span className="cc-td-sub">#{r.code}</span></span>
+              <span className="cc-mono">{(tables[r.id] || []).join(", ") || "—"}<br /><span className="cc-td-sub">#{r.code}</span>
+                {canAct(r) && open !== r.id && <><br /><button className="cc-mini danger" style={{ marginTop: 6 }} onClick={() => { setOpen(r.id); setFlash(""); }}>{r.status === "cancelled" ? "Refund" : r.status === "pending" && r.payment_status !== "paid" ? "Release hold" : "Cancel / refund"}</button></>}
+              </span>
+              {open === r.id && <ExpCancelPanel r={r} onClose={() => setOpen(null)} onDone={(out) => {
+                setOpen(null);
+                setFlash("✓ #" + r.code + (out.cancelled ? " cancelled" : "") + (out.refunded_cents ? (out.cancelled ? " and " : " ") + "refunded " + money(out.refunded_cents) : "") + (out.email === "sent" ? " · guest emailed" : out.email === "failed" ? " · ⚠ email didn't send" : "") + ". Tables released.");
+                load();
+              }} />}
             </div>
           );
         })}
