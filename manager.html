@@ -144,6 +144,15 @@
     .rec-radio input{ display:none; }
     .rec-radio.on{ border-color:var(--cheddar); background:#fff7e0; font-weight:700; }
     .rec-radio.on::before{ content:'✓'; color:var(--cheddar); font-weight:900; }
+    .th-pills{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+    .th-pill{ display:flex; flex-direction:column; align-items:flex-start; gap:1px; border:1px solid var(--line); border-radius:10px; padding:7px 11px; font-size:0.8rem; cursor:pointer; background:#fff; user-select:none; min-width:84px; }
+    .th-pill input{ display:none; }
+    .th-pill span{ font-size:0.72rem; color:#777; }
+    .th-pill.on{ border-color:var(--accent,#c8952c); background:var(--accent-soft,#fff7e0); }
+    .th-pill.on b::before{ content:'✓ '; }
+    .th-pill.busy{ opacity:.5; cursor:not-allowed; background:#f3f3f3; text-decoration:line-through; }
+    .th-note{ font-size:0.78rem; color:#666; margin-top:6px; line-height:1.35; }
+    .th-bad{ color:#a33; }
     @media (max-width:640px){
       #recModal{ padding:0 !important; align-items:flex-end !important; }
       .rec-card{ width:100%; border-radius:16px 16px 0 0; border-top:none; padding:12px 12px calc(10px + env(safe-area-inset-bottom)); max-height:94vh; max-height:94dvh; }
@@ -1407,6 +1416,88 @@ async function fn(action, payload) {
   let data={}; try{ data=await res.json(); }catch(_){}
   return { ok:res.ok, status:res.status, data };
 }
+
+/* ── Table holds ─────────────────────────────────────────────────────
+   "Block tables" on an event books the tables in Wix as a normal
+   reservation (status RESERVED, guest "<title> (table hold)"), so the Wix
+   widget, Google and phone-ins can't double-book them while the rest of the
+   room stays open. Experiences (paid reservations) hold tables the same way at
+   checkout. Everything goes through the table-holds edge function, which
+   records each hold in public.table_holds and refuses tables Wix already has
+   booked. A 5-minute cron (table-holds-sweep) releases holds whose event or
+   experience was cancelled, moved or deleted. */
+const TH_URL = SB_URL + '/functions/v1/table-holds';
+async function th(action, payload){
+  let token = SB_KEY;
+  try{ const { data } = await sb.auth.getSession(); if(data && data.session){ SESSION = data.session; token = data.session.access_token; } else if(SESSION) token = SESSION.access_token; }
+  catch(_){ if(SESSION) token = SESSION.access_token; }
+  try{
+    const res = await fetch(TH_URL + '?action=' + encodeURIComponent(action), {
+      method:'POST', headers:{ 'Content-Type':'application/json', 'apikey':SB_KEY, 'Authorization':'Bearer '+token },
+      body: JSON.stringify(payload || {})
+    });
+    let data={}; try{ data=await res.json(); }catch(_){}
+    return { ok:res.ok && data.ok!==false, status:res.status, data };
+  }catch(e){ return { ok:false, status:0, data:{ error:String(e && e.message || e) } }; }
+}
+// 'portal_item:<id>' / 'event:<id>' → hold rows (held first, then the latest failure)
+let TH_HELD = {};
+async function thLoadHeld(source){
+  try{
+    const { data } = await sb.from('table_holds').select('*').eq('source', source)
+      .in('status',['held','failed']).gte('ends_at', new Date(Date.now()-86400000).toISOString())
+      .order('created_at',{ ascending:false });
+    Object.keys(TH_HELD).forEach(k=>{ if(k.indexOf(source+':')===0) delete TH_HELD[k]; });
+    (data||[]).forEach(h=>{ (TH_HELD[source+':'+h.source_id] = TH_HELD[source+':'+h.source_id] || []).push(h); });
+  }catch(_){ /* table list still renders without hold tags */ }
+}
+function thSummary(source, id){
+  const rows = TH_HELD[source+':'+id] || [];
+  const held = rows.filter(h=>h.status==='held');
+  if(held.length){
+    const names = [].concat.apply([], held.map(h=>h.table_names||[])).filter(Boolean);
+    return { ok:true, text: names.length ? names.join(', ') : (held[0].guests ? held[0].guests+' guests' : 'held') };
+  }
+  const fail = rows.find(h=>h.status==='failed');
+  return fail ? { ok:false, text: fail.error || 'not held' } : null;
+}
+function thTagHtml(source, id){
+  const s = thSummary(source, id);
+  if(!s) return '<span class="tag tag-special">🍽 tables — not held yet</span>';
+  return s.ok ? '<span class="tag tag-confirmed">🍽 '+esc(s.text)+'</span>'
+              : '<span class="tag tag-tentative" title="'+esc(s.text)+'">⚠️ tables NOT held</span>';
+}
+function thFmtTime(iso){ const d=new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
+// Renders the Wix floor for a time window as tick-box pills. Busy tables are
+// disabled and show who has them. opts: {location,start,end,source,sourceId,selected[],onChange}
+async function thRenderPicker(el, opts){
+  if(!el) return;
+  el.innerHTML = '<div class="th-note">Checking Wix…</div>';
+  const r = await th('availability', { location:opts.location, start:opts.start, end:opts.end, source:opts.source, source_id:opts.sourceId });
+  if(!r.ok){ el.innerHTML = '<div class="th-note th-bad">❌ '+esc(r.data.error||'Could not load tables from Wix.')+'</div>'; return; }
+  const sel = new Set(opts.selected||[]);
+  const tables = r.data.tables || [];
+  if(!tables.length){ el.innerHTML = '<div class="th-note th-bad">This location has no tables set up in Wix.</div>'; return; }
+  let html = '<div class="th-pills">' + tables.map(t=>{
+    const busy = (t.busy||[]).length > 0;
+    const on = sel.has(t.id) && !busy;
+    const why = busy ? t.busy.map(b=>b.who+' '+thFmtTime(b.start)+'–'+thFmtTime(b.end)).join('; ') : '';
+    return '<label class="th-pill'+(on?' on':'')+(busy?' busy':'')+'" title="'+esc(why)+'">'
+      +'<input type="checkbox" value="'+esc(t.id)+'"'+(on?' checked':'')+(busy?' disabled':'')+'>'
+      +'<b>'+esc(t.name)+'</b><span>'+(busy ? 'taken · '+esc(t.busy[0].who) : t.seatsMax+' seats')+'</span></label>';
+  }).join('') + '</div>';
+  const free = tables.filter(t=>!(t.busy||[]).length).length;
+  html += '<div class="th-note">'+free+' of '+tables.length+' tables free for this time'+(r.data.unassigned ? ' · '+r.data.unassigned+' booking(s) with no table assigned yet' : '')+'. Held from 1 hr before start to the end time.</div>';
+  if(r.data.mode && r.data.mode !== 'ON'){
+    html += '<div class="th-note th-bad">⚠️ This location\'s Wix is set to <b>in-house table assignment</b>, so online bookings are not checked against tables. The hold shows on your floor, but to stop online guests too, turn on Table Management in Wix (Settings → Table Reservations → Tables) or use “Block during event”.</div>';
+  }
+  el.innerHTML = html;
+  el.dataset.loaded = '1';
+  el.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.addEventListener('change', ()=>{
+    cb.closest('.th-pill').classList.toggle('on', cb.checked);
+    if(opts.onChange) opts.onChange(Array.from(el.querySelectorAll('input:checked')).map(x=>x.value));
+  }));
+}
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtDisplay(d){ if(!d) return ''; return new Date(d+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}); }
 
@@ -1790,8 +1881,10 @@ const SCHEMA = {
         names:{ none:'Not set', confirmed:'✅ Confirmed', tentative:'❓ Tentative' }},
       {k:'archived', label:'Visibility', type:'radio', full:true, options:['live','archived'],
         names:{ live:'Show on the staff portal', archived:'📦 Archived (hidden)' }},
-      {k:'blockScope', label:'🚫 Wix reservations', type:'radio', full:true, options:['none','window','day'],
-        names:{ none:'Do not block', window:'Block during event', day:'Block all day' }},
+      {k:'blockScope', label:'🚫 Wix reservations', type:'radio', full:true, options:['none','window','day','tables'],
+        names:{ none:'Do not block', window:'Block during event', day:'Block all day', tables:'🍽 Block tables' }},
+      {k:'blockGuests', label:'Guests (Wix picks the tables)', type:'number', ph:'e.g. 12', showIf:v=>v.blockScope==='tables'},
+      {k:'blockTables', label:'…or pick the exact tables', type:'tables', full:true, showIf:v=>v.blockScope==='tables'},
       {k:'body', label:'Details', type:'textarea', full:true, ph:'Details shown on the portal'}
     ],
     defaults:{ blockScope:'none', repeat:'none', status:'none', archived:'live' },
@@ -1800,10 +1893,13 @@ const SCHEMA = {
     valid:r=> !r.title ? 'A title is required.'
       : !r.date ? 'Events need a date.'
       : (r.blockScope==='window' && (!r.time || !r.blockTo)) ? 'To block during the event, set the start and end times.'
+      : (r.blockScope==='tables' && (!r.time || !r.blockTo)) ? 'To block tables, set the start and end times.'
+      : (r.blockScope==='tables' && !r.blockTables && !(Number(r.blockGuests)>0)) ? 'Pick the tables to hold, or enter a guest count.'
       : '',
     map:r=>({ id:r.id, type:'event', title:r.title, date:r.date||'', time:(r.time||'').slice(0,5), endDate:r.end_date||'',
       repeat:r.repeat||'none', repeatUntil:r.repeat_until||'', body:r.body||'', location:r.location||'memphis',
       blockScope:r.block_scope||'none', blockTo:(r.block_to||'').slice(0,5), status:r.status||'none',
+      blockTables:(r.block_tables||[]).join(','), blockGuests:r.block_guests||'',
       archived:r.archived===true?'archived':'live' }),
     rowTitle:r=>r.title,
     rowTags:r=>'<span class="tag tag-event">event</span>'
@@ -1811,7 +1907,8 @@ const SCHEMA = {
         : r.status==='tentative' ? '<span class="tag tag-tentative">❓ tentative</span>' : '')
       +(r.archived==='archived' ? '<span class="tag tag-off2">📦 archived</span>' : '')
       +(r.blockScope==='day' ? '<span class="tag tag-special">🚫 all day</span>'
-        : r.blockScope==='window' ? '<span class="tag tag-special">🚫 '+esc((r.time||''))+'–'+esc((r.blockTo||''))+'</span>' : ''),
+        : r.blockScope==='window' ? '<span class="tag tag-special">🚫 '+esc((r.time||''))+'–'+esc((r.blockTo||''))+'</span>'
+        : r.blockScope==='tables' ? thTagHtml('portal_item', r.id) : ''),
     rowMeta:r=>{
       const bits=[];
       if(r.date) bits.push('📅 '+fmtDisplay(r.date)+(r.endDate?' – '+fmtDisplay(r.endDate):''));
@@ -1819,6 +1916,7 @@ const SCHEMA = {
       if(r.repeat && r.repeat!=='none') bits.push('↻ '+r.repeat+(r.repeatUntil?' until '+fmtDisplay(r.repeatUntil):''));
       if(r.blockScope==='day') bits.push('🚫 Wix blocked all day');
       else if(r.blockScope==='window') bits.push('🚫 Wix blocked during event');
+      else if(r.blockScope==='tables') bits.push('🍽 Wix tables held'+(r.blockGuests?' for '+esc(r.blockGuests)+' guests':''));
       if(r.body) bits.push(esc(r.body.length>100 ? r.body.slice(0,100)+'…' : r.body));
       return bits.join(' &nbsp;·&nbsp; ');
     },
@@ -1908,6 +2006,7 @@ async function loadKind(kind){
       rows = rows.map(r=>Object.assign({}, r, { contact_email: em[r.id]||'', contact_phone: ph[r.id]||'' }));
     }
     ROWS[kind] = rows.map(S.map);
+    if(kind==='events') await thLoadHeld('portal_item');
   }catch(e){ ROWS[kind]=[]; }
   renderKind(kind);
 }
@@ -1976,6 +2075,10 @@ function openRec(kind, row){
     } else if(f.type==='select'){
       input = '<select id="rec-f-'+f.k+'">'+f.options.map(o=>
         '<option value="'+o+'"'+(String(v)===o?' selected':'')+'>'+((f.names&&f.names[o])||o)+'</option>').join('')+'</select>';
+    } else if(f.type==='tables'){
+      input = '<div class="th-pick" id="rec-f-'+f.k+'" data-sel="'+esc(v)+'">'
+        +'<button type="button" class="btn btn-ghost btn-sm" onclick="thRecLoad()">🔄 Show tables for this time</button>'
+        +'<div class="th-list"></div></div>';
     } else if(f.type==='textarea'){
       input = '<textarea id="rec-f-'+f.k+'"'+(f.ph?' placeholder="'+esc(f.ph)+'"':'')+'>'+esc(v)+'</textarea>';
     } else {
@@ -1987,6 +2090,9 @@ function openRec(kind, row){
   // only when blocking a window, "Repeat until" only when repeating)
   document.querySelectorAll('#recFields select, #recFields input').forEach(el=>{
     el.addEventListener('change', recApplyVisibility);
+    if(kind==='events' && ['rec-f-date','rec-f-time','rec-f-blockTo','rec-f-location'].includes(el.id)){
+      el.addEventListener('change', ()=>{ const l=document.querySelector('#rec-f-blockTables .th-list'); if(l && l.dataset.loaded) thRecLoad(); });
+    }
   });
   recApplyVisibility();
   document.getElementById('recDelBtn').style.display = row?'inline-block':'none';
@@ -1994,6 +2100,12 @@ function openRec(kind, row){
   const first = document.querySelector('#recFields input, #recFields textarea'); if(first) first.focus();
 }
 function recGetVal(f){
+  if(f.type==='tables'){
+    const el = document.getElementById('rec-f-'+f.k); if(!el) return '';
+    const list = el.querySelector('.th-list');
+    if(list && list.dataset.loaded) return Array.from(list.querySelectorAll('input:checked')).map(x=>x.value).join(',');
+    return el.dataset.sel || '';
+  }
   if(f.type==='radio'){
     const el = document.querySelector('input[name="rec-f-'+f.k+'"]:checked');
     return el ? el.value : '';
@@ -2024,6 +2136,30 @@ function recApplyVisibility(){
     const inp = l.querySelector('input');
     if(inp) l.classList.toggle('on', inp.checked);
   });
+  // first time "Block tables" is showing, load the Wix floor for this time
+  if(REC_CTX && REC_CTX.kind==='events' && vals.blockScope==='tables'){
+    const list = document.querySelector('#rec-f-blockTables .th-list');
+    if(list && !list.dataset.loaded && !list.dataset.tried && vals.date && vals.time && vals.blockTo){ list.dataset.tried='1'; thRecLoad(); }
+  }
+}
+// hold window for staff events: 1 hr setup before start → end time (next day if it wraps)
+function thStaffWindow(v){
+  if(!v.date || !v.time || !v.blockTo) return null;
+  let start = new Date(v.date+'T'+v.time+':00'); start = new Date(start.getTime() - 3600000);
+  let end = new Date(v.date+'T'+v.blockTo+':00'); if(end <= start) end = new Date(end.getTime() + 86400000);
+  if(isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+  return { start:start.toISOString(), end:end.toISOString() };
+}
+function thRecLoad(){
+  const wrap = document.getElementById('rec-f-blockTables'); if(!wrap) return;
+  const list = wrap.querySelector('.th-list');
+  const v = recFieldVals();
+  const w = thStaffWindow(v);
+  if(!w){ list.innerHTML = '<div class="th-note th-bad">Set the date, start time and end time first.</div>'; return; }
+  const current = recGetVal({ k:'blockTables', type:'tables' });
+  thRenderPicker(list, { location:v.location, start:w.start, end:w.end, source:'portal_item',
+    sourceId: REC_CTX && REC_CTX.id ? String(REC_CTX.id) : '', selected: current ? current.split(',') : [],
+    onChange: ids=>{ wrap.dataset.sel = ids.join(','); } });
 }
 function recClose(){ document.getElementById('recModal').style.display='none'; REC_CTX=null; }
 async function recSave(){
@@ -2054,7 +2190,11 @@ async function recSave(){
       if(prevRow && prevRow.location!==rec.location && WIX_LOCS[prevRow.location]){
         await fn('unblock-reservations', { location_id: WIX_LOCS[prevRow.location], comment_prefix: '[EVT-P:'+savedId+']' });
       }
-      await staffEventSyncBlock(rec, prevRow);
+      // portal-api stores block_scope 'tables' only after table-holds confirms the hold,
+      // so sync from what was just typed, not from the reloaded row
+      await staffEventSyncBlock(Object.assign({}, rec, { blockScope: payload.blockScope,
+        blockTables: payload.blockTables, blockGuests: payload.blockGuests }), prevRow);
+      if(payload.blockScope==='tables' || (prevRow && prevRow.blockScope==='tables')) await loadKind('events');
     }
   }
 }
@@ -2088,6 +2228,18 @@ async function staffEventSyncBlock(rec, prevRow){
       const r = await fn('unblock-reservations', { location_id: locId, comment_prefix: prefix });
       if(!r.ok) alert('⚠️ Event saved, but removing the Wix block failed: '+(r.data.error||'unknown error'));
     }
+    // 🍽 table holds — real Wix reservations on the chosen tables (or for N guests)
+    if(rec.blockScope==='tables'){
+      const w = thStaffWindow(rec);
+      if(!w) return;
+      const ids = String(rec.blockTables||'').split(',').map(x=>x.trim()).filter(Boolean);
+      const r = await th('hold', { source:'portal_item', source_id:String(rec.id), location:rec.location,
+        start:w.start, end:w.end, label:rec.title||'Event', table_ids:ids, guests:Number(rec.blockGuests)||0, persist:true });
+      if(!r.ok) alert('⚠️ Event saved, but the tables are NOT held in Wix:\n\n'+(r.data.error||'unknown error')+'\n\nPick other tables (or fewer guests) and save again.');
+    } else if(prevRow && prevRow.blockScope==='tables'){
+      const r = await th('release', { source:'portal_item', source_id:String(rec.id) });
+      if(!r.ok) alert('⚠️ Event saved, but releasing the held Wix tables failed: '+(r.data.error||'unknown error'));
+    }
   }catch(_){ /* blocking is best-effort — the event itself saved */ }
 }
 function recDeleteCurrent(){ if(REC_CTX) recDelete(REC_CTX.kind, REC_CTX.id, true); }
@@ -2104,6 +2256,7 @@ async function recDelete(kind, id, fromModal){
   if(old && (old.blockScope==='day' || old.blockScope==='window') && WIX_LOCS[old.location]){
     await fn('unblock-reservations', { location_id: WIX_LOCS[old.location], comment_prefix: '[EVT-P:'+id+']' });
   }
+  if(old && old.blockScope==='tables') await th('release', { source:'portal_item', source_id:String(id) });
 }
 function msg(kind, text, isErr){
   const el = document.getElementById(SCHEMA[kind].msg);
@@ -3064,6 +3217,9 @@ const eventFromRow = (r) => ({
   location: r.location || "Memphis",
   // Wix online-reservation block: 'none' | 'window' (1hr before → end) | 'day' (whole date)
   blockScope: r.block_scope || (r.block_resys ? "window" : "none"),
+  // 'tables' scope: Wix table ids to hold, or a guest count Wix seats itself
+  blockTables: r.block_tables || [],
+  blockGuests: r.block_guests || null,
   archived: !!r.archived, // hidden from the dashboard's default views
   // Artwork shown on the ticket site's class card. Always a hosted copy in the
   // social-assets bucket — a raw Canva export URL dies within hours.
@@ -3072,6 +3228,34 @@ const eventFromRow = (r) => ({
   // Unset = the site picks the fastest-selling class automatically.
   featured: r.featured === true,
 });
+// "Block tables" picker for ticketed events: shows the Wix floor for the
+// event window (1 hr before start → end) and lets the manager tick tables,
+// or type a guest count and let Wix choose. Holds are made on Save.
+function TableHoldPicker({ location, date, time, durationMin, eventId, value, onChange, guests, onGuests }) {
+  const box = useRef(null);
+  const [msg, setMsg] = useState("");
+  const load = () => {
+    if (!date || !time) { setMsg("Set the date and start time first."); return; }
+    setMsg("");
+    const w = wixBlockWindow({ date, time, durationMin, blockScope: "tables" });
+    if (!w || typeof thRenderPicker !== "function") return;
+    thRenderPicker(box.current, { location, start: w.start, end: w.end, source: "event", sourceId: eventId,
+      selected: value || [], onChange: (ids) => onChange(ids) });
+  };
+  useEffect(() => { load(); /* reload when the time or shop changes */ }, [location, date, time, durationMin]);
+  return (
+    <div style={{ margin: "6px 0 12px" }}>
+      <label className="cc-label">Guests (Wix picks the tables)</label>
+      <input className="cc-input" type="number" min="1" placeholder="e.g. 12" value={guests}
+        onChange={(e) => onGuests(e.target.value)} />
+      <label className="cc-label">…or pick the exact tables</label>
+      <button type="button" className="cc-mini" onClick={load}>🔄 Refresh tables</button>
+      {msg && <p className="cc-hint">{msg}</p>}
+      <div ref={box} />
+      <p className="cc-hint">Tables are booked in Wix as a reservation named after this event. With several dates, the same tables are held on each date.</p>
+    </div>
+  );
+}
 const eventToRow = (ev) => ({
   title: ev.title,
   blurb: ev.blurb,
@@ -3086,7 +3270,9 @@ const eventToRow = (ev) => ({
   kind: ev.kind || "class",
   location: ev.location || "Memphis",
   block_scope: ev.blockScope || "none",
-  block_resys: (ev.blockScope || "none") !== "none", // kept in sync for older rows/queries
+  block_resys: ev.blockScope === "window" || ev.blockScope === "day", // kept in sync for older rows/queries
+  block_tables: ev.blockScope === "tables" ? (ev.blockTables || []) : [],
+  block_guests: ev.blockScope === "tables" && Number(ev.blockGuests) > 0 ? Number(ev.blockGuests) : null,
   archived: !!ev.archived,
   image_url: ev.imageUrl || null,
   featured: ev.featured === true,
@@ -3126,6 +3312,24 @@ const syncWixBlock = async (ev, prev) => {
     }
     const locId = wixLocIdFor(ev.location);
     if (!locId) return;
+    // 🍽 table holds: real Wix reservations on the chosen tables (see th() in the shell)
+    if (ev.blockScope === "tables") {
+      if (prev && (prev.blockScope === "window" || prev.blockScope === "day")) {
+        await fn("unblock-reservations", { location_id: wixLocIdFor(prev.location) || locId, comment_prefix: "[EVT:" + ev.id + "]" });
+      }
+      const w = wixBlockWindow(ev);
+      if (!w || typeof th !== "function") return;
+      const r = await th("hold", {
+        source: "event", source_id: ev.id, location: ev.location, start: w.start, end: w.end,
+        label: ev.title || "Event", table_ids: ev.blockTables || [], guests: Number(ev.blockGuests) || 0, persist: true,
+      });
+      if (!r.ok) window.alert("⚠️ Saved, but the tables are NOT held in Wix" + (ev.date ? " for " + ev.date : "") + ":\n\n" + (r.data.error || "unknown error"));
+      return;
+    }
+    if (prev && prev.blockScope === "tables" && typeof th === "function") {
+      const r = await th("release", { source: "event", source_id: ev.id });
+      if (!r.ok) window.alert("⚠️ Saved, but releasing the held Wix tables failed: " + (r.data.error || "unknown error"));
+    }
     if ((ev.blockScope || "none") !== "none") {
       const w = wixBlockWindow(ev);
       if (!w) return;
@@ -3135,7 +3339,7 @@ const syncWixBlock = async (ev, prev) => {
         replace_prefix: "[EVT:" + ev.id + "]",
       });
       if (!r.ok) window.alert("⚠️ Saved, but blocking Wix reservations failed: " + (r.data.error || "unknown error"));
-    } else if (prev && (prev.blockScope || "none") !== "none") {
+    } else if (prev && (prev.blockScope === "window" || prev.blockScope === "day")) {
       // toggled off → remove the old block
       const r = await fn("unblock-reservations", { location_id: locId, comment_prefix: "[EVT:" + ev.id + "]" });
       if (!r.ok) window.alert("⚠️ Saved, but un-blocking Wix reservations failed: " + (r.data.error || "unknown error"));
@@ -3145,6 +3349,7 @@ const syncWixBlock = async (ev, prev) => {
 const removeWixBlock = async (ev) => {
   try {
     if (typeof fn !== "function" || !ev) return;
+    if (ev.blockScope === "tables" && typeof th === "function") await th("release", { source: "event", source_id: ev.id });
     const locId = wixLocIdFor(ev.location);
     if (!locId) return;
     await fn("unblock-reservations", { location_id: locId, comment_prefix: "[EVT:" + ev.id + "]" });
@@ -5383,7 +5588,7 @@ function AdminDash({ events: allEvents, section = "class", onAddMany, regs, sold
                 <button className="cc-link" onClick={() => go("detail", { eventId: ev.id })}>
                   {ev.title}
                 </button>
-                <span className="cc-td-sub">📍 {ev.location || "Memphis"}{ev.partySize > 1 && ev.capacity < ev.partySize ? " · ⚠️ no tables to sell" : ""}{ev.blockScope === "day" ? " · 🚫 day blocked" : ev.blockScope === "window" ? " · 🚫 resys blocked" : ""}{ev.archived ? " · 📦 archived" : ""}</span>
+                <span className="cc-td-sub">📍 {ev.location || "Memphis"}{ev.partySize > 1 && ev.capacity < ev.partySize ? " · ⚠️ no tables to sell" : ""}{ev.blockScope === "day" ? " · 🚫 day blocked" : ev.blockScope === "window" ? " · 🚫 resys blocked" : ev.blockScope === "tables" ? " · 🍽 tables held" : ""}{ev.archived ? " · 📦 archived" : ""}</span>
               </span>
               <span className="cc-mono">{fmtDate(ev.date)} · {fmtTime(ev.time)}</span>
               <span>
@@ -6582,6 +6787,8 @@ function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
   const [blockScope, setBlockScope] = useState(
     ev ? (ev.blockScope || "none") : isClass ? "none" : "window"
   );
+  const [blockTables, setBlockTables] = useState(ev?.blockTables || []);
+  const [blockGuests, setBlockGuests] = useState(ev?.blockGuests ? String(ev.blockGuests) : "");
   const [err, setErr] = useState("");
   // Class artwork. imageUrl is always a hosted URL; imageIn is whatever the
   // user pasted (usually a Canva share/export link) before it's imported.
@@ -6701,6 +6908,10 @@ function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
       ? "event_tabled"
       : "event_single";
     const tabled = kindOut === "event_tabled";
+    if (blockScope === "tables" && !blockTables.length && !(Number(blockGuests) > 0)) {
+      setErr("Block tables: pick the tables to hold, or enter a guest count.");
+      return;
+    }
     const base = {
       title: title.trim(),
       blurb: blurb.trim(),
@@ -6716,6 +6927,8 @@ function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
       partySize: tabled ? Math.max(2, Number(partySize) || 2) : 1,
       groupSeating: isClass ? true : tabled,
       blockScope,
+      blockTables: blockScope === "tables" ? blockTables : [],
+      blockGuests: blockScope === "tables" && Number(blockGuests) > 0 ? Number(blockGuests) : null,
       archived: ev ? !!ev.archived : false,
       imageUrl,
     };
@@ -6773,7 +6986,21 @@ function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
         <option value="none">Keep taking online reservations (no block)</option>
         <option value="window">🚫 Block during the {noun} only (1 hr before start → end)</option>
         <option value="day">🚫 Block the whole day — entire restaurant, midnight to midnight</option>
+        <option value="tables">🍽 Block tables only — book them in Wix like a reservation, rest of the room stays open</option>
       </select>
+      {blockScope === "tables" && (
+        <TableHoldPicker
+          location={location}
+          date={dates.find(Boolean) || ""}
+          time={time}
+          durationMin={Number(duration) || 90}
+          eventId={ev ? ev.id : ""}
+          value={blockTables}
+          onChange={setBlockTables}
+          guests={blockGuests}
+          onGuests={setBlockGuests}
+        />
+      )}
 
       <label className="cc-label">Date(s)</label>
       {dates.map((d, i) => (
