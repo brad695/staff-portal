@@ -204,6 +204,7 @@
     .t-res{ background:rgba(70,140,230,0.18); color:#6cabff; } .t-cancel{ background:rgba(224,104,91,0.18); color:#f0897c; }
     .t-event{ background:rgba(230,90,150,0.18); color:#f27cb1; } .t-special{ background:rgba(46,196,150,0.16); color:#4fd6a0; }
     .t-class{ background:rgba(214,170,50,0.20); color:#e8c765; }
+    .t-exp{ background:rgba(165,43,30,0.14); color:#a52b1e; }
     .t-sched{ background:rgba(236,138,94,0.20); color:#f0a274; } .t-off{ background:rgba(224,104,91,0.18); color:#f0897c; }
     /* Square future orders. Inked darker than the tags above because these
        land on the white agenda card and have to be readable at a glance. */
@@ -999,7 +1000,7 @@ function renderReservations(recs){
 
 // ═══ CALENDAR ═══
 let _calYear=new Date().getFullYear(), _calMonth=new Date().getMonth(), _selDay=null;
-let _calData={ res:{}, ev:{}, sp:{}, sch:{}, off:{}, cls:{}, ord:{} };
+let _calData={ res:{}, ev:{}, sp:{}, sch:{}, off:{}, cls:{}, ord:{}, exp:{} };
 let _calTarget={ label:'calMonthLabel', list:'agendaList' };   // where the calendar renders: full view or inline home preview
 async function loadCalMonth(y,m){
   _calData.res={};
@@ -1009,6 +1010,9 @@ async function loadCalMonth(y,m){
     const res=await wixFetch(p); if(!res.ok) return;
     const data=await res.json();
     (data.reservations||[]).forEach(r=>{ if(!r.details||!r.details.startDate) return;
+      // Holds the portal books for events/experiences ("… (table hold)") are shown
+      // by their event or experience row instead of as a second reservation.
+      if(((r.reservee||{}).lastName||'')==='(table hold)') return;
       const dt=new Date(r.details.startDate), d=fmt(dt), who=r.reservee||{};
       const name=[who.firstName,who.lastName].filter(Boolean).join(' ')||'Guest';
       (_calData.res[d]=_calData.res[d]||[]).push({ time:dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}), name, party:r.details.partySize||'?', status:r.status||'UNKNOWN', t:dt.getTime() });
@@ -1034,6 +1038,22 @@ async function loadCalClasses(mS,mE){
     });
     Object.values(_calData.cls).forEach(a=>a.sort((x,y)=>(x.time||'').localeCompare(y.time||'')));
   }catch(e){ _calData.cls={}; }
+}
+// ── EXPERIENCES (paid reservations booked on tickets.greyscheese.com/experiences.html) ──
+// portal_experiences() is a narrow read: confirmed bookings at this shop plus the
+// Wix tables held for them.
+async function loadCalExperiences(mS,mE){
+  _calData.exp={};
+  try{
+    const { data } = await sb.rpc('portal_experiences', { p_from:mS, p_to:mE, p_loc:LOC });
+    (data||[]).forEach(x=>{ if(!x.starts_at) return;
+      const dt=new Date(x.starts_at), d=fmt(dt);
+      (_calData.exp[d]=_calData.exp[d]||[]).push({ ...x, t:dt.getTime(),
+        time:dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}),
+        until:x.ends_at?new Date(x.ends_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):'' });
+    });
+    Object.values(_calData.exp).forEach(a=>a.sort((a2,b2)=>a2.t-b2.t));
+  }catch(e){ _calData.exp={}; }
 }
 // ── SQUARE FUTURE ORDERS (mirror kept by the square-orders function) ──
 // Everything with a pickup or delivery date: Square Online / third-party
@@ -1089,7 +1109,7 @@ async function renderCalendar(){
   const labelEl=document.getElementById(_calTarget.label); if(labelEl) labelEl.textContent=months[m]+' '+y;
   await loadCalMonth(y,m);
   const mS=fmt(new Date(y,m,1)), mE=fmt(new Date(y,m+1,0));
-  await Promise.all([ loadCalClasses(mS,mE), loadCalOrders(mS,mE) ]);
+  await Promise.all([ loadCalClasses(mS,mE), loadCalOrders(mS,mE), loadCalExperiences(mS,mE) ]);
   _calData.ev={}; _events.forEach(ev=>occurrences(ev,mS,mE).forEach(d=>{(_calData.ev[d]=_calData.ev[d]||[]).push({name:ev.name,time:ev.time,desc:ev.desc,status:ev.status,endDate:ev.endDate,repeat:ev.repeat});}));
   _calData.sp={}; _specials.forEach(s=>{ if((s.repeat||'none')==='none'&&s.endDate&&s.endDate>s.date){ spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sp[k]=_calData.sp[k]||[]).push(s);}); } else { occurrences(s,mS,mE).forEach(d=>{(_calData.sp[d]=_calData.sp[d]||[]).push(s);}); } });
   _calData.sch={}; _schedules.forEach(s=>{ if(!s.date) return; spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sch[k]=_calData.sch[k]||[]).push(s);}); });
@@ -1125,8 +1145,8 @@ function renderAgenda(y,m){
   let html='', any=false;
   for(let d=startDay; d<=dim; d++){
     const date=fmt(new Date(y,m,d));
-    const res=_calData.res[date]||[], ev=_calData.ev[date]||[], sp=_calData.sp[date]||[], sch=_calData.sch[date]||[], off=_calData.off[date]||[], cls=_calData.cls[date]||[], ord=_calData.ord[date]||[];
-    if(!(res.length||ev.length||sp.length||sch.length||off.length||cls.length||ord.length)) continue;
+    const res=_calData.res[date]||[], ev=_calData.ev[date]||[], sp=_calData.sp[date]||[], sch=_calData.sch[date]||[], off=_calData.off[date]||[], cls=_calData.cls[date]||[], ord=_calData.ord[date]||[], exp=_calData.exp[date]||[];
+    if(!(res.length||ev.length||sp.length||sch.length||off.length||cls.length||ord.length||exp.length)) continue;
     any=true;
     const dl=new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
     let rows='';
@@ -1142,6 +1162,11 @@ function renderAgenda(y,m){
     ])));
     cls.forEach(c=>rows+=agRow('t-class', c.kind==='class'?'Class':'Ticketed',
       (c.time?fmtTime(c.time)+' · ':'')+esc(c.title)+(c.capacity?' · 🎟 '+c.booked+'/'+c.capacity+' booked':'')));
+    exp.forEach(x=>rows+=agRow('t-exp','Experience',
+      esc(x.time)+' · '+esc(x.experience)+' · '+esc(x.guest_name||'Guest')+' · 👥'+esc(x.party_size)
+        +(x.payment_status==='paid'?' <span class="ag-ok">\u2705</span>':''),
+      agDetail([['Time', x.time+(x.until?' – '+x.until:'')], ['Tables', x.tables||''],
+        ['Paid', x.payment_status==='paid'?'Yes':'Not yet'], ['Confirmation', x.code], ['Notes', x.notes]])));
     res.forEach(r=>{ const c=can.includes(r.status); const txt=esc(r.time)+' · '+esc(r.name)+' · 👥'+esc(r.party); rows+=agRow(c?'t-cancel':'t-res', c?'Cancelled':'Reserved', c?'<span class="ag-strike">'+txt+'</span>':txt); });
     sch.forEach(n=>rows+=agRow('t-sched','Schedule',esc(n.name||n),agDetail([
       ['Notes', n.note], ['Through', (n.endDate&&n.endDate!==date)?fmtDisplay(n.endDate):'']
