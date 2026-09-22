@@ -205,6 +205,13 @@
     .t-event{ background:rgba(230,90,150,0.18); color:#f27cb1; } .t-special{ background:rgba(46,196,150,0.16); color:#4fd6a0; }
     .t-class{ background:rgba(214,170,50,0.20); color:#e8c765; }
     .t-exp{ background:rgba(165,43,30,0.14); color:#a52b1e; }
+    .xt{ margin-top:8px; border-top:1px solid rgba(0,0,0,.08); padding-top:8px; }
+    .xt-h{ font-weight:700; font-size:.8rem; margin-bottom:6px; }
+    .xt-m{ font-size:.82rem; line-height:1.4; padding:6px 9px; border-radius:8px; margin:0 0 6px; background:#f3f4f6; max-width:92%; }
+    .xt-out{ background:#fdf3dc; margin-left:auto; }
+    .xt-note{ background:#eef2ff; font-style:italic; }
+    .xt-w{ font-size:.7rem; color:#6b7280; margin-bottom:2px; }
+    .xt-a{ display:inline-block; font-size:.8rem; font-weight:700; color:#0b6aa9; text-decoration:none; margin-top:2px; }
     .t-sched{ background:rgba(236,138,94,0.20); color:#f0a274; } .t-off{ background:rgba(224,104,91,0.18); color:#f0897c; }
     /* Square future orders. Inked darker than the tags above because these
        land on the white agenda card and have to be readable at a glance. */
@@ -1053,7 +1060,30 @@ async function loadCalExperiences(mS,mE){
         until:x.ends_at?new Date(x.ends_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):'' });
     });
     Object.values(_calData.exp).forEach(a=>a.sort((a2,b2)=>a2.t-b2.t));
+    await loadExpThreads();
   }catch(e){ _calData.exp={}; }
+}
+// Pre-booking conversations (💬 Experience Inquiries) matched to each booking by
+// the guest's email. Admin-only: the RPC returns nothing unless this browser has a
+// manager sign-in, so the public staff calendar never shows customer messages.
+async function loadExpThreads(){
+  const all=[].concat(...Object.values(_calData.exp)); if(!all.length) return;
+  try{
+    const { data:{ session } } = await sb.auth.getSession(); if(!session) return;
+    const { data } = await sb.rpc('portal_experience_threads', { p_codes: all.map(x=>x.code) });
+    const by={}; (data||[]).forEach(t=>{ (by[t.code]=by[t.code]||[]).push(t); });
+    all.forEach(x=>{ x.threads=by[x.code]||null; });
+  }catch(e){}
+}
+function expThreadHtml(x){
+  if(!x.threads||!x.threads.length) return '';
+  let h='<div class="xt"><div class="xt-h">💬 Conversation</div>';
+  x.threads.forEach(t=>(t.messages||[]).forEach(m=>{
+    const who=m.dir==='out'?'GREYS':m.dir==='note'?'Note':(x.guest_name||'Guest');
+    const when=new Date(m.at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+    h+='<div class="xt-m xt-'+esc(m.dir)+'"><div class="xt-w">'+esc(who)+' · '+esc(when)+'</div>'+esc(m.body).replace(/\n/g,'<br>')+'</div>';
+  }));
+  return h+'<a class="xt-a" href="manager.html#inquiries" onclick="event.stopPropagation()">Reply in the portal →</a></div>';
 }
 // ── SQUARE FUTURE ORDERS (mirror kept by the square-orders function) ──
 // Everything with a pickup or delivery date: Square Online / third-party
@@ -1166,7 +1196,7 @@ function renderAgenda(y,m){
       esc(x.time)+' · '+esc(x.experience)+' · '+esc(x.guest_name||'Guest')+' · 👥'+esc(x.party_size)
         +(x.payment_status==='paid'?' <span class="ag-ok">\u2705</span>':''),
       agDetail([['Time', x.time+(x.until?' – '+x.until:'')], ['Tables', x.tables||''],
-        ['Paid', x.payment_status==='paid'?'Yes':'Not yet'], ['Confirmation', x.code], ['Notes', x.notes]])));
+        ['Paid', x.payment_status==='paid'?'Yes':'Not yet'], ['Confirmation', x.code], ['Notes', x.notes]])+expThreadHtml(x)));
     res.forEach(r=>{ const c=can.includes(r.status); const txt=esc(r.time)+' · '+esc(r.name)+' · 👥'+esc(r.party); rows+=agRow(c?'t-cancel':'t-res', c?'Cancelled':'Reserved', c?'<span class="ag-strike">'+txt+'</span>':txt); });
     sch.forEach(n=>rows+=agRow('t-sched','Schedule',esc(n.name||n),agDetail([
       ['Notes', n.note], ['Through', (n.endDate&&n.endDate!==date)?fmtDisplay(n.endDate):'']
