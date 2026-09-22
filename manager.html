@@ -602,6 +602,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab-head">Events &amp; Reservations</div>
     <div class="tab" onclick="mtab('events')">Events</div>
     <div class="tab" onclick="mtab('resys')">Reservations</div>
+    <div class="tab" onclick="mtab('inquiries')">💬 Experience Inquiries <span id="inqBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
     <div class="tab-head">Tickets &amp; Classes</div>
     <div class="tab" onclick="tkTab(this,'admin')">Classes</div>
     <div class="tab" onclick="tkTab(this,'mahjong')">🀄 Mahjong</div>
@@ -672,6 +673,38 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
   </div>
 
   <!-- RESERVATIONS -->
+  <!-- Experience inquiries: HoneyBook-style conversations with customers before they book -->
+  <div id="panel-inquiries" class="panel">
+    <div class="section-card">
+      <h2>💬 Experience Inquiries</h2>
+      <div class="hint">Questions customers send from the <strong>Experiences</strong> page (Ask a question). Reply here and it's emailed to them from info@greyscheese.com; <strong>their replies come to brad@greyscheese.com for now</strong> — paste them in with <em>Log their reply</em> so the whole conversation stays here. <strong>Booking link</strong> drops in a link that opens their experience already filled in.</div>
+      <div class="toolbar" id="inqChips"></div>
+      <div class="rec-list" id="inqList"><div class="rec-empty">Loading…</div></div>
+    </div>
+  </div>
+  <div id="inqModal" class="rec-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:200;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 10px;" onclick="if(event.target===this)inqClose()">
+    <div class="rec-card" style="background:#fff;max-width:720px;width:100%;border-radius:14px;padding:22px;">
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <div style="flex:1;min-width:0;"><h3 id="inqTitle" style="margin:0 0 4px;"></h3><div id="inqMeta" class="hint" style="margin:0;"></div></div>
+        <select id="inqStage" class="loc-sel" onchange="inqSetStage(this.value)">
+          <option value="new">New</option><option value="replied">Replied</option><option value="link_sent">Booking link sent</option><option value="booked">Booked</option><option value="lost">Lost</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="inqClose()">✕</button>
+      </div>
+      <div id="inqThread" style="margin:16px 0;max-height:46vh;overflow-y:auto;"></div>
+      <div class="rf full"><label>Reply</label>
+        <select id="inqQuick" class="loc-sel" style="margin-bottom:6px;" onchange="inqQuickPick(this)"><option value="">Quick replies…</option></select>
+        <textarea id="inqBody" rows="5" placeholder="Write your reply…"></textarea></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center;">
+        <button class="btn btn-ghost btn-sm" onclick="inqInsertLink()">🔗 Booking link</button>
+        <button class="btn btn-ghost btn-sm" onclick="inqLog(false)">📥 Log their reply</button>
+        <button class="btn btn-ghost btn-sm" onclick="inqLog(true)">📝 Add note</button>
+        <span class="save-msg" id="inqMsg" style="flex:1;"></span>
+        <button class="btn btn-gold" id="inqSend" onclick="inqSend()">Send reply ✉️</button>
+      </div>
+    </div>
+  </div>
+
   <div id="panel-resys" class="panel">
     <div class="section-card">
       <h2>🗓️ Reservations</h2>
@@ -1553,7 +1586,145 @@ function openHashTab(){
 }
 window.addEventListener('hashchange', openHashTab);
 
-function loadAll(){ loadKind('items'); loadKind('events'); loadKind('schedules'); loadKind('employees'); sgLoad(); loadTimeOff(); loadSwaps(); loadAnnouncements(); resInit(); if(window.tkInit)tkInit(); if(window.ccInit)ccInit(); if(window.pluInit)pluInit(); if(window.emcInit)emcInit(); if(window.socInit)socInit(); if(window.poInit)poInit(); openHashTab(); }
+function loadAll(){ loadKind('items'); loadKind('events'); loadKind('schedules'); loadKind('employees'); sgLoad(); loadTimeOff(); loadSwaps(); loadAnnouncements(); resInit(); inqLoad(); if(window.tkInit)tkInit(); if(window.ccInit)ccInit(); if(window.pluInit)pluInit(); if(window.emcInit)emcInit(); if(window.socInit)socInit(); if(window.poInit)poInit(); openHashTab(); }
+
+/* ---- Experience inquiries (HoneyBook-style) ----
+   Tables: inquiries (one per customer question) + inquiry_messages (in / out / note),
+   admin-only by RLS. Sending goes through the `inquiries` edge function, which emails
+   the customer via send-mail. Customer replies land in brad@greyscheese.com until
+   inbound email is wired in — "Log their reply" pastes them into the thread. */
+const INQ_URL = SB_URL + '/functions/v1/inquiries';
+const INQ_STAGES = { new:'New', replied:'Replied', link_sent:'Link sent', booked:'Booked', lost:'Lost' };
+const INQ_SITE = 'https://tickets.greyscheese.com/experiences.html';
+let INQ_ROWS = [], INQ_FILTER = 'open', INQ_CUR = null;
+const INQ_QUICK = [
+  ['Thanks — checking', "Thanks so much for reaching out! Let me check on that and get right back to you."],
+  ['Pricing', "Our experiences are priced per party and include everything at the table. Happy to put one together for you — just let me know the date and how many guests."],
+  ['Bigger group', "We'd love to host your group! For parties larger than what's listed online we can combine tables or set up a private seating — what date are you thinking?"],
+  ['Dietary needs', "Absolutely — just let us know about any allergies or dietary needs and we'll make sure your table is taken care of."],
+  ['Book here', "Great news — you can lock it in here and pay online:\n{link}\n\nIt's already filled in with your details. Let me know if you need anything else!"]
+];
+async function inqApi(action, payload){
+  let token = SB_KEY;
+  try{ const { data } = await sb.auth.getSession(); if(data && data.session) token = data.session.access_token; }catch(_){}
+  try{
+    const r = await fetch(INQ_URL+'?action='+action, { method:'POST', headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+token }, body: JSON.stringify(payload||{}) });
+    const d = await r.json().catch(()=>({}));
+    return { ok: r.ok && d.ok!==false, data:d };
+  }catch(e){ return { ok:false, data:{ error:String(e) } }; }
+}
+function inqWhen(iso){ const d=new Date(iso); return isNaN(d)?'':d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
+async function inqLoad(){
+  const el = document.getElementById('inqList'); if(!el) return;
+  const { data, error } = await sb.from('inquiries').select('*, inquiry_messages(body,direction,created_at)').order('last_message_at',{ascending:false}).limit(300);
+  if(error){ el.innerHTML = '<div class="rec-empty">❌ Could not load inquiries.</div>'; return; }
+  INQ_ROWS = data || [];
+  const unread = INQ_ROWS.filter(r=>r.unread).length;
+  const b = document.getElementById('inqBadge'); if(b){ b.textContent = unread; b.style.display = unread ? '' : 'none'; }
+  inqRender();
+}
+function inqRender(){
+  const counts = { open:0 }; Object.keys(INQ_STAGES).forEach(k=>counts[k]=0);
+  INQ_ROWS.forEach(r=>{ counts[r.stage]=(counts[r.stage]||0)+1; if(r.stage!=='booked'&&r.stage!=='lost') counts.open++; });
+  document.getElementById('inqChips').innerHTML = [['open','Open'],...Object.entries(INQ_STAGES),['all','All']].map(([k,l])=>
+    '<button class="chip'+(INQ_FILTER===k?' on':'')+'" onclick="INQ_FILTER=\''+k+'\';inqRender()">'+l+(k==='all'?'':' · '+(counts[k]||0))+'</button>').join('')
+    +'<div class="spacer"></div><button class="btn btn-ghost btn-sm" onclick="inqLoad()">↻ Refresh</button>';
+  const rows = INQ_ROWS.filter(r=> INQ_FILTER==='all' ? true : INQ_FILTER==='open' ? (r.stage!=='booked'&&r.stage!=='lost') : r.stage===INQ_FILTER);
+  const el = document.getElementById('inqList');
+  if(!rows.length){ el.innerHTML = '<div class="rec-empty">No inquiries here.</div>'; return; }
+  el.innerHTML = rows.map(r=>{
+    const msgs = (r.inquiry_messages||[]).filter(m=>m.direction!=='note').sort((a,b)=>a.created_at.localeCompare(b.created_at));
+    const lastMsg = msgs[msgs.length-1];
+    const bits = [r.experience_name||'Not sure yet', r.preferred_date?fmtDisplay(r.preferred_date):'', r.party_size?('👥 '+r.party_size):''].filter(Boolean).join(' · ');
+    const pill = r.stage==='booked'?'pill-ok':r.stage==='lost'?'pill-bad':r.stage==='new'?'pill-req':'pill-mid';
+    return '<div class="rec-row" onclick="inqOpen(\''+r.id+'\')">'
+      +'<span style="width:10px;height:10px;border-radius:50%;flex:0 0 10px;background:'+(r.unread?'#d97706':'transparent')+'"></span>'
+      +'<div style="flex:1;min-width:0;"><div class="res-r-name">'+esc(r.name)+' <span style="font-weight:400;color:#64748b;">· '+esc(bits)+'</span></div>'
+      +'<div class="res-r-meta" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(lastMsg?(lastMsg.direction==='out'?'You: ':'')+esc(lastMsg.body.slice(0,140)):'')+'</div></div>'
+      +'<span class="res-r-time" style="min-width:auto;">'+esc(inqWhen(r.last_message_at))+'</span>'
+      +'<span class="pill '+pill+'">'+INQ_STAGES[r.stage]+'</span></div>';
+  }).join('');
+}
+async function inqOpen(id){
+  INQ_CUR = INQ_ROWS.find(r=>r.id===id); if(!INQ_CUR) return;
+  const r = INQ_CUR;
+  document.getElementById('inqTitle').textContent = r.name + (r.experience_name ? ' — ' + r.experience_name : '');
+  document.getElementById('inqMeta').innerHTML = [ '<a href="mailto:'+esc(r.email)+'">'+esc(r.email)+'</a>', r.phone?esc(r.phone):'',
+    r.preferred_date?'📅 '+fmtDisplay(r.preferred_date):'', r.party_size?'👥 '+r.party_size:'', '#'+esc(r.code) ].filter(Boolean).join(' · ');
+  document.getElementById('inqStage').value = r.stage;
+  document.getElementById('inqBody').value = '';
+  document.getElementById('inqMsg').textContent = '';
+  const q = document.getElementById('inqQuick');
+  q.innerHTML = '<option value="">Quick replies…</option>' + INQ_QUICK.map((x,i)=>'<option value="'+i+'">'+esc(x[0])+'</option>').join('');
+  document.getElementById('inqModal').style.display = 'flex';
+  await inqThread();
+  if(r.unread){ await sb.from('inquiries').update({ unread:false }).eq('id', r.id); r.unread=false; inqLoad(); }
+}
+async function inqThread(){
+  const el = document.getElementById('inqThread'); el.innerHTML = '<div class="rec-empty">Loading…</div>';
+  const { data } = await sb.from('inquiry_messages').select('*').eq('inquiry_id', INQ_CUR.id).order('created_at');
+  el.innerHTML = (data||[]).map(m=>{
+    const mine = m.direction==='out', note = m.direction==='note';
+    const bg = note ? '#fef9c3' : mine ? '#e0f2fe' : '#f1f5f9';
+    const who = note ? '📝 Note' : mine ? ('You'+(m.sent_by?' ('+esc(m.sent_by)+')':'')) : esc(INQ_CUR.name);
+    const warn = mine && m.email_status && m.email_status!=='sent' ? ' <span class="pill pill-bad">email failed</span>' : '';
+    return '<div style="display:flex;justify-content:'+(mine?'flex-end':'flex-start')+';margin:6px 0;"><div style="max-width:82%;background:'+bg+';border-radius:12px;padding:9px 12px;">'
+      +'<div style="font-size:.72rem;color:#64748b;margin-bottom:3px;">'+who+' · '+esc(inqWhen(m.created_at))+warn+'</div>'
+      +'<div style="white-space:pre-wrap;font-size:.9rem;">'+esc(m.body)+'</div></div></div>';
+  }).join('') || '<div class="rec-empty">No messages.</div>';
+  el.scrollTop = el.scrollHeight;
+}
+function inqClose(){ document.getElementById('inqModal').style.display='none'; INQ_CUR=null; }
+function inqLink(){
+  const r = INQ_CUR; if(!r) return INQ_SITE;
+  const [first, ...rest] = (r.name||'').trim().split(/\s+/);
+  const p = new URLSearchParams();
+  if(r.experience_type_id) p.set('book', r.experience_type_id); else p.set('ask','');
+  if(r.preferred_date) p.set('date', r.preferred_date);
+  if(r.party_size) p.set('party', r.party_size);
+  if(first) p.set('first', first); if(rest.length) p.set('last', rest.join(' '));
+  if(r.email) p.set('email', r.email); if(r.phone) p.set('phone', r.phone);
+  return INQ_SITE + '?' + p.toString();
+}
+function inqInsertLink(){
+  const t = document.getElementById('inqBody');
+  if(!INQ_CUR.experience_type_id){ document.getElementById('inqMsg').textContent = 'They didn\'t pick an experience — the link opens the Experiences page.'; }
+  t.value = (t.value ? t.value.replace(/\s*$/,'') + '\n\n' : '') + inqLink();
+  t.focus();
+}
+function inqQuickPick(sel){
+  const x = INQ_QUICK[Number(sel.value)]; sel.value=''; if(!x) return;
+  const t = document.getElementById('inqBody');
+  const first = ((INQ_CUR && INQ_CUR.name)||'').split(' ')[0];
+  const txt = (first ? 'Hi '+first+',\n\n' : '') + x[1].replace('{link}', inqLink());
+  t.value = t.value ? t.value + '\n\n' + x[1].replace('{link}', inqLink()) : txt;
+}
+async function inqSend(){
+  const body = document.getElementById('inqBody').value.trim();
+  const msg = document.getElementById('inqMsg');
+  if(!body){ msg.textContent = 'Write a reply first.'; return; }
+  const btn = document.getElementById('inqSend'); btn.disabled = true; msg.textContent = 'Sending…';
+  const r = await inqApi('reply', { inquiry_id: INQ_CUR.id, body });
+  btn.disabled = false;
+  msg.textContent = r.ok ? '✓ Sent to '+INQ_CUR.email : '❌ '+(r.data.error||'Could not send');
+  if(r.ok){ document.getElementById('inqBody').value=''; if(r.data.stage){ INQ_CUR.stage=r.data.stage; document.getElementById('inqStage').value=r.data.stage; } }
+  await inqThread(); inqLoad();
+}
+async function inqLog(note){
+  const body = document.getElementById('inqBody').value.trim();
+  const msg = document.getElementById('inqMsg');
+  if(!body){ msg.textContent = note ? 'Type the note in the box first.' : 'Paste their email reply into the box first.'; return; }
+  const r = await inqApi('log', { inquiry_id: INQ_CUR.id, body, note });
+  msg.textContent = r.ok ? (note?'✓ Note added':'✓ Reply logged') : '❌ '+(r.data.error||'Could not save');
+  if(r.ok) document.getElementById('inqBody').value='';
+  await inqThread(); inqLoad();
+}
+async function inqSetStage(v){
+  if(!INQ_CUR) return;
+  const { error } = await sb.from('inquiries').update({ stage:v }).eq('id', INQ_CUR.id);
+  document.getElementById('inqMsg').textContent = error ? '❌ '+error.message : '✓ Moved to '+INQ_STAGES[v];
+  INQ_CUR.stage = v; inqLoad();
+}
 
 /* ---- Reservations (Wix, via portal-api) ---- */
 // Wix reservation-location ids — must match index.html's LOCATIONS map.
