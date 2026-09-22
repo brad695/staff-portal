@@ -693,6 +693,10 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
         </select>
         <button class="btn btn-ghost btn-sm" onclick="inqClose()">✕</button>
       </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;margin:10px 0 0;cursor:pointer;">
+        <input type="checkbox" id="inqHideCal" onchange="inqSetHideCal(this.checked)">
+        🔒 Hide this conversation from the staff calendar <span class="hint" style="margin:0;">(for anything sensitive — it stays here)</span>
+      </label>
       <div id="inqThread" style="margin:16px 0;max-height:46vh;overflow-y:auto;"></div>
       <div class="rf full"><label>Reply</label>
         <select id="inqQuick" class="loc-sel" style="margin-bottom:6px;" onchange="inqQuickPick(this)"><option value="">Quick replies…</option></select>
@@ -1663,6 +1667,7 @@ async function inqOpen(id){
         ? '<div style="margin-top:4px;color:#92400e;">⏳ Held until '+esc(inqWhen(r.hold_expires_at))+' — sending the booking link restarts the 48 h.</div>'
         : '<div style="margin-top:4px;color:#b91c1c;">Hold expired — the link still works if the time is open.</div>') : '');
   document.getElementById('inqStage').value = r.stage;
+  document.getElementById('inqHideCal').checked = !!r.hide_on_calendar;
   document.getElementById('inqBody').value = '';
   document.getElementById('inqMsg').textContent = '';
   const q = document.getElementById('inqQuick');
@@ -1733,6 +1738,12 @@ async function inqLog(note){
   msg.textContent = r.ok ? (note?'✓ Note added':'✓ Reply logged') : '❌ '+(r.data.error||'Could not save');
   if(r.ok) document.getElementById('inqBody').value='';
   await inqThread(); inqLoad();
+}
+async function inqSetHideCal(v){
+  if(!INQ_CUR) return;
+  const { error } = await sb.from('inquiries').update({ hide_on_calendar: !!v }).eq('id', INQ_CUR.id);
+  document.getElementById('inqMsg').textContent = error ? '❌ '+error.message : (v ? '🔒 Hidden from the calendar' : '✓ Shown on the calendar again');
+  if(!error) INQ_CUR.hide_on_calendar = !!v;
 }
 async function inqSetStage(v){
   if(!INQ_CUR) return;
