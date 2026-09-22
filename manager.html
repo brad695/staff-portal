@@ -1625,6 +1625,12 @@ async function inqLoad(){
   const b = document.getElementById('inqBadge'); if(b){ b.textContent = unread; b.style.display = unread ? '' : 'none'; }
   inqRender();
 }
+// Jump straight into one conversation (used by the Experiences bookings list).
+window.inqOpenById = async function(id){
+  const t = document.querySelector(".tab[onclick*=\"'inquiries'\"]"); if(t) t.click();
+  if(!INQ_ROWS.some(r=>r.id===id)) await inqLoad();
+  inqOpen(id);
+};
 function inqRender(){
   const counts = { open:0 }; Object.keys(INQ_STAGES).forEach(k=>counts[k]=0);
   INQ_ROWS.forEach(r=>{ counts[r.stage]=(counts[r.stage]||0)+1; if(r.stage!=='booked'&&r.stage!=='lost') counts.open++; });
@@ -5711,7 +5717,7 @@ function ExperienceBookings({ x, onBack, onEdit }) {
                 <b>{r.guest_name || "Guest"}</b>
                 <span className="cc-td-sub">{[r.email && <a key="e" href={"mailto:" + r.email}>{r.email}</a>, r.phone && <a key="p" href={"tel:" + r.phone}>{r.phone}</a>].filter(Boolean).reduce((a, b, i) => i ? [...a, " · ", b] : [b], [])}</span>
                 {r.notes && <span className="cc-td-sub">📝 {r.notes}</span>}
-                {q && <a className="cc-td-sub" href="#inquiries" onClick={(e) => { e.preventDefault(); const t = document.querySelector(".tab[onclick*=\"'inquiries'\"]"); if (t) t.click(); }}>💬 Inquiry #{q.code} · {q.stage.replace("_", " ")}</a>}
+                {q && <a className="cc-td-sub" href="#inquiries" style={{ fontWeight: 700 }} onClick={(e) => { e.preventDefault(); window.inqOpenById && window.inqOpenById(q.id); }}>💬 Open the conversation (#{q.code} · {q.stage.replace("_", " ")}) →</a>}
               </span>
               <span className="cc-mono">👥 {r.party_size}<br />{money(r.total_cents || 0)}</span>
               <span style={{ color: col, fontWeight: 700, fontSize: 13 }}>{st}</span>
