@@ -607,6 +607,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab" onclick="tkTab(this,'admin')">Classes</div>
     <div class="tab" onclick="tkTab(this,'mahjong')">🀄 Mahjong</div>
     <div class="tab" onclick="tkTab(this,'ticketed')">Events</div>
+    <div class="tab" onclick="tkTab(this,'experiences')">✨ Experiences</div>
     <div class="tab" onclick="tkTab(this,'edit',{kind:'class'})">＋ Add Class</div>
     <div class="tab" onclick="tkTab(this,'edit',{kind:'event'})">＋ Add Ticketed Event</div>
     <div class="tab" onclick="tkTab(this,'home')">🏠 Front Page</div>
@@ -4209,6 +4210,7 @@ function App() {
                 <AdminReport events={events} regs={regs} />
               )}
               {view.name === "home" && <AdminHome go={go} />}
+              {view.name === "experiences" && <AdminExperiences go={go} />}
               {view.name === "confirm" && <AdminConfirmEmail go={go} />}
               {view.name === "bulk" && (
                 <AdminBulk
@@ -5620,6 +5622,266 @@ const DASH_TEXT = {
   mahjong: { eyebrow: "Ongoing series", h2: "Mahjong nights", list: "Mahjong schedule", col: "Night", one: "night", many: "nights" },
   event: { eyebrow: "Dashboard", h2: "Ticketed events", list: "Event schedule", col: "Event", one: "event", many: "events" },
 };
+// ── EXPERIENCES (paid reservations on tickets.greyscheese.com/experiences.html) ──
+// The tiles on that page are rows of rb_experience_types. Edit them here the same
+// way classes are edited: title, blurb, picture, price, party size, length.
+// Bookings themselves live in rb_reservations (see the calendar / inquiries).
+const EXP_SITE = "https://tickets.greyscheese.com/experiences.html";
+const expBlank = () => ({ id: null, name: "", description: "", price_cents: 30000, per_person: false,
+  duration_min: 90, min_party: 2, max_party: 8, tables_needed: 2, lead_time_min: null, active: true,
+  sort_order: 99, image_url: "" });
+
+function AdminExperiences({ go }) {
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState("");
+  const [editing, setEditing] = useState(null); // row being edited (or blank for new)
+  const [booked, setBooked] = useState({});
+  const load = async () => {
+    setErr("");
+    const { data, error } = await db.from("rb_experience_types").select("*").order("sort_order");
+    if (error) { setErr(error.message); setRows([]); return; }
+    setRows(data || []);
+    const { data: rs } = await db.from("rb_reservations").select("experience_type_id,status,payment_status,starts_at")
+      .eq("kind", "experience").gte("starts_at", new Date().toISOString());
+    const b = {};
+    (rs || []).forEach((r) => {
+      const k = r.experience_type_id; if (!k) return;
+      b[k] = b[k] || { paid: 0, held: 0 };
+      if (r.status === "confirmed" && r.payment_status === "paid") b[k].paid++;
+      else if (r.status === "pending") b[k].held++;
+    });
+    setBooked(b);
+  };
+  useEffect(() => { load(); }, []);
+
+  const move = async (i, dir) => {
+    const list = [...rows]; const j = i + dir;
+    if (j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
+    setRows(list);
+    for (let k = 0; k < list.length; k++) {
+      if (list[k].sort_order !== k + 1) await db.from("rb_experience_types").update({ sort_order: k + 1 }).eq("id", list[k].id);
+    }
+    load();
+  };
+  const toggle = async (x) => {
+    const { error } = await db.from("rb_experience_types").update({ active: !x.active }).eq("id", x.id);
+    if (error) setErr(error.message); else load();
+  };
+
+  if (editing) return (
+    <ExperienceEdit x={editing} count={(rows || []).length}
+      onCancel={() => setEditing(null)}
+      onSaved={() => { setEditing(null); load(); }} />
+  );
+
+  return (
+    <div>
+      <div className="cc-dash-head">
+        <div>
+          <p className="cc-eyebrow">Paid reservations · tickets.greyscheese.com/experiences</p>
+          <h2 className="cc-h2">Experiences</h2>
+        </div>
+        <div className="cc-dash-btns">
+          <button className="cc-btn cc-btn-wax" onClick={() => setEditing(expBlank())}>＋ Add experience</button>
+          <a className="cc-btn cc-btn-ghost" href={EXP_SITE} target="_blank" rel="noopener" style={{ textDecoration: "none" }}>View the page ↗</a>
+        </div>
+      </div>
+      {err && <div className="cc-err">{err}</div>}
+      <div className="cc-table cc-table-exp">
+        <div className="cc-tr cc-tr-head">
+          <span>Experience</span><span>Price</span><span>Party · length</span><span>Upcoming</span><span></span>
+        </div>
+        {rows === null && <div className="cc-empty">Loading…</div>}
+        {rows && rows.length === 0 && <div className="cc-empty">No experiences yet — add one above.</div>}
+        {(rows || []).map((x, i) => {
+          const b = booked[x.id] || { paid: 0, held: 0 };
+          return (
+            <div key={x.id} className={"cc-tr" + (x.active ? "" : " cc-tr-past")}>
+              <span className="cc-td-title" style={{ display: "flex", flexDirection: "row", gap: 10, alignItems: "center", justifyContent: "flex-start", textAlign: "left" }}>
+                {x.image_url
+                  ? <img src={x.image_url} alt="" style={{ width: 56, height: 40, objectFit: "cover", flex: "none" }} />
+                  : <span style={{ width: 56, height: 40, background: "#e5e7eb", flex: "none" }} />}
+                <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
+                  <button className="cc-link" onClick={() => setEditing(x)}>{x.name}</button>
+                  <span className="cc-td-sub">{x.active ? "🟢 On the site" : "⏸ Hidden"} · {x.tables_needed} table{x.tables_needed === 1 ? "" : "s"}</span>
+                </span>
+              </span>
+              <span className="cc-mono">{money(x.price_cents)}{x.per_person ? " / guest" : " / party"}</span>
+              <span className="cc-mono">{x.min_party}–{x.max_party} · {x.duration_min} min</span>
+              <span className="cc-mono">{b.paid} booked{b.held ? " · " + b.held + " on hold" : ""}</span>
+              <span className="cc-td-actions">
+                <button className="cc-mini" onClick={() => setEditing(x)}>Edit</button>
+                <button className="cc-mini" onClick={() => toggle(x)}>{x.active ? "Hide" : "Show"}</button>
+                <button className="cc-mini" title="Move up" onClick={() => move(i, -1)} disabled={i === 0}>↑</button>
+                <button className="cc-mini" title="Move down" onClick={() => move(i, 1)} disabled={i === rows.length - 1}>↓</button>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="cc-hint">Order here is the order of the tiles on the page. Hidden experiences stay in the system (and keep their bookings) but disappear from the site.</p>
+    </div>
+  );
+}
+
+function ExperienceEdit({ x, count, onCancel, onSaved }) {
+  const isNew = !x.id;
+  const [name, setName] = useState(x.name || "");
+  const [desc, setDesc] = useState(x.description || "");
+  const [price, setPrice] = useState(((x.price_cents || 0) / 100).toString());
+  const [perPerson, setPerPerson] = useState(!!x.per_person);
+  const [duration, setDuration] = useState(String(x.duration_min || 90));
+  const [minP, setMinP] = useState(String(x.min_party || 1));
+  const [maxP, setMaxP] = useState(String(x.max_party || 8));
+  const [tables, setTables] = useState(String(x.tables_needed || 2));
+  const [lead, setLead] = useState(x.lead_time_min == null ? "" : String(Math.round(x.lead_time_min / 60)));
+  const [active, setActive] = useState(x.active !== false);
+  const [imageUrl, setImageUrl] = useState(x.image_url || "");
+  const [imageIn, setImageIn] = useState("");
+  const [imageBusy, setImageBusy] = useState(false);
+  const [imageMsg, setImageMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const importImage = async () => {
+    const u = imageIn.trim(); if (!u) return setImageMsg("Paste an image link first.");
+    setImageBusy(true); setImageMsg("");
+    try { setImageUrl(await window.emcHostImage(u, "social-assets", name || "experience")); setImageIn(""); setImageMsg("Imported — this copy is permanent."); }
+    catch (e) { setImageMsg(String((e && e.message) || e)); }
+    setImageBusy(false);
+  };
+  const uploadImageFile = async (file) => {
+    if (!file) return;
+    if (!String(file.type || "").startsWith("image/")) return setImageMsg("Choose an image file (JPEG, PNG, WebP, etc.).");
+    if (file.size > 25 * 1024 * 1024) return setImageMsg("That image is over 25 MB — shrink it first.");
+    setImageBusy(true); setImageMsg("Uploading…");
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const path = "experiences/" + new Date().toISOString().slice(0, 10) + "/" + Math.random().toString(36).slice(2, 10) + "." + ext;
+      const { error } = await db.storage.from("social-assets").upload(path, file, { contentType: file.type, upsert: false });
+      if (error) throw new Error(error.message || "Upload failed");
+      const { data } = db.storage.from("social-assets").getPublicUrl(path);
+      setImageUrl(data.publicUrl); setImageMsg("Uploaded — this copy is permanent.");
+    } catch (e) { setImageMsg("Upload failed: " + String((e && e.message) || e)); }
+    setImageBusy(false);
+  };
+
+  const save = async () => {
+    setErr("");
+    const cents = Math.round(Number(price) * 100);
+    const mn = Math.floor(Number(minP)), mx = Math.floor(Number(maxP)), du = Math.floor(Number(duration)), tb = Math.floor(Number(tables));
+    if (!name.trim()) return setErr("Give it a name.");
+    if (!(cents > 0)) return setErr("Enter a price.");
+    if (!(mn >= 1) || !(mx >= mn)) return setErr("Party size: the most must be at least the fewest.");
+    if (!(du >= 15)) return setErr("Length must be at least 15 minutes.");
+    if (!(tb >= 1)) return setErr("It needs at least one table.");
+    const row = { name: name.trim(), description: desc.trim(), price_cents: cents, per_person: perPerson,
+      duration_min: du, min_party: mn, max_party: mx, tables_needed: tb,
+      lead_time_min: lead === "" ? null : Math.max(0, Math.round(Number(lead) * 60)),
+      active, image_url: imageUrl || null };
+    setBusy(true);
+    const q = isNew
+      ? db.from("rb_experience_types").insert({ ...row, sort_order: count + 1 })
+      : db.from("rb_experience_types").update(row).eq("id", x.id);
+    const { error } = await q;
+    setBusy(false);
+    if (error) return setErr(error.message);
+    onSaved();
+  };
+
+  const total = Math.round(Number(price) * 100) || 0;
+  return (
+    <div className="cc-edit">
+      <button className="cc-back" onClick={onCancel}>← Back</button>
+      <h2 className="cc-h2">{isNew ? "New experience" : "Edit experience"}</h2>
+
+      <label className="cc-label">Experience name</label>
+      <input className="cc-input" value={name} onChange={(e) => setName(e.target.value)} />
+
+      <label className="cc-label">Description</label>
+      <textarea className="cc-input cc-textarea" value={desc} onChange={(e) => setDesc(e.target.value)} />
+
+      <label className="cc-label">Experience image</label>
+      {imageUrl ? (
+        <div className="cc-classimg">
+          <img src={imageUrl} alt="" style={{ aspectRatio: "384 / 275", width: 150 }} />
+          <div className="cc-classimg-side">
+            <p className="cc-hint" style={{ margin: 0 }}>Shown on this experience's tile.</p>
+            <button className="cc-mini danger" onClick={() => { setImageUrl(""); setImageMsg(""); }}>Remove image</button>
+          </div>
+        </div>
+      ) : <p className="cc-hint">No image — the site will use a generic experience photo.</p>}
+      <div className="cc-giftrow">
+        <label className="cc-mini" style={{ cursor: imageBusy ? "default" : "pointer", margin: 0 }}>
+          {imageBusy ? "Working…" : "Upload"}
+          <input type="file" accept="image/*" style={{ display: "none" }} disabled={imageBusy}
+            onChange={(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ""; uploadImageFile(f); }} />
+        </label>
+        <input className="cc-input" placeholder="…or paste a Canva or image link" value={imageIn} onChange={(e) => setImageIn(e.target.value)} />
+        <button className="cc-mini" onClick={importImage} disabled={imageBusy}>{imageBusy ? "Working…" : imageUrl ? "Replace" : "Import"}</button>
+      </div>
+      {imageMsg && <p className="cc-hint">{imageMsg}</p>}
+      <p className="cc-hint">Landscape pictures fit the tile best (about 7 wide × 5 tall).</p>
+
+      <div className="cc-row2">
+        <div>
+          <label className="cc-label">Price ($)</label>
+          <input className="cc-input" type="number" min="0" step="1" value={price} onChange={(e) => setPrice(e.target.value)} />
+        </div>
+        <div>
+          <label className="cc-label">Priced</label>
+          <select className="cc-input" value={perPerson ? "person" : "party"} onChange={(e) => setPerPerson(e.target.value === "person")}>
+            <option value="party">Per party (one price for the group)</option>
+            <option value="person">Per guest</option>
+          </select>
+        </div>
+      </div>
+      <p className="cc-hint">
+        {perPerson ? `A party of ${Number(minP) || 1} pays ${money(total * (Number(minP) || 1))}, a party of ${Number(maxP) || 1} pays ${money(total * (Number(maxP) || 1))}.`
+          : `Every party pays ${money(total)}, whatever its size.`}
+      </p>
+
+      <div className="cc-row2">
+        <div>
+          <label className="cc-label">Fewest guests</label>
+          <input className="cc-input" type="number" min="1" value={minP} onChange={(e) => setMinP(e.target.value)} />
+        </div>
+        <div>
+          <label className="cc-label">Most guests</label>
+          <input className="cc-input" type="number" min="1" value={maxP} onChange={(e) => setMaxP(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="cc-row2">
+        <div>
+          <label className="cc-label">Length (minutes)</label>
+          <input className="cc-input" type="number" min="15" step="15" value={duration} onChange={(e) => setDuration(e.target.value)} />
+        </div>
+        <div>
+          <label className="cc-label">Tables it uses</label>
+          <input className="cc-input" type="number" min="1" value={tables} onChange={(e) => setTables(e.target.value)} />
+        </div>
+      </div>
+      <p className="cc-hint">Tables are held in Wix for the booking, from 1½ hours before start to 1 hour after, the same as event holds.</p>
+
+      <label className="cc-label">Book at least … hours ahead (blank = shop default)</label>
+      <input className="cc-input" type="number" min="0" value={lead} onChange={(e) => setLead(e.target.value)} />
+
+      <label className="cc-check" style={{ marginTop: 14 }}>
+        <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+        <span>Show this experience on the site</span>
+      </label>
+
+      {err && <div className="cc-err" style={{ marginTop: 12 }}>{err}</div>}
+      <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+        <button className="cc-btn cc-btn-ghost" onClick={onCancel}>Cancel</button>
+        <button className="cc-btn cc-btn-wax" style={{ flex: 1 }} onClick={save} disabled={busy}>{busy ? "Saving…" : isNew ? "Add experience" : "Save changes"}</button>
+      </div>
+    </div>
+  );
+}
+
 function AdminDash({ events: allEvents, section = "class", onAddMany, regs, soldFor, revenueFor, go, onDelete, onArchive, onArchiveAll }) {
   const T = DASH_TEXT[section] || DASH_TEXT.class;
   const events = allEvents.filter((e) => sectionOf(e) === section);
@@ -8643,6 +8905,7 @@ select.cc-input{appearance:auto;-webkit-appearance:auto;cursor:pointer;}
 .cc-tr{display:grid;grid-template-columns:2.2fr 1.4fr 1.4fr 1fr 1.2fr;gap:12px;align-items:center;
   padding:14px 18px;border-top:1px solid ${C.line};font-size:14px;}
 .cc-table-reg .cc-tr{grid-template-columns:2fr .6fr 1.6fr 1.8fr .9fr;align-items:start;}
+.cc-table-exp .cc-tr{grid-template-columns:2.4fr 1fr 1.2fr 1.2fr 1.6fr;}
 .cc-table-promo .cc-tr{grid-template-columns:1.8fr 1fr 1.5fr .8fr .6fr 1.2fr;align-items:start;}
 .cc-promo-form{background:${C.card};border:2px solid ${C.rind};padding:18px 20px;margin-bottom:22px;}
 .cc-promo-form-actions{display:flex;gap:10px;margin-top:14px;}
