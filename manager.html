@@ -1487,7 +1487,7 @@ async function thRenderPicker(el, opts){
       +'<b>'+esc(t.name)+'</b><span>'+(busy ? 'taken · '+esc(t.busy[0].who) : t.seatsMax+' seats')+'</span></label>';
   }).join('') + '</div>';
   const free = tables.filter(t=>!(t.busy||[]).length).length;
-  html += '<div class="th-note">'+free+' of '+tables.length+' tables free for this time'+(r.data.unassigned ? ' · '+r.data.unassigned+' booking(s) with no table assigned yet' : '')+'. Held from 1 hr before start to the end time.</div>';
+  html += '<div class="th-note">'+free+' of '+tables.length+' tables free for this time'+(r.data.unassigned ? ' · '+r.data.unassigned+' booking(s) with no table assigned yet' : '')+'. Held from 1½ hrs before start to 1 hr after the end.</div>';
   if(r.data.mode && r.data.mode !== 'ON'){
     html += '<div class="th-note th-bad">⚠️ This location\'s Wix is set to <b>in-house table assignment</b>, so online bookings are not checked against tables. The hold shows on your floor, but to stop online guests too, turn on Table Management in Wix (Settings → Table Reservations → Tables) or use “Block during event”.</div>';
   }
@@ -2142,11 +2142,14 @@ function recApplyVisibility(){
     if(list && !list.dataset.loaded && !list.dataset.tried && vals.date && vals.time && vals.blockTo){ list.dataset.tried='1'; thRecLoad(); }
   }
 }
-// hold window for staff events: 1 hr setup before start → end time (next day if it wraps)
+// table holds run 1.5 hr before start → 1 hr after the end (next day if it wraps)
+const TH_BEFORE_MIN = 90, TH_AFTER_MIN = 60;
+// hold window for staff events
 function thStaffWindow(v){
   if(!v.date || !v.time || !v.blockTo) return null;
-  let start = new Date(v.date+'T'+v.time+':00'); start = new Date(start.getTime() - 3600000);
-  let end = new Date(v.date+'T'+v.blockTo+':00'); if(end <= start) end = new Date(end.getTime() + 86400000);
+  const s0 = new Date(v.date+'T'+v.time+':00');
+  let e0 = new Date(v.date+'T'+v.blockTo+':00'); if(e0 <= s0) e0 = new Date(e0.getTime() + 86400000);
+  const start = new Date(s0.getTime() - TH_BEFORE_MIN*60000), end = new Date(e0.getTime() + TH_AFTER_MIN*60000);
   if(isNaN(start.getTime()) || isNaN(end.getTime())) return null;
   return { start:start.toISOString(), end:end.toISOString() };
 }
@@ -3237,7 +3240,7 @@ function TableHoldPicker({ location, date, time, durationMin, eventId, value, on
   const load = () => {
     if (!date || !time) { setMsg("Set the date and start time first."); return; }
     setMsg("");
-    const w = wixBlockWindow({ date, time, durationMin, blockScope: "tables" });
+    const w = thTableWindow({ date, time, durationMin });
     if (!w || typeof thRenderPicker !== "function") return;
     thRenderPicker(box.current, { location, start: w.start, end: w.end, source: "event", sourceId: eventId,
       selected: value || [], onChange: (ids) => onChange(ids) });
@@ -3302,6 +3305,14 @@ const wixBlockWindow = (ev) => {
   const to = new Date(start.getTime() + (Number(ev.durationMin) || 120) * 60000);
   return { start: from.toISOString(), end: to.toISOString() };
 };
+// table holds: 1.5 hr before start → 1 hr after the end (TH_BEFORE_MIN / TH_AFTER_MIN in the shell)
+const thTableWindow = (ev) => {
+  if (!ev || !ev.date || !ev.time) return null;
+  const s0 = new Date(ev.date + "T" + ev.time + ":00");
+  if (isNaN(s0.getTime())) return null;
+  const e0 = new Date(s0.getTime() + (Number(ev.durationMin) || 120) * 60000);
+  return { start: new Date(s0.getTime() - 90 * 60000).toISOString(), end: new Date(e0.getTime() + 60 * 60000).toISOString() };
+};
 const syncWixBlock = async (ev, prev) => {
   try {
     if (typeof fn !== "function") return;
@@ -3317,7 +3328,7 @@ const syncWixBlock = async (ev, prev) => {
       if (prev && (prev.blockScope === "window" || prev.blockScope === "day")) {
         await fn("unblock-reservations", { location_id: wixLocIdFor(prev.location) || locId, comment_prefix: "[EVT:" + ev.id + "]" });
       }
-      const w = wixBlockWindow(ev);
+      const w = thTableWindow(ev);
       if (!w || typeof th !== "function") return;
       const r = await th("hold", {
         source: "event", source_id: ev.id, location: ev.location, start: w.start, end: w.end,
