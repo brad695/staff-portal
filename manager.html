@@ -602,12 +602,10 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab-head">Events &amp; Reservations</div>
     <div class="tab" onclick="mtab('events')">Events</div>
     <div class="tab" onclick="mtab('resys')">Reservations</div>
-    <div class="tab" onclick="mtab('inquiries')">💬 Experience Inquiries <span id="inqBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
     <div class="tab-head">Tickets &amp; Classes</div>
     <div class="tab" onclick="tkTab(this,'admin')">Classes</div>
     <div class="tab" onclick="tkTab(this,'mahjong')">🀄 Mahjong</div>
     <div class="tab" onclick="tkTab(this,'ticketed')">Events</div>
-    <div class="tab" onclick="tkTab(this,'experiences')">✨ Experiences</div>
     <div class="tab" onclick="tkTab(this,'edit',{kind:'class'})">＋ Add Class</div>
     <div class="tab" onclick="tkTab(this,'edit',{kind:'event'})">＋ Add Ticketed Event</div>
     <div class="tab" onclick="tkTab(this,'home')">🏠 Front Page</div>
@@ -616,6 +614,9 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab" onclick="tkTab(this,'bulk')">Bulk Add Classes</div>
     <div class="tab" onclick="tkTab(this,'customers')">Customers</div>
     <div class="tab" onclick="tkTab(this,'promos')">Promo Codes</div>
+    <div class="tab-head">Experiences</div>
+    <div class="tab" onclick="tkTab(this,'experiences')">✨ Experiences</div>
+    <div class="tab" onclick="mtab('inquiries')">💬 Inquiries <span id="inqBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
     <div class="tab-head">Cheese Case</div>
     <div class="tab" onclick="mtab('plu')">🧀 New Case Entry</div>
     <div class="tab" onclick="mtab('jamlabels')">🏷️ Jam Labels</div>
@@ -12347,6 +12348,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     'Staff':                  { ico:'👥', desk:'Staff',       phone:'Staff'    },
     'Events & Reservations':  { ico:'🗓',  desk:'Events',      phone:'Events'   },
     'Tickets & Classes':      { ico:'🎟',  desk:'Tickets',     phone:'Tickets'  },
+    'Experiences':            { ico:'✨', desk:'Experiences', phone:'Exp'      },
     'Cheese Case':            { ico:'🧀', desk:'Cheese Case', phone:'Cheese'   },
     'Marketing':              { ico:'📣', desk:'Marketing',   phone:'Mktg'     },
     'Catering':               { ico:'🥂', desk:'Catering',    phone:'Catering' },
@@ -12362,6 +12364,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     'Staff':                  { sc:'#4f46e5', soft:'#eef1fe' },
     'Events & Reservations':  { sc:'#0f766e', soft:'#e6f4f2' },
     'Tickets & Classes':      { sc:'#7c3aed', soft:'#f2ecfe' },
+    'Experiences':            { sc:'#a52b1e', soft:'#fbecea' },
     'Cheese Case':            { sc:'#b45309', soft:'#fdf1e3' },
     'Marketing':              { sc:'#be123c', soft:'#fdeef1' },
     'Catering':               { sc:'#047857', soft:'#e7f5ef' },
