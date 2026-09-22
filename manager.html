@@ -5632,10 +5632,103 @@ const expBlank = () => ({ id: null, name: "", description: "", price_cents: 3000
   duration_min: 90, min_party: 2, max_party: 8, tables_needed: 2, lead_time_min: null, active: true,
   sort_order: 99, image_url: "" });
 
+// Bookings for one experience — the "detail" view, like a class's roster.
+function ExperienceBookings({ x, onBack, onEdit }) {
+  const [rows, setRows] = useState(null);
+  const [filter, setFilter] = useState("upcoming"); // upcoming | past | cancelled | all
+  const [tables, setTables] = useState({});
+  const [inqs, setInqs] = useState({});
+  const [err, setErr] = useState("");
+  const load = async () => {
+    setErr("");
+    const { data, error } = await db.from("rb_reservations")
+      .select("id, code, guest_name, email, phone, party_size, starts_at, ends_at, status, payment_status, total_cents, notes, hold_expires_at, inquiry_id, external_id, created_at")
+      .eq("kind", "experience").eq("experience_type_id", x.id).order("starts_at", { ascending: true }).limit(500);
+    if (error) { setErr(error.message); setRows([]); return; }
+    setRows(data || []);
+    const ids = (data || []).map((r) => r.id);
+    if (ids.length) {
+      const { data: th } = await db.from("table_holds").select("source_id, table_names, status").eq("source", "experience").eq("status", "held").in("source_id", ids);
+      const t = {}; (th || []).forEach((h) => { t[h.source_id] = [...(t[h.source_id] || []), ...(h.table_names || [])]; }); setTables(t);
+      const iq = (data || []).map((r) => r.inquiry_id).filter(Boolean);
+      if (iq.length) {
+        const { data: qs } = await db.from("inquiries").select("id, code, stage").in("id", iq);
+        const m = {}; (qs || []).forEach((q) => { m[q.id] = q; }); setInqs(m);
+      }
+    }
+  };
+  useEffect(() => { load(); }, [x.id]);
+
+  const now = Date.now();
+  const live = (r) => r.status === "confirmed" || (r.status === "pending" && Date.parse(r.hold_expires_at || "") > now);
+  const list = (rows || []).filter((r) =>
+    filter === "all" ? true
+    : filter === "cancelled" ? !live(r)
+    : filter === "past" ? live(r) && Date.parse(r.starts_at) < now
+    : live(r) && Date.parse(r.starts_at) >= now);
+  if (filter === "past" || filter === "cancelled") list.reverse();
+  const up = (rows || []).filter((r) => live(r) && Date.parse(r.starts_at) >= now);
+  const paidUp = up.filter((r) => r.payment_status === "paid");
+  const when = (iso) => new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const statusOf = (r) => r.status === "confirmed" && r.payment_status === "paid" ? ["✅ Paid", "#15803d"]
+    : r.status === "pending" && Date.parse(r.hold_expires_at || "") > now ? ["⏳ On hold till " + when(r.hold_expires_at), "#b45309"]
+    : r.status === "pending" ? ["Hold expired", "#6b7280"]
+    : r.status === "cancelled" ? ["Cancelled", "#6b7280"]
+    : [r.status + (r.payment_status === "paid" ? " · paid" : ""), "#374151"];
+
+  return (
+    <div>
+      <button className="cc-back" onClick={onBack}>← All experiences</button>
+      <div className="cc-dash-head">
+        <div>
+          <p className="cc-eyebrow">Experience · {money(x.price_cents)}{x.per_person ? " / guest" : " / party"} · parties of {x.min_party}–{x.max_party}</p>
+          <h2 className="cc-h2">{x.name}</h2>
+        </div>
+        <div className="cc-dash-btns">
+          <button className="cc-btn cc-btn-ghost" onClick={onEdit}>Edit experience</button>
+        </div>
+      </div>
+      <p className="cc-hint" style={{ marginTop: 0 }}>
+        <b>{paidUp.length}</b> upcoming booked · <b>{up.length - paidUp.length}</b> on hold · <b>{money(paidUp.reduce((s, r) => s + (r.total_cents || 0), 0))}</b> upcoming paid
+      </p>
+      <div className="cc-dash-btns" style={{ margin: "10px 0 12px", flexWrap: "wrap" }}>
+        {[["upcoming", "Upcoming"], ["past", "Past"], ["cancelled", "Cancelled / expired"], ["all", "All"]].map(([k, l]) => (
+          <button key={k} className={"cc-mini" + (filter === k ? " on" : "")} style={filter === k ? { background: "var(--accent,#a52b1e)", color: "#fff", borderColor: "var(--accent,#a52b1e)" } : null} onClick={() => setFilter(k)}>{l}</button>
+        ))}
+        <button className="cc-mini" onClick={load}>↻ Refresh</button>
+      </div>
+      {err && <div className="cc-err">{err}</div>}
+      <div className="cc-table cc-table-expb">
+        <div className="cc-tr cc-tr-head" style={{ background: "#111", color: "#fff" }}><span>When</span><span>Guest</span><span>Party</span><span>Status</span><span>Tables · code</span></div>
+        {rows === null && <div className="cc-empty">Loading…</div>}
+        {rows && list.length === 0 && <div className="cc-empty">No {filter === "all" ? "" : filter + " "}bookings.</div>}
+        {list.map((r) => {
+          const [st, col] = statusOf(r); const q = r.inquiry_id && inqs[r.inquiry_id];
+          return (
+            <div key={r.id} className={"cc-tr" + (live(r) ? "" : " cc-tr-past")}>
+              <span className="cc-mono">{when(r.starts_at)}</span>
+              <span className="cc-td-title" style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left" }}>
+                <b>{r.guest_name || "Guest"}</b>
+                <span className="cc-td-sub">{[r.email && <a key="e" href={"mailto:" + r.email}>{r.email}</a>, r.phone && <a key="p" href={"tel:" + r.phone}>{r.phone}</a>].filter(Boolean).reduce((a, b, i) => i ? [...a, " · ", b] : [b], [])}</span>
+                {r.notes && <span className="cc-td-sub">📝 {r.notes}</span>}
+                {q && <a className="cc-td-sub" href="#inquiries" onClick={(e) => { e.preventDefault(); const t = document.querySelector(".tab[onclick*=\"'inquiries'\"]"); if (t) t.click(); }}>💬 Inquiry #{q.code} · {q.stage.replace("_", " ")}</a>}
+              </span>
+              <span className="cc-mono">👥 {r.party_size}<br />{money(r.total_cents || 0)}</span>
+              <span style={{ color: col, fontWeight: 700, fontSize: 13 }}>{st}</span>
+              <span className="cc-mono">{(tables[r.id] || []).join(", ") || "—"}<br /><span className="cc-td-sub">#{r.code}</span></span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function AdminExperiences({ go }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState("");
   const [editing, setEditing] = useState(null); // row being edited (or blank for new)
+  const [viewing, setViewing] = useState(null); // experience whose bookings are open
   const [booked, setBooked] = useState({});
   const load = async () => {
     setErr("");
@@ -5670,10 +5763,13 @@ function AdminExperiences({ go }) {
     if (error) setErr(error.message); else load();
   };
 
+  if (viewing && !editing) return (
+    <ExperienceBookings x={viewing} onBack={() => { setViewing(null); load(); }} onEdit={() => setEditing(viewing)} />
+  );
   if (editing) return (
     <ExperienceEdit x={editing} count={(rows || []).length}
       onCancel={() => setEditing(null)}
-      onSaved={() => { setEditing(null); load(); }} />
+      onSaved={() => { setEditing(null); setViewing(null); load(); }} />
   );
 
   return (
@@ -5704,13 +5800,13 @@ function AdminExperiences({ go }) {
                   ? <img src={x.image_url} alt="" style={{ width: 56, height: 40, objectFit: "cover", flex: "none" }} />
                   : <span style={{ width: 56, height: 40, background: "#e5e7eb", flex: "none" }} />}
                 <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
-                  <button className="cc-link" onClick={() => setEditing(x)}>{x.name}</button>
+                  <button className="cc-link" onClick={() => setViewing(x)}>{x.name}</button>
                   <span className="cc-td-sub">{x.active ? "🟢 On the site" : "⏸ Hidden"} · {x.tables_needed} table{x.tables_needed === 1 ? "" : "s"}</span>
                 </span>
               </span>
               <span className="cc-mono">{money(x.price_cents)}{x.per_person ? " / guest" : " / party"}</span>
               <span className="cc-mono">{x.min_party}–{x.max_party} · {x.duration_min} min</span>
-              <span className="cc-mono">{b.paid} booked{b.held ? " · " + b.held + " on hold" : ""}</span>
+              <span className="cc-mono"><button className="cc-link" onClick={() => setViewing(x)}>{b.paid} booked{b.held ? " · " + b.held + " on hold" : ""}</button></span>
               <span className="cc-td-actions">
                 <button className="cc-mini" onClick={() => setEditing(x)}>Edit</button>
                 <button className="cc-mini" onClick={() => toggle(x)}>{x.active ? "Hide" : "Show"}</button>
@@ -8907,6 +9003,7 @@ select.cc-input{appearance:auto;-webkit-appearance:auto;cursor:pointer;}
   padding:14px 18px;border-top:1px solid ${C.line};font-size:14px;}
 .cc-table-reg .cc-tr{grid-template-columns:2fr .6fr 1.6fr 1.8fr .9fr;align-items:start;}
 .cc-table-exp .cc-tr{grid-template-columns:2.4fr 1fr 1.2fr 1.2fr 1.6fr;}
+.cc-table-expb .cc-tr{grid-template-columns:1.3fr 2.4fr .8fr 1.3fr 1.2fr;align-items:start;}
 .cc-table-promo .cc-tr{grid-template-columns:1.8fr 1fr 1.5fr .8fr .6fr 1.2fr;align-items:start;}
 .cc-promo-form{background:${C.card};border:2px solid ${C.rind};padding:18px 20px;margin-bottom:22px;}
 .cc-promo-form-actions{display:flex;gap:10px;margin-top:14px;}
