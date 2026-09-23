@@ -715,6 +715,18 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
   </div>
 
   <style>
+    #catModal .rec-card, #catNewModal .rec-card{ max-height:none !important; display:block; }
+    .cat-tot{ margin:14px 0 0 auto; max-width:340px; font-size:.9rem; border:1px solid var(--line-soft,#e2e8f0); border-radius:10px; padding:10px 14px; background:#fafaf9; }
+    .cat-tot > div{ display:flex; justify-content:space-between; gap:12px; padding:3px 0; }
+    .cat-tot .big{ font-weight:800; border-top:1px solid #e2e8f0; margin-top:4px; padding-top:7px; }
+    .cat-tot .paid{ color:#047857; font-weight:700; }
+    .cat-tbl{ width:100%; border-collapse:collapse; margin-top:12px; font-size:.9rem; }
+    .cat-tbl th{ text-align:left; color:#64748b; font-size:.7rem; text-transform:uppercase; letter-spacing:.3px; padding:6px 6px; border-bottom:1px solid #e2e8f0; }
+    .cat-tbl td{ padding:8px 6px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+    .cat-tbl .n{ text-align:right; white-space:nowrap; }
+    .cat-actions{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:flex-end; margin-top:16px; padding-top:14px; border-top:1px solid #e2e8f0; }
+    .cat-actions .save-msg{ flex:1 1 180px; }
+    .cat-foot{ font-size:.75rem; color:#64748b; margin-top:8px; text-align:right; }
     .cat-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:10px; }
     .cat-items{ display:flex; flex-direction:column; gap:8px; }
     .cat-item{ display:grid; grid-template-columns:1fr 70px 100px 90px 36px; gap:6px; align-items:center; padding:8px; border:1px solid var(--line-soft,#e2e8f0); border-radius:10px; background:#fafaf9; }
@@ -2037,18 +2049,17 @@ function catQuoteRender(copyFrom){
     + '</div>'
     + '<div class="cat-grid" style="margin-top:14px;">'
     +   catField('Sales tax %','cq_tax', q?q.tax_rate:9.75,'number') + catField('Deposit %','cq_dep', q?q.deposit_pct:50,'number')
-    +   catField('Balance due','cq_bal', (q&&q.balance_due_date)||'','date')
-    +   '<div class="rf"><label>&nbsp;</label><div class="hint" style="margin:6px 0 0;">Blank = 3 days before the event</div></div>'
+    +   '<div class="rf"><label>Balance due</label><input id="cq_bal" type="date" value="'+esc((q&&q.balance_due_date)||'')+'"><span style="font-size:.72rem;color:#64748b;">Blank = 3 days before the event</span></div>'
     + '</div>'
-    + '<div id="catTotals" style="margin:14px 0 0 auto;max-width:320px;font-size:.92rem;"></div>'
+    + '<div id="catTotals" class="cat-tot"></div>'
     + '<div class="rf" style="margin-top:14px;"><label>Note on the proposal (the customer sees this)</label><textarea id="cq_note" rows="2">'+esc((src&&src.customer_note)||'')+'</textarea></div>'
     + '<details style="margin-top:14px;"><summary style="cursor:pointer;font-weight:700;">📜 Agreement text</summary>'
     +   '<div class="hint" style="margin:8px 0;">Placeholders fill in automatically: {{name}} {{event_date}} {{guests}} {{total}} {{deposit_pct}} {{deposit}} {{balance_due_date}}. Changes here apply to this proposal only.</div>'
     +   '<textarea id="cq_contract" rows="14" style="width:100%;font-family:inherit;font-size:.85rem;">'+esc((src&&src.contract_text)||CAT_TEMPLATE)+'</textarea>'
     +   '<div style="margin-top:6px;"><button class="btn btn-ghost btn-sm" onclick="catSaveTemplate()">Save as the default for new proposals</button></div></details>'
     + '<div class="rf" style="margin-top:14px;"><label>Message with the proposal email (optional)</label><textarea id="cq_msg" rows="3" placeholder="Leave blank for the standard note"></textarea></div>'
-    + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center;">'
-    +   '<span class="save-msg" id="cqMsg" style="flex:1;"></span>'
+    + '<div class="cat-actions">'
+    +   '<span class="save-msg" id="cqMsg"></span>'
     +   '<button class="btn btn-ghost" onclick="catSaveQuote(false)">💾 Save draft</button>'
     +   '<button class="btn btn-gold" id="cqSend" onclick="catSaveQuote(true)">📨 Save &amp; send proposal</button>'
     + '</div>'
@@ -2078,7 +2089,7 @@ function catTotals(){
   CAT_ITEMS.forEach((it,i)=>{ const a=document.getElementById('ciAmt'+i); if(a) a.textContent = catMoney(Math.round((Number(it.qty)||0)*(it.price_cents||0))); });
   const rate = Number(document.getElementById('cq_tax').value)||0, dep = Math.min(100,Math.max(0,Math.round(Number(document.getElementById('cq_dep').value)||0)));
   const sub = CAT_ITEMS.reduce((s,it)=>s+Math.round((Number(it.qty)||0)*(it.price_cents||0)),0), tax = Math.round(sub*rate/100), tot = sub+tax;
-  const row = (k,v,b) => '<div style="display:flex;justify-content:space-between;padding:2px 0;'+(b?'font-weight:800;border-top:1px solid #e2e8f0;margin-top:4px;padding-top:6px;':'')+'"><span>'+k+'</span><span>'+v+'</span></div>';
+  const row = (k,v,b) => '<div'+(b?' class="big"':'')+'><span>'+k+'</span><span>'+v+'</span></div>';
   el.innerHTML = row('Subtotal',catMoney(sub)) + row('Tax ('+rate+'%)',catMoney(tax)) + row('Total',catMoney(tot),true)
     + (dep>0&&dep<100 ? row('Deposit ('+dep+'%)',catMoney(Math.round(tot*dep/100))) + row('Balance',catMoney(tot-Math.round(tot*dep/100))) : '');
 }
@@ -2148,7 +2159,7 @@ async function catSaveQuote(send){
 }
 function catLockedHtml(q){
   const split = q.deposit_pct>0 && q.deposit_pct<100, dep = Math.round(q.total_cents*q.deposit_pct/100);
-  const items = (q.items||[]).map(it=>'<tr><td>'+esc(it.name)+(it.note?'<div class="hint" style="margin:0;">'+esc(it.note)+'</div>':'')+'</td><td style="text-align:right;">'+esc(it.qty)+'</td><td style="text-align:right;">'+catMoney(it.price_cents)+'</td><td style="text-align:right;">'+catMoney(Math.round(it.qty*it.price_cents))+'</td></tr>').join('');
+  const items = (q.items||[]).map(it=>'<tr><td>'+esc(it.name)+(it.note?'<div style="font-size:.78rem;color:#64748b;">'+esc(it.note)+'</div>':'')+'</td><td class="n">'+esc(it.qty)+'</td><td class="n">'+catMoney(it.price_cents)+'</td><td class="n">'+catMoney(Math.round(it.qty*it.price_cents))+'</td></tr>').join('');
   const pill = q.status==='paid'?'pill-ok':q.status==='canceled'?'pill-bad':q.status==='deposit_paid'?'pill-ok':'pill-req';
   return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="pill '+pill+'">'+esc(CAT_QSTAT[q.status]||q.status)+'</span>'
     + (q.square_env==='sandbox'?'<span class="pill pill-bad">Square SANDBOX</span>':'') + '<div style="flex:1"></div>'
@@ -2156,22 +2167,23 @@ function catLockedHtml(q){
     + (q.invoice_url?'<a class="btn btn-ghost btn-sm" target="_blank" href="'+esc(q.invoice_url)+'">🧾 Invoice'+(q.invoice_number?' #'+esc(q.invoice_number):'')+'</a>':'')
     + (q.square_invoice_id?'<button class="btn btn-ghost btn-sm" onclick="catSync(\''+q.id+'\')">↻ Payment status</button>':'')
     + '</div>'
-    + (q.signed_at?'<p style="margin:12px 0 0;">✍️ Signed by <b>'+esc(q.signed_name)+'</b> · '+esc(inqWhen(q.signed_at))+(q.signed_ip?' · IP '+esc(q.signed_ip):'')+'</p>':'')
+    + (q.signed_at?'<div style="margin:12px 0 0;font-size:.88rem;">✍️ Signed by <b>'+esc(q.signed_name)+'</b> · '+esc(inqWhen(q.signed_at))+(q.signed_ip?' <span style="color:#64748b;">· IP '+esc(q.signed_ip)+'</span>':'')+'</div>':'')
     + (q.invoice_error && !q.square_invoice_id ? '<div style="margin:12px 0;padding:10px 12px;background:#fef2f2;color:#991b1b;border-radius:8px;">Square invoice failed: '+esc(q.invoice_error)+'<div style="margin-top:8px;"><button class="btn btn-gold btn-sm" onclick="catRetryInvoice(\''+q.id+'\')">Retry invoice</button></div></div>' : '')
-    + '<table style="width:100%;border-collapse:collapse;margin-top:12px;font-size:.9rem;"><thead><tr style="text-align:left;color:#64748b;font-size:.72rem;text-transform:uppercase;"><th>Item</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Price</th><th style="text-align:right;">Amount</th></tr></thead><tbody>'+items+'</tbody></table>'
-    + '<div style="margin:10px 0 0 auto;max-width:320px;font-size:.92rem;">'
-    +   '<div style="display:flex;justify-content:space-between;"><span>Subtotal</span><span>'+catMoney(q.subtotal_cents)+'</span></div>'
-    +   '<div style="display:flex;justify-content:space-between;"><span>Tax ('+Number(q.tax_rate)+'%)</span><span>'+catMoney(q.tax_cents)+'</span></div>'
-    +   '<div style="display:flex;justify-content:space-between;font-weight:800;border-top:1px solid #e2e8f0;margin-top:4px;padding-top:6px;"><span>Total</span><span>'+catMoney(q.total_cents)+'</span></div>'
-    +   (split?'<div style="display:flex;justify-content:space-between;"><span>Deposit ('+q.deposit_pct+'%)</span><span>'+catMoney(dep)+'</span></div>':'')
-    +   '<div style="display:flex;justify-content:space-between;color:#047857;font-weight:700;"><span>Paid so far</span><span>'+catMoney(q.amount_paid_cents)+'</span></div>'
+    + '<table class="cat-tbl"><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th></tr></thead><tbody>'+items+'</tbody></table>'
+    + '<div class="cat-tot">'
+    +   '<div><span>Subtotal</span><span>'+catMoney(q.subtotal_cents)+'</span></div>'
+    +   '<div><span>Tax ('+Number(q.tax_rate)+'%)</span><span>'+catMoney(q.tax_cents)+'</span></div>'
+    +   '<div class="big"><span>Total</span><span>'+catMoney(q.total_cents)+'</span></div>'
+    +   (split?'<div><span>Deposit ('+q.deposit_pct+'%)</span><span>'+catMoney(dep)+'</span></div>':'')
+    +   '<div class="paid"><span>Paid so far</span><span>'+catMoney(q.amount_paid_cents)+'</span></div>'
+    +   '<div><span>Still owed</span><span>'+catMoney(Math.max(0,q.total_cents-q.amount_paid_cents))+'</span></div>'
     + '</div>'
-    + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;align-items:center;">'
-    +   '<span class="save-msg" id="cqMsg" style="flex:1;"></span>'
+    + '<div class="cat-actions">'
+    +   '<span class="save-msg" id="cqMsg"></span>'
     +   (['signed','invoiced'].includes(q.status)?'<button class="btn btn-ghost btn-sm" onclick="catCancelInvoice(\''+q.id+'\')">Cancel '+(q.square_invoice_id?'invoice':'proposal')+'</button>':'')
     +   '<button class="btn btn-ghost btn-sm" onclick="catNewProposal()">＋ New proposal (copy this one)</button>'
     + '</div>'
-    + (q.synced_at?'<div class="hint" style="margin-top:8px;">Square checked '+esc(inqWhen(q.synced_at))+' · status '+esc(q.invoice_status||'—')+'</div>':'');
+    + (q.synced_at?'<div class="cat-foot">Square checked '+esc(inqWhen(q.synced_at))+' · '+esc((q.invoice_status||'—').replace(/_/g,' ').toLowerCase())+'</div>':'');
 }
 function catNewProposal(){
   const from = CAT_Q; CAT_Q = null;
