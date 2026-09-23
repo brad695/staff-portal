@@ -626,6 +626,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab" onclick="mtab('campaigns')">✉️ Email Campaigns</div>
     <div class="tab" onclick="mtab('social')">📣 Social Posts</div>
     <div class="tab-head">Catering</div>
+    <div class="tab" onclick="mtab('catering')">💼 Catering Leads <span id="catBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
     <div class="tab" onclick="mtab('preorders')">📅 Pre-Orders</div>
     <div class="tab-head">Cheese Club</div>
     <div class="tab" onclick="ccTab(this,'ov')">Clubs</div>
@@ -686,7 +687,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       <div class="rec-list" id="inqList"><div class="rec-empty">Loading…</div></div>
     </div>
   </div>
-  <div id="inqModal" class="rec-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:200;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 10px;" onclick="if(event.target===this)inqClose()">
+  <div id="inqModal" class="rec-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:980;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 10px;" onclick="if(event.target===this)inqClose()">
     <div class="rec-card" style="background:#fff;max-width:720px;width:100%;border-radius:14px;padding:22px;">
       <div style="display:flex;align-items:flex-start;gap:10px;">
         <div style="flex:1;min-width:0;"><h3 id="inqTitle" style="margin:0 0 4px;"></h3><div id="inqMeta" class="hint" style="margin:0;"></div></div>
@@ -709,6 +710,78 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
         <button class="btn btn-ghost btn-sm" onclick="inqLog(true)">📝 Add note</button>
         <span class="save-msg" id="inqMsg" style="flex:1;"></span>
         <button class="btn btn-gold" id="inqSend" onclick="inqSend()">Send reply ✉️</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .cat-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:10px; }
+    .cat-items{ display:flex; flex-direction:column; gap:8px; }
+    .cat-item{ display:grid; grid-template-columns:1fr 70px 100px 90px 36px; gap:6px; align-items:center; padding:8px; border:1px solid var(--line-soft,#e2e8f0); border-radius:10px; background:#fafaf9; }
+    .cat-item input{ padding:8px 10px; border:1px solid var(--line,#cbd5e1); border-radius:8px; font:inherit; font-size:.88rem; min-width:0; }
+    .cat-item .ci-note{ grid-column:1/-1; font-size:.8rem; }
+    .cat-item .ci-amt{ text-align:right; font-weight:700; font-size:.88rem; }
+    @media (max-width:640px){ .cat-item{ grid-template-columns:1fr 60px 84px 32px; } .cat-item .ci-amt{ display:none; } }
+  </style>
+  <!-- Catering leads: HoneyBook-style pipeline — conversation → proposal → e-signed contract → Square invoice -->
+  <div id="panel-catering" class="panel">
+    <div class="section-card">
+      <h2>💼 Catering Leads</h2>
+      <div class="hint">Requests from <strong>tickets.greyscheese.com/catering.html</strong> (and any you add by hand). Reply here and it's emailed from info@greyscheese.com; their replies come back in automatically (Gmail sync). Build the <strong>Proposal</strong>, send it, and the customer signs online — that <strong>creates a Square invoice</strong> (deposit now, balance before the event) with the signed agreement attached. Payment status refreshes from Square every 15 minutes.</div>
+      <div class="toolbar" id="catChips"></div>
+      <div class="rec-list" id="catList"><div class="rec-empty">Loading…</div></div>
+    </div>
+  </div>
+  <div id="catModal" class="rec-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:980;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 10px;" onclick="if(event.target===this)catClose()">
+    <div class="rec-card" style="background:#fff;max-width:900px;width:100%;border-radius:14px;padding:22px;">
+      <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:220px;"><h3 id="catTitle" style="margin:0 0 4px;"></h3><div id="catMeta" class="hint" style="margin:0;"></div></div>
+        <select id="catStage" class="loc-sel" onchange="catSetStage(this.value)"></select>
+        <button class="btn btn-ghost btn-sm" onclick="catClose()">✕</button>
+      </div>
+      <div class="toolbar" style="margin:14px 0 0;">
+        <button class="chip on" id="catTabConvo" onclick="catView('convo')">💬 Conversation</button>
+        <button class="chip" id="catTabQuote" onclick="catView('quote')">📄 Proposal &amp; Invoice</button>
+      </div>
+
+      <div id="catConvo">
+        <div id="catThread" style="margin:16px 0;max-height:46vh;overflow-y:auto;"></div>
+        <div class="rf full"><label>Reply</label>
+          <select id="catQuick" class="loc-sel" style="margin-bottom:6px;" onchange="catQuickPick(this)"><option value="">Quick replies…</option></select>
+          <textarea id="catBody" rows="5" placeholder="Write your reply…"></textarea></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center;">
+          <button class="btn btn-ghost btn-sm" onclick="catLog(false)">📥 Log their reply</button>
+          <button class="btn btn-ghost btn-sm" onclick="catLog(true)">📝 Add note</button>
+          <span class="save-msg" id="catMsg" style="flex:1;"></span>
+          <button class="btn btn-gold" id="catSend" onclick="catSend()">Send reply ✉️</button>
+        </div>
+      </div>
+
+      <div id="catQuote" style="display:none;margin-top:16px;"></div>
+    </div>
+  </div>
+  <div id="catNewModal" class="rec-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:990;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 10px;" onclick="if(event.target===this)this.style.display='none'">
+    <div class="rec-card" style="background:#fff;max-width:620px;width:100%;border-radius:14px;padding:22px;">
+      <h3 style="margin:0 0 12px;">＋ New catering lead</h3>
+      <div class="hint">For a phone call or walk-in. No email is sent until you reply or send a proposal.</div>
+      <div class="cat-grid">
+        <div class="rf"><label>Name *</label><input id="cn_name"></div>
+        <div class="rf"><label>Email *</label><input id="cn_email" type="email"></div>
+        <div class="rf"><label>Phone</label><input id="cn_phone" type="tel"></div>
+        <div class="rf"><label>Company</label><input id="cn_company"></div>
+        <div class="rf"><label>Event date</label><input id="cn_date" type="date"></div>
+        <div class="rf"><label>Time</label><input id="cn_time" type="time"></div>
+        <div class="rf"><label>Guests</label><input id="cn_guests" type="number" min="1"></div>
+        <div class="rf"><label>Store</label><select id="cn_loc" class="loc-sel"><option>Memphis</option><option>Nashville</option></select></div>
+        <div class="rf"><label>Service</label><select id="cn_ful" class="loc-sel"><option value="">—</option><option value="pickup">Pick-up</option><option value="delivery">Delivery</option><option value="onsite">On-site service</option></select></div>
+        <div class="rf"><label>Occasion</label><input id="cn_occ"></div>
+        <div class="rf" style="grid-column:1/-1;"><label>Address</label><input id="cn_addr"></div>
+        <div class="rf" style="grid-column:1/-1;"><label>Notes</label><textarea id="cn_msg" rows="3"></textarea></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px;align-items:center;">
+        <span class="save-msg" id="cn_msgout" style="flex:1;"></span>
+        <button class="btn btn-ghost" onclick="document.getElementById('catNewModal').style.display='none'">Cancel</button>
+        <button class="btn btn-gold" onclick="catCreate()">Add lead</button>
       </div>
     </div>
   </div>
@@ -1594,7 +1667,7 @@ function openHashTab(){
 }
 window.addEventListener('hashchange', openHashTab);
 
-function loadAll(){ loadKind('items'); loadKind('events'); loadKind('schedules'); loadKind('employees'); sgLoad(); loadTimeOff(); loadSwaps(); loadAnnouncements(); resInit(); inqLoad(); if(window.tkInit)tkInit(); if(window.ccInit)ccInit(); if(window.pluInit)pluInit(); if(window.emcInit)emcInit(); if(window.socInit)socInit(); if(window.poInit)poInit(); openHashTab(); }
+function loadAll(){ loadKind('items'); loadKind('events'); loadKind('schedules'); loadKind('employees'); sgLoad(); loadTimeOff(); loadSwaps(); loadAnnouncements(); resInit(); inqLoad(); catLoad(); if(window.tkInit)tkInit(); if(window.ccInit)ccInit(); if(window.pluInit)pluInit(); if(window.emcInit)emcInit(); if(window.socInit)socInit(); if(window.poInit)poInit(); openHashTab(); }
 
 /* ---- Experience inquiries (HoneyBook-style) ----
    Tables: inquiries (one per customer question) + inquiry_messages (in / out / note),
@@ -1752,6 +1825,383 @@ async function inqSetStage(v){
   const { error } = await sb.from('inquiries').update({ stage:v }).eq('id', INQ_CUR.id);
   document.getElementById('inqMsg').textContent = error ? '❌ '+error.message : '✓ Moved to '+INQ_STAGES[v];
   INQ_CUR.stage = v; inqLoad();
+}
+
+/* ---- Catering leads (HoneyBook-style) ----
+   Tables: catering_leads · catering_messages (in / out / note) · catering_quotes, admin-only by RLS.
+   Everything that emails or touches Square goes through the `catering` edge function:
+   reply / log / new_lead / save_quote / send_quote / create_invoice / cancel_invoice / contract_url / sync.
+   The customer signs at tickets.greyscheese.com/catering.html?q=<sign_token>; signing creates the Square
+   invoice (deposit + balance) with the signed PDF attached. The `catering-invoice-sync` cron refreshes
+   payment status every 15 min; "↻ Payment status" does it on demand. */
+const CAT_URL = SB_URL + '/functions/v1/catering';
+const CAT_SITE = 'https://tickets.greyscheese.com/catering.html';
+const CAT_STAGES = { new:'New', replied:'Replied', quoted:'Quoting', contract_sent:'Proposal sent', signed:'Signed', deposit_paid:'Deposit paid', paid:'Paid', lost:'Lost' };
+const CAT_QSTAT = { draft:'Draft', sent:'Sent — waiting for signature', signed:'Signed — invoice pending', invoiced:'Invoiced — deposit due', deposit_paid:'Deposit paid', paid:'Paid in full', canceled:'Canceled' };
+const CAT_FUL = { pickup:'Pick-up', delivery:'Delivery', onsite:'On-site service' };
+let CAT_ROWS = [], CAT_FILTER = 'open', CAT_CUR = null, CAT_Q = null, CAT_QUOTES = [], CAT_ITEMS = [], CAT_MENU = null, CAT_TEMPLATE = '';
+const CAT_QUICK = [
+  ['Thanks — on it', "Thanks so much for thinking of us! I'm pulling some ideas together and will send a proposal shortly."],
+  ['Questions', "Happy to help! A couple of quick questions so I can put the right spread together:\n\n• About how many guests?\n• Any allergies or dietary needs?\n• Pick-up, delivery, or would you like us on-site?"],
+  ['Proposal coming', "Great — I'll put your proposal together and send it over today. You'll be able to review and sign online, and a deposit holds your date."],
+  ['Balance reminder', "Just a friendly reminder that the balance for your catering is coming due — the pay link is in your Square invoice email. Let me know if anything has changed!"],
+];
+async function catApi(action, payload){
+  let token = SB_KEY;
+  try{ const { data } = await sb.auth.getSession(); if(data && data.session) token = data.session.access_token; }catch(_){}
+  try{
+    const r = await fetch(CAT_URL+'?action='+action, { method:'POST', headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+token }, body: JSON.stringify(payload||{}) });
+    const d = await r.json().catch(()=>({}));
+    return { ok: r.ok && d.ok!==false, data:d };
+  }catch(e){ return { ok:false, data:{ error:String(e) } }; }
+}
+const catMoney = c => '$' + (Math.round(c||0)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+function catTime(t){ if(!t||!/^\d{1,2}:\d{2}/.test(t)) return t||''; const [h,m]=t.split(':').map(Number); return ((h%12)||12)+':'+String(m).padStart(2,'0')+(h>=12?' PM':' AM'); }
+async function catLoad(){
+  const el = document.getElementById('catList'); if(!el) return;
+  const { data, error } = await sb.from('catering_leads')
+    .select('*, catering_messages(body,direction,created_at), catering_quotes(status,total_cents,amount_paid_cents,created_at)')
+    .order('last_message_at',{ascending:false}).limit(300);
+  if(error){ el.innerHTML = '<div class="rec-empty">❌ Could not load catering leads.</div>'; return; }
+  CAT_ROWS = data || [];
+  const unread = CAT_ROWS.filter(r=>r.unread).length;
+  const b = document.getElementById('catBadge'); if(b){ b.textContent = unread; b.style.display = unread ? '' : 'none'; }
+  catRender();
+}
+window.catOpenById = async function(id){
+  const t = document.querySelector(".tab[onclick*=\"'catering'\"]"); if(t) t.click();
+  if(!CAT_ROWS.some(r=>r.id===id)) await catLoad();
+  catOpen(id);
+};
+function catRender(){
+  const counts = { open:0 }; Object.keys(CAT_STAGES).forEach(k=>counts[k]=0);
+  CAT_ROWS.forEach(r=>{ counts[r.stage]=(counts[r.stage]||0)+1; if(r.stage!=='paid'&&r.stage!=='lost') counts.open++; });
+  document.getElementById('catChips').innerHTML = [['open','Open'],...Object.entries(CAT_STAGES),['all','All']].map(([k,l])=>
+    '<button class="chip'+(CAT_FILTER===k?' on':'')+'" onclick="CAT_FILTER=\''+k+'\';catRender()">'+l+(k==='all'?'':' · '+(counts[k]||0))+'</button>').join('')
+    +'<div class="spacer"></div><button class="btn btn-ghost btn-sm" onclick="catLoad()">↻ Refresh</button><button class="btn btn-gold btn-sm" onclick="catNew()">＋ New lead</button>';
+  const rows = CAT_ROWS.filter(r=> CAT_FILTER==='all' ? true : CAT_FILTER==='open' ? (r.stage!=='paid'&&r.stage!=='lost') : r.stage===CAT_FILTER);
+  const el = document.getElementById('catList');
+  if(!rows.length){ el.innerHTML = '<div class="rec-empty">No catering leads here.</div>'; return; }
+  el.innerHTML = rows.map(r=>{
+    const msgs = (r.catering_messages||[]).filter(m=>m.direction!=='note').sort((a,b)=>a.created_at.localeCompare(b.created_at));
+    const lastMsg = msgs[msgs.length-1];
+    const q = (r.catering_quotes||[]).filter(x=>x.status!=='canceled').sort((a,b)=>b.created_at.localeCompare(a.created_at))[0];
+    const bits = [r.occasion, r.event_date?fmtDisplay(r.event_date):'', r.guests?('👥 '+r.guests):'', r.location, q?catMoney(q.total_cents):''].filter(Boolean).join(' · ');
+    const pill = r.stage==='paid'?'pill-ok':r.stage==='lost'?'pill-bad':r.stage==='new'?'pill-req':'pill-mid';
+    return '<div class="rec-row" onclick="catOpen(\''+r.id+'\')">'
+      +'<span style="width:10px;height:10px;border-radius:50%;flex:0 0 10px;background:'+(r.unread?'#d97706':'transparent')+'"></span>'
+      +'<div style="flex:1;min-width:0;"><div class="res-r-name">'+esc(r.name)+(r.company?' <span style="font-weight:400;">('+esc(r.company)+')</span>':'')+' <span style="font-weight:400;color:#64748b;">· '+esc(bits)+'</span></div>'
+      +'<div class="res-r-meta" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(lastMsg?(lastMsg.direction==='out'?'You: ':'')+esc(lastMsg.body.slice(0,140)):'')+'</div></div>'
+      +'<span class="res-r-time" style="min-width:auto;">'+esc(inqWhen(r.last_message_at))+'</span>'
+      +'<span class="pill '+pill+'">'+CAT_STAGES[r.stage]+'</span></div>';
+  }).join('');
+}
+async function catOpen(id){
+  CAT_CUR = CAT_ROWS.find(r=>r.id===id); if(!CAT_CUR) return;
+  catHead();
+  document.getElementById('catStage').innerHTML = Object.entries(CAT_STAGES).map(([k,l])=>'<option value="'+k+'">'+l+'</option>').join('');
+  document.getElementById('catStage').value = CAT_CUR.stage;
+  document.getElementById('catBody').value = '';
+  document.getElementById('catMsg').textContent = '';
+  document.getElementById('catQuick').innerHTML = '<option value="">Quick replies…</option>' + CAT_QUICK.map((x,i)=>'<option value="'+i+'">'+esc(x[0])+'</option>').join('');
+  document.getElementById('catModal').style.display = 'flex';
+  catView('convo');
+  await catThread();
+  if(CAT_CUR.unread){ await sb.from('catering_leads').update({ unread:false }).eq('id', CAT_CUR.id); CAT_CUR.unread=false; catLoad(); }
+}
+function catHead(){
+  const r = CAT_CUR;
+  document.getElementById('catTitle').textContent = r.name + (r.company ? ' — ' + r.company : '');
+  document.getElementById('catMeta').innerHTML = [ '<a href="mailto:'+esc(r.email)+'">'+esc(r.email)+'</a>', r.phone?esc(r.phone):'',
+    r.event_date?'📅 '+fmtDisplay(r.event_date)+(r.event_time?' '+catTime(r.event_time):''):'', r.guests?'👥 '+r.guests:'',
+    r.fulfillment?CAT_FUL[r.fulfillment]:'', r.location||'', '#'+esc(r.code) ].filter(Boolean).join(' · ')
+    + (r.address?'<div style="margin-top:3px;">📍 '+esc(r.address)+'</div>':'') + (r.budget?'<div style="margin-top:3px;">Budget: '+esc(r.budget)+'</div>':'');
+}
+function catView(which){
+  document.getElementById('catConvo').style.display = which==='convo' ? '' : 'none';
+  document.getElementById('catQuote').style.display = which==='quote' ? '' : 'none';
+  document.getElementById('catTabConvo').classList.toggle('on', which==='convo');
+  document.getElementById('catTabQuote').classList.toggle('on', which==='quote');
+  if(which==='quote') catQuoteLoad();
+}
+async function catThread(){
+  const el = document.getElementById('catThread'); el.innerHTML = '<div class="rec-empty">Loading…</div>';
+  const { data } = await sb.from('catering_messages').select('*').eq('lead_id', CAT_CUR.id).order('created_at');
+  el.innerHTML = (data||[]).map(m=>{
+    const mine = m.direction==='out', note = m.direction==='note';
+    const bg = note ? '#fef9c3' : mine ? '#e0f2fe' : '#f1f5f9';
+    const who = note ? (m.sent_by==='system'?'🤖 Update':'📝 Note') : mine ? ('You'+(m.sent_by?' ('+esc(m.sent_by)+')':'')) : esc(CAT_CUR.name);
+    const warn = mine && m.email_status && m.email_status!=='sent' ? ' <span class="pill pill-bad">email failed</span>' : '';
+    return '<div style="display:flex;justify-content:'+(mine?'flex-end':'flex-start')+';margin:6px 0;"><div style="max-width:82%;background:'+bg+';border-radius:12px;padding:9px 12px;">'
+      +'<div style="font-size:.72rem;color:#64748b;margin-bottom:3px;">'+who+' · '+esc(inqWhen(m.created_at))+warn+'</div>'
+      +'<div style="white-space:pre-wrap;font-size:.9rem;">'+esc(m.body)+'</div></div></div>';
+  }).join('') || '<div class="rec-empty">No messages.</div>';
+  el.scrollTop = el.scrollHeight;
+}
+function catClose(){ document.getElementById('catModal').style.display='none'; CAT_CUR=null; CAT_Q=null; }
+function catQuickPick(sel){
+  const x = CAT_QUICK[Number(sel.value)]; sel.value=''; if(!x) return;
+  const t = document.getElementById('catBody');
+  const first = ((CAT_CUR && CAT_CUR.name)||'').split(' ')[0];
+  t.value = t.value ? t.value + '\n\n' + x[1] : (first ? 'Hi '+first+',\n\n' : '') + x[1];
+}
+async function catSend(){
+  const body = document.getElementById('catBody').value.trim();
+  const msg = document.getElementById('catMsg');
+  if(!body){ msg.textContent = 'Write a reply first.'; return; }
+  const btn = document.getElementById('catSend'); btn.disabled = true; msg.textContent = 'Sending…';
+  const r = await catApi('reply', { lead_id: CAT_CUR.id, body });
+  btn.disabled = false;
+  msg.textContent = r.ok ? '✓ Sent to '+CAT_CUR.email : '❌ '+(r.data.error||'Could not send');
+  if(r.ok){ document.getElementById('catBody').value=''; if(r.data.stage){ CAT_CUR.stage=r.data.stage; document.getElementById('catStage').value=r.data.stage; } }
+  await catThread(); catLoad();
+}
+async function catLog(note){
+  const body = document.getElementById('catBody').value.trim();
+  const msg = document.getElementById('catMsg');
+  if(!body){ msg.textContent = note ? 'Type the note in the box first.' : 'Paste their reply into the box first.'; return; }
+  const r = await catApi('log', { lead_id: CAT_CUR.id, body, note });
+  msg.textContent = r.ok ? (note?'✓ Note added':'✓ Reply logged') : '❌ '+(r.data.error||'Could not save');
+  if(r.ok) document.getElementById('catBody').value='';
+  await catThread(); catLoad();
+}
+async function catSetStage(v){
+  if(!CAT_CUR) return;
+  const { error } = await sb.from('catering_leads').update({ stage:v }).eq('id', CAT_CUR.id);
+  document.getElementById('catMsg').textContent = error ? '❌ '+error.message : '✓ Moved to '+CAT_STAGES[v];
+  CAT_CUR.stage = v; catLoad();
+}
+function catNew(){
+  ['name','email','phone','company','date','time','guests','occ','addr','msg'].forEach(k=>{ const e=document.getElementById('cn_'+k); if(e) e.value=''; });
+  document.getElementById('cn_ful').value=''; document.getElementById('cn_msgout').textContent='';
+  document.getElementById('catNewModal').style.display='flex';
+}
+async function catCreate(){
+  const v = k => document.getElementById('cn_'+k).value.trim();
+  const out = document.getElementById('cn_msgout');
+  out.textContent = 'Saving…';
+  const r = await catApi('new_lead', { name:v('name'), email:v('email'), phone:v('phone'), company:v('company'), event_date:v('date'), event_time:v('time'),
+    guests:v('guests'), location:v('loc'), fulfillment:v('ful'), occasion:v('occ'), address:v('addr'), message:v('msg') });
+  if(!r.ok){ out.textContent = '❌ '+(r.data.error||'Could not save'); return; }
+  document.getElementById('catNewModal').style.display='none';
+  await catLoad(); catOpen(r.data.lead.id);
+}
+
+/* ---------- proposal editor ---------- */
+async function catTemplate(){
+  if(CAT_TEMPLATE) return CAT_TEMPLATE;
+  const { data } = await sb.from('site_content').select('data').eq('key','catering_contract').maybeSingle();
+  return (CAT_TEMPLATE = (data && data.data && data.data.text) || '');
+}
+async function catQuoteLoad(){
+  const box = document.getElementById('catQuote');
+  box.innerHTML = '<div class="rec-empty">Loading…</div>';
+  const { data } = await sb.from('catering_quotes').select('*').eq('lead_id', CAT_CUR.id).order('created_at',{ascending:false});
+  CAT_QUOTES = data || [];
+  CAT_Q = CAT_QUOTES.find(q=>q.status!=='canceled') || null;
+  await catTemplate();
+  catQuoteRender();
+}
+function catBalDefault(){
+  const r = CAT_CUR; if(!r.event_date) return '';
+  const d = new Date(r.event_date+'T12:00:00'); d.setDate(d.getDate()-3);
+  return d.toISOString().slice(0,10);
+}
+function catQuoteRender(copyFrom){
+  const box = document.getElementById('catQuote'), r = CAT_CUR, q = CAT_Q;
+  const locked = q && !['draft','sent'].includes(q.status);
+  const history = CAT_QUOTES.filter(x=>x!==q).map(x=>'<span class="pill pill-mid" style="margin-right:6px;">'+esc(new Date(x.created_at).toLocaleDateString())+' · '+catMoney(x.total_cents)+' · '+esc(CAT_QSTAT[x.status]||x.status)+'</span>').join('');
+  if(locked){ box.innerHTML = catLockedHtml(q) + (history?'<div class="hint" style="margin-top:14px;">Earlier proposals: '+history+'</div>':''); return; }
+  const src = q || copyFrom || null;
+  CAT_ITEMS = src ? JSON.parse(JSON.stringify(src.items||[])) : [];
+  const status = q ? '<span class="pill '+(q.status==='sent'?'pill-req':'pill-mid')+'">'+esc(CAT_QSTAT[q.status])+'</span>'
+    + (q.sent_at?' <span class="hint" style="margin:0;">sent '+esc(inqWhen(q.sent_at))+'</span>':'') + (q.viewed_at?' <span class="hint" style="margin:0;">· 👀 opened '+esc(inqWhen(q.viewed_at))+'</span>':'') : '<span class="pill pill-mid">New proposal</span>';
+  box.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+status+'<div class="spacer" style="flex:1"></div>'
+    + (q && q.status==='sent' ? '<button class="btn btn-ghost btn-sm" onclick="catCopyLink()">🔗 Copy link</button><a class="btn btn-ghost btn-sm" target="_blank" href="'+CAT_SITE+'?q='+esc(q.sign_token)+'">👁 Preview</a>' : '')
+    + '</div>'
+    + '<h4 style="margin:16px 0 6px;">Event</h4><div class="cat-grid">'
+    +   catField('Name','cq_name',r.name) + catField('Email','cq_email',r.email,'email') + catField('Phone','cq_phone',r.phone||'','tel') + catField('Company','cq_company',r.company||'')
+    +   catField('Event date','cq_date',r.event_date||'','date') + catField('Time','cq_time',r.event_time||'','time') + catField('Guests','cq_guests',r.guests||'','number')
+    +   '<div class="rf"><label>Store</label><select id="cq_loc" class="loc-sel">'+['Memphis','Nashville'].map(l=>'<option'+(l===(r.location||'Memphis')?' selected':'')+'>'+l+'</option>').join('')+'</select></div>'
+    +   '<div class="rf"><label>Service</label><select id="cq_ful" class="loc-sel"><option value="">—</option>'+Object.entries(CAT_FUL).map(([k,l])=>'<option value="'+k+'"'+(r.fulfillment===k?' selected':'')+'>'+l+'</option>').join('')+'</select></div>'
+    +   catField('Occasion','cq_occ',r.occasion||'')
+    +   '<div class="rf" style="grid-column:1/-1;"><label>Address</label><input id="cq_addr" value="'+esc(r.address||'')+'"></div>'
+    + '</div>'
+    + '<h4 style="margin:18px 0 6px;">Items</h4>'
+    + '<div id="catItems"></div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center;">'
+    +   '<button class="btn btn-ghost btn-sm" onclick="catAddItem()">＋ Custom line</button>'
+    +   '<select id="catMenu" class="loc-sel" style="max-width:340px;" onchange="catMenuPick(this)"><option value="">＋ From the Square catering menu…</option></select>'
+    +   '<button class="btn btn-ghost btn-sm" onclick="catAddItem(\'Delivery & set-up\',1,0)">＋ Delivery fee</button>'
+    + '</div>'
+    + '<div class="cat-grid" style="margin-top:14px;">'
+    +   catField('Sales tax %','cq_tax', q?q.tax_rate:9.75,'number') + catField('Deposit %','cq_dep', q?q.deposit_pct:50,'number')
+    +   catField('Balance due','cq_bal', (q&&q.balance_due_date)||'','date')
+    +   '<div class="rf"><label>&nbsp;</label><div class="hint" style="margin:6px 0 0;">Blank = 3 days before the event</div></div>'
+    + '</div>'
+    + '<div id="catTotals" style="margin:14px 0 0 auto;max-width:320px;font-size:.92rem;"></div>'
+    + '<div class="rf" style="margin-top:14px;"><label>Note on the proposal (the customer sees this)</label><textarea id="cq_note" rows="2">'+esc((src&&src.customer_note)||'')+'</textarea></div>'
+    + '<details style="margin-top:14px;"><summary style="cursor:pointer;font-weight:700;">📜 Agreement text</summary>'
+    +   '<div class="hint" style="margin:8px 0;">Placeholders fill in automatically: {{name}} {{event_date}} {{guests}} {{total}} {{deposit_pct}} {{deposit}} {{balance_due_date}}. Changes here apply to this proposal only.</div>'
+    +   '<textarea id="cq_contract" rows="14" style="width:100%;font-family:inherit;font-size:.85rem;">'+esc((src&&src.contract_text)||CAT_TEMPLATE)+'</textarea>'
+    +   '<div style="margin-top:6px;"><button class="btn btn-ghost btn-sm" onclick="catSaveTemplate()">Save as the default for new proposals</button></div></details>'
+    + '<div class="rf" style="margin-top:14px;"><label>Message with the proposal email (optional)</label><textarea id="cq_msg" rows="3" placeholder="Leave blank for the standard note"></textarea></div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center;">'
+    +   '<span class="save-msg" id="cqMsg" style="flex:1;"></span>'
+    +   '<button class="btn btn-ghost" onclick="catSaveQuote(false)">💾 Save draft</button>'
+    +   '<button class="btn btn-gold" id="cqSend" onclick="catSaveQuote(true)">📨 Save &amp; send proposal</button>'
+    + '</div>'
+    + (history?'<div class="hint" style="margin-top:14px;">Earlier proposals: '+history+'</div>':'');
+  box.querySelectorAll('#cq_tax,#cq_dep').forEach(e=>e.oninput = catTotals);
+  document.getElementById('cq_loc').onchange = catMenuLoad;
+  catItemsRender(); catMenuLoad();
+}
+function catField(label,id,val,type){ return '<div class="rf"><label>'+label+'</label><input id="'+id+'" type="'+(type||'text')+'" value="'+esc(val==null?'':val)+'"'+(type==='number'?' step="any" min="0"':'')+'></div>'; }
+function catItemsRender(){
+  const el = document.getElementById('catItems'); if(!el) return;
+  if(!CAT_ITEMS.length){ el.innerHTML = '<div class="rec-empty" style="padding:14px;">No items yet — add from the menu or a custom line.</div>'; catTotals(); return; }
+  el.innerHTML = '<div class="cat-items">'+CAT_ITEMS.map((it,i)=>
+    '<div class="cat-item">'
+    +'<input class="ci-name" value="'+esc(it.name)+'" placeholder="Item" oninput="CAT_ITEMS['+i+'].name=this.value">'
+    +'<input class="ci-qty" type="number" step="any" min="0" value="'+esc(it.qty)+'" oninput="CAT_ITEMS['+i+'].qty=Number(this.value);catTotals()" title="Qty">'
+    +'<input class="ci-price" type="number" step="0.01" min="0" value="'+(it.price_cents/100).toFixed(2)+'" oninput="CAT_ITEMS['+i+'].price_cents=Math.round(Number(this.value)*100);catTotals()" title="Price each">'
+    +'<span class="ci-amt" id="ciAmt'+i+'"></span>'
+    +'<button class="btn btn-ghost btn-sm" onclick="CAT_ITEMS.splice('+i+',1);catItemsRender()" title="Remove">✕</button>'
+    +'<input class="ci-note" value="'+esc(it.note||'')+'" placeholder="Note (optional)" oninput="CAT_ITEMS['+i+'].note=this.value">'
+    +'</div>').join('')+'</div>';
+  catTotals();
+}
+function catAddItem(name, qty, cents){ CAT_ITEMS.push({ name:name||'', qty:qty||1, price_cents:cents||0 }); catItemsRender(); }
+function catTotals(){
+  const el = document.getElementById('catTotals'); if(!el) return;
+  CAT_ITEMS.forEach((it,i)=>{ const a=document.getElementById('ciAmt'+i); if(a) a.textContent = catMoney(Math.round((Number(it.qty)||0)*(it.price_cents||0))); });
+  const rate = Number(document.getElementById('cq_tax').value)||0, dep = Math.min(100,Math.max(0,Math.round(Number(document.getElementById('cq_dep').value)||0)));
+  const sub = CAT_ITEMS.reduce((s,it)=>s+Math.round((Number(it.qty)||0)*(it.price_cents||0)),0), tax = Math.round(sub*rate/100), tot = sub+tax;
+  const row = (k,v,b) => '<div style="display:flex;justify-content:space-between;padding:2px 0;'+(b?'font-weight:800;border-top:1px solid #e2e8f0;margin-top:4px;padding-top:6px;':'')+'"><span>'+k+'</span><span>'+v+'</span></div>';
+  el.innerHTML = row('Subtotal',catMoney(sub)) + row('Tax ('+rate+'%)',catMoney(tax)) + row('Total',catMoney(tot),true)
+    + (dep>0&&dep<100 ? row('Deposit ('+dep+'%)',catMoney(Math.round(tot*dep/100))) + row('Balance',catMoney(tot-Math.round(tot*dep/100))) : '');
+}
+async function catMenuLoad(){
+  const sel = document.getElementById('catMenu'); if(!sel) return;
+  const loc = (document.getElementById('cq_loc').value||'Memphis').toLowerCase();
+  try{
+    if(!CAT_MENU || CAT_MENU.loc!==loc){
+      const {data:{session}} = await sb.auth.getSession();
+      const res = await fetch(SB_URL + '/functions/v1/square-preorders', { method:'POST', headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+(session?session.access_token:SB_KEY) }, body: JSON.stringify({ action:'catalog_catering', loc }) });
+      const d = await res.json(); if(!res.ok) throw new Error(d.error||'menu');
+      CAT_MENU = { loc, groups: d.groups||[] };
+    }
+    sel.innerHTML = '<option value="">＋ From the Square catering menu…</option>' + CAT_MENU.groups.map((g,gi)=>'<optgroup label="'+esc(g.name)+'">'
+      + (g.items||[]).map((it,ii)=>(it.variations||[]).map((v,vi)=>'<option value="'+gi+'|'+ii+'|'+vi+'">'+esc(it.name+(v.name&&v.name!=='Regular'?' · '+v.name:''))+(v.price_cents?' — '+catMoney(v.price_cents):' — price varies')+'</option>').join('')).join('')
+      + '</optgroup>').join('');
+  }catch(e){ sel.innerHTML = '<option value="">(Square menu unavailable — use a custom line)</option>'; }
+}
+function catMenuPick(sel){
+  const [gi,ii,vi] = sel.value.split('|').map(Number); sel.value=''; if(isNaN(gi)) return;
+  const it = CAT_MENU.groups[gi].items[ii], v = it.variations[vi];
+  catAddItem(it.name+(v.name&&v.name!=='Regular'?' · '+v.name:''), 1, v.price_cents||0);
+}
+function catCopyLink(){
+  const url = CAT_SITE+'?q='+CAT_Q.sign_token;
+  (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(()=>{ document.getElementById('cqMsg').textContent='✓ Link copied'; }).catch(()=>prompt('Proposal link:', url));
+}
+async function catSaveTemplate(){
+  const text = document.getElementById('cq_contract').value;
+  const { error } = await sb.from('site_content').upsert({ key:'catering_contract', data:{ text }, updated_at:new Date().toISOString() });
+  document.getElementById('cqMsg').textContent = error ? '❌ '+error.message : '✓ Saved as the default agreement';
+  if(!error) CAT_TEMPLATE = text;
+}
+async function catSaveQuote(send){
+  const out = document.getElementById('cqMsg');
+  const v = id => document.getElementById(id).value.trim();
+  const items = CAT_ITEMS.map(it=>({ name:String(it.name||'').trim(), qty:Number(it.qty)||0, price_cents:it.price_cents||0, note:String(it.note||'').trim() })).filter(it=>it.name && it.qty>0);
+  if(send){
+    if(!items.length) { out.textContent = 'Add at least one item.'; return; }
+    if(items.some(it=>!it.price_cents)) { if(!confirm('Some items are $0 — send anyway?')) return; }
+    if(!v('cq_date')) { out.textContent = 'Set the event date first.'; return; }
+  }
+  out.textContent = 'Saving…';
+  const payload = { lead_id: CAT_CUR.id, quote_id: CAT_Q ? CAT_Q.id : undefined, items,
+    tax_rate: v('cq_tax'), deposit_pct: v('cq_dep'), balance_due_date: v('cq_bal'), customer_note: v('cq_note'),
+    contract_text: document.getElementById('cq_contract').value === CAT_TEMPLATE ? '' : document.getElementById('cq_contract').value,
+    lead: { name:v('cq_name'), email:v('cq_email'), phone:v('cq_phone'), company:v('cq_company'), event_date:v('cq_date'), event_time:v('cq_time'),
+      guests:v('cq_guests'), location:v('cq_loc'), fulfillment:v('cq_ful'), occasion:v('cq_occ'), address:v('cq_addr') } };
+  const r = await catApi('save_quote', payload);
+  if(!r.ok){ out.textContent = '❌ '+(r.data.error||'Could not save'); return; }
+  CAT_Q = r.data.quote;
+  Object.assign(CAT_CUR, { name:payload.lead.name, email:payload.lead.email, phone:payload.lead.phone, company:payload.lead.company, event_date:payload.lead.event_date||null,
+    event_time:payload.lead.event_time, guests:payload.lead.guests, location:payload.lead.location, fulfillment:payload.lead.fulfillment||null, occasion:payload.lead.occasion, address:payload.lead.address });
+  catHead();
+  if(!send){
+    if(['new','replied'].includes(CAT_CUR.stage)){ await sb.from('catering_leads').update({ stage:'quoted' }).eq('id', CAT_CUR.id); CAT_CUR.stage='quoted'; document.getElementById('catStage').value='quoted'; }
+    out.textContent = '✓ Draft saved'; catLoad(); return;
+  }
+  if(!confirm('Email the proposal to '+CAT_CUR.email+'? They\'ll be able to sign it and pay the deposit.')){ out.textContent = '✓ Saved (not sent)'; return; }
+  document.getElementById('cqSend').disabled = true; out.textContent = 'Sending…';
+  const s = await catApi('send_quote', { quote_id: CAT_Q.id, message: v('cq_msg') });
+  document.getElementById('cqSend').disabled = false;
+  if(!s.ok){ out.textContent = '❌ '+(s.data.error||'Could not send'); return; }
+  CAT_CUR.stage = 'contract_sent'; document.getElementById('catStage').value = 'contract_sent';
+  await catQuoteLoad(); document.getElementById('cqMsg').textContent = '✓ Proposal sent to '+CAT_CUR.email;
+  catThread(); catLoad();
+}
+function catLockedHtml(q){
+  const split = q.deposit_pct>0 && q.deposit_pct<100, dep = Math.round(q.total_cents*q.deposit_pct/100);
+  const items = (q.items||[]).map(it=>'<tr><td>'+esc(it.name)+(it.note?'<div class="hint" style="margin:0;">'+esc(it.note)+'</div>':'')+'</td><td style="text-align:right;">'+esc(it.qty)+'</td><td style="text-align:right;">'+catMoney(it.price_cents)+'</td><td style="text-align:right;">'+catMoney(Math.round(it.qty*it.price_cents))+'</td></tr>').join('');
+  const pill = q.status==='paid'?'pill-ok':q.status==='canceled'?'pill-bad':q.status==='deposit_paid'?'pill-ok':'pill-req';
+  return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="pill '+pill+'">'+esc(CAT_QSTAT[q.status]||q.status)+'</span>'
+    + (q.square_env==='sandbox'?'<span class="pill pill-bad">Square SANDBOX</span>':'') + '<div style="flex:1"></div>'
+    + (q.pdf_path?'<button class="btn btn-ghost btn-sm" onclick="catPdf(\''+q.id+'\')">📄 Signed PDF</button>':'')
+    + (q.invoice_url?'<a class="btn btn-ghost btn-sm" target="_blank" href="'+esc(q.invoice_url)+'">🧾 Invoice'+(q.invoice_number?' #'+esc(q.invoice_number):'')+'</a>':'')
+    + (q.square_invoice_id?'<button class="btn btn-ghost btn-sm" onclick="catSync(\''+q.id+'\')">↻ Payment status</button>':'')
+    + '</div>'
+    + (q.signed_at?'<p style="margin:12px 0 0;">✍️ Signed by <b>'+esc(q.signed_name)+'</b> · '+esc(inqWhen(q.signed_at))+(q.signed_ip?' · IP '+esc(q.signed_ip):'')+'</p>':'')
+    + (q.invoice_error && !q.square_invoice_id ? '<div style="margin:12px 0;padding:10px 12px;background:#fef2f2;color:#991b1b;border-radius:8px;">Square invoice failed: '+esc(q.invoice_error)+'<div style="margin-top:8px;"><button class="btn btn-gold btn-sm" onclick="catRetryInvoice(\''+q.id+'\')">Retry invoice</button></div></div>' : '')
+    + '<table style="width:100%;border-collapse:collapse;margin-top:12px;font-size:.9rem;"><thead><tr style="text-align:left;color:#64748b;font-size:.72rem;text-transform:uppercase;"><th>Item</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Price</th><th style="text-align:right;">Amount</th></tr></thead><tbody>'+items+'</tbody></table>'
+    + '<div style="margin:10px 0 0 auto;max-width:320px;font-size:.92rem;">'
+    +   '<div style="display:flex;justify-content:space-between;"><span>Subtotal</span><span>'+catMoney(q.subtotal_cents)+'</span></div>'
+    +   '<div style="display:flex;justify-content:space-between;"><span>Tax ('+Number(q.tax_rate)+'%)</span><span>'+catMoney(q.tax_cents)+'</span></div>'
+    +   '<div style="display:flex;justify-content:space-between;font-weight:800;border-top:1px solid #e2e8f0;margin-top:4px;padding-top:6px;"><span>Total</span><span>'+catMoney(q.total_cents)+'</span></div>'
+    +   (split?'<div style="display:flex;justify-content:space-between;"><span>Deposit ('+q.deposit_pct+'%)</span><span>'+catMoney(dep)+'</span></div>':'')
+    +   '<div style="display:flex;justify-content:space-between;color:#047857;font-weight:700;"><span>Paid so far</span><span>'+catMoney(q.amount_paid_cents)+'</span></div>'
+    + '</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;align-items:center;">'
+    +   '<span class="save-msg" id="cqMsg" style="flex:1;"></span>'
+    +   (['signed','invoiced'].includes(q.status)?'<button class="btn btn-ghost btn-sm" onclick="catCancelInvoice(\''+q.id+'\')">Cancel '+(q.square_invoice_id?'invoice':'proposal')+'</button>':'')
+    +   '<button class="btn btn-ghost btn-sm" onclick="catNewProposal()">＋ New proposal (copy this one)</button>'
+    + '</div>'
+    + (q.synced_at?'<div class="hint" style="margin-top:8px;">Square checked '+esc(inqWhen(q.synced_at))+' · status '+esc(q.invoice_status||'—')+'</div>':'');
+}
+function catNewProposal(){
+  const from = CAT_Q; CAT_Q = null;
+  if(from && ['signed','invoiced','deposit_paid','paid'].includes(from.status) && !confirm('This lead already has a signed proposal. Start a new one anyway?')){ CAT_Q = from; return; }
+  catQuoteRender(from ? { items: from.items, customer_note: from.customer_note, contract_text: '' } : null);
+}
+async function catPdf(id){
+  const r = await catApi('contract_url', { quote_id:id });
+  if(r.ok) window.open(r.data.url, '_blank'); else document.getElementById('cqMsg').textContent = '❌ '+(r.data.error||'Could not open');
+}
+async function catSync(id){
+  document.getElementById('cqMsg').textContent = 'Checking Square…';
+  const r = await catApi('sync', { quote_id:id });
+  const s = r.ok && r.data.synced && r.data.synced[0];
+  await catQuoteLoad();
+  document.getElementById('cqMsg').textContent = !r.ok ? '❌ '+(r.data.error||'failed') : s && s.error ? '❌ '+s.error : '✓ Up to date';
+  catThread(); catLoad();
+}
+async function catRetryInvoice(id){
+  document.getElementById('cqMsg').textContent = 'Creating the Square invoice…';
+  const r = await catApi('create_invoice', { quote_id:id });
+  await catQuoteLoad();
+  document.getElementById('cqMsg').textContent = r.ok ? '✓ Invoice created and emailed' : '❌ '+(r.data.error||'failed');
+  catThread();
+}
+async function catCancelInvoice(id){
+  if(!confirm('Cancel this proposal'+(CAT_Q&&CAT_Q.square_invoice_id?' and its Square invoice':'')+'? The customer\'s link will stop working.')) return;
+  const r = await catApi('cancel_invoice', { quote_id:id });
+  if(!r.ok){ document.getElementById('cqMsg').textContent = '❌ '+(r.data.error||'failed'); return; }
+  await catQuoteLoad(); catThread();
 }
 
 /* ---- Reservations (Wix, via portal-api) ---- */
