@@ -13189,6 +13189,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
      strips go back into .subbar and v2's bottom bar is untouched. -->
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
 <style id="nav-v3">
+/* staging: one brand blue for the whole console instead of per-section accents */
+:root{ --accent:#06273a !important; --accent-soft:#e3edf2 !important; }
+.btn-gold, .btn-navy{ color:#fff; }
 @media(min-width:821px){
   body:has(#consoleView:not(.hide)) > header{ display:none; }
   #consoleView{ min-height:100vh; }
@@ -13244,9 +13247,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   .tabs.v3.searching .subgrp .tab.nomatch, .tabs.v3.searching .sect.nomatch, .tabs.v3.searching .subgrp.nomatch{ display:none; }
   #consoleView .main > .subbar.v3-empty{ display:none; }
   /* page title, like the template's "My Dashboard" */
-  .v3-title{ background:#fff; border-bottom:1px solid var(--line); padding:26px 34px 22px; }
-  .v3-title .crumb{ font:500 .72rem 'Poppins',sans-serif; color:var(--sub); letter-spacing:.6px; text-transform:uppercase; }
-  .v3-title h1{ font:600 1.55rem 'Poppins',sans-serif; color:#1d1b29; margin:4px 0 0; letter-spacing:-.3px; }
+  .v3-title{ background:#06273a; border-bottom:1px solid #06273a; padding:26px 34px 22px; }
+  .v3-title .crumb{ font:500 .72rem 'Poppins',sans-serif; color:#9db3c1; letter-spacing:.6px; text-transform:uppercase; }
+  .v3-title h1{ font:600 1.55rem 'Poppins',sans-serif; color:#fff; margin:4px 0 0; letter-spacing:-.3px; }
 }
 @media(max-width:820px){
   .v3-title{ display:none; }
