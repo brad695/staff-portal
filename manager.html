@@ -13452,7 +13452,19 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       beoLoad();
     };
   }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', mount); else mount();
+  function mountQuoteBar(){
+    const oq = window.catQuoteRender, oc = window.catClose;
+    if(typeof oq==='function' && !oq.__beo){
+      const fn = function(){ const res = oq.apply(this, arguments);
+        try{ const box = $('catQuote'); if(typeof CAT_Q!=='undefined' && CAT_Q && box && !box.querySelector('.beo-pdfbar'))
+          box.insertAdjacentHTML('beforeend','<div class="beo-pdfbar cat-actions"><span class="hint" style="margin:0;flex:1 1 180px;">Staff copy of this proposal / invoice</span><button class="btn btn-ghost btn-sm" onclick="beoPrintInvoice()">🧾 Print</button><button class="btn btn-ghost btn-sm" onclick="beoPrintInvoice(true)">⬇ PDF</button></div>');
+        }catch(e){} return res; };
+      fn.__beo = true; window.catQuoteRender = fn;
+    }
+    if(typeof oc==='function' && !oc.__beo){ const fc = function(){ Q = null; B = null; return oc.apply(this, arguments); }; fc.__beo = true; window.catClose = fc; }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', ()=>{ mount(); mountQuoteBar(); }); else { mount(); mountQuoteBar(); }
+  window.addEventListener('load', mountQuoteBar);
 
   let B = null, Q = null;   // working BEO, current proposal
   const SERVICE = ['Grazing table','Buffet','Boards / platters (drop-off)','Boxed / individual','Passed','Plated','Stations'];
@@ -13530,7 +13542,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       + '</div></div>'
       + '<div class="cat-actions"><span class="save-msg" id="beoMsg">'+(r.beo_updated_at?'Last saved '+v(inqWhen(r.beo_updated_at)):'')+'</span>'
         + '<button class="btn btn-ghost" onclick="beoPrintInvoice()" '+(Q?'':'disabled')+'>🧾 Print invoice (staff copy)</button>'
+        + '<button class="btn btn-ghost" onclick="beoPrintInvoice(true)" '+(Q?'':'disabled')+'>⬇ Invoice PDF</button>'
         + '<button class="btn btn-ghost" onclick="beoPrint()">🖨 Print BEO</button>'
+        + '<button class="btn btn-ghost" onclick="beoPrint(true)">⬇ BEO PDF</button>'
         + '<button class="btn btn-gold" onclick="beoSave()">Save BEO</button></div>';
     box.querySelectorAll('input[data-k]').forEach(el=>el.addEventListener('input', ()=>{ const row=B[el.dataset.k][+el.dataset.i]; row[el.dataset.f]=el.value; dirty(); }));
     box.querySelectorAll('[data-b]').forEach(el=>el.addEventListener('input', ()=>{ B[el.dataset.b]=el.value; dirty(); }));
@@ -13575,11 +13589,33 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     + '.sig td{border:2px solid #000;border-top:none;height:.65in;vertical-align:bottom;padding:4px 8px;font-size:11px}'
     + '.foot{font-size:10px;color:#444;text-align:center;margin-top:6px}'
     + '.tot td{border:none!important;padding:3px 8px}.tot .g td{font-weight:700;font-size:15px;border-top:1.5px solid #000!important}';
-  function printDoc(title, body){
+  function printDoc(title, body, pdfName){
     const w = window.open('', '_blank'); if(!w){ alert('Allow pop-ups for this site to print.'); return; }
-    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>'+PCSS+'</style></head><body><div class="sheet">'+body
-      +'</div><script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>');
+    const tail = pdfName
+      ? '<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>'
+      : '<script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script>';
+    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>'+PCSS
+      + 'body.pdf{background:#fff}body.pdf .sheet{box-shadow:none!important;margin:0!important;padding:0!important;max-width:7.5in!important;width:7.5in}'
+      + '#pdfmsg{font:600 13px Arial;text-align:center;padding:10px;background:#06273a;color:#fff}'
+      + '</style></head><body'+(pdfName?' class="pdf"':'')+'>'+(pdfName?'<div id="pdfmsg">Building PDF…</div>':'')+'<div class="sheet">'+body+'</div>'+tail+'</body></html>');
     w.document.close();
+    if(pdfName){
+      // the opener drives html2pdf once the library has loaded in the new tab; if it never loads, fall back to the print dialog (Save as PDF)
+      const t0 = Date.now();
+      (function go(){
+        const msg = w.document.getElementById('pdfmsg');
+        if(w.html2pdf){
+          // options are rebuilt inside the new tab: html2pdf rejects arrays made in this window (cross-window instanceof)
+          const opts = w.JSON.parse(JSON.stringify({ margin:[0.75,0.5,0.5,0.5], filename:pdfName, image:{type:'jpeg',quality:0.97}, html2canvas:{scale:2,useCORS:true},
+            jsPDF:{unit:'in',format:'letter',orientation:'portrait'}, pagebreak:{mode:['css','legacy'], avoid:['tr','.hdr','.allergy','.sig','.chk div']} }));
+          w.html2pdf().set(opts)
+            .from(w.document.querySelector('.sheet')).save()
+            .then(()=>{ if(msg) msg.textContent='PDF downloaded — you can close this tab.'; })
+            .catch(e=>{ if(msg) msg.textContent='PDF failed ('+e+') — use Print → Save as PDF.'; });
+        } else if(Date.now()-t0 < 15000){ setTimeout(go, 200); }
+        else { if(msg) msg.textContent='Could not load the PDF tool — choose "Save as PDF" in the print window.'; w.print(); }
+      })();
+    }
   }
   const sec = (title, inner, raw) => '<div class="sec"><div class="t">'+title+'</div>'+(raw?inner:'<div class="b">'+inner+'</div>')+'</div>';
   const row4 = (a,b,c,d) => '<tr><td class="l">'+a+'</td><td>'+(b||'&nbsp;')+'</td><td class="l">'+c+'</td><td>'+(d||'&nbsp;')+'</td></tr>';
@@ -13588,7 +13624,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     return '<table class="hdr"><tr><td><div class="brand">GREYS Fine Cheeses · '+P(r.location||'')+'</div><h1>'+kind+'</h1></td>'
       + '<td class="no"><b>'+no+'</b><span>'+sub+'</span></td></tr></table>';
   }
-  window.beoPrint = async function(){
+  window.beoPrint = async function(pdf){
     const m = $('beoMsg'); if(m && m.textContent==='Unsaved changes' && confirm('Save the BEO before printing?')){ if(!(await beoSave())) return; }
     const r = CAT_CUR, b = B, q = Q;
     const when = r.event_date ? new Date(r.event_date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}) : '—';
@@ -13617,10 +13653,10 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       + row4('Balance','<b>'+catMoney(Math.max(0,tot-paid))+'</b>'+(q.balance_due_date?' due '+P(fmtDisplay(q.balance_due_date)):''),'Invoice',P(q.invoice_number?'#'+q.invoice_number:'—')+(q.invoice_status?' · '+P(q.invoice_status.replace(/_/g,' ').toLowerCase()):''))+'</table>', true);
     h += '<table class="sig"><tr><td>Client approval / date</td><td>GREYS manager / date</td><td>Kitchen lead / date</td></tr></table>';
     h += '<div class="foot">Changes after printing are made in the portal and reprinted — the highest revision number wins.</div>';
-    printDoc('BEO #'+r.code+' — '+r.name, h);
+    printDoc('BEO #'+r.code+' — '+r.name, h, pdf ? 'BEO-'+r.code+'-rev'+(r.beo_rev||0)+'.pdf' : null);
   };
-  window.beoPrintInvoice = function(){
-    const r = CAT_CUR, q = Q; if(!q) return;
+  window.beoPrintInvoice = function(pdf){
+    const r = CAT_CUR, q = (typeof CAT_Q!=='undefined' && CAT_Q) || Q; if(!r || !q) return;
     const items = q.items || [];
     const dep = Math.round((q.total_cents||0) * (q.deposit_pct||0) / 100), paid = q.amount_paid_cents||0;
     let h = header('Catering Invoice', q.invoice_number?'Invoice #'+P(q.invoice_number):'Proposal #'+P(r.code), 'STAFF COPY · '+P((q.invoice_status||q.status||'').replace(/_/g,' ').toLowerCase()));
@@ -13639,7 +13675,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       + '<tr class="g"><td>Balance due</td><td class="n">'+catMoney(Math.max(0,(q.total_cents||0)-paid))+'</td></tr></table></div>', true);
     if(q.customer_note) h += sec('Note to customer', P(q.customer_note));
     h += '<div class="foot">Staff copy printed '+new Date().toLocaleString()+' · payments are taken on the Square invoice.</div>';
-    printDoc('Invoice — '+r.name, h);
+    printDoc('Invoice — '+r.name, h, pdf ? (q.invoice_number?'Invoice-'+q.invoice_number:'Proposal-'+r.code)+'.pdf' : null);
   };
 })();
 </script>
