@@ -13554,10 +13554,10 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 
   /* ── printing ── (v2: boxed form layout, larger type, nothing past the margins) */
   const P = s => esc(s==null?'':String(s)).replace(/\n/g,'<br>');
-  const PCSS = '@page{size:letter;margin:0.5in}'
+  const PCSS = '@page{size:letter;margin:0.75in 0.5in 0.5in 0.5in}'
     + '*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
     + 'html,body{margin:0;padding:0}body{font:13px/1.45 Arial,Helvetica,sans-serif;color:#000}'
-    + '.sheet{width:100%;max-width:7.5in;margin:0 auto}'
+    + '.sheet{width:100%;max-width:7.5in;margin:0 auto;padding-top:0.15in}'
     + '@media screen{body{background:#e5e7eb}.sheet{background:#fff;padding:0.5in;margin:16px auto;max-width:8.5in;box-shadow:0 2px 12px rgba(0,0,0,.2)}}'
     + 'table{width:100%;border-collapse:collapse;table-layout:fixed}td,th{word-wrap:break-word;overflow-wrap:anywhere;vertical-align:top}'
     + '.hdr td{border:2px solid #000;padding:8px 10px}.hdr .brand{font-size:11px;letter-spacing:2px;text-transform:uppercase}.hdr h1{margin:2px 0 0;font-size:24px;letter-spacing:1px}'
