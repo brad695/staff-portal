@@ -13191,6 +13191,13 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 <style id="nav-v3">
 /* staging: one brand blue for the whole console instead of per-section accents */
 :root{ --accent:#06273a !important; --accent-soft:#e3edf2 !important; }
+/* filter chips in panel toolbars -> underline tabs */
+.panel .toolbar:has(> .chips){ border-bottom:1px solid var(--line); align-items:flex-end; padding-bottom:0; }
+.panel .toolbar > .chips{ gap:4px; margin-bottom:-1px; flex-wrap:wrap; }
+.panel .toolbar .chip{ background:none; border:none; border-bottom:2px solid transparent; border-radius:0; padding:10px 14px 11px;
+  color:var(--sub); font-weight:600; font-size:.84rem; }
+.panel .toolbar .chip:hover{ color:var(--ink); background:none; }
+.panel .toolbar .chip.on{ background:none; color:#06273a; border-bottom-color:#06273a; }
 .btn-gold, .btn-navy{ color:#fff; }
 @media(min-width:821px){
   body:has(#consoleView:not(.hide)) > header{ display:none; }
@@ -13247,7 +13254,11 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   .tabs.v3.searching .subgrp .tab.nomatch, .tabs.v3.searching .sect.nomatch, .tabs.v3.searching .subgrp.nomatch{ display:none; }
   #consoleView .main > .subbar.v3-empty{ display:none; }
   /* page title, like the template's "My Dashboard" */
-  .v3-title{ background:#06273a; border-bottom:1px solid #06273a; padding:26px 34px 22px; }
+  .v3-title{ background:#06273a; border-bottom:1px solid #06273a; padding:26px 34px 22px; display:flex; align-items:flex-end; gap:16px; }
+  .v3-title .v3-tt{ flex:1; min-width:0; }
+  .v3-title .v3-act{ display:flex; gap:8px; align-items:center; }
+  .v3-title .v3-act .btn{ background:#fff; color:#06273a; border-color:#fff; font-weight:700; padding:11px 18px; }
+  .v3-title .v3-act .btn:hover{ background:#e3edf2; }
   .v3-title .crumb{ font:500 .72rem 'Poppins',sans-serif; color:#9db3c1; letter-spacing:.6px; text-transform:uppercase; }
   .v3-title h1{ font:600 1.55rem 'Poppins',sans-serif; color:#fff; margin:4px 0 0; letter-spacing:-.3px; }
 }
@@ -13343,7 +13354,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     // page title bar
     const title = document.createElement('div');
     title.className = 'v3-title';
-    title.innerHTML = '<div class="crumb"></div><h1></h1>';
+    title.innerHTML = '<div class="v3-tt"><div class="crumb"></div><h1></h1></div><div class="v3-act"></div>';
     main.insertBefore(title, main.firstChild);
     function retitle(){
       const a = document.querySelector('#consoleView .tab.active'); if(!a) return;
@@ -13351,6 +13362,18 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       title.querySelector('.crumb').textContent = g ? g.name : '';
       const n = Array.from(a.childNodes).filter(x=> x.nodeType===3).map(x=> x.data).join('').trim();
       title.querySelector('h1').textContent = n || a.textContent.trim();
+      moveAction();
+    }
+    // the open panel's primary "＋ Add …" button lives in the title bar on
+    // desktop; it goes back to its own toolbar when the panel changes
+    const act = title.querySelector('.v3-act');
+    let moved = null;   // { btn, parent, next }
+    function moveAction(){
+      const panel = document.querySelector('#consoleView .panel.active');
+      const want = DESK.matches && panel ? panel.querySelector(':scope > .section-card .toolbar > .btn-gold') : null;
+      if(moved && moved.btn === want) return;
+      if(moved){ moved.parent.insertBefore(moved.btn, moved.next && moved.next.parentNode === moved.parent ? moved.next : null); moved = null; }
+      if(want){ moved = { btn:want, parent:want.parentNode, next:want.nextSibling }; act.appendChild(want); }
     }
 
     // desktop: strips live under their section; phone: back in the sub-bar
@@ -13365,7 +13388,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       }
     }
     place();
-    DESK.addEventListener ? DESK.addEventListener('change', place) : DESK.addListener(place);
+    const onBp = ()=>{ place(); try{ moveAction(); }catch(e){} };
+    DESK.addEventListener ? DESK.addEventListener('change', onBp) : DESK.addListener(onBp);
 
     // search: filter sub-items across every section, Enter opens the first hit
     const inp = search.querySelector('input');
