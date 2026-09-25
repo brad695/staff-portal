@@ -13193,7 +13193,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   body:has(#consoleView:not(.hide)) > header{ display:none; }
   #consoleView{ min-height:100vh; }
   #consoleView > .tabs.v3{
-    --pv:#361b59; --pv2:#472a74; --pv3:#50318a; --pvt:#ece6f7; --pvm:#bfb2da; --pvl:rgba(255,255,255,.11);
+    --pv:#06273a; --pv2:#0d3850; --pv3:#15506e; --pvt:#ece6f7; --pvm:#bfb2da; --pvl:rgba(255,255,255,.11);
     width:272px; flex:none; background:var(--pv); color:var(--pvt); border:none; padding:0; gap:0;
     position:sticky; top:0; align-self:flex-start; height:100vh; min-height:100vh; max-height:100vh;
     display:flex; flex-direction:column; overflow:hidden; font-family:'Poppins',system-ui,sans-serif;
@@ -13206,8 +13206,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   .tabs.v3 .v3-search input{ width:100%; box-sizing:border-box; background:var(--pv2); border:1px solid transparent; border-radius:8px; color:#fff;
       font:400 .82rem 'Poppins',sans-serif; padding:10px 12px 10px 34px; outline:none; }
   .tabs.v3 .v3-search input::placeholder{ color:var(--pvm); }
-  .tabs.v3 .v3-search input:focus{ border-color:#7c5cc4; }
-  .tabs.v3 .v3-list{ flex:1; overflow-y:auto; border-top:1px solid var(--pvl); padding:14px 0 10px; scrollbar-width:thin; scrollbar-color:#5b3d8f transparent; }
+  .tabs.v3 .v3-search input:focus{ border-color:#3a8bb3; }
+  .tabs.v3 .v3-list{ flex:1; overflow-y:auto; border-top:1px solid var(--pvl); padding:14px 0 10px; scrollbar-width:thin; scrollbar-color:#1f5673 transparent; }
   .tabs.v3 .v3-foot{ border-top:1px solid var(--pvl); padding:10px 0 34px; }
   .tabs.v3 .sect, .tabs.v3 .v3-link{
       display:flex; align-items:center; gap:14px; width:100%; min-height:48px; padding:0 22px; margin:0;
@@ -13221,7 +13221,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   .tabs.v3 .sect .lbl-desk{ display:inline; flex:1; } .tabs.v3 .sect .lbl-phone{ display:none; }
   .tabs.v3 .sect .chev{ width:16px; height:16px; margin-left:auto; transform:rotate(180deg); transition:transform .15s; opacity:.8; }
   .tabs.v3 .sect.on{ background:none; color:#fff; font-weight:500; }
-  .tabs.v3 .sect.on .chev{ transform:rotate(0deg); }
+  .tabs.v3 .sect.x .chev{ transform:rotate(0deg); }
   .tabs.v3 .sect.more{ display:none; }
   .tabs.v3 .sect .v3-dot{ width:8px; height:8px; border-radius:50%; background:#ef4444; display:none; margin-left:auto; }
   .tabs.v3 .sect.has-badge:not(.on) .v3-dot{ display:block; }
@@ -13229,7 +13229,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   /* sub-items (the moved .tab elements) */
   .tabs.v3 .subgrp .tab{ width:100%; box-sizing:border-box; justify-content:flex-start; text-align:left; flex:none; }
   .tabs.v3 .subgrp{ display:none; flex-direction:column; gap:2px; align-items:stretch; padding:2px 16px 8px 0; overflow:visible; background:none; }
-  .tabs.v3 .subgrp.on{ display:flex; }
+  .tabs.v3 .subgrp.on{ display:none; } .tabs.v3 .subgrp.x{ display:flex; }
   .tabs.v3 .subgrp .tab{ position:relative; display:flex; align-items:center; gap:10px; min-height:40px; padding:0 14px 0 82px; margin:0;
       border:none; border-radius:0 999px 999px 0; background:none; color:var(--pvt); cursor:pointer;
       font:400 .82rem 'Poppins',sans-serif; letter-spacing:.1px; text-transform:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:none; }
@@ -13253,7 +13253,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   .tabs.v3 .v3-brand, .tabs.v3 .v3-search, .tabs.v3 .v3-foot, .tabs.v3 .chev, .tabs.v3 .v3-dot{ display:none; }
   .tabs.v3 .v3-list{ display:contents; }
   .tabs.v3 svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-  .tabs.v3 .sect .ico{ color:var(--sc,#361b59); }
+  .tabs.v3 .sect .ico{ color:var(--sc,#06273a); }
   .tabs.v3 .sect.on .ico{ color:#fff; }
 }
 </style>
@@ -13321,6 +13321,21 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       g.btn.insertAdjacentHTML('beforeend','<span class="v3-dot"></span>'+svg('chev').replace('<svg','<svg class="chev"'));
       g.strip.style.setProperty('--si', s[1]);
     });
+
+    // desktop order + nothing expanded by default; a section click only
+    // toggles its list open/closed (capture on the list beats v2's handler)
+    const ORDER = ['Events & Reservations','Tickets & Classes','Experiences','Catering','Cheese Case','Staff','Marketing','Cheese Club'];
+    const sorted = G.groups.slice().sort((a,b)=>{ const x=ORDER.indexOf(a.name), y=ORDER.indexOf(b.name); return (x<0?99:x)-(y<0?99:y); });
+    sorted.forEach(g=> list.appendChild(g.btn));
+    const moreBtn = list.querySelector('.sect.more'); if(moreBtn) list.appendChild(moreBtn);
+    list.addEventListener('click', e=>{
+      if(!DESK.matches) return;
+      const b = e.target.closest('.sect'); if(!b || !list.contains(b)) return;
+      const g = G.groups.find(x=> x.btn === b); if(!g) return;
+      e.stopPropagation(); e.preventDefault();
+      const open = !g.strip.classList.contains('x');
+      g.strip.classList.toggle('x', open); b.classList.toggle('x', open);
+    }, true);
 
     // page title bar
     const title = document.createElement('div');
