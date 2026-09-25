@@ -13464,6 +13464,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     if(typeof oc==='function' && !oc.__beo){ const fc = function(){ Q = null; B = null; return oc.apply(this, arguments); }; fc.__beo = true; window.catClose = fc; }
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', ()=>{ mount(); mountQuoteBar(); }); else { mount(); mountQuoteBar(); }
+  // logo as a data URL so print/PDF tabs never wait on a network image
+  fetch('icon-192.png').then(r=>r.blob()).then(b=>new Promise(res=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.readAsDataURL(b); })).then(u=>{ window.__greysLogo=u; }).catch(()=>{});
   window.addEventListener('load', mountQuoteBar);
 
   let B = null, Q = null;   // working BEO, current proposal
@@ -13658,25 +13660,62 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   window.beoPrintInvoice = function(pdf){
     const r = CAT_CUR, q = (typeof CAT_Q!=='undefined' && CAT_Q) || Q; if(!r || !q) return;
     const items = q.items || [];
-    const dep = Math.round((q.total_cents||0) * (q.deposit_pct||0) / 100), paid = q.amount_paid_cents||0;
-    let h = header('Catering Invoice', q.invoice_number?'Invoice #'+P(q.invoice_number):'Proposal #'+P(r.code), 'STAFF COPY · '+P((q.invoice_status||q.status||'').replace(/_/g,' ').toLowerCase()));
-    h += sec('Customer &amp; event', '<table class="info">'
-      + row4('Bill to', P(r.name)+(r.company?'<br>'+P(r.company):''), 'Event date', P(r.event_date?fmtDisplay(r.event_date):'')+(r.event_time?' · '+P(catTime(r.event_time)):''))
-      + row4('Email', P(r.email), 'Service', P(r.fulfillment?CAT_FUL[r.fulfillment]:''))
-      + row4('Phone', P(r.phone), 'Guests', P(r.guests))
-      + row4('Signed', q.signed_at?P(q.signed_name)+' · '+P(new Date(q.signed_at).toLocaleDateString()):'Not signed', 'Balance due', q.balance_due_date?P(fmtDisplay(q.balance_due_date)):'—')
-      + '</table>', true);
-    h += sec('Items', '<table><tr><th>Item</th><th class="n" style="width:.7in">Qty</th><th class="n" style="width:1.1in">Price</th><th class="n" style="width:1.2in">Amount</th></tr>'
-      + items.map(i=>'<tr><td>'+P(i.name)+(i.note?'<div style="color:#444;font-size:11px">'+P(i.note)+'</div>':'')+'</td><td class="n">'+P(i.qty)+'</td><td class="n">'+catMoney(i.price_cents)+'</td><td class="n">'+catMoney((i.price_cents||0)*(Number(i.qty)||0))+'</td></tr>').join('')
-      + '</table><div class="b"><table class="tot" style="width:3.4in;margin-left:auto">'
-      + '<tr><td>Subtotal</td><td class="n">'+catMoney(q.subtotal_cents)+'</td></tr><tr><td>Tax ('+P(q.tax_rate)+'%)</td><td class="n">'+catMoney(q.tax_cents)+'</td></tr>'
-      + '<tr class="g"><td>Total</td><td class="n">'+catMoney(q.total_cents)+'</td></tr>'
-      + '<tr><td>Deposit ('+P(q.deposit_pct)+'%)</td><td class="n">'+catMoney(dep)+'</td></tr><tr><td>Paid to date</td><td class="n">'+catMoney(paid)+'</td></tr>'
-      + '<tr class="g"><td>Balance due</td><td class="n">'+catMoney(Math.max(0,(q.total_cents||0)-paid))+'</td></tr></table></div>', true);
-    if(q.customer_note) h += sec('Note to customer', P(q.customer_note));
-    h += '<div class="foot">Staff copy printed '+new Date().toLocaleString()+' · payments are taken on the Square invoice.</div>';
-    printDoc('Invoice — '+r.name, h, pdf ? (q.invoice_number?'Invoice-'+q.invoice_number:'Proposal-'+r.code)+'.pdf' : null);
+    const total = q.total_cents||0, dep = Math.round(total * (q.deposit_pct||0) / 100), paid = q.amount_paid_cents||0, bal = Math.max(0,total-paid);
+    const isInv = !!q.invoice_number;
+    const today = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+    const evDate = r.event_date ? new Date(r.event_date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}) : '—';
+    const logo = window.__greysLogo || (location.origin + '/icon-192.png');
+    const css = '<style>'
+      + '.pp{display:flex;flex-direction:column;min-height:9.55in;font-size:14px}'
+      + '.pp .top{display:flex;align-items:center;gap:16px;border-bottom:4px solid #06273a;padding-bottom:14px}'
+      + '.pp .top img{width:64px;height:64px;border-radius:12px}'
+      + '.pp .top .nm{flex:1}.pp .top .nm b{display:block;font-size:24px;letter-spacing:.5px;color:#06273a}.pp .top .nm span{font-size:12px;color:#444;letter-spacing:1.5px;text-transform:uppercase}'
+      + '.pp .top .dt{text-align:right}.pp .top .dt b{display:block;font-size:30px;letter-spacing:2px;color:#06273a;text-transform:uppercase}.pp .top .dt span{font-size:13px;color:#333}'
+      + '.pp .blocks{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:20px 0}'
+      + '.pp .blk{border:1.5px solid #06273a;border-radius:6px;overflow:hidden}.pp .blk h3{margin:0;background:#06273a;color:#fff;font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;padding:6px 12px}'
+      + '.pp .blk .in{padding:10px 12px;line-height:1.6}.pp .blk .in b{font-size:15px}'
+      + '.pp table.items{width:100%;border-collapse:collapse;table-layout:fixed}'
+      + '.pp table.items th{background:#06273a;color:#fff;font-size:11.5px;letter-spacing:1px;text-transform:uppercase;padding:9px 12px;text-align:left}'
+      + '.pp table.items td{padding:11px 12px;border-bottom:1px solid #cfd6dc;font-size:14px;vertical-align:top;word-wrap:break-word}'
+      + '.pp table.items tr:nth-child(even) td{background:#f4f7f9}.pp table.items .n{text-align:right;white-space:nowrap}'
+      + '.pp .sub{color:#555;font-size:12px;margin-top:2px}'
+      + '.pp .lower{display:grid;grid-template-columns:1fr 3.05in;gap:24px;margin-top:18px;align-items:start}'
+      + '.pp .sched{border:1.5px solid #06273a;border-radius:6px;overflow:hidden}.pp .sched h3{margin:0;background:#e8eef2;color:#06273a;font-size:11.5px;letter-spacing:1.5px;text-transform:uppercase;padding:6px 12px;border-bottom:1.5px solid #06273a}'
+      + '.pp .sched table{width:100%;border-collapse:collapse}.pp .sched td{padding:8px 12px;border-bottom:1px solid #dde3e8}.pp .sched tr:last-child td{border-bottom:none}'
+      + '.pp .tots{width:100%;border-collapse:collapse}.pp .tots td{padding:6px 10px;font-size:14px}.pp .tots .n{text-align:right}'
+      + '.pp .tots .grand td{background:#06273a;color:#fff;font-size:18px;font-weight:700;padding:10px}'
+      + '.pp .tots .due td{border-top:2px solid #06273a;font-weight:700;font-size:16px}'
+      + '.pp .note{margin-top:18px;border-left:4px solid #06273a;background:#f4f7f9;padding:10px 14px;line-height:1.5}'
+      + '.pp .grow{flex:1;min-height:.3in}'
+      + '.pp .accept{display:grid;grid-template-columns:2fr 1fr;gap:24px;margin-top:18px}.pp .accept div{border-top:1.5px solid #000;padding-top:4px;font-size:11.5px;color:#333}.pp .accept .v{font-size:15px;color:#000;border:none;padding:0 0 4px;min-height:22px}'
+      + '.pp .ftr{margin-top:18px;border-top:4px solid #06273a;padding-top:10px;display:flex;justify-content:space-between;font-size:12px;color:#333}'
+      + '</style>';
+    let h = css + '<div class="pp">'
+      + '<div class="top"><img src="'+logo+'" alt=""><div class="nm"><b>GREYS Fine Cheeses</b><span>Catering · '+P(r.location||'')+'</span></div>'
+      + '<div class="dt"><b>'+(isInv?'Invoice':'Proposal')+'</b><span>'+(isInv?'#'+P(q.invoice_number):'#'+P(r.code))+' · '+P(today)+'</span></div></div>'
+      + '<div class="blocks"><div class="blk"><h3>Prepared for</h3><div class="in"><b>'+P(r.name)+'</b>'+(r.company?'<br>'+P(r.company):'')+(r.email?'<br>'+P(r.email):'')+(r.phone?'<br>'+P(r.phone):'')+'</div></div>'
+      + '<div class="blk"><h3>Event</h3><div class="in"><b>'+P(evDate)+'</b>'+(r.event_time?'<br>'+P(catTime(r.event_time)):'')
+        + '<br>'+P(r.fulfillment?CAT_FUL[r.fulfillment]:'')+(r.guests?' · '+P(r.guests)+' guests':'')+(r.occasion?'<br>'+P(r.occasion):'')+(r.address?'<br>'+P(r.address):'')+'</div></div></div>'
+      + '<table class="items"><tr><th>Description</th><th class="n" style="width:.8in">Qty</th><th class="n" style="width:1.15in">Price</th><th class="n" style="width:1.25in">Amount</th></tr>'
+      + items.map(i=>'<tr><td><b>'+P(i.name)+'</b>'+(i.note?'<div class="sub">'+P(i.note)+'</div>':'')+'</td><td class="n">'+P(i.qty)+'</td><td class="n">'+catMoney(i.price_cents)+'</td><td class="n">'+catMoney((i.price_cents||0)*(Number(i.qty)||0))+'</td></tr>').join('')
+      + '</table>'
+      + '<div class="lower"><div class="sched"><h3>Payment schedule</h3><table>'
+        + '<tr><td>Deposit ('+P(q.deposit_pct)+'%) — due at signing</td><td style="text-align:right"><b>'+catMoney(dep)+'</b></td></tr>'
+        + '<tr><td>Balance — due '+P(q.balance_due_date?fmtDisplay(q.balance_due_date):'before the event')+'</td><td style="text-align:right"><b>'+catMoney(Math.max(0,total-dep))+'</b></td></tr>'
+        + '<tr><td>Paid to date</td><td style="text-align:right">'+catMoney(paid)+'</td></tr>'
+        + '</table></div>'
+      + '<table class="tots"><tr><td>Subtotal</td><td class="n">'+catMoney(q.subtotal_cents)+'</td></tr><tr><td>Tax ('+P(q.tax_rate)+'%)</td><td class="n">'+catMoney(q.tax_cents)+'</td></tr>'
+        + '<tr class="grand"><td>Total</td><td class="n">'+catMoney(total)+'</td></tr>'
+        + (paid?'<tr><td>Paid</td><td class="n">−'+catMoney(paid)+'</td></tr>':'')
+        + '<tr class="due"><td>Balance due</td><td class="n">'+catMoney(bal)+'</td></tr></table></div>'
+      + (q.customer_note ? '<div class="note">'+P(q.customer_note)+'</div>' : '')
+      + '<div class="grow"></div>'
+      + '<div class="accept"><div><div class="v">'+(q.signed_at?P(q.signed_name)+' (signed online)':'')+'</div>Accepted by</div><div><div class="v">'+(q.signed_at?P(new Date(q.signed_at).toLocaleDateString()):'')+'</div>Date</div></div>'
+      + '<div class="ftr"><span>GREYS Fine Cheeses · greyscheese.com · info@greyscheese.com</span><span>Thank you!</span></div>'
+      + '</div>';
+    printDoc((isInv?'Invoice':'Proposal')+' — '+r.name, h, pdf ? (isInv?'Invoice-'+q.invoice_number:'Proposal-'+r.code)+'.pdf' : null);
   };
+
 })();
 </script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
