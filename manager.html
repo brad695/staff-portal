@@ -13193,7 +13193,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   body:has(#consoleView:not(.hide)) > header{ display:none; }
   #consoleView{ min-height:100vh; }
   #consoleView > .tabs.v3{
-    --pv:#06273a; --pv2:#0d3850; --pv3:#15506e; --pvt:#ece6f7; --pvm:#bfb2da; --pvl:rgba(255,255,255,.11);
+    --pv:#06273a; --pv2:#0d3850; --pv3:#15506e; --pvt:#e4edf2; --pvm:#9db3c1; --pvl:rgba(255,255,255,.11);
     width:272px; flex:none; background:var(--pv); color:var(--pvt); border:none; padding:0; gap:0;
     position:sticky; top:0; align-self:flex-start; height:100vh; min-height:100vh; max-height:100vh;
     display:flex; flex-direction:column; overflow:hidden; font-family:'Poppins',system-ui,sans-serif;
@@ -13234,8 +13234,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       border:none; border-radius:0 999px 999px 0; background:none; color:var(--pvt); cursor:pointer;
       font:400 .82rem 'Poppins',sans-serif; letter-spacing:.1px; text-transform:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:none; }
   .tabs.v3 .subgrp .tab::before{ content:''; position:absolute; left:58px; top:50%; width:13px; height:15px; transform:translateY(-50%);
-      border:1.6px solid var(--si,#c4b5fd); border-radius:3px; opacity:1;
-      background:linear-gradient(var(--si,#c4b5fd),var(--si,#c4b5fd)) 3px 4px/6px 1.4px no-repeat, linear-gradient(var(--si,#c4b5fd),var(--si,#c4b5fd)) 3px 7.5px/6px 1.4px no-repeat; }
+      border:1.6px solid var(--si,#9db3c1); border-radius:3px; opacity:1;
+      background:linear-gradient(var(--si,#9db3c1),var(--si,#9db3c1)) 3px 4px/6px 1.4px no-repeat, linear-gradient(var(--si,#9db3c1),var(--si,#9db3c1)) 3px 7.5px/6px 1.4px no-repeat; }
   .tabs.v3 .subgrp .tab:hover{ background:rgba(255,255,255,.05); color:#fff; }
   .tabs.v3 .subgrp .tab.active{ background:var(--pv3); color:#fff; font-weight:500; }
   .tabs.v3 .subgrp .tab .pill{ margin-left:auto!important; min-width:20px; height:20px; padding:0 6px; border-radius:999px; background:#ef4444; color:#fff;
@@ -13277,7 +13277,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   };
   const svg = k => '<svg viewBox="0 0 24 24">'+(I[k]||I.dot)+'</svg>';
   const SECT = {
-    'Staff':['users','#a5b4fc'], 'Events & Reservations':['cal','#5eead4'], 'Tickets & Classes':['ticket','#c4b5fd'],
+    'Staff':['users','#a5b4fc'], 'Events & Reservations':['cal','#5eead4'], 'Tickets & Classes':['ticket','#7dd3fc'],
     'Experiences':['spark','#fdba74'], 'Cheese Case':['cheese','#fcd34d'], 'Marketing':['mega','#fda4af'],
     'Catering':['glass','#6ee7b7'], 'Cheese Club':['box','#93c5fd']
   };
@@ -13316,7 +13316,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     foot.querySelector('#v3Logout').addEventListener('click', ()=>{ if(typeof logout==='function') logout(); });
 
     G.groups.forEach(g=>{
-      const s = SECT[g.name] || ['dot','#c4b5fd'];
+      const s = SECT[g.name] || ['dot','#9db3c1'];
       const ico = g.btn.querySelector('.ico'); if(ico) ico.innerHTML = svg(s[0]);
       g.btn.insertAdjacentHTML('beforeend','<span class="v3-dot"></span>'+svg('chev').replace('<svg','<svg class="chev"'));
       g.strip.style.setProperty('--si', s[1]);
