@@ -2,6 +2,7 @@ services:
   - type: web
     name: greys-staff-portal
     runtime: static
+    branch: main
     # No build step — static index.html + manager.html that talk directly to
     # Supabase (DB) and the Supabase Edge Function (Wix proxy). No server to boot.
     buildCommand: ""
@@ -11,3 +12,20 @@ services:
       - path: /*
         name: Cache-Control
         value: no-cache
+
+  # STAGING copy of the portal — builds branch `staging`. Same live Supabase DB.
+  # Red STAGING bar is added client-side by hostname (see STAGING-BAR in each page).
+  - type: web
+    name: greys-staff-portal-staging
+    runtime: static
+    branch: staging
+    buildCommand: ""
+    staticPublishPath: .
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+      - path: /*
+        name: X-Robots-Tag
+        value: noindex

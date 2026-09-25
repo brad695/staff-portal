@@ -820,5 +820,7 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   annLoad();
 });
 </script>
+<!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
+<script>(function(){if(location.hostname.indexOf("staging")<0)return;document.title="[STAGING] "+document.title;var m=document.createElement("meta");m.name="robots";m.content="noindex";document.head.appendChild(m);var b=document.createElement("div");b.textContent="STAGING \u2014 test copy. Same live database: data changes, emails and Square actions are REAL.";b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#c62828;color:#fff;font:600 12px/1.2 system-ui,sans-serif;text-align:center;padding:5px 8px;pointer-events:none;opacity:.92";document.body.appendChild(b);})();</script>
 </body>
 </html>
