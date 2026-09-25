@@ -13182,18 +13182,28 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   window.addEventListener('load', wrap);
 })();
 </script>
-<!-- ═══ NAV v3 (STAGING) — purple vertical sidebar, desktop only (>820px) ═══
+<!-- ═══ NAV v3 — vertical sidebar, desktop only (>820px) ═══
      Layered ON TOP of NAV v2: v2 still builds sections + moves the .tab
      elements into .subgrp strips. v3 restyles the rail and, on desktop,
      moves each strip under its section button (accordion). On phone the
      strips go back into .subbar and v2's bottom bar is untouched. -->
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
 <style id="nav-v3">
+/* staging: one brand blue for the whole console instead of per-section accents */
+:root{ --accent:#06273a !important; --accent-soft:#e3edf2 !important; }
+/* filter chips in panel toolbars -> underline tabs */
+.panel .toolbar:has(> .chips){ border-bottom:1px solid var(--line); align-items:flex-end; padding-bottom:0; }
+.panel .toolbar > .chips{ gap:4px; margin-bottom:-1px; flex-wrap:wrap; }
+.panel .toolbar .chip{ background:none; border:none; border-bottom:2px solid transparent; border-radius:0; padding:10px 14px 11px;
+  color:var(--sub); font-weight:600; font-size:.84rem; }
+.panel .toolbar .chip:hover{ color:var(--ink); background:none; }
+.panel .toolbar .chip.on{ background:none; color:#06273a; border-bottom-color:#06273a; }
+.btn-gold, .btn-navy{ color:#fff; }
 @media(min-width:821px){
   body:has(#consoleView:not(.hide)) > header{ display:none; }
   #consoleView{ min-height:100vh; }
   #consoleView > .tabs.v3{
-    --pv:#361b59; --pv2:#472a74; --pv3:#50318a; --pvt:#ece6f7; --pvm:#bfb2da; --pvl:rgba(255,255,255,.11);
+    --pv:#06273a; --pv2:#0d3850; --pv3:#15506e; --pvt:#e4edf2; --pvm:#9db3c1; --pvl:rgba(255,255,255,.11);
     width:272px; flex:none; background:var(--pv); color:var(--pvt); border:none; padding:0; gap:0;
     position:sticky; top:0; align-self:flex-start; height:100vh; min-height:100vh; max-height:100vh;
     display:flex; flex-direction:column; overflow:hidden; font-family:'Poppins',system-ui,sans-serif;
@@ -13206,8 +13216,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   .tabs.v3 .v3-search input{ width:100%; box-sizing:border-box; background:var(--pv2); border:1px solid transparent; border-radius:8px; color:#fff;
       font:400 .82rem 'Poppins',sans-serif; padding:10px 12px 10px 34px; outline:none; }
   .tabs.v3 .v3-search input::placeholder{ color:var(--pvm); }
-  .tabs.v3 .v3-search input:focus{ border-color:#7c5cc4; }
-  .tabs.v3 .v3-list{ flex:1; overflow-y:auto; border-top:1px solid var(--pvl); padding:14px 0 10px; scrollbar-width:thin; scrollbar-color:#5b3d8f transparent; }
+  .tabs.v3 .v3-search input:focus{ border-color:#3a8bb3; }
+  .tabs.v3 .v3-list{ flex:1; overflow-y:auto; border-top:1px solid var(--pvl); padding:14px 0 10px; scrollbar-width:thin; scrollbar-color:#1f5673 transparent; }
   .tabs.v3 .v3-foot{ border-top:1px solid var(--pvl); padding:10px 0 34px; }
   .tabs.v3 .sect, .tabs.v3 .v3-link{
       display:flex; align-items:center; gap:14px; width:100%; min-height:48px; padding:0 22px; margin:0;
@@ -13221,7 +13231,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   .tabs.v3 .sect .lbl-desk{ display:inline; flex:1; } .tabs.v3 .sect .lbl-phone{ display:none; }
   .tabs.v3 .sect .chev{ width:16px; height:16px; margin-left:auto; transform:rotate(180deg); transition:transform .15s; opacity:.8; }
   .tabs.v3 .sect.on{ background:none; color:#fff; font-weight:500; }
-  .tabs.v3 .sect.on .chev{ transform:rotate(0deg); }
+  .tabs.v3 .sect.x .chev{ transform:rotate(0deg); }
   .tabs.v3 .sect.more{ display:none; }
   .tabs.v3 .sect .v3-dot{ width:8px; height:8px; border-radius:50%; background:#ef4444; display:none; margin-left:auto; }
   .tabs.v3 .sect.has-badge:not(.on) .v3-dot{ display:block; }
@@ -13229,13 +13239,13 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   /* sub-items (the moved .tab elements) */
   .tabs.v3 .subgrp .tab{ width:100%; box-sizing:border-box; justify-content:flex-start; text-align:left; flex:none; }
   .tabs.v3 .subgrp{ display:none; flex-direction:column; gap:2px; align-items:stretch; padding:2px 16px 8px 0; overflow:visible; background:none; }
-  .tabs.v3 .subgrp.on{ display:flex; }
+  .tabs.v3 .subgrp.on{ display:none; } .tabs.v3 .subgrp.x{ display:flex; }
   .tabs.v3 .subgrp .tab{ position:relative; display:flex; align-items:center; gap:10px; min-height:40px; padding:0 14px 0 82px; margin:0;
       border:none; border-radius:0 999px 999px 0; background:none; color:var(--pvt); cursor:pointer;
       font:400 .82rem 'Poppins',sans-serif; letter-spacing:.1px; text-transform:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:none; }
   .tabs.v3 .subgrp .tab::before{ content:''; position:absolute; left:58px; top:50%; width:13px; height:15px; transform:translateY(-50%);
-      border:1.6px solid var(--si,#c4b5fd); border-radius:3px; opacity:1;
-      background:linear-gradient(var(--si,#c4b5fd),var(--si,#c4b5fd)) 3px 4px/6px 1.4px no-repeat, linear-gradient(var(--si,#c4b5fd),var(--si,#c4b5fd)) 3px 7.5px/6px 1.4px no-repeat; }
+      border:1.6px solid var(--si,#9db3c1); border-radius:3px; opacity:1;
+      background:linear-gradient(var(--si,#9db3c1),var(--si,#9db3c1)) 3px 4px/6px 1.4px no-repeat, linear-gradient(var(--si,#9db3c1),var(--si,#9db3c1)) 3px 7.5px/6px 1.4px no-repeat; }
   .tabs.v3 .subgrp .tab:hover{ background:rgba(255,255,255,.05); color:#fff; }
   .tabs.v3 .subgrp .tab.active{ background:var(--pv3); color:#fff; font-weight:500; }
   .tabs.v3 .subgrp .tab .pill{ margin-left:auto!important; min-width:20px; height:20px; padding:0 6px; border-radius:999px; background:#ef4444; color:#fff;
@@ -13244,16 +13254,20 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   .tabs.v3.searching .subgrp .tab.nomatch, .tabs.v3.searching .sect.nomatch, .tabs.v3.searching .subgrp.nomatch{ display:none; }
   #consoleView .main > .subbar.v3-empty{ display:none; }
   /* page title, like the template's "My Dashboard" */
-  .v3-title{ background:#fff; border-bottom:1px solid var(--line); padding:26px 34px 22px; }
-  .v3-title .crumb{ font:500 .72rem 'Poppins',sans-serif; color:var(--sub); letter-spacing:.6px; text-transform:uppercase; }
-  .v3-title h1{ font:600 1.55rem 'Poppins',sans-serif; color:#1d1b29; margin:4px 0 0; letter-spacing:-.3px; }
+  .v3-title{ background:#06273a; border-bottom:1px solid #06273a; padding:26px 34px 22px; display:flex; align-items:flex-end; gap:16px; }
+  .v3-title .v3-tt{ flex:1; min-width:0; }
+  .v3-title .v3-act{ display:flex; gap:8px; align-items:center; }
+  .v3-title .v3-act .btn{ background:#fff; color:#06273a; border-color:#fff; font-weight:700; padding:11px 18px; }
+  .v3-title .v3-act .btn:hover{ background:#e3edf2; }
+  .v3-title .crumb{ font:500 .72rem 'Poppins',sans-serif; color:#9db3c1; letter-spacing:.6px; text-transform:uppercase; }
+  .v3-title h1{ font:600 1.55rem 'Poppins',sans-serif; color:#fff; margin:4px 0 0; letter-spacing:-.3px; }
 }
 @media(max-width:820px){
   .v3-title{ display:none; }
   .tabs.v3 .v3-brand, .tabs.v3 .v3-search, .tabs.v3 .v3-foot, .tabs.v3 .chev, .tabs.v3 .v3-dot{ display:none; }
   .tabs.v3 .v3-list{ display:contents; }
   .tabs.v3 svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-  .tabs.v3 .sect .ico{ color:var(--sc,#361b59); }
+  .tabs.v3 .sect .ico{ color:var(--sc,#06273a); }
   .tabs.v3 .sect.on .ico{ color:#fff; }
 }
 </style>
@@ -13277,7 +13291,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   };
   const svg = k => '<svg viewBox="0 0 24 24">'+(I[k]||I.dot)+'</svg>';
   const SECT = {
-    'Staff':['users','#a5b4fc'], 'Events & Reservations':['cal','#5eead4'], 'Tickets & Classes':['ticket','#c4b5fd'],
+    'Staff':['users','#a5b4fc'], 'Events & Reservations':['cal','#5eead4'], 'Tickets & Classes':['ticket','#7dd3fc'],
     'Experiences':['spark','#fdba74'], 'Cheese Case':['cheese','#fcd34d'], 'Marketing':['mega','#fda4af'],
     'Catering':['glass','#6ee7b7'], 'Cheese Club':['box','#93c5fd']
   };
@@ -13307,6 +13321,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     const foot = document.createElement('div'); foot.className = 'v3-foot';
     const L = (href, ico, txt, blank)=> '<a class="v3-link" href="'+href+'"'+(blank?' target="_blank" rel="noopener"':'')+'><span class="ico">'+svg(ico)+'</span>'+txt+'</a>';
     foot.innerHTML = L('index.html','home','Staff Portal')
+      + L('calendar.html','cal','Calendar')
       + L('https://tickets.greyscheese.com','ext','Ticket Site',1)
       + L('https://tickets.greyscheese.com/experiences.html','ext','Experiences Site',1)
       + L('https://brad695.github.io/cheese-club/','ext','Cheese Club',1)
@@ -13316,16 +13331,31 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     foot.querySelector('#v3Logout').addEventListener('click', ()=>{ if(typeof logout==='function') logout(); });
 
     G.groups.forEach(g=>{
-      const s = SECT[g.name] || ['dot','#c4b5fd'];
+      const s = SECT[g.name] || ['dot','#9db3c1'];
       const ico = g.btn.querySelector('.ico'); if(ico) ico.innerHTML = svg(s[0]);
       g.btn.insertAdjacentHTML('beforeend','<span class="v3-dot"></span>'+svg('chev').replace('<svg','<svg class="chev"'));
       g.strip.style.setProperty('--si', s[1]);
     });
 
+    // desktop order + nothing expanded by default; a section click only
+    // toggles its list open/closed (capture on the list beats v2's handler)
+    const ORDER = ['Events & Reservations','Tickets & Classes','Experiences','Catering','Cheese Case','Staff','Marketing','Cheese Club'];
+    const sorted = G.groups.slice().sort((a,b)=>{ const x=ORDER.indexOf(a.name), y=ORDER.indexOf(b.name); return (x<0?99:x)-(y<0?99:y); });
+    sorted.forEach(g=> list.appendChild(g.btn));
+    const moreBtn = list.querySelector('.sect.more'); if(moreBtn) list.appendChild(moreBtn);
+    list.addEventListener('click', e=>{
+      if(!DESK.matches) return;
+      const b = e.target.closest('.sect'); if(!b || !list.contains(b)) return;
+      const g = G.groups.find(x=> x.btn === b); if(!g) return;
+      e.stopPropagation(); e.preventDefault();
+      const open = !g.strip.classList.contains('x');
+      g.strip.classList.toggle('x', open); b.classList.toggle('x', open);
+    }, true);
+
     // page title bar
     const title = document.createElement('div');
     title.className = 'v3-title';
-    title.innerHTML = '<div class="crumb"></div><h1></h1>';
+    title.innerHTML = '<div class="v3-tt"><div class="crumb"></div><h1></h1></div><div class="v3-act"></div>';
     main.insertBefore(title, main.firstChild);
     function retitle(){
       const a = document.querySelector('#consoleView .tab.active'); if(!a) return;
@@ -13333,6 +13363,18 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       title.querySelector('.crumb').textContent = g ? g.name : '';
       const n = Array.from(a.childNodes).filter(x=> x.nodeType===3).map(x=> x.data).join('').trim();
       title.querySelector('h1').textContent = n || a.textContent.trim();
+      moveAction();
+    }
+    // the open panel's primary "＋ Add …" button lives in the title bar on
+    // desktop; it goes back to its own toolbar when the panel changes
+    const act = title.querySelector('.v3-act');
+    let moved = null;   // { btn, parent, next }
+    function moveAction(){
+      const panel = document.querySelector('#consoleView .panel.active');
+      const want = DESK.matches && panel ? panel.querySelector(':scope > .section-card .toolbar > .btn-gold') : null;
+      if(moved && moved.btn === want) return;
+      if(moved){ moved.parent.insertBefore(moved.btn, moved.next && moved.next.parentNode === moved.parent ? moved.next : null); moved = null; }
+      if(want){ moved = { btn:want, parent:want.parentNode, next:want.nextSibling }; act.appendChild(want); }
     }
 
     // desktop: strips live under their section; phone: back in the sub-bar
@@ -13347,7 +13389,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       }
     }
     place();
-    DESK.addEventListener ? DESK.addEventListener('change', place) : DESK.addListener(place);
+    const onBp = ()=>{ place(); try{ moveAction(); }catch(e){} };
+    DESK.addEventListener ? DESK.addEventListener('change', onBp) : DESK.addListener(onBp);
 
     // search: filter sub-items across every section, Enter opens the first hit
     const inp = search.querySelector('input');
@@ -13374,6 +13417,212 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', ()=> setTimeout(boot,0));
   else setTimeout(boot,0);
+})();
+</script>
+<!-- ═══ BEO — Banquet Event Order for catering leads (Catering Leads → 📋 BEO tab) ═══
+     Stored on catering_leads.beo (jsonb) + beo_rev / beo_updated_at. Client/event
+     header comes live from the lead; menu + billing come from the current proposal. -->
+<style>
+  #catBeo .beo-sec{ margin-top:18px; }
+  #catBeo .beo-sec > h4{ margin:0 0 8px; font-size:.78rem; letter-spacing:.8px; text-transform:uppercase; color:#475569; display:flex; align-items:center; gap:8px; }
+  #catBeo .beo-sec > h4 .btn{ margin-left:auto; }
+  #catBeo .beo-rows{ display:flex; flex-direction:column; gap:6px; }
+  #catBeo .beo-row{ display:grid; gap:6px; align-items:center; }
+  #catBeo .beo-row input, #catBeo textarea, #catBeo .cat-grid input, #catBeo .cat-grid select{ padding:8px 10px; border:1px solid var(--line,#cbd5e1); border-radius:8px; font:inherit; font-size:.88rem; min-width:0; width:100%; box-sizing:border-box; }
+  #catBeo .beo-x{ border:none; background:none; color:#94a3b8; font-size:1.05rem; cursor:pointer; }
+  #catBeo .beo-x:hover{ color:#b91c1c; }
+  #catBeo .beo-head{ display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:4px 16px; font-size:.86rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px; }
+  #catBeo .beo-head b{ color:#475569; font-weight:700; font-size:.72rem; text-transform:uppercase; letter-spacing:.5px; margin-right:6px; }
+  #catBeo .beo-bill{ display:flex; flex-wrap:wrap; gap:6px 18px; font-size:.88rem; }
+  @media (max-width:640px){ #catBeo .beo-row.tl{ grid-template-columns:90px 1fr 32px!important; } #catBeo .beo-row.tl .who{ display:none; } }
+</style>
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  // tab + pane injected next to Conversation / Proposal
+  function mount(){
+    const tq = $('catTabQuote'); if(!tq || $('catTabBeo')) return;
+    tq.insertAdjacentHTML('afterend', '<button class="chip" id="catTabBeo" onclick="catView(\'beo\')">📋 BEO</button>');
+    $('catQuote').insertAdjacentHTML('afterend', '<div id="catBeo" style="display:none;margin-top:16px;"></div>');
+    const orig = window.catView;
+    window.catView = function(which){
+      if(which !== 'beo'){ $('catBeo').style.display='none'; $('catTabBeo').classList.remove('on'); return orig(which); }
+      $('catConvo').style.display='none'; $('catQuote').style.display='none'; $('catBeo').style.display='';
+      $('catTabConvo').classList.remove('on'); $('catTabQuote').classList.remove('on'); $('catTabBeo').classList.add('on');
+      beoLoad();
+    };
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', mount); else mount();
+
+  let B = null, Q = null;   // working BEO, current proposal
+  const SERVICE = ['Grazing table','Buffet','Boards / platters (drop-off)','Boxed / individual','Passed','Plated','Stations'];
+  const addMin = (hhmm, m) => { if(!/^\d{1,2}:\d{2}/.test(hhmm||'')) return ''; const [h,mm]=hhmm.split(':').map(Number); let t=h*60+mm+m; t=((t%1440)+1440)%1440; return String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0'); };
+  function defaults(r){
+    const T = r.event_time && /^\d{1,2}:\d{2}/.test(r.event_time) ? r.event_time.slice(0,5) : '';
+    const f = r.fulfillment || 'pickup';
+    const TL = {
+      pickup:  [[-180,'Kitchen prep begins','Kitchen'],[-30,'Order packed, labeled, checked against BEO — at counter','FOH'],[0,'Customer pick-up','FOH']],
+      delivery:[[-210,'Kitchen prep begins','Kitchen'],[-75,'Pack + load van — check equipment list','Kitchen / Driver'],[-60,'Depart','Driver'],[-20,'Arrive, set up display','Driver'],[0,'Food ready / service begins','']],
+      onsite:  [[-240,'Kitchen prep begins','Kitchen'],[-150,'Pack + load — check equipment list','Team'],[-120,'Depart','Team'],[-90,'Arrive, load in, set up','Team'],[0,'Service begins','Team'],[120,'Service ends','Team'],[120,'Breakdown + pack out','Team'],[150,'Depart venue','Team']]
+    }[f] || [];
+    const EQ = f==='pickup'
+      ? ['Allergen / item labels','Plates, napkins, cutlery (if ordered)','Serving utensils (if ordered)']
+      : ['Serving utensils','Boards, risers & display pieces','Plates, napkins, cutlery','Chafing dishes + Sterno (hot items)','Ice + coolers','Allergen / item cards','Linens','Trash bags + wipes'];
+    return {
+      event_name: r.occasion || '', service_style: f==='pickup' ? 'Boards / platters (drop-off)' : 'Grazing table',
+      onsite_name: r.name || '', onsite_phone: r.phone || '',
+      guests_expected: r.guests || '', guests_guaranteed: '', guarantee_due: '', prepared_by: '',
+      timeline: TL.map(([m,what,who])=>({ t: T?addMin(T,m):'', what, who })),
+      menu: [], dietary: '', beverage: '',
+      staff: f==='onsite' ? [{name:'',role:'Lead',shift:''},{name:'',role:'Server',shift:''}] : f==='delivery' ? [{name:'',role:'Driver',shift:''}] : [],
+      equipment: EQ.join('\n'), setup: '', kitchen_notes: '', foh_notes: ''
+    };
+  }
+  function menuFromQuote(){ return (Q && Q.items || []).map(i=>({ qty: i.qty||1, item: i.name||'', notes: i.note||'' })); }
+
+  async function beoLoad(){
+    const box = $('catBeo'); box.innerHTML = '<div class="rec-empty">Loading…</div>';
+    const r = CAT_CUR;
+    const [{ data: lead }, { data: qs }] = await Promise.all([
+      sb.from('catering_leads').select('beo,beo_rev,beo_updated_at').eq('id', r.id).maybeSingle(),
+      sb.from('catering_quotes').select('*').eq('lead_id', r.id).order('created_at',{ascending:false})
+    ]);
+    Q = (qs||[]).find(q=>q.status!=='canceled') || null;
+    r.beo = lead && lead.beo; r.beo_rev = (lead && lead.beo_rev) || 0; r.beo_updated_at = lead && lead.beo_updated_at;
+    B = r.beo ? JSON.parse(JSON.stringify(r.beo)) : defaults(r);
+    if(!r.beo && !B.menu.length) B.menu = menuFromQuote();
+    render();
+  }
+  const v = s => esc(s==null?'':String(s));
+  function rowsHtml(key, cols, tmpl){
+    return (B[key]||[]).map((row,i)=>'<div class="beo-row '+tmpl+'" style="grid-template-columns:'+cols+'">'
+      + Object.keys(row).map(k=>'<input class="'+k+'" data-k="'+key+'" data-i="'+i+'" data-f="'+k+'" value="'+v(row[k])+'"'+(k==='t'?' type="time"':k==='qty'?' inputmode="numeric"':'')+' placeholder="'+({t:'Time',what:'What happens',who:'Who',qty:'Qty',item:'Item',notes:'Notes / allergens / plating',name:'Name',role:'Role',shift:'Shift (e.g. 2–8 PM)'}[k]||'')+'">').join('')
+      + '<button class="beo-x" title="Remove" onclick="beoDel(\''+key+'\','+i+')">✕</button></div>').join('');
+  }
+  function render(){
+    const r = CAT_CUR, box = $('catBeo');
+    const tot = Q ? Q.total_cents : 0, paid = Q ? (Q.amount_paid_cents||0) : 0;
+    box.innerHTML =
+      '<div class="beo-head">'
+        + '<div><b>BEO</b>#'+v(r.code)+(r.beo_rev?' · rev '+r.beo_rev:' · not saved yet')+'</div>'
+        + '<div><b>Client</b>'+v(r.name)+(r.company?' ('+v(r.company)+')':'')+'</div>'
+        + '<div><b>Date</b>'+(r.event_date?v(fmtDisplay(r.event_date)):'—')+(r.event_time?' · '+v(catTime(r.event_time)):'')+'</div>'
+        + '<div><b>Service</b>'+v(r.fulfillment?CAT_FUL[r.fulfillment]:'—')+' · '+v(r.location||'')+'</div>'
+        + (r.address?'<div style="grid-column:1/-1"><b>Address</b>'+v(r.address)+'</div>':'')
+        + '<div style="grid-column:1/-1;color:#64748b;font-size:.78rem;">Client, date, time, guests and address come from the lead (edit them in 📄 Proposal &amp; Invoice). Everything below is the BEO.</div>'
+      + '</div>'
+      + '<div class="beo-sec"><h4>Event</h4><div class="cat-grid">'
+        + f('event_name','Event / occasion') + sel('service_style','Service style',SERVICE)
+        + f('guests_expected','Guests expected','number') + f('guests_guaranteed','Guaranteed count','number') + f('guarantee_due','Final count due','date')
+        + f('onsite_name','On-site contact') + f('onsite_phone','On-site phone','tel') + f('prepared_by','Prepared by')
+      + '</div></div>'
+      + '<div class="beo-sec"><h4>Timeline <button class="btn btn-ghost btn-sm" onclick="beoAdd(\'timeline\')">＋ Row</button></h4><div class="beo-rows">'+rowsHtml('timeline','110px 1fr 160px 32px','tl')+'</div></div>'
+      + '<div class="beo-sec"><h4>Menu <button class="btn btn-ghost btn-sm" onclick="beoRefill()" '+(Q?'':'disabled')+'>↻ Refill from proposal</button><button class="btn btn-ghost btn-sm" style="margin-left:0" onclick="beoAdd(\'menu\')">＋ Item</button></h4><div class="beo-rows">'+rowsHtml('menu','70px 1fr 1fr 32px','mn')+'</div></div>'
+      + '<div class="beo-sec"><h4>Dietary &amp; allergens</h4>'+ta('dietary','e.g. 3 gluten-free, 1 severe tree-nut allergy (label + keep separate), 2 vegetarian',2)+'</div>'
+      + '<div class="beo-sec"><h4>Beverage</h4>'+ta('beverage','Wine / beer / NA, quantities, ice, who pours…',2)+'</div>'
+      + '<div class="beo-sec"><h4>Staffing <button class="btn btn-ghost btn-sm" onclick="beoAdd(\'staff\')">＋ Person</button></h4><div class="beo-rows">'+rowsHtml('staff','1fr 1fr 1fr 32px','st')+'</div></div>'
+      + '<div class="beo-sec"><h4>Equipment &amp; rentals <span style="font-weight:400;text-transform:none;letter-spacing:0;">(one per line — prints as a checklist)</span></h4>'+ta('equipment','',5)+'</div>'
+      + '<div class="beo-sec"><h4>Setup / delivery / venue</h4>'+ta('setup','Parking, load-in, dock/elevator, table layout, power, venue contact…',3)+'</div>'
+      + '<div class="beo-sec cat-grid" style="grid-template-columns:1fr 1fr;"><div><h4 style="margin:0 0 8px;font-size:.78rem;letter-spacing:.8px;text-transform:uppercase;color:#475569;">Kitchen notes</h4>'+ta('kitchen_notes','',3)+'</div><div><h4 style="margin:0 0 8px;font-size:.78rem;letter-spacing:.8px;text-transform:uppercase;color:#475569;">Front of house / driver notes</h4>'+ta('foh_notes','',3)+'</div></div>'
+      + '<div class="beo-sec"><h4>Billing (from the proposal)</h4><div class="beo-bill">'
+        + (Q ? '<span>Total <b>'+catMoney(tot)+'</b></span><span>Paid <b>'+catMoney(paid)+'</b></span><span>Balance <b>'+catMoney(Math.max(0,tot-paid))+'</b>'+(Q.balance_due_date?' due '+v(fmtDisplay(Q.balance_due_date)):'')+'</span>'+(Q.invoice_number?'<span>Invoice #'+v(Q.invoice_number)+'</span>':'')
+             : '<span class="hint" style="margin:0;">No proposal yet.</span>')
+      + '</div></div>'
+      + '<div class="cat-actions"><span class="save-msg" id="beoMsg">'+(r.beo_updated_at?'Last saved '+v(inqWhen(r.beo_updated_at)):'')+'</span>'
+        + '<button class="btn btn-ghost" onclick="beoPrintInvoice()" '+(Q?'':'disabled')+'>🧾 Print invoice (staff copy)</button>'
+        + '<button class="btn btn-ghost" onclick="beoPrint()">🖨 Print BEO</button>'
+        + '<button class="btn btn-gold" onclick="beoSave()">Save BEO</button></div>';
+    box.querySelectorAll('input[data-k]').forEach(el=>el.addEventListener('input', ()=>{ const row=B[el.dataset.k][+el.dataset.i]; row[el.dataset.f]=el.value; dirty(); }));
+    box.querySelectorAll('[data-b]').forEach(el=>el.addEventListener('input', ()=>{ B[el.dataset.b]=el.value; dirty(); }));
+  }
+  function f(k,label,type){ return '<div class="rf"><label>'+label+'</label><input data-b="'+k+'" type="'+(type||'text')+'" value="'+v(B[k])+'"></div>'; }
+  function sel(k,label,opts){ const cur=B[k]||''; const o=opts.includes(cur)||!cur?opts:[cur].concat(opts); return '<div class="rf"><label>'+label+'</label><select data-b="'+k+'">'+o.map(x=>'<option'+(x===cur?' selected':'')+'>'+esc(x)+'</option>').join('')+'</select></div>'; }
+  function ta(k,ph,rows){ return '<textarea data-b="'+k+'" rows="'+rows+'" placeholder="'+v(ph)+'">'+v(B[k])+'</textarea>'; }
+  function dirty(){ const m=$('beoMsg'); if(m) m.textContent='Unsaved changes'; }
+  window.beoAdd = function(key){ const blank={ timeline:{t:'',what:'',who:''}, menu:{qty:'',item:'',notes:''}, staff:{name:'',role:'',shift:''} }[key]; (B[key]=B[key]||[]).push(blank); render(); dirty(); };
+  window.beoDel = function(key,i){ B[key].splice(i,1); render(); dirty(); };
+  window.beoRefill = function(){ if(B.menu.length && !confirm('Replace the BEO menu with the items on the proposal? Notes you typed on these rows will be lost.')) return; B.menu = menuFromQuote(); render(); dirty(); };
+  window.beoSave = async function(){
+    const r = CAT_CUR, m = $('beoMsg'); m.textContent = 'Saving…';
+    B.timeline = (B.timeline||[]).filter(x=>x.t||x.what||x.who).sort((a,b)=>(a.t||'99').localeCompare(b.t||'99'));
+    B.menu = (B.menu||[]).filter(x=>x.item||x.notes); B.staff = (B.staff||[]).filter(x=>x.name||x.role||x.shift);
+    const rev = (r.beo_rev||0)+1, now = new Date().toISOString();
+    const { error } = await sb.from('catering_leads').update({ beo:B, beo_rev:rev, beo_updated_at:now }).eq('id', r.id);
+    if(error){ m.textContent = '❌ '+error.message; return false; }
+    r.beo = JSON.parse(JSON.stringify(B)); r.beo_rev = rev; r.beo_updated_at = now; render(); $('beoMsg').textContent = '✓ Saved · rev '+rev; return true;
+  };
+
+  /* ── printing ── */
+  const P = s => esc(s==null?'':String(s)).replace(/\n/g,'<br>');
+  function printDoc(title, body){
+    const w = window.open('', '_blank'); if(!w){ alert('Allow pop-ups for this site to print.'); return; }
+    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>'
+      + '@page{size:letter;margin:.45in}*{box-sizing:border-box}body{font:11px/1.4 -apple-system,"Segoe UI",Helvetica,Arial,sans-serif;color:#111;margin:0}'
+      + '.top{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #06273a;padding-bottom:8px;margin-bottom:10px}'
+      + '.top h1{font-size:20px;margin:0;letter-spacing:.5px;color:#06273a}.top .sub{font-size:10px;color:#555;letter-spacing:1.5px;text-transform:uppercase}.top .no{text-align:right;font-size:11px}.top .no b{font-size:16px;display:block}'
+      + '.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}.kv{display:grid;grid-template-columns:118px 1fr;border-bottom:1px solid #e5e5e5;padding:3px 0}.kv b{color:#555;font-weight:600;font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;padding-top:1px}'
+      + 'h2{font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;background:#06273a;color:#fff;padding:4px 8px;margin:12px 0 6px}'
+      + 'table{width:100%;border-collapse:collapse}th{text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#555;border-bottom:1.5px solid #333;padding:3px 5px}td{border-bottom:1px solid #ddd;padding:4px 5px;vertical-align:top}td.n,th.n{text-align:right;white-space:nowrap}'
+      + '.box{border:1.5px solid #b91c1c;background:#fff5f5;padding:6px 8px;font-weight:600}.note{border:1px solid #ccc;padding:6px 8px;min-height:30px}'
+      + '.chk{columns:2;column-gap:20px}.chk div{break-inside:avoid;padding:2px 0}.chk span{display:inline-block;width:11px;height:11px;border:1.3px solid #333;margin-right:7px;vertical-align:-2px}'
+      + '.sig{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-top:22px}.sig div{border-top:1px solid #333;padding-top:3px;font-size:9.5px;color:#444}'
+      + '.foot{margin-top:10px;font-size:9px;color:#777;text-align:center}.tot td{border:none;padding:2px 5px}.tot .big td{font-weight:700;font-size:13px;border-top:1.5px solid #333;padding-top:5px}'
+      + '</style></head><body>'+body+'<script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>');
+    w.document.close();
+  }
+  function kv(k,val){ return '<div class="kv"><b>'+k+'</b><span>'+(val||'&nbsp;')+'</span></div>'; }
+  window.beoPrint = async function(){
+    const m = $('beoMsg'); if(m && m.textContent==='Unsaved changes' && confirm('Save the BEO before printing?')){ if(!(await beoSave())) return; }
+    const r = CAT_CUR, b = B, q = Q;
+    const when = r.event_date ? new Date(r.event_date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}) : '';
+    const tot = q ? q.total_cents : 0, paid = q ? (q.amount_paid_cents||0) : 0;
+    const body =
+      '<div class="top"><div><div class="sub">GREYS Fine Cheeses · '+P(r.location||'')+'</div><h1>BANQUET EVENT ORDER</h1></div>'
+      + '<div class="no"><b>BEO #'+P(r.code)+'</b>Rev '+(r.beo_rev||0)+' · printed '+new Date().toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+'</div></div>'
+      + '<div class="grid"><div>'
+        + kv('Client', P(r.name)+(r.company?' — '+P(r.company):'')) + kv('Phone', P(r.phone)) + kv('Email', P(r.email))
+        + kv('On-site contact', P(b.onsite_name)+(b.onsite_phone?' · '+P(b.onsite_phone):'')) + kv('Prepared by', P(b.prepared_by))
+      + '</div><div>'
+        + kv('Event', P(b.event_name||r.occasion)) + kv('Date', '<b style="font-size:12px">'+P(when)+'</b>') + kv('Time', P(r.event_time?catTime(r.event_time):''))
+        + kv('Service', P(r.fulfillment?CAT_FUL[r.fulfillment]:'')+(b.service_style?' · '+P(b.service_style):''))
+        + kv('Guests', 'Expected <b>'+P(b.guests_expected||r.guests||'—')+'</b> · Guaranteed <b>'+P(b.guests_guaranteed||'—')+'</b>'+(b.guarantee_due?' (due '+P(fmtDisplay(b.guarantee_due))+')':''))
+      + '</div></div>'
+      + (r.address ? kv('Location / address', P(r.address)) : '')
+      + ((b.timeline||[]).length ? '<h2>Timeline</h2><table><tr><th style="width:80px">Time</th><th>What</th><th style="width:150px">Who</th></tr>'
+          + b.timeline.map(x=>'<tr><td><b>'+P(x.t?catTime(x.t):'')+'</b></td><td>'+P(x.what)+'</td><td>'+P(x.who)+'</td></tr>').join('')+'</table>' : '')
+      + '<h2>Menu</h2>' + ((b.menu||[]).length ? '<table><tr><th class="n" style="width:44px">Qty</th><th>Item</th><th>Notes</th></tr>'
+          + b.menu.map(x=>'<tr><td class="n"><b>'+P(x.qty)+'</b></td><td>'+P(x.item)+'</td><td>'+P(x.notes)+'</td></tr>').join('')+'</table>' : '<div class="note">—</div>')
+      + (b.dietary ? '<h2>Dietary &amp; allergens</h2><div class="box">'+P(b.dietary)+'</div>' : '')
+      + (b.beverage ? '<h2>Beverage</h2><div class="note">'+P(b.beverage)+'</div>' : '')
+      + ((b.staff||[]).length ? '<h2>Staffing</h2><table><tr><th>Name</th><th>Role</th><th>Shift</th></tr>'+b.staff.map(x=>'<tr><td>'+P(x.name)+'</td><td>'+P(x.role)+'</td><td>'+P(x.shift)+'</td></tr>').join('')+'</table>' : '')
+      + ((b.equipment||'').trim() ? '<h2>Equipment &amp; rentals</h2><div class="chk">'+b.equipment.split('\n').filter(s=>s.trim()).map(s=>'<div><span></span>'+P(s.trim())+'</div>').join('')+'</div>' : '')
+      + (b.setup ? '<h2>Setup / delivery / venue</h2><div class="note">'+P(b.setup)+'</div>' : '')
+      + ((b.kitchen_notes||b.foh_notes) ? '<div class="grid" style="margin-top:0"><div><h2>Kitchen</h2><div class="note">'+P(b.kitchen_notes)+'</div></div><div><h2>Front of house / driver</h2><div class="note">'+P(b.foh_notes)+'</div></div></div>' : '')
+      + (q ? '<h2>Billing</h2><div class="grid"><div>'+kv('Total', '<b>'+catMoney(tot)+'</b>')+kv('Paid', catMoney(paid))+'</div><div>'+kv('Balance', '<b>'+catMoney(Math.max(0,tot-paid))+'</b>'+(q.balance_due_date?' due '+P(fmtDisplay(q.balance_due_date)):''))+kv('Invoice', P(q.invoice_number?'#'+q.invoice_number:'')+(q.invoice_status?' · '+P(q.invoice_status):''))+'</div></div>' : '')
+      + '<div class="sig"><div>Client approval / date</div><div>GREYS manager / date</div><div>Kitchen lead / date</div></div>'
+      + '<div class="foot">Changes after printing must be made in the portal and reprinted — the latest revision number wins.</div>';
+    printDoc('BEO #'+r.code+' — '+r.name, body);
+  };
+  window.beoPrintInvoice = function(){
+    const r = CAT_CUR, q = Q; if(!q) return;
+    const items = q.items || [];
+    const dep = Math.round((q.total_cents||0) * (q.deposit_pct||0) / 100), paid = q.amount_paid_cents||0;
+    const body =
+      '<div class="top"><div><div class="sub">GREYS Fine Cheeses · '+P(r.location||'')+' · STAFF COPY</div><h1>CATERING INVOICE</h1></div>'
+      + '<div class="no"><b>'+(q.invoice_number?'Invoice #'+P(q.invoice_number):'Proposal #'+P(r.code))+'</b>'+P(q.invoice_status||q.status||'')+'</div></div>'
+      + '<div class="grid"><div>'+kv('Bill to', P(r.name)+(r.company?'<br>'+P(r.company):''))+kv('Email', P(r.email))+kv('Phone', P(r.phone))+'</div>'
+      + '<div>'+kv('Event date', P(r.event_date?fmtDisplay(r.event_date):'')+(r.event_time?' · '+P(catTime(r.event_time)):''))+kv('Service', P(r.fulfillment?CAT_FUL[r.fulfillment]:''))+kv('Guests', P(r.guests))+kv('Signed', q.signed_at?P(q.signed_name)+' · '+P(new Date(q.signed_at).toLocaleDateString()):'Not signed')+'</div></div>'
+      + '<h2>Items</h2><table><tr><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th></tr>'
+      + items.map(i=>'<tr><td>'+P(i.name)+(i.note?'<div style="color:#666;font-size:10px">'+P(i.note)+'</div>':'')+'</td><td class="n">'+P(i.qty)+'</td><td class="n">'+catMoney(i.price_cents)+'</td><td class="n">'+catMoney((i.price_cents||0)*(Number(i.qty)||0))+'</td></tr>').join('')+'</table>'
+      + '<table class="tot" style="width:280px;margin:8px 0 0 auto">'
+        + '<tr><td>Subtotal</td><td class="n">'+catMoney(q.subtotal_cents)+'</td></tr><tr><td>Tax ('+P(q.tax_rate)+'%)</td><td class="n">'+catMoney(q.tax_cents)+'</td></tr>'
+        + '<tr class="big"><td>Total</td><td class="n">'+catMoney(q.total_cents)+'</td></tr>'
+        + '<tr><td>Deposit ('+P(q.deposit_pct)+'%)</td><td class="n">'+catMoney(dep)+'</td></tr><tr><td>Paid to date</td><td class="n">'+catMoney(paid)+'</td></tr>'
+        + '<tr class="big"><td>Balance due'+(q.balance_due_date?' '+P(fmtDisplay(q.balance_due_date)):'')+'</td><td class="n">'+catMoney(Math.max(0,(q.total_cents||0)-paid))+'</td></tr></table>'
+      + (q.customer_note ? '<h2>Note</h2><div class="note">'+P(q.customer_note)+'</div>' : '')
+      + '<div class="foot">Staff copy printed '+new Date().toLocaleString()+'. Payments are taken on the Square invoice.</div>';
+    printDoc('Invoice — '+r.name, body);
+  };
 })();
 </script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
