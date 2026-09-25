@@ -13552,76 +13552,94 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     r.beo = JSON.parse(JSON.stringify(B)); r.beo_rev = rev; r.beo_updated_at = now; render(); $('beoMsg').textContent = '✓ Saved · rev '+rev; return true;
   };
 
-  /* ── printing ── */
+  /* ── printing ── (v2: boxed form layout, larger type, nothing past the margins) */
   const P = s => esc(s==null?'':String(s)).replace(/\n/g,'<br>');
+  const PCSS = '@page{size:letter;margin:0.5in}'
+    + '*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    + 'html,body{margin:0;padding:0}body{font:13px/1.45 Arial,Helvetica,sans-serif;color:#000}'
+    + '.sheet{width:100%;max-width:7.5in;margin:0 auto}'
+    + '@media screen{body{background:#e5e7eb}.sheet{background:#fff;padding:0.5in;margin:16px auto;max-width:8.5in;box-shadow:0 2px 12px rgba(0,0,0,.2)}}'
+    + 'table{width:100%;border-collapse:collapse;table-layout:fixed}td,th{word-wrap:break-word;overflow-wrap:anywhere;vertical-align:top}'
+    + '.hdr td{border:2px solid #000;padding:8px 10px}.hdr .brand{font-size:11px;letter-spacing:2px;text-transform:uppercase}.hdr h1{margin:2px 0 0;font-size:24px;letter-spacing:1px}'
+    + '.hdr .no{text-align:right;width:2.3in}.hdr .no b{display:block;font-size:20px}.hdr .no span{font-size:11px}'
+    + '.sec{border:2px solid #000;margin-top:-2px;break-inside:avoid;page-break-inside:avoid}'
+    + '.sec > .t{background:#e5e7eb;border-bottom:1.5px solid #000;padding:4px 10px;font-weight:700;font-size:12px;letter-spacing:1.2px;text-transform:uppercase}'
+    + '.sec > .b{padding:8px 10px}.sec > table td,.sec > table th{border:1px solid #777;padding:5px 8px}.sec > table tr > :first-child{border-left:none}.sec > table tr > :last-child{border-right:none}.sec > table tr:last-child td{border-bottom:none}'
+    + '.sec > table th{background:#f3f4f6;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-top:none}'
+    + '.info td{border:1px solid #777;padding:5px 8px}.info .l{width:1.25in;background:#f3f4f6;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}'
+    + '.info tr:first-child td{border-top:none}.info tr:last-child td{border-bottom:none}.info tr > :first-child{border-left:none}.info tr > :last-child{border-right:none}'
+    + '.big{font-size:15px;font-weight:700}.n{text-align:right;white-space:nowrap}'
+    + '.allergy{border:3px solid #b91c1c;color:#7f1d1d;font-weight:700;font-size:14px;padding:8px 10px}'
+    + '.chk{columns:2;column-gap:24px}.chk div{break-inside:avoid;padding:3px 0}.chk i{display:inline-block;width:14px;height:14px;border:1.5px solid #000;margin-right:8px;vertical-align:-2px}'
+    + '.two{display:grid;grid-template-columns:1fr 1fr}.two > div + div{border-left:1.5px solid #000}'
+    + '.sig td{border:2px solid #000;border-top:none;height:.65in;vertical-align:bottom;padding:4px 8px;font-size:11px}'
+    + '.foot{font-size:10px;color:#444;text-align:center;margin-top:6px}'
+    + '.tot td{border:none!important;padding:3px 8px}.tot .g td{font-weight:700;font-size:15px;border-top:1.5px solid #000!important}';
   function printDoc(title, body){
     const w = window.open('', '_blank'); if(!w){ alert('Allow pop-ups for this site to print.'); return; }
-    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>'
-      + '@page{size:letter;margin:.45in}*{box-sizing:border-box}body{font:11px/1.4 -apple-system,"Segoe UI",Helvetica,Arial,sans-serif;color:#111;margin:0}'
-      + '.top{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #06273a;padding-bottom:8px;margin-bottom:10px}'
-      + '.top h1{font-size:20px;margin:0;letter-spacing:.5px;color:#06273a}.top .sub{font-size:10px;color:#555;letter-spacing:1.5px;text-transform:uppercase}.top .no{text-align:right;font-size:11px}.top .no b{font-size:16px;display:block}'
-      + '.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}.kv{display:grid;grid-template-columns:118px 1fr;border-bottom:1px solid #e5e5e5;padding:3px 0}.kv b{color:#555;font-weight:600;font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;padding-top:1px}'
-      + 'h2{font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;background:#06273a;color:#fff;padding:4px 8px;margin:12px 0 6px}'
-      + 'table{width:100%;border-collapse:collapse}th{text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#555;border-bottom:1.5px solid #333;padding:3px 5px}td{border-bottom:1px solid #ddd;padding:4px 5px;vertical-align:top}td.n,th.n{text-align:right;white-space:nowrap}'
-      + '.box{border:1.5px solid #b91c1c;background:#fff5f5;padding:6px 8px;font-weight:600}.note{border:1px solid #ccc;padding:6px 8px;min-height:30px}'
-      + '.chk{columns:2;column-gap:20px}.chk div{break-inside:avoid;padding:2px 0}.chk span{display:inline-block;width:11px;height:11px;border:1.3px solid #333;margin-right:7px;vertical-align:-2px}'
-      + '.sig{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-top:22px}.sig div{border-top:1px solid #333;padding-top:3px;font-size:9.5px;color:#444}'
-      + '.foot{margin-top:10px;font-size:9px;color:#777;text-align:center}.tot td{border:none;padding:2px 5px}.tot .big td{font-weight:700;font-size:13px;border-top:1.5px solid #333;padding-top:5px}'
-      + '</style></head><body>'+body+'<script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>');
+    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>'+PCSS+'</style></head><body><div class="sheet">'+body
+      +'</div><script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>');
     w.document.close();
   }
-  function kv(k,val){ return '<div class="kv"><b>'+k+'</b><span>'+(val||'&nbsp;')+'</span></div>'; }
+  const sec = (title, inner, raw) => '<div class="sec"><div class="t">'+title+'</div>'+(raw?inner:'<div class="b">'+inner+'</div>')+'</div>';
+  const row4 = (a,b,c,d) => '<tr><td class="l">'+a+'</td><td>'+(b||'&nbsp;')+'</td><td class="l">'+c+'</td><td>'+(d||'&nbsp;')+'</td></tr>';
+  function header(kind, no, sub){
+    const r = CAT_CUR;
+    return '<table class="hdr"><tr><td><div class="brand">GREYS Fine Cheeses · '+P(r.location||'')+'</div><h1>'+kind+'</h1></td>'
+      + '<td class="no"><b>'+no+'</b><span>'+sub+'</span></td></tr></table>';
+  }
   window.beoPrint = async function(){
     const m = $('beoMsg'); if(m && m.textContent==='Unsaved changes' && confirm('Save the BEO before printing?')){ if(!(await beoSave())) return; }
     const r = CAT_CUR, b = B, q = Q;
-    const when = r.event_date ? new Date(r.event_date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}) : '';
+    const when = r.event_date ? new Date(r.event_date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}) : '—';
     const tot = q ? q.total_cents : 0, paid = q ? (q.amount_paid_cents||0) : 0;
-    const body =
-      '<div class="top"><div><div class="sub">GREYS Fine Cheeses · '+P(r.location||'')+'</div><h1>BANQUET EVENT ORDER</h1></div>'
-      + '<div class="no"><b>BEO #'+P(r.code)+'</b>Rev '+(r.beo_rev||0)+' · printed '+new Date().toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+'</div></div>'
-      + '<div class="grid"><div>'
-        + kv('Client', P(r.name)+(r.company?' — '+P(r.company):'')) + kv('Phone', P(r.phone)) + kv('Email', P(r.email))
-        + kv('On-site contact', P(b.onsite_name)+(b.onsite_phone?' · '+P(b.onsite_phone):'')) + kv('Prepared by', P(b.prepared_by))
-      + '</div><div>'
-        + kv('Event', P(b.event_name||r.occasion)) + kv('Date', '<b style="font-size:12px">'+P(when)+'</b>') + kv('Time', P(r.event_time?catTime(r.event_time):''))
-        + kv('Service', P(r.fulfillment?CAT_FUL[r.fulfillment]:'')+(b.service_style?' · '+P(b.service_style):''))
-        + kv('Guests', 'Expected <b>'+P(b.guests_expected||r.guests||'—')+'</b> · Guaranteed <b>'+P(b.guests_guaranteed||'—')+'</b>'+(b.guarantee_due?' (due '+P(fmtDisplay(b.guarantee_due))+')':''))
-      + '</div></div>'
-      + (r.address ? kv('Location / address', P(r.address)) : '')
-      + ((b.timeline||[]).length ? '<h2>Timeline</h2><table><tr><th style="width:80px">Time</th><th>What</th><th style="width:150px">Who</th></tr>'
-          + b.timeline.map(x=>'<tr><td><b>'+P(x.t?catTime(x.t):'')+'</b></td><td>'+P(x.what)+'</td><td>'+P(x.who)+'</td></tr>').join('')+'</table>' : '')
-      + '<h2>Menu</h2>' + ((b.menu||[]).length ? '<table><tr><th class="n" style="width:44px">Qty</th><th>Item</th><th>Notes</th></tr>'
-          + b.menu.map(x=>'<tr><td class="n"><b>'+P(x.qty)+'</b></td><td>'+P(x.item)+'</td><td>'+P(x.notes)+'</td></tr>').join('')+'</table>' : '<div class="note">—</div>')
-      + (b.dietary ? '<h2>Dietary &amp; allergens</h2><div class="box">'+P(b.dietary)+'</div>' : '')
-      + (b.beverage ? '<h2>Beverage</h2><div class="note">'+P(b.beverage)+'</div>' : '')
-      + ((b.staff||[]).length ? '<h2>Staffing</h2><table><tr><th>Name</th><th>Role</th><th>Shift</th></tr>'+b.staff.map(x=>'<tr><td>'+P(x.name)+'</td><td>'+P(x.role)+'</td><td>'+P(x.shift)+'</td></tr>').join('')+'</table>' : '')
-      + ((b.equipment||'').trim() ? '<h2>Equipment &amp; rentals</h2><div class="chk">'+b.equipment.split('\n').filter(s=>s.trim()).map(s=>'<div><span></span>'+P(s.trim())+'</div>').join('')+'</div>' : '')
-      + (b.setup ? '<h2>Setup / delivery / venue</h2><div class="note">'+P(b.setup)+'</div>' : '')
-      + ((b.kitchen_notes||b.foh_notes) ? '<div class="grid" style="margin-top:0"><div><h2>Kitchen</h2><div class="note">'+P(b.kitchen_notes)+'</div></div><div><h2>Front of house / driver</h2><div class="note">'+P(b.foh_notes)+'</div></div></div>' : '')
-      + (q ? '<h2>Billing</h2><div class="grid"><div>'+kv('Total', '<b>'+catMoney(tot)+'</b>')+kv('Paid', catMoney(paid))+'</div><div>'+kv('Balance', '<b>'+catMoney(Math.max(0,tot-paid))+'</b>'+(q.balance_due_date?' due '+P(fmtDisplay(q.balance_due_date)):''))+kv('Invoice', P(q.invoice_number?'#'+q.invoice_number:'')+(q.invoice_status?' · '+P(q.invoice_status):''))+'</div></div>' : '')
-      + '<div class="sig"><div>Client approval / date</div><div>GREYS manager / date</div><div>Kitchen lead / date</div></div>'
-      + '<div class="foot">Changes after printing must be made in the portal and reprinted — the latest revision number wins.</div>';
-    printDoc('BEO #'+r.code+' — '+r.name, body);
+    const printed = new Date().toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+    let h = header('Banquet Event Order', 'BEO #'+P(r.code), 'Revision '+(r.beo_rev||0)+' · printed '+printed);
+    h += sec('Event', '<table class="info">'
+      + row4('Date','<span class="big">'+P(when)+'</span>','Time','<span class="big">'+P(r.event_time?catTime(r.event_time):'—')+'</span>')
+      + row4('Client', P(r.name)+(r.company?'<br>'+P(r.company):''), 'Event', P(b.event_name||r.occasion))
+      + row4('Phone', P(r.phone), 'Service', P(r.fulfillment?CAT_FUL[r.fulfillment]:'')+(b.service_style?'<br>'+P(b.service_style):''))
+      + row4('Email', P(r.email), 'Guests', 'Expected <b>'+P(b.guests_expected||r.guests||'—')+'</b> · Guaranteed <b>'+P(b.guests_guaranteed||'—')+'</b>'+(b.guarantee_due?'<br>Final count due '+P(fmtDisplay(b.guarantee_due)):''))
+      + row4('On-site', P(b.onsite_name)+(b.onsite_phone?'<br>'+P(b.onsite_phone):''), 'Prepared by', P(b.prepared_by))
+      + (r.address ? '<tr><td class="l">Address</td><td colspan="3">'+P(r.address)+'</td></tr>' : '')
+      + '</table>', true);
+    if((b.timeline||[]).length) h += sec('Timeline', '<table><tr><th style="width:1.1in">Time</th><th>What happens</th><th style="width:1.8in">Who</th></tr>'
+      + b.timeline.map(x=>'<tr><td><b>'+P(x.t?catTime(x.t):'')+'</b></td><td>'+P(x.what)+'</td><td>'+P(x.who)+'</td></tr>').join('')+'</table>', true);
+    h += sec('Menu', (b.menu||[]).length ? '<table><tr><th class="n" style="width:.7in">Qty</th><th>Item</th><th style="width:2.6in">Notes</th></tr>'
+      + b.menu.map(x=>'<tr><td class="n big">'+P(x.qty)+'</td><td class="big" style="font-weight:600">'+P(x.item)+'</td><td>'+P(x.notes)+'</td></tr>').join('')+'</table>' : '<div class="b">—</div>', true);
+    h += sec('Dietary &amp; allergens', b.dietary ? '<div class="allergy">⚠ '+P(b.dietary)+'</div>' : 'None noted');
+    if(b.beverage) h += sec('Beverage', P(b.beverage));
+    if((b.staff||[]).length) h += sec('Staffing', '<table><tr><th>Name</th><th>Role</th><th>Shift</th></tr>'+b.staff.map(x=>'<tr><td>'+P(x.name)+'</td><td>'+P(x.role)+'</td><td>'+P(x.shift)+'</td></tr>').join('')+'</table>', true);
+    if((b.equipment||'').trim()) h += sec('Equipment &amp; rentals — check off when packed', '<div class="chk">'+b.equipment.split('\n').filter(s=>s.trim()).map(s=>'<div><i></i>'+P(s.trim())+'</div>').join('')+'</div>');
+    if(b.setup) h += sec('Setup / delivery / venue', P(b.setup));
+    if(b.kitchen_notes||b.foh_notes) h += sec('Department notes', '<div class="two"><div class="b"><b>KITCHEN</b><br>'+(P(b.kitchen_notes)||'—')+'</div><div class="b"><b>FRONT OF HOUSE / DRIVER</b><br>'+(P(b.foh_notes)||'—')+'</div></div>', true);
+    if(q) h += sec('Billing', '<table class="info">'+row4('Total','<b>'+catMoney(tot)+'</b>','Paid',catMoney(paid))
+      + row4('Balance','<b>'+catMoney(Math.max(0,tot-paid))+'</b>'+(q.balance_due_date?' due '+P(fmtDisplay(q.balance_due_date)):''),'Invoice',P(q.invoice_number?'#'+q.invoice_number:'—')+(q.invoice_status?' · '+P(q.invoice_status.replace(/_/g,' ').toLowerCase()):''))+'</table>', true);
+    h += '<table class="sig"><tr><td>Client approval / date</td><td>GREYS manager / date</td><td>Kitchen lead / date</td></tr></table>';
+    h += '<div class="foot">Changes after printing are made in the portal and reprinted — the highest revision number wins.</div>';
+    printDoc('BEO #'+r.code+' — '+r.name, h);
   };
   window.beoPrintInvoice = function(){
     const r = CAT_CUR, q = Q; if(!q) return;
     const items = q.items || [];
     const dep = Math.round((q.total_cents||0) * (q.deposit_pct||0) / 100), paid = q.amount_paid_cents||0;
-    const body =
-      '<div class="top"><div><div class="sub">GREYS Fine Cheeses · '+P(r.location||'')+' · STAFF COPY</div><h1>CATERING INVOICE</h1></div>'
-      + '<div class="no"><b>'+(q.invoice_number?'Invoice #'+P(q.invoice_number):'Proposal #'+P(r.code))+'</b>'+P(q.invoice_status||q.status||'')+'</div></div>'
-      + '<div class="grid"><div>'+kv('Bill to', P(r.name)+(r.company?'<br>'+P(r.company):''))+kv('Email', P(r.email))+kv('Phone', P(r.phone))+'</div>'
-      + '<div>'+kv('Event date', P(r.event_date?fmtDisplay(r.event_date):'')+(r.event_time?' · '+P(catTime(r.event_time)):''))+kv('Service', P(r.fulfillment?CAT_FUL[r.fulfillment]:''))+kv('Guests', P(r.guests))+kv('Signed', q.signed_at?P(q.signed_name)+' · '+P(new Date(q.signed_at).toLocaleDateString()):'Not signed')+'</div></div>'
-      + '<h2>Items</h2><table><tr><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th></tr>'
-      + items.map(i=>'<tr><td>'+P(i.name)+(i.note?'<div style="color:#666;font-size:10px">'+P(i.note)+'</div>':'')+'</td><td class="n">'+P(i.qty)+'</td><td class="n">'+catMoney(i.price_cents)+'</td><td class="n">'+catMoney((i.price_cents||0)*(Number(i.qty)||0))+'</td></tr>').join('')+'</table>'
-      + '<table class="tot" style="width:280px;margin:8px 0 0 auto">'
-        + '<tr><td>Subtotal</td><td class="n">'+catMoney(q.subtotal_cents)+'</td></tr><tr><td>Tax ('+P(q.tax_rate)+'%)</td><td class="n">'+catMoney(q.tax_cents)+'</td></tr>'
-        + '<tr class="big"><td>Total</td><td class="n">'+catMoney(q.total_cents)+'</td></tr>'
-        + '<tr><td>Deposit ('+P(q.deposit_pct)+'%)</td><td class="n">'+catMoney(dep)+'</td></tr><tr><td>Paid to date</td><td class="n">'+catMoney(paid)+'</td></tr>'
-        + '<tr class="big"><td>Balance due'+(q.balance_due_date?' '+P(fmtDisplay(q.balance_due_date)):'')+'</td><td class="n">'+catMoney(Math.max(0,(q.total_cents||0)-paid))+'</td></tr></table>'
-      + (q.customer_note ? '<h2>Note</h2><div class="note">'+P(q.customer_note)+'</div>' : '')
-      + '<div class="foot">Staff copy printed '+new Date().toLocaleString()+'. Payments are taken on the Square invoice.</div>';
-    printDoc('Invoice — '+r.name, body);
+    let h = header('Catering Invoice', q.invoice_number?'Invoice #'+P(q.invoice_number):'Proposal #'+P(r.code), 'STAFF COPY · '+P((q.invoice_status||q.status||'').replace(/_/g,' ').toLowerCase()));
+    h += sec('Customer &amp; event', '<table class="info">'
+      + row4('Bill to', P(r.name)+(r.company?'<br>'+P(r.company):''), 'Event date', P(r.event_date?fmtDisplay(r.event_date):'')+(r.event_time?' · '+P(catTime(r.event_time)):''))
+      + row4('Email', P(r.email), 'Service', P(r.fulfillment?CAT_FUL[r.fulfillment]:''))
+      + row4('Phone', P(r.phone), 'Guests', P(r.guests))
+      + row4('Signed', q.signed_at?P(q.signed_name)+' · '+P(new Date(q.signed_at).toLocaleDateString()):'Not signed', 'Balance due', q.balance_due_date?P(fmtDisplay(q.balance_due_date)):'—')
+      + '</table>', true);
+    h += sec('Items', '<table><tr><th>Item</th><th class="n" style="width:.7in">Qty</th><th class="n" style="width:1.1in">Price</th><th class="n" style="width:1.2in">Amount</th></tr>'
+      + items.map(i=>'<tr><td>'+P(i.name)+(i.note?'<div style="color:#444;font-size:11px">'+P(i.note)+'</div>':'')+'</td><td class="n">'+P(i.qty)+'</td><td class="n">'+catMoney(i.price_cents)+'</td><td class="n">'+catMoney((i.price_cents||0)*(Number(i.qty)||0))+'</td></tr>').join('')
+      + '</table><div class="b"><table class="tot" style="width:3.4in;margin-left:auto">'
+      + '<tr><td>Subtotal</td><td class="n">'+catMoney(q.subtotal_cents)+'</td></tr><tr><td>Tax ('+P(q.tax_rate)+'%)</td><td class="n">'+catMoney(q.tax_cents)+'</td></tr>'
+      + '<tr class="g"><td>Total</td><td class="n">'+catMoney(q.total_cents)+'</td></tr>'
+      + '<tr><td>Deposit ('+P(q.deposit_pct)+'%)</td><td class="n">'+catMoney(dep)+'</td></tr><tr><td>Paid to date</td><td class="n">'+catMoney(paid)+'</td></tr>'
+      + '<tr class="g"><td>Balance due</td><td class="n">'+catMoney(Math.max(0,(q.total_cents||0)-paid))+'</td></tr></table></div>', true);
+    if(q.customer_note) h += sec('Note to customer', P(q.customer_note));
+    h += '<div class="foot">Staff copy printed '+new Date().toLocaleString()+' · payments are taken on the Square invoice.</div>';
+    printDoc('Invoice — '+r.name, h);
   };
 })();
 </script>
