@@ -1,13 +1,3 @@
-// ============================================================================
-// square-ticket-pay-sandbox — STAGING COPY of square-ticket-pay (v16).
-// Used only by the staging ticket site (ticket-rennet.onrender.com).
-//   * ALWAYS Square sandbox — reuses the SQUARE_EXP_SANDBOX_* secrets. No real
-//     card can be charged: the sandbox SDK only accepts test cards.
-//   * A successful test booking is immediately marked canceled + refunded, so
-//     it never takes a real seat on the live class.
-//   * Promo codes are priced but never burned.
-// Regenerate from square-ticket-pay whenever that function changes.
-// ============================================================================
 // square-ticket-pay: real card payments for the Greys ticket site.
 //
 // The browser mounts Square's Web Payments SDK, tokenizes the card, and posts
@@ -97,11 +87,14 @@ const PAY_LIMIT = 12;
 const PAY_WINDOW_SECS = 3600;
 
 const DEFAULT_ORIGINS = [
+  "https://tickets.greyscheese.com",
   "https://ticket-rennet.onrender.com",
 ];
 
 // ---------- env ----------
-const env = (): "production" | "sandbox" => "sandbox"; // STAGING: never production
+const env = () => (Deno.env.get("SQUARE_TICKET_ENV") ?? "sandbox").toLowerCase() === "production"
+  ? "production"
+  : "sandbox";
 const squareBase = () =>
   env() === "production" ? "https://connect.squareup.com" : "https://connect.squareupsandbox.com";
 // A sandbox test account gets a generated location id, different for every
@@ -113,10 +106,10 @@ const squareBase = () =>
 let RESOLVED_LOCATION: string | null = null;
 
 const locationId = () =>
-  RESOLVED_LOCATION ?? Deno.env.get("SQUARE_EXP_SANDBOX_LOCATION_ID") ?? DEFAULT_LOCATION;
+  RESOLVED_LOCATION ?? Deno.env.get("SQUARE_TICKET_LOCATION_ID") ?? DEFAULT_LOCATION;
 
 async function ensureLocation() {
-  const explicit = Deno.env.get("SQUARE_EXP_SANDBOX_LOCATION_ID");
+  const explicit = Deno.env.get("SQUARE_TICKET_LOCATION_ID");
   if (explicit) return (RESOLVED_LOCATION = explicit);
   if (RESOLVED_LOCATION) return RESOLVED_LOCATION;
   if (env() === "production") return (RESOLVED_LOCATION = DEFAULT_LOCATION);
@@ -190,10 +183,9 @@ function publicMessage(e: unknown, correlation: string): string {
 // Fails closed. An origin that is not on the list gets no allow header, so the
 // browser refuses the response rather than us handing out a working one.
 function corsFor(req: Request) {
-  // STAGING: staging site + the staff portal (admin list/refund) only.
-  const allow = [...DEFAULT_ORIGINS];
-  const o = req.headers.get("Origin") ?? "";
-  if (/^https:\/\/([a-z0-9-]+\.)*greyscheese\.com$/.test(o) && o !== "https://tickets.greyscheese.com") allow.push(o);
+  const configured = (Deno.env.get("TICKET_ALLOWED_ORIGINS") ?? "")
+    .split(",").map((s) => s.trim()).filter(Boolean);
+  const allow = configured.length ? configured : DEFAULT_ORIGINS;
   const origin = req.headers.get("Origin") ?? "";
   const headers: Record<string, string> = {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -234,7 +226,7 @@ async function rateLimit(bucket: string, limit: number, windowSecs: number, msg:
 
 // ---------- Square plumbing ----------
 function squareHeaders() {
-  const token = Deno.env.get("SQUARE_EXP_SANDBOX_ACCESS_TOKEN");
+  const token = Deno.env.get("SQUARE_TICKET_ACCESS_TOKEN") ?? Deno.env.get("SQUARE_ACCESS_TOKEN");
   if (!token) throw new Error("SQUARE_TICKET_ACCESS_TOKEN is not set");
   return {
     Authorization: `Bearer ${token}`,
@@ -603,9 +595,9 @@ async function config() {
   }
 
   return {
-    app_id: Deno.env.get("SQUARE_EXP_SANDBOX_APP_ID") ?? null,
+    app_id: Deno.env.get("SQUARE_TICKET_APP_ID") ?? null,
     location_id: locationId(),
-    location_source: Deno.env.get("SQUARE_EXP_SANDBOX_LOCATION_ID") ? "secret" : "resolved from token",
+    location_source: Deno.env.get("SQUARE_TICKET_LOCATION_ID") ? "secret" : "resolved from token",
     location_name,
     merchant,
     reachable,
@@ -618,8 +610,8 @@ async function config() {
     fee_rate: feeRate(),
     fee_label: feeLabel(),
     tax_label: taxLabel(),
-    ready: !!(Deno.env.get("SQUARE_EXP_SANDBOX_APP_ID") &&
-      (Deno.env.get("SQUARE_EXP_SANDBOX_ACCESS_TOKEN"))),
+    ready: !!(Deno.env.get("SQUARE_TICKET_APP_ID") &&
+      (Deno.env.get("SQUARE_TICKET_ACCESS_TOKEN") ?? Deno.env.get("SQUARE_ACCESS_TOKEN"))),
   };
 }
 
@@ -1287,9 +1279,7 @@ async function pay(req: Request, body: Record<string, unknown>) {
 
   problems.push(await persist("registration", () =>
     admin.from("registrations").update({
-      // STAGING: a test booking must never hold a real seat.
-      payment_status: "canceled",
-      refunded: true,
+      payment_status: "paid",
       total: totals!.total_cents,
       tip_cents: intent.tipCents,
       square_payment_id: payment.id ?? null,
@@ -1299,7 +1289,7 @@ async function pay(req: Request, body: Record<string, unknown>) {
     }).eq("id", regId)) ?? "");
 
   // 5. Burn the promo only once money actually moved, with OUR discount.
-  if (false && intent.promo && intent.discountCents > 0) { // STAGING: never burn a real promo
+  if (intent.promo && intent.discountCents > 0) {
     try {
       await admin.rpc("redeem_promo", {
         p_code: clean(intent.promo.code, 64),
