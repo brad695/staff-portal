@@ -202,9 +202,16 @@ async function syncCatalog() {
   for (const [key, g] of groups) {
     const categoryId = await ensureCategory(String(g.location ?? "").trim());
     const priceOf = (ev: any) => Math.round(Number(ev.price) * (1 + FEE_RATE));
+    // Classes normally run once: then the item carries the date in its name
+    // and has a single plain "Regular" variation, so the register never asks
+    // for a date. Only a title with several dates gets one variation per date.
+    const single = g.events.length === 1;
     const desired = g.events.map((ev, i) => ({
-      id: ev.id, name: niceWhen(ev.date, ev.time), price: priceOf(ev), ord: i,
+      id: ev.id, name: single ? "Regular" : niceWhen(ev.date, ev.time), price: priceOf(ev), ord: i,
     }));
+    const itemName = single
+      ? `Class – ${g.title} · ${niceWhen(g.events[0].date, g.events[0].time)} (${g.location})`
+      : `Class – ${g.title} (${g.location})`;
     // Upgrades (charcuterie, wine...) -> one modifier list per item, union of
     // the group's add-ons keyed by display name. Register price carries the fee.
     const mods: { key: string; name: string; price: number; addonIds: Record<string, string[]> }[] = [];
@@ -219,7 +226,7 @@ async function syncCatalog() {
       }
     }
     const sig = await sha(JSON.stringify({
-      n: g.title, loc: g.loc, c: categoryId, t: taxId, d: desired,
+      n: itemName, loc: g.loc, c: categoryId, t: taxId, d: desired,
       m: mods.map((m) => [m.name, m.price]), v: 2,
     }));
     const have = items.get(key);
@@ -307,7 +314,7 @@ async function syncCatalog() {
     obj.present_at_all_locations = false;
     obj.present_at_location_ids = [g.loc];
     Object.assign(obj.item_data, {
-      name: ENV === "production" ? `Class – ${g.title} (${g.location})` : `Class – ${g.title} (${g.location})`,
+      name: itemName.slice(0, 255),
       description: obj.item_data.description ||
         `GREYS ${g.location} class. Pick the date; add each guest's name in the item note.`,
       product_type: "REGULAR",
