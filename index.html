@@ -429,6 +429,12 @@ body, .app{ background:var(--bg); color:var(--ink); }
 .res-contact a, .req{ color:var(--accent); }
 @keyframes flash{ 0%,100%{ box-shadow:var(--shadow);} 25%{ box-shadow:0 0 0 3px var(--accent-soft), var(--shadow);} }
 </style>
+<!-- SQUARE-BUTTONS: every button is a rounded square (no pills, no circles). !important also beats inline styles in the React back office. -->
+<style id="square-buttons">
+  button, .btn, [role="button"], input[type="button"], input[type="submit"],
+  .chip, .loc-chip, .loc-tab, .po-qtab, .po-subtab, .rec-radio, .seg, .seg button,
+  .back-btn, .home-btn, .icon-btn, .wk-btn, .sw-btn, .btn-mini { border-radius: 8px !important; }
+</style>
 </head>
 <body>
 <div class="app">

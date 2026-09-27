@@ -223,6 +223,12 @@ tr.me td.emp{ background:#eef0f3; }
 .sw-btn{ background:#fff; border:1px solid var(--line); color:#4a5462; }
 .sw-btn:hover{ border-color:var(--accent); color:var(--accent); }
 </style>
+<!-- SQUARE-BUTTONS: every button is a rounded square (no pills, no circles). !important also beats inline styles in the React back office. -->
+<style id="square-buttons">
+  button, .btn, [role="button"], input[type="button"], input[type="submit"],
+  .chip, .loc-chip, .loc-tab, .po-qtab, .po-subtab, .rec-radio, .seg, .seg button,
+  .back-btn, .home-btn, .icon-btn, .wk-btn, .sw-btn, .btn-mini { border-radius: 8px !important; }
+</style>
 </head>
 <body>
 <div class="app">

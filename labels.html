@@ -116,6 +116,12 @@ legend{
 #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 @media (max-width:1100px){ #editor{width:290px;} #sidebar{width:210px;} }
 </style>
+<!-- SQUARE-BUTTONS: every button is a rounded square (no pills, no circles). !important also beats inline styles in the React back office. -->
+<style id="square-buttons">
+  button, .btn, [role="button"], input[type="button"], input[type="submit"],
+  .chip, .loc-chip, .loc-tab, .po-qtab, .po-subtab, .rec-radio, .seg, .seg button,
+  .back-btn, .home-btn, .icon-btn, .wk-btn, .sw-btn, .btn-mini { border-radius: 8px !important; }
+</style>
 </head>
 <body>
 
