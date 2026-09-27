@@ -329,6 +329,10 @@ type Intent = {
   // never taxed or hit by the service fee.
   tipCents: number;
   tipPercent: number;
+  // Square catalog variation for this class date (square-class-items). When
+  // set, the ticket line references the real item so Square reports online and
+  // register sales together. Price stays the ticket price (fee is separate).
+  variationId: string | null;
 };
 
 // Tip presets the page offers. Anything else must come in as a flat amount.
@@ -464,7 +468,18 @@ async function buildIntent(body: Record<string, unknown>): Promise<Intent> {
   const discountCents = promoDiscountCents(promo, addOnCounts, subtotal);
   const { tipCents, tipPercent } = tipFor(body, subtotal - discountCents);
 
+  let variationId: string | null = null;
+  try {
+    const { data: link } = await admin.from("class_square_links")
+      .select("square_variation_id,location_id")
+      .eq("env", env()).eq("event_id", event.id).maybeSingle();
+    if (link?.square_variation_id && link.location_id === locationForEvent(event)) {
+      variationId = link.square_variation_id;
+    }
+  } catch (_) { /* no link: ad-hoc line, exactly as before */ }
+
   return {
+    variationId,
     tipCents,
     tipPercent,
     event,
@@ -494,8 +509,12 @@ function orderBody(intent: Intent, referenceId?: string) {
 
   const line_items: Record<string, unknown>[] = [{
     uid: "tickets",
-    name: `${clean(ev.title, 400)} · ${when}`,
+    ...(intent.variationId
+      ? { catalog_object_id: intent.variationId }
+      : { name: `${clean(ev.title, 400)} · ${when}` }),
     quantity: String(intent.qty),
+    // Online price is the bare ticket; the service fee is its own charge below.
+    // (The catalog price carries the fee for register sales.)
     base_price_money: money(ev.price),
     note: clean(ev.location, 40),
   }];
