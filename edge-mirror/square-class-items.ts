@@ -209,9 +209,11 @@ async function syncCatalog() {
     const desired = g.events.map((ev, i) => ({
       id: ev.id, name: single ? "Regular" : niceWhen(ev.date, ev.time), price: priceOf(ev), ord: i,
     }));
-    const itemName = single
-      ? `Class – ${g.title} · ${niceWhen(g.events[0].date, g.events[0].time)} (${g.location})`
-      : `Class – ${g.title} (${g.location})`;
+    // Staff-only names (Maverick): "A Nightmare on Cheese Street - Oct 28".
+    // The shop is already the category (Classes – Memphis / – Nashville).
+    const shortDate = (d: string) =>
+      new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+    const itemName = single ? `${g.title} - ${shortDate(g.events[0].date)}` : g.title;
     // Upgrades (charcuterie, wine...) -> one modifier list per item, union of
     // the group's add-ons keyed by display name. Register price carries the fee.
     const mods: { key: string; name: string; price: number; addonIds: Record<string, string[]> }[] = [];
@@ -315,8 +317,7 @@ async function syncCatalog() {
     obj.present_at_location_ids = [g.loc];
     Object.assign(obj.item_data, {
       name: itemName.slice(0, 255),
-      description: obj.item_data.description ||
-        `GREYS ${g.location} class. Pick the date; add each guest's name in the item note.`,
+      description: "",
       product_type: "REGULAR",
       categories: [{ id: categoryId }],
       reporting_category: { id: categoryId },
@@ -327,6 +328,8 @@ async function syncCatalog() {
         : [],
     });
     delete obj.item_data.category_id;
+    delete obj.item_data.description_html;
+    delete obj.item_data.description_plaintext;
 
     const res = await sq("/v2/catalog/batch-upsert", {
       method: "POST",
