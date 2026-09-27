@@ -321,7 +321,18 @@ type Intent = {
   // never taxed or hit by the service fee.
   tipCents: number;
   tipPercent: number;
+  // Square catalog variation for this class date (square-class-items). When
+  // set, the ticket line references the real item so Square reports online and
+  // register sales together. Price stays the ticket price (fee is separate).
+  variationId: string | null;
 };
+
+// Catalog-linked ticket lines are on for the staging site first; add the live
+// origin here (or set CLASS_CATALOG_ONLINE=all) once register tests pass.
+function catalogAllowed(req: Request) {
+  if ((Deno.env.get("CLASS_CATALOG_ONLINE") ?? "") === "all") return true;
+  return (req.headers.get("Origin") ?? "") === "https://ticket-rennet.onrender.com";
+}
 
 // Tip presets the page offers. Anything else must come in as a flat amount.
 const TIP_PERCENTS = [15, 18, 20];
@@ -456,7 +467,20 @@ async function buildIntent(body: Record<string, unknown>): Promise<Intent> {
   const discountCents = promoDiscountCents(promo, addOnCounts, subtotal);
   const { tipCents, tipPercent } = tipFor(body, subtotal - discountCents);
 
+  let variationId: string | null = null;
+  if (body.__catalog === true) {
+    try {
+      const { data: link } = await admin.from("class_square_links")
+        .select("square_variation_id,location_id")
+        .eq("env", env()).eq("event_id", event.id).maybeSingle();
+      if (link?.square_variation_id && link.location_id === locationForEvent(event)) {
+        variationId = link.square_variation_id;
+      }
+    } catch (_) { /* no link: ad-hoc line, exactly as before */ }
+  }
+
   return {
+    variationId,
     tipCents,
     tipPercent,
     event,
@@ -486,8 +510,12 @@ function orderBody(intent: Intent, referenceId?: string) {
 
   const line_items: Record<string, unknown>[] = [{
     uid: "tickets",
-    name: `${clean(ev.title, 400)} · ${when}`,
+    ...(intent.variationId
+      ? { catalog_object_id: intent.variationId }
+      : { name: `${clean(ev.title, 400)} · ${when}` }),
     quantity: String(intent.qty),
+    // Online price is the bare ticket; the service fee is its own charge below.
+    // (The catalog price carries the fee for register sales.)
     base_price_money: money(ev.price),
     note: clean(ev.location, 40),
   }];
@@ -625,7 +653,7 @@ async function quote(req: Request, body: Record<string, unknown>) {
     `q:${callerIp(req)}`, QUOTE_LIMIT, QUOTE_WINDOW_SECS,
     "Too many price checks from this connection. Please wait a minute and try again.",
   );
-  const intent = await buildIntent(body);
+  const intent = await buildIntent({ ...body, __catalog: catalogAllowed(req) });
   const { order: _sq, ...totals } = await calculate(intent);
   const left = await seatsLeft(intent.event.id, intent.event.capacity);
   return {
@@ -1050,7 +1078,7 @@ async function pay(req: Request, body: Record<string, unknown>) {
     }
   }
 
-  const intent = await buildIntent(body);
+  const intent = await buildIntent({ ...body, __catalog: catalogAllowed(req) });
   await throttle(intent.buyer.email);
 
   // The ceiling. The client sends the total it actually displayed; if the
