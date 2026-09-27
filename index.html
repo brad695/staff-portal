@@ -429,48 +429,97 @@ body, .app{ background:var(--bg); color:var(--ink); }
 .res-contact a, .req{ color:var(--accent); }
 @keyframes flash{ 0%,100%{ box-shadow:var(--shadow);} 25%{ box-shadow:0 0 0 3px var(--accent-soft), var(--shadow);} }
 </style>
+<!-- HOME-V4: location bar at the very top, 6 compact tiles, today's calendar on the home page -->
+<style id="home-v4">
+.loc-bar{ align-items:center; padding:12px 16px 0; }
+.loc-act{ flex:0 0 42px; height:40px; display:flex; align-items:center; justify-content:center;
+  background:#fff; border:1px solid var(--line); border-radius:10px; color:#4a5462; cursor:pointer;
+  box-shadow:0 1px 1px rgba(18,26,38,.04); text-decoration:none; font:inherit; }
+.loc-act i{ font-size:20px; line-height:1; }
+.loc-act:hover{ background:#f5f6f8; color:var(--ink); }
+.loc-tab{ padding:11px 0; }
+
+.tiles{ grid-template-columns:repeat(3,1fr); gap:10px; padding:12px 16px 2px; }
+.tile{ flex-direction:column; align-items:center; justify-content:center; text-align:center;
+  gap:8px; padding:14px 6px 12px; }
+.tile .ic{ width:38px; height:38px; }
+.tile .ic i{ font-size:21px; }
+.tile .tl{ font-size:.92rem; letter-spacing:-.1px; }
+.home-preview{ margin:12px 16px 4px; }
+.notes-banner{ margin:12px 16px 0; }
+
+.today-card{ margin:14px 16px 8px; background:#fff; border:1px solid var(--line); border-radius:14px;
+  box-shadow:var(--shadow); padding:14px 16px 10px; }
+.today-head{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+.today-title{ flex:1; min-width:0; font-weight:800; font-size:1.15rem; letter-spacing:-.3px; color:var(--ink); line-height:1.15; }
+.today-title small{ display:block; font-size:.8rem; font-weight:600; color:var(--sub); letter-spacing:0; margin-top:2px; }
+.today-head .cal-nav{ width:36px; height:36px; font-size:1.2rem; display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer; }
+.today-head .cal-today{ height:36px; padding:0 12px; border:none; font-weight:700; font-size:.82rem; cursor:pointer; font-family:inherit; }
+.today-head .cal-today.off{ background:#eef0f3; color:#9aa3ad; }
+.today-list .ag-row:first-child{ border-top:none; }
+.today-list .empty{ padding:18px 0 12px; }
+.today-all{ display:block; width:100%; border-radius:0 !important; margin-top:6px; padding:10px 0 4px; border:none; border-top:1px solid var(--line);
+  background:none; color:var(--accent); font-weight:700; font-size:.85rem; cursor:pointer; font-family:inherit; }
+
+@media(min-width:640px){
+  .tiles{ grid-template-columns:repeat(6,1fr); }
+}
+@media(min-width:1000px){
+  .loc-bar{ padding:16px 28px 0; }
+  .tiles{ grid-template-columns:repeat(6,1fr); gap:14px; padding:16px 28px 4px; }
+  .tile{ padding:18px 8px 16px; }
+  .tile .tl{ font-size:1rem; }
+  .home-preview{ margin:16px 28px 6px; }
+  .notes-banner{ margin:16px 28px 0; }
+  .today-card{ margin:18px 28px 10px; padding:18px 22px 12px; }
+  .today-title{ font-size:1.3rem; }
+}
+@media print{ .loc-bar, .tiles, .today-all, .today-head button{ display:none !important; } }
+</style>
+<!-- SQUARE-BUTTONS: every button is a rounded square (no pills, no circles). !important also beats inline styles in the React back office. -->
+<style id="square-buttons">
+  button, .btn, [role="button"], input[type="button"], input[type="submit"],
+  .chip, .loc-chip, .loc-tab, .po-qtab, .po-subtab, .rec-radio, .seg, .seg button,
+  .back-btn, .home-btn, .icon-btn, .wk-btn, .sw-btn, .btn-mini { border-radius: 8px !important; }
+</style>
 </head>
 <body>
 <div class="app">
 
-  <!-- TOP BAR -->
-  <div class="topbar">
-    <div>
-      <div class="brand">GREYS <span id="brandLoc">Memphis</span></div>
-      <div class="loc">Staff Portal</div>
-    </div>
-    <div class="spacer"></div>
-    <a class="top-link" href="index.html">Portal</a>
-    <a class="top-link" href="manager.html">Manager</a>
-    <button class="top-link" onclick="topLogout()">Logout</button>
-  </div>
-
-  <!-- LOCATION BUTTONS -->
+  <!-- LOCATION BAR (very top) -->
   <div class="loc-bar" id="locBar">
     <button class="loc-tab" data-loc="memphis" onclick="setLoc('memphis')">Memphis</button>
     <button class="loc-tab" data-loc="nashville" onclick="setLoc('nashville')">Nashville</button>
+    <a class="loc-act" href="manager.html" title="Manager"><i class="ti ti-layout-dashboard"></i></a>
+    <button class="loc-act" onclick="topLogout()" title="Logout"><i class="ti ti-logout"></i></button>
   </div>
+  <span id="brandLoc" hidden></span>
 
   <!-- ══ HOME ══ -->
   <div id="view-home" class="view active">
-    <div class="home-head">
-      <h1 id="greeting">Hi, team</h1>
-      <div class="when" id="homeWhen"></div>
+    <div class="tiles">
+      <button class="tile" id="tile-resys" onclick="tileTap('resys')"><span class="ic"><i class="ti ti-clipboard-list"></i></span><span class="tl">Resys</span></button>
+      <button class="tile" id="tile-calendar" onclick="showView('calendar')"><span class="ic"><i class="ti ti-calendar-month"></i></span><span class="tl">Calendar</span></button>
+      <button class="tile" id="tile-myshifts" onclick="location.href='schedule.html'"><span class="ic"><i class="ti ti-calendar-week"></i></span><span class="tl">Schedule</span></button>
+      <button class="tile" id="tile-cheese-entry" onclick="location.href='manager.html#plu'"><span class="ic"><i class="ti ti-barcode"></i></span><span class="tl">Cheese Entry</span></button>
+      <button class="tile" id="tile-catering" onclick="location.href='manager.html#preorders'"><span class="ic"><i class="ti ti-file-check"></i></span><span class="tl">Catering</span></button>
+      <button class="tile" id="tile-stuff" onclick="tileTap('stuff')"><span class="ic"><i class="ti ti-info-circle"></i></span><span class="tl">Stuff to Know</span></button>
     </div>
+    <div id="homePreview" class="home-preview" style="display:none;"></div>
 
     <div class="notes-banner" id="notesGrid"></div>
 
-    <div class="tiles">
-      <button class="tile" id="tile-specials" onclick="tileTap('specials')"><span class="ic ic-mint"><i class="ti ti-tools-kitchen-2"></i></span><span class="tl">Specials</span></button>
-      <button class="tile" id="tile-resys" onclick="tileTap('resys')"><span class="ic ic-sky"><i class="ti ti-clipboard-list"></i></span><span class="tl">Resys</span></button>
-      <button class="tile" id="tile-calendar" onclick="tileTap('calendar')"><span class="ic ic-lav"><i class="ti ti-calendar-month"></i></span><span class="tl">Calendar</span></button>
-      <button class="tile" id="tile-myshifts" onclick="location.href='schedule.html'"><span class="ic ic-mint"><i class="ti ti-calendar-week"></i></span><span class="tl">Schedule</span></button>
-      <button class="tile" id="tile-events" onclick="tileTap('events')"><span class="ic ic-pink"><i class="ti ti-confetti"></i></span><span class="tl">Events</span></button>
-      <button class="tile" id="tile-stuff" onclick="tileTap('stuff')"><span class="ic ic-sky"><i class="ti ti-info-circle"></i></span><span class="tl">Stuff to Know</span></button>
-      <button class="tile" id="tile-cheese-entry" onclick="location.href='manager.html#plu'"><span class="ic ic-butter"><i class="ti ti-barcode"></i></span><span class="tl">Cheese Entry</span></button>
-      <button class="tile" id="tile-catering" onclick="location.href='manager.html#preorders'"><span class="ic ic-peach"><i class="ti ti-file-check"></i></span><span class="tl">Catering</span></button>
+    <!-- TODAY: the calendar for one day, stepped with ‹ › -->
+    <div class="today-card">
+      <div class="today-head">
+        <div class="today-title"><span id="todayLabel">Today</span><small id="todayDate"></small></div>
+        <button class="cal-nav" onclick="todayStep(-1)" aria-label="Previous day">‹</button>
+        <button class="cal-today" id="todayBtn" onclick="todayStep(0)">Today</button>
+        <button class="cal-nav" onclick="todayStep(1)" aria-label="Next day">›</button>
+      </div>
+      <div id="todayList" class="today-list"><div class="empty"><span class="spin"></span> Loading…</div></div>
+      <button class="today-all" onclick="showView('calendar')">Full calendar →</button>
     </div>
-    <div id="homePreview" class="home-preview" style="display:none;"></div>
   </div>
 
   <!-- ══ SPECIALS ══ -->
@@ -599,7 +648,7 @@ function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,
 
 // ── NAVIGATION ──
 function showView(name){
-  if (name === 'home') closePreview();
+  if (name === 'home'){ closePreview(); if (document.getElementById('view-home') && !document.getElementById('view-home').classList.contains('active')) renderToday(); }
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   const el = document.getElementById('view-' + name);
   if (el) el.classList.add('active');
@@ -694,7 +743,7 @@ updateWhen(); setInterval(updateWhen, 30000);
   const t=document.getElementById('dateTo'); if(t) t.value=fmt(to);
   const ts=document.getElementById('toStart'); if(ts) ts.value=fmt(today);
 })();
-window.addEventListener('DOMContentLoaded', () => { loadItems(); loadSchedules(); loadTimeOff(); });
+window.addEventListener('DOMContentLoaded', () => { Promise.all([loadItems(), loadSchedules(), loadTimeOff()]).catch(()=>{}).then(renderToday); });
 
 // ═══ CONTENT ITEMS (notes · specials · events) ═══
 let _notes=[], _specials=[], _events=[], _info=[];
@@ -1133,10 +1182,11 @@ function ordRow(o){
   ]);
   return agRow(meta.tag, meta.label, esc(when)+' \u00b7 '+esc(o.name)+money+paid, detail);
 }
-async function renderCalendar(){
-  const y=_calYear, m=_calMonth;
+async function renderCalendar(opt){
+  opt=opt||{};
+  const y=opt.y!=null?opt.y:_calYear, m=opt.m!=null?opt.m:_calMonth, tgt=opt.target||_calTarget;
   const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const labelEl=document.getElementById(_calTarget.label); if(labelEl) labelEl.textContent=months[m]+' '+y;
+  const labelEl=tgt.label&&document.getElementById(tgt.label); if(labelEl) labelEl.textContent=months[m]+' '+y;
   await loadCalMonth(y,m);
   const mS=fmt(new Date(y,m,1)), mE=fmt(new Date(y,m+1,0));
   await Promise.all([ loadCalClasses(mS,mE), loadCalOrders(mS,mE), loadCalExperiences(mS,mE) ]);
@@ -1144,7 +1194,7 @@ async function renderCalendar(){
   _calData.sp={}; _specials.forEach(s=>{ if((s.repeat||'none')==='none'&&s.endDate&&s.endDate>s.date){ spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sp[k]=_calData.sp[k]||[]).push(s);}); } else { occurrences(s,mS,mE).forEach(d=>{(_calData.sp[d]=_calData.sp[d]||[]).push(s);}); } });
   _calData.sch={}; _schedules.forEach(s=>{ if(!s.date) return; spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sch[k]=_calData.sch[k]||[]).push(s);}); });
   _calData.off={}; approvedTimeOff().forEach(r=>{ if(!r.date) return; spanDays(r.date,r.endDate,mS,mE,k=>{(_calData.off[k]=_calData.off[k]||[]).push(r);}); });
-  renderAgenda(y,m);
+  renderAgenda(y,m,tgt,opt.only);
 }
 // Build the expandable body from label/value pairs, skipping the empty ones.
 function agDetail(pairs){
@@ -1168,12 +1218,12 @@ function agRow(tag,label,text,detail){
     +'<span class="ag-body"><span>'+text+'<i class="ag-chev">\u25be</i></span>'
     +'<div class="ag-det">'+detail+'</div></span></div>';
 }
-function renderAgenda(y,m){
-  const list=document.getElementById(_calTarget.list); if(!list) return;
+function renderAgenda(y,m,tgt,only){
+  const list=document.getElementById((tgt||_calTarget).list); if(!list) return;
   const dim=new Date(y,m+1,0).getDate(), today=fmt(new Date()), can=['CANCELLED','CANCELED','DECLINED','NO_SHOW'];
   const now=new Date(); const startDay=(y===now.getFullYear() && m===now.getMonth()) ? now.getDate() : 1;
   let html='', any=false;
-  for(let d=startDay; d<=dim; d++){
+  for(let d=(only?+only.slice(8):startDay); d<=(only?+only.slice(8):dim); d++){
     const date=fmt(new Date(y,m,d));
     const res=_calData.res[date]||[], ev=_calData.ev[date]||[], sp=_calData.sp[date]||[], sch=_calData.sch[date]||[], off=_calData.off[date]||[], cls=_calData.cls[date]||[], ord=_calData.ord[date]||[], exp=_calData.exp[date]||[];
     if(!(res.length||ev.length||sp.length||sch.length||off.length||cls.length||ord.length||exp.length)) continue;
@@ -1207,14 +1257,72 @@ function renderAgenda(y,m){
     off.forEach(n=>rows+=agRow('t-off','Time Off',esc(n.name||n),agDetail([
       ['Reason', n.note], ['Through', (n.endDate&&n.endDate!==date)?fmtDisplay(n.endDate):'']
     ])));
-    html+='<div class="ag-day"><div class="ag-date">'+dl+(date===today?'<span class="ag-today">Today</span>':'')+'</div>'+rows+'</div>';
+    html+= only ? rows : '<div class="ag-day"><div class="ag-date">'+dl+(date===today?'<span class="ag-today">Today</span>':'')+'</div>'+rows+'</div>';
   }
-  list.innerHTML = any ? html : '<div class="empty"><span class="ic">📅</span>Nothing scheduled this month.</div>';
+  list.innerHTML = any ? html : '<div class="empty"><span class="ic">📅</span>'+(only?'Nothing on the calendar.':'Nothing scheduled this month.')+'</div>';
 }
 function calNav(dir){ _calMonth+=dir; if(_calMonth>11){_calMonth=0;_calYear++;} if(_calMonth<0){_calMonth=11;_calYear--;} renderCalendar(); }
+// ── TODAY card on home ──
+let _todayOff=0, _todaySeq=0;
+async function renderToday(){
+  const list=document.getElementById('todayList'); if(!list) return;
+  const d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()+_todayOff);
+  const date=fmt(d), seq=++_todaySeq;
+  document.getElementById('todayLabel').textContent=_todayOff===0?'Today':_todayOff===1?'Tomorrow':_todayOff===-1?'Yesterday':d.toLocaleDateString('en-US',{weekday:'long'});
+  document.getElementById('todayDate').textContent=d.toLocaleDateString('en-US',{weekday:_todayOff&&Math.abs(_todayOff)>1?undefined:'long',month:'long',day:'numeric'});
+  document.getElementById('todayBtn').classList.toggle('off',_todayOff===0);
+  list.innerHTML='<div class="empty"><span class="spin"></span> Loading…</div>';
+  const tmp='todayTmp'+seq; const box=document.createElement('div'); box.id=tmp; box.hidden=true; document.body.appendChild(box);
+  try{ await renderCalendar({ y:d.getFullYear(), m:d.getMonth(), target:{ list:tmp }, only:date }); }catch(e){}
+  if(seq===_todaySeq) list.innerHTML=box.innerHTML;
+  box.remove();
+}
+function todayStep(n){ _todayOff = n===0 ? 0 : _todayOff+n; renderToday(); }
 function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().getMonth(); _selDay=fmt(new Date()); renderCalendar(); }
 </script>
 <div style="text-align:center;padding:14px 20px 22px;font-size:0.78rem;color:#8fa0ae;">Greys Fine Cheese &amp; Entertaining · <a href="terms.html" style="color:#0b6aa9;text-decoration:none;font-weight:600;">SMS Terms</a> · <a href="privacy.html" style="color:#0b6aa9;text-decoration:none;font-weight:600;">Privacy Policy</a></div>
+<!-- CLEAN-URL: once /<page> is confirmed to serve this page (Render rewrite), drop ".html" from the address bar. -->
+<script>
+(function(){
+  var p = location.pathname; if (!/\.html$/.test(p)) return;
+  var c = p.replace(/index\.html$/, '').replace(/\.html$/, '');
+  fetch(c, { method:'HEAD', cache:'no-store' }).then(function(r){
+    if (r.ok && location.pathname === p) history.replaceState(history.state, '', c + location.search + location.hash);
+  }).catch(function(){});
+})();
+</script>
+<!-- HISTORY-ROUTER: each section (Specials, Calendar, Events…) becomes a browser history entry (#calendar)
+     so Back / the phone back swipe returns to the previous screen instead of leaving the portal. -->
+<script>
+(function(){
+  var current = 'home';
+  function hashKey(){ return decodeURIComponent((location.hash || '').slice(1)); }
+  function onActive(v){
+    var k = v.id.replace(/^view-/, ''); if (k === current) return;
+    current = k;
+    var h = hashKey();
+    if (h === k || (!h && k === 'home')) return;
+    if (k === 'home') history.pushState({ view:k }, '', location.pathname + location.search);
+    else history.pushState({ view:k }, '', location.pathname + location.search + '#' + k);
+  }
+  function route(){
+    var k = hashKey() || 'home';
+    if (k === current || !document.getElementById('view-' + k) || !window.showView) return;
+    showView(k);
+  }
+  function boot(){
+    var vs = document.querySelectorAll('.view');
+    var mo = new MutationObserver(function(recs){
+      for (var i = 0; i < recs.length; i++){ var v = recs[i].target; if (v.classList.contains('active')) { onActive(v); return; } }
+    });
+    Array.prototype.forEach.call(vs, function(v){ mo.observe(v, { attributes:true, attributeFilter:['class'] }); });
+    window.addEventListener('popstate', route);
+    window.addEventListener('hashchange', route);
+    if (hashKey()) route();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
 <script>(function(){if(location.hostname.indexOf("staging")<0)return;document.title="[STAGING] "+document.title;var m=document.createElement("meta");m.name="robots";m.content="noindex";document.head.appendChild(m);var b=document.createElement("div");b.textContent="STAGING \u2014 test copy. Same live database: data changes, emails and Square actions are REAL.";b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#c62828;color:#fff;font:600 12px/1.2 system-ui,sans-serif;text-align:center;padding:5px 8px;pointer-events:none;opacity:.92";document.body.appendChild(b);})();</script>
 </body>
