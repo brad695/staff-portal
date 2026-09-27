@@ -4678,6 +4678,13 @@ function App() {
                   onAddMany={async (list) => {
                     for (const one of list) await saveEvent(one, false);
                   }}
+                  onUpdateMany={async (ids, patch) => {
+                    if (!db || !ids.length) return;
+                    const { data, error } = await db.from("events").update(patch).in("id", ids).select();
+                    if (error) throw new Error(error.message);
+                    const byId = new Map((data || []).map((r) => [r.id, eventFromRow(r)]));
+                    setEvents((prev) => prev.map((e) => byId.get(e.id) || e));
+                  }}
                   events={events}
                   regs={regs}
                   soldFor={soldFor}
@@ -5884,6 +5891,220 @@ const plusMonths = (iso, n) => {
 };
 const weekdayOf = (iso) => new Date(iso + "T12:00:00").getDay();
 
+// ── Mahjong (2026-09-27 rework) ────────────────────────────────────────────
+// Maverick: the planner was too much, and the picture had to be set night by
+// night. Now: ONE settings card for the whole series (picture, description,
+// price per table) that writes to every Mahjong night, and a plain "add
+// nights" card — pick a shop, click dates on the calendar, done.
+const mjSeriesEvents = (events) =>
+  events.filter((e) => seriesFor(e) && !e.archived);
+
+// Upload a local image (or import a pasted link) into the public
+// social-assets bucket and hand back the permanent URL.
+async function mjHostFile(file) {
+  if (!file || !String(file.type || "").startsWith("image/")) throw new Error("Choose an image file (JPEG, PNG, WebP…).");
+  if (file.size > 25 * 1024 * 1024) throw new Error("That image is over 25 MB — shrink it first.");
+  if (!db) throw new Error("Storage is unavailable right now.");
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const path = "mahjong/" + new Date().toISOString().slice(0, 10) + "/" + Math.random().toString(36).slice(2, 10) + "." + ext;
+  const { error } = await db.storage.from("social-assets").upload(path, file, { contentType: file.type, upsert: false });
+  if (error) throw new Error(error.message || "Upload failed");
+  const { data } = db.storage.from("social-assets").getPublicUrl(path);
+  if (!data || !data.publicUrl) throw new Error("Could not get a public URL.");
+  return data.publicUrl;
+}
+
+function MahjongSettings({ events, onUpdateMany }) {
+  const today = todayStr();
+  const all = mjSeriesEvents(events).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  const upcoming = all.filter((e) => e.date >= today);
+  // Current values = the soonest upcoming night (what the ticket site shows).
+  const cur = upcoming[0] || all[all.length - 1] || null;
+  const ps = cur && cur.partySize > 1 ? cur.partySize : 4;
+  const [imageUrl, setImageUrl] = useState(cur ? cur.imageUrl || "" : "");
+  const [imageIn, setImageIn] = useState("");
+  const [blurb, setBlurb] = useState(cur ? cur.blurb || "" : "");
+  const [priceStr, setPriceStr] = useState(cur ? ((cur.price * ps) / 100).toFixed(2) : "100.00");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const host = async (fn) => {
+    setBusy(true);
+    setMsg("");
+    try { setImageUrl(await fn()); setImageIn(""); setMsg("Picture ready — press Save to put it on every night."); }
+    catch (e) { setMsg(String((e && e.message) || e)); }
+    setBusy(false);
+  };
+
+  const save = async () => {
+    const tablePrice = Math.round(parseFloat(priceStr || "0") * 100);
+    if (!tablePrice) { setMsg("Enter a price per table."); return; }
+    const seat = Math.round(tablePrice / ps);
+    if (!window.confirm(
+      `Update all ${all.length} Mahjong night${all.length === 1 ? "" : "s"} (both shops)?\n\n` +
+      `• Picture and description: every night\n• Price $${(tablePrice / 100).toFixed(2)} per table: the ${upcoming.length} upcoming night${upcoming.length === 1 ? "" : "s"}`
+    )) return;
+    setBusy(true);
+    setMsg("");
+    try {
+      await onUpdateMany(all.map((e) => e.id), { image_url: imageUrl || null, blurb });
+      if (upcoming.length) await onUpdateMany(upcoming.map((e) => e.id), { price: seat });
+      setMsg(`Saved to ${all.length} nights. The ticket site shows it on next load.`);
+    } catch (e) {
+      setMsg("Save failed: " + String((e && e.message) || e));
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div className="cc-mj-plan">
+      <div className="cc-mj-plan-head">
+        <h4>Mahjong settings — all nights, both shops</h4>
+      </div>
+      <div className="cc-mj-set">
+        <div className="cc-mj-img">
+          {imageUrl ? <img src={imageUrl} alt="" /> : <div className="cc-mj-noimg">No picture</div>}
+          <div className="cc-giftrow" style={{ marginTop: 8 }}>
+            <label className="cc-mini" style={{ cursor: busy ? "default" : "pointer", margin: 0 }}>
+              {busy ? "Working…" : "Upload"}
+              <input type="file" accept="image/*" style={{ display: "none" }} disabled={busy}
+                onChange={(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f) host(() => mjHostFile(f)); }} />
+            </label>
+            {imageUrl && <button className="cc-mini danger" onClick={() => setImageUrl("")} disabled={busy}>Remove</button>}
+          </div>
+          <input className="cc-input" style={{ marginTop: 8 }} placeholder="…or paste a Canva / image link" value={imageIn}
+            onChange={(e) => setImageIn(e.target.value)} />
+          <button className="cc-mini" style={{ marginTop: 6 }} disabled={busy || !imageIn.trim()}
+            onClick={() => host(() => window.emcHostImage(imageIn.trim(), "social-assets", "mahjong"))}>Import link</button>
+        </div>
+        <div>
+          <label className="cc-label">Description</label>
+          <textarea className="cc-input" rows={6} value={blurb} onChange={(e) => setBlurb(e.target.value)} />
+          <label className="cc-label">Price per table ($) — table of {ps}</label>
+          <input className="cc-input" type="number" step="0.01" min={0} value={priceStr} onChange={(e) => setPriceStr(e.target.value)} />
+          <p className="cc-hint">Price changes apply to upcoming nights only; tables already sold keep what they paid.</p>
+        </div>
+      </div>
+      {msg && <div className="cc-fp-ok">{msg}</div>}
+      <div className="cc-edit-actions">
+        <button className="cc-btn cc-btn-wax" disabled={busy || !all.length} onClick={save}>
+          {busy ? "Saving…" : "Save for all Mahjong nights"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MahjongAddNights({ events, onCreate }) {
+  const today = todayStr();
+  const [loc, setLoc] = useState(LOCATIONS[0]);
+  const series = mjSeriesEvents(events)
+    .filter((e) => (e.location || "Memphis") === loc)
+    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  const all = mjSeriesEvents(events).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  const tpl = [...series].reverse().find((e) => (e.partySize || 1) > 1) || series[series.length - 1] || null;
+  // Picture/description come from the series settings (soonest upcoming night anywhere).
+  const look = all.find((e) => e.date >= today) || all[all.length - 1] || tpl;
+  const ps = tpl && tpl.partySize > 1 ? tpl.partySize : 4;
+  const [dates, setDates] = useState([]);
+  const [pick, setPick] = useState("");
+  const [time, setTime] = useState("17:30");
+  const [tables, setTables] = useState(4);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    setTime(tpl ? tpl.time : "17:30");
+    setTables(MAHJONG_TABLES[loc] || Math.max(1, Math.floor((tpl ? tpl.capacity : 16) / ps)));
+    setDates([]);
+  }, [loc]);
+  const taken = new Set(series.map((e) => e.date));
+  const add = (d) => {
+    if (!d) return;
+    if (d < today) { setMsg("That date has passed."); return; }
+    if (taken.has(d)) { setMsg(`${fmtDate(d)} is already on the schedule at ${loc}.`); return; }
+    setMsg("");
+    setDates((x) => (x.includes(d) ? x : [...x, d].sort()));
+    setPick("");
+  };
+  const nTables = Math.max(1, Number(tables) || 1);
+  const create = async () => {
+    if (!dates.length) return;
+    setBusy(true);
+    setMsg("");
+    const base = tpl ? { ...tpl } : {
+      title: "Mahjong – Tannins & Tiles", blurb: "", durationMin: 150, addOns: [],
+      groupSeating: true, blockScope: "none", imageUrl: "", price: 2500,
+    };
+    const list = dates.map((d) => ({
+      ...base,
+      id: uid("ev"),
+      date: d,
+      time,
+      kind: "event_tabled",
+      partySize: ps,
+      groupSeating: true,
+      capacity: nTables * ps,
+      location: loc,
+      archived: false,
+      featured: false,
+      imageUrl: (look && look.imageUrl) || base.imageUrl || "",
+      blurb: (look && look.blurb) || base.blurb || "",
+      price: (look && look.price) || base.price,
+    }));
+    try {
+      await onCreate(list);
+      setMsg(`Added ${list.length} night${list.length === 1 ? "" : "s"} at ${loc}. Live on the ticket site now.`);
+      setDates([]);
+    } catch (e) {
+      setMsg("Something failed partway: " + String((e && e.message) || e) + " — refresh and check the list below.");
+    }
+    setBusy(false);
+  };
+  return (
+    <div className="cc-mj-plan">
+      <div className="cc-mj-plan-head"><h4>Add Mahjong nights</h4></div>
+      <div className="cc-mj-grid">
+        <div>
+          <label className="cc-label">Shop</label>
+          <select className="cc-input" value={loc} onChange={(e) => setLoc(e.target.value)}>
+            {LOCATIONS.map((l) => <option key={l}>{l}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="cc-label">Pick a date</label>
+          <input className="cc-input" type="date" min={today} value={pick}
+            onChange={(e) => { setPick(e.target.value); add(e.target.value); }} />
+        </div>
+        <div>
+          <label className="cc-label">Start time</label>
+          <input className="cc-input" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+        </div>
+        <div>
+          <label className="cc-label">Tables per night</label>
+          <input className="cc-input" type="number" min={1} value={tables} onChange={(e) => setTables(e.target.value)} />
+        </div>
+      </div>
+      <div className="cc-mj-dates">
+        {dates.length === 0 ? (
+          <span className="cc-hint">Pick dates above — each one is added here. Click a date to remove it.</span>
+        ) : dates.map((d) => (
+          <button key={d} type="button" className="cc-mj-date" title="Remove"
+            onClick={() => setDates((x) => x.filter((y) => y !== d))}>
+            {fmtDate(d)} ✕
+          </button>
+        ))}
+      </div>
+      <p className="cc-hint">Picture, description and price come from Mahjong settings above.</p>
+      {msg && <div className="cc-fp-ok">{msg}</div>}
+      <div className="cc-edit-actions">
+        <button className="cc-btn cc-btn-wax" disabled={busy || !dates.length} onClick={create}>
+          {busy ? "Adding…" : `Add ${dates.length || ""} night${dates.length === 1 ? "" : "s"} at ${loc}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function MahjongPlanner({ events, onCreate, onClose }) {
   const today = todayStr();
   const [loc, setLoc] = useState(LOCATIONS[0]);
@@ -6539,7 +6760,7 @@ function ExperienceEdit({ x, count, onCancel, onSaved }) {
   );
 }
 
-function AdminDash({ events: allEvents, section = "class", onAddMany, regs, soldFor, revenueFor, go, onDelete, onArchive, onArchiveAll }) {
+function AdminDash({ events: allEvents, section = "class", onAddMany, onUpdateMany, regs, soldFor, revenueFor, go, onDelete, onArchive, onArchiveAll }) {
   const T = DASH_TEXT[section] || DASH_TEXT.class;
   const events = allEvents.filter((e) => sectionOf(e) === section);
   const [classFilter, setClassFilter] = useState("upcoming"); // upcoming|past|all|archived
@@ -6577,7 +6798,7 @@ function AdminDash({ events: allEvents, section = "class", onAddMany, regs, sold
         <div className="cc-dash-btns">
           {section === "mahjong" ? (
             <button className="cc-btn cc-btn-wax" onClick={() => setPlanOpen((v) => !v)}>
-              {planOpen ? "Hide date planner" : "＋ Add future dates"}
+              {planOpen ? "Hide settings" : "⚙ Settings & add nights"}
             </button>
           ) : (
             <button
@@ -6596,11 +6817,10 @@ function AdminDash({ events: allEvents, section = "class", onAddMany, regs, sold
       </div>
 
       {section === "mahjong" && planOpen && (
-        <MahjongPlanner
-          events={allEvents}
-          onCreate={onAddMany}
-          onClose={() => setPlanOpen(false)}
-        />
+        <>
+          <MahjongSettings events={allEvents} onUpdateMany={onUpdateMany} />
+          <MahjongAddNights events={allEvents} onCreate={onAddMany} />
+        </>
       )}
 
       <div className="cc-reg-head">
@@ -10326,6 +10546,10 @@ select.cc-input{appearance:auto;-webkit-appearance:auto;cursor:pointer;}
 .cc-reg-filter span{color:#666666;}
 /* ---- dashboard header buttons + Mahjong planner ---- */
 .cc-dash-btns{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.cc-mj-set{display:grid;grid-template-columns:200px 1fr;gap:18px;margin-top:12px;}
+.cc-mj-img img{width:200px;aspect-ratio:4/5;object-fit:cover;border-radius:8px;border:1px solid #dddddd;display:block;}
+.cc-mj-noimg{width:200px;aspect-ratio:4/5;border:1px dashed #cccccc;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#888;font-size:13px;}
+@media (max-width:700px){.cc-mj-set{grid-template-columns:1fr;}}
 .cc-mj-plan{background:#ffffff;border:1px solid #dddddd;border-radius:12px;padding:18px 20px;margin:0 0 22px;color:#111111;}
 .cc-mj-plan-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px;}
 .cc-mj-plan-head h4{margin:0;font-size:16px;color:#111111;}
