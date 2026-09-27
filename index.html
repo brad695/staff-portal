@@ -1142,7 +1142,11 @@ function ordRow(o){
   ]);
   return agRow(meta.tag, meta.label, esc(when)+' \u00b7 '+esc(o.name)+money+paid, detail);
 }
-async function renderCalendar(){
+// One calendar load at a time: overlapping loads each reset then refill the same
+// _calData buckets, which doubled/tripled reservations and orders.
+let _calChain=Promise.resolve();
+function renderCalendar(opt){ _calChain=_calChain.then(()=>_renderCalendar(opt)).catch(()=>{}); return _calChain; }
+async function _renderCalendar(){
   const y=_calYear, m=_calMonth;
   const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const labelEl=document.getElementById(_calTarget.label); if(labelEl) labelEl.textContent=months[m]+' '+y;
