@@ -461,8 +461,13 @@ async function pull(days?: number) {
     cursor = d.cursor;
     for (const o of d.orders ?? []) {
       out.scanned++;
-      // Ticket-site orders already made their own registration.
+      // Ticket-site orders already made their own registration. Square only
+      // shows an order's metadata to the app that wrote it, so also match the
+      // order id against the ticket-site payment ledger.
       if (o.metadata?.source === "ticket-site") { out.skipped_online++; continue; }
+      const { data: online } = await admin.from("ticket_payments").select("id")
+        .eq("square_order_id", o.id).limit(1);
+      if (online?.length) { out.skipped_online++; continue; }
 
       for (const li of o.line_items ?? []) {
         const eventId = varToEvent.get(li.catalog_object_id);
