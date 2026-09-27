@@ -4678,6 +4678,14 @@ function App() {
                   onAddMany={async (list) => {
                     for (const one of list) await saveEvent(one, false);
                   }}
+                  onPatchEach={async (list) => {
+                    if (!db) return;
+                    for (const { id, patch } of list) {
+                      const { data, error } = await db.from("events").update(patch).eq("id", id).select().single();
+                      if (error) throw new Error(error.message);
+                      if (data) setEvents((prev) => prev.map((e) => (e.id === id ? eventFromRow(data) : e)));
+                    }
+                  }}
                   onUpdateMany={async (ids, patch) => {
                     if (!db || !ids.length) return;
                     const { data, error } = await db.from("events").update(patch).in("id", ids).select();
@@ -6760,13 +6768,104 @@ function ExperienceEdit({ x, count, onCancel, onSaved }) {
   );
 }
 
-function AdminDash({ events: allEvents, section = "class", onAddMany, onUpdateMany, regs, soldFor, revenueFor, go, onDelete, onArchive, onArchiveAll }) {
+// ── Class upgrades library (2026-09-27) ────────────────────────────────────
+// Maverick: keep one list of every class upgrade (charcuterie, wine…); the
+// class editor ticks them on, and this editor adds/updates them. Stored in
+// site_content 'class_upgrades' = { items:[{id,name,price(cents)}] }. A class
+// keeps its own copy in add_ons (id = the library id), so old bookings and
+// the Square modifiers are unaffected until the class is saved again.
+const UPG_KEY = "class_upgrades";
+const upgNorm = (s) =>
+  String(s || "").toLowerCase().replace(/^base\s+ticket\s+plus\s+/, "").replace(/[^a-z0-9]+/g, " ").trim();
+async function loadUpgrades() {
+  if (!db) return [];
+  const { data } = await db.from("site_content").select("data").eq("key", UPG_KEY).maybeSingle();
+  const items = (data && data.data && Array.isArray(data.data.items)) ? data.data.items : [];
+  return items.filter((x) => x && x.id && x.name);
+}
+function useUpgrades() {
+  const [items, setItems] = useState(null);
+  const reload = () => loadUpgrades().then(setItems).catch(() => setItems([]));
+  useEffect(() => { reload(); }, []);
+  return [items, reload];
+}
+
+function UpgradesLibrary({ events, onPatchEach, onClose }) {
+  const [items, reload] = useUpgrades();
+  const [rows, setRows] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  useEffect(() => {
+    if (items) setRows(items.map((x) => ({ ...x, priceStr: (x.price / 100).toFixed(2) })));
+  }, [items]);
+  if (!rows) return <div className="cc-mj-plan"><p className="cc-hint">Loading upgrades…</p></div>;
+  const edit = (id, k, v) => setRows((r) => r.map((x) => (x.id === id ? { ...x, [k]: v } : x)));
+  const today = todayStr();
+  const save = async () => {
+    const clean = rows
+      .filter((r) => r.name.trim())
+      .map((r) => ({ id: r.id, name: r.name.trim(), price: Math.round(parseFloat(r.priceStr || "0") * 100) }));
+    if (clean.some((r) => !(r.price >= 0))) { setMsg("Every upgrade needs a price."); return; }
+    setBusy(true);
+    setMsg("");
+    try {
+      const { error } = await db.from("site_content").upsert(
+        { key: UPG_KEY, data: { items: clean }, updated_at: new Date().toISOString() });
+      if (error) throw new Error(error.message);
+      // Carry name/price changes onto upcoming classes that use them.
+      const byId = new Map(clean.map((c) => [c.id, c]));
+      const patches = [];
+      events.filter((e) => e.kind === "class" && e.date >= today && !e.archived).forEach((e) => {
+        let changed = false;
+        const next = (e.addOns || []).map((a) => {
+          const lib = byId.get(a.id);
+          if (lib && (lib.name !== a.name || lib.price !== a.price)) { changed = true; return { ...a, name: lib.name, price: lib.price }; }
+          return a;
+        });
+        if (changed) patches.push({ id: e.id, patch: { add_ons: next } });
+      });
+      if (patches.length) await onPatchEach(patches);
+      setMsg(`Saved ${clean.length} upgrade${clean.length === 1 ? "" : "s"}` +
+        (patches.length ? ` · updated ${patches.length} upcoming class${patches.length === 1 ? "" : "es"}.` : "."));
+      reload();
+    } catch (e) {
+      setMsg("Save failed: " + String((e && e.message) || e));
+    }
+    setBusy(false);
+  };
+  return (
+    <div className="cc-mj-plan">
+      <div className="cc-mj-plan-head">
+        <h4>Class upgrades</h4>
+        <button className="cc-mini" onClick={onClose}>Close</button>
+      </div>
+      <p className="cc-hint">The list every class picks from. Renaming or repricing here also updates upcoming classes that use it.</p>
+      {rows.map((r) => (
+        <div key={r.id} className="cc-addon-row">
+          <input className="cc-input" placeholder="Upgrade name" value={r.name} onChange={(e) => edit(r.id, "name", e.target.value)} />
+          <input className="cc-input cc-input-sm" placeholder="$" type="number" step="0.01" value={r.priceStr}
+            onChange={(e) => edit(r.id, "priceStr", e.target.value)} />
+          <button className="cc-mini danger" title="Remove from the list (classes that have it keep it)"
+            onClick={() => setRows((x) => x.filter((y) => y.id !== r.id))}>✕</button>
+        </div>
+      ))}
+      <button className="cc-mini" onClick={() => setRows((x) => [...x, { id: uid("up"), name: "", priceStr: "" }])}>+ Add upgrade</button>
+      {msg && <div className="cc-fp-ok">{msg}</div>}
+      <div className="cc-edit-actions">
+        <button className="cc-btn cc-btn-wax" disabled={busy} onClick={save}>{busy ? "Saving…" : "Save upgrades"}</button>
+      </div>
+    </div>
+  );
+}
+
+function AdminDash({ events: allEvents, section = "class", onAddMany, onUpdateMany, onPatchEach, regs, soldFor, revenueFor, go, onDelete, onArchive, onArchiveAll }) {
   const T = DASH_TEXT[section] || DASH_TEXT.class;
   const events = allEvents.filter((e) => sectionOf(e) === section);
   const [classFilter, setClassFilter] = useState("upcoming"); // upcoming|past|all|archived
   const [locFilter, setLocFilter] = useState("all"); // all | Memphis | Nashville
   const [openSeries, setOpenSeries] = useState({}); // series rows expanded
   const [planOpen, setPlanOpen] = useState(section === "mahjong");
+  const [upgOpen, setUpgOpen] = useState(false);
   const locEvents =
     locFilter === "all"
       ? events
@@ -6808,6 +6907,11 @@ function AdminDash({ events: allEvents, section = "class", onAddMany, onUpdateMa
               ＋ Add {T.one}
             </button>
           )}
+          {section === "class" && (
+            <button className="cc-btn cc-btn-ghost" onClick={() => setUpgOpen((v) => !v)}>
+              {upgOpen ? "Hide upgrades" : "⚙ Upgrades"}
+            </button>
+          )}
           {/* The words around the schedule on tickets.greyscheese.com are edited
               here too — it is the same page to whoever is looking at it. */}
           <button className="cc-btn cc-btn-ghost" onClick={() => go("home")}>
@@ -6815,6 +6919,10 @@ function AdminDash({ events: allEvents, section = "class", onAddMany, onUpdateMa
           </button>
         </div>
       </div>
+
+      {section === "class" && upgOpen && (
+        <UpgradesLibrary events={allEvents} onPatchEach={onPatchEach} onClose={() => setUpgOpen(false)} />
+      )}
 
       {section === "mahjong" && planOpen && (
         <>
@@ -8191,6 +8299,17 @@ function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
     setImageBusy(false);
   };
 
+  const [upgLib] = useUpgrades();
+  // A library upgrade counts as on this class if the ids match, or (for classes
+  // made before the library) the names match once "Base ticket plus" is dropped.
+  const libHit = (u) =>
+    addOns.find((a) => a.id === u.id || (a.name && upgNorm(a.name) === upgNorm(u.name)));
+  const toggleLib = (u, on) =>
+    setAddOns((a) =>
+      on
+        ? [...a, { id: u.id, name: u.name, priceStr: (u.price / 100).toString() }]
+        : a.filter((x) => !(x.id === u.id || upgNorm(x.name) === upgNorm(u.name)))
+    );
   const addRow = () =>
     setAddOns((a) => [...a, { id: uid("ao"), name: "", priceStr: "" }]);
   const rmRow = (id) => setAddOns((a) => a.filter((x) => x.id !== id));
@@ -8534,13 +8653,25 @@ function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
           Upgrades
         </label>
         <button className="cc-mini" onClick={addRow}>
-          + Add upgrade
+          + Custom upgrade
         </button>
       </div>
-      {addOns.length === 0 && (
-        <p className="cc-hint">No upgrades yet — add wine pairings, take-home kits, etc.</p>
+      {upgLib && upgLib.length > 0 && (
+        <div className="cc-upg-lib">
+          {upgLib.map((u) => {
+            const hit = libHit(u);
+            return (
+              <label key={u.id} className={"cc-upg-pick" + (hit ? " on" : "")}>
+                <input type="checkbox" checked={!!hit} onChange={(e) => toggleLib(u, e.target.checked)} />
+                <span>{u.name}</span>
+                <b>{money(u.price)}</b>
+              </label>
+            );
+          })}
+        </div>
       )}
-      {addOns.map((a) => (
+      <p className="cc-hint">Tick upgrades from the list (edit the list with ⚙ Upgrades on the Classes page). Custom rows below are for one-offs.</p>
+      {addOns.filter((a) => !(upgLib || []).some((u) => u.id === a.id || upgNorm(u.name) === upgNorm(a.name))).map((a) => (
         <div key={a.id} className="cc-addon-row">
           <input
             className="cc-input"
@@ -10546,6 +10677,11 @@ select.cc-input{appearance:auto;-webkit-appearance:auto;cursor:pointer;}
 .cc-reg-filter span{color:#666666;}
 /* ---- dashboard header buttons + Mahjong planner ---- */
 .cc-dash-btns{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.cc-upg-lib{display:flex;flex-direction:column;gap:6px;margin:6px 0 4px;}
+.cc-upg-pick{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1.5px solid #dddddd;border-radius:8px;background:#fff;cursor:pointer;color:#111;font-size:14px;}
+.cc-upg-pick span{flex:1;}
+.cc-upg-pick.on{border-color:#06273a;background:#f1f5f9;}
+.cc-upg-pick input{width:18px;height:18px;accent-color:#06273a;}
 .cc-mj-set{display:grid;grid-template-columns:200px 1fr;gap:18px;margin-top:12px;}
 .cc-mj-img img{width:200px;aspect-ratio:4/5;object-fit:cover;border-radius:8px;border:1px solid #dddddd;display:block;}
 .cc-mj-noimg{width:200px;aspect-ratio:4/5;border:1px dashed #cccccc;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#888;font-size:13px;}
