@@ -41,5 +41,15 @@
   <h2>Privacy</h2>
   <p>Personal information is handled as described in our <a href="privacy.html">Privacy Policy</a>. Mobile numbers and opt-in data are never sold or shared with third parties for marketing.</p>
 </div>
+<!-- CLEAN-URL: once /<page> is confirmed to serve this page (Render rewrite), drop ".html" from the address bar. -->
+<script>
+(function(){
+  var p = location.pathname; if (!/\.html$/.test(p)) return;
+  var c = p.replace(/index\.html$/, '').replace(/\.html$/, '');
+  fetch(c, { method:'HEAD', cache:'no-store' }).then(function(r){
+    if (r.ok && location.pathname === p) history.replaceState(history.state, '', c + location.search + location.hash);
+  }).catch(function(){});
+})();
+</script>
 </body>
 </html>

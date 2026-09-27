@@ -14077,6 +14077,60 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 
 })();
 </script>
+<!-- CLEAN-URL: once /<page> is confirmed to serve this page (Render rewrite), drop ".html" from the address bar. -->
+<script>
+(function(){
+  var p = location.pathname; if (!/\.html$/.test(p)) return;
+  var c = p.replace(/index\.html$/, '').replace(/\.html$/, '');
+  fetch(c, { method:'HEAD', cache:'no-store' }).then(function(r){
+    if (r.ok && location.pathname === p) history.replaceState(history.state, '', c + location.search + location.hash);
+  }).catch(function(){});
+})();
+</script>
+<!-- HISTORY-ROUTER: each tab change becomes a browser history entry (#plu, #tickets/mahjong, #club/members)
+     so Back / Forward, the phone back swipe, refresh and bookmarks all work. Watches the .tab "active" class, so it
+     catches every way a tab opens (click, sidebar, nav sections, deep links) without touching mtab/tkTab/ccTab. -->
+<script>
+(function(){
+  function keyOf(t){
+    var m = /^\s*(mtab|tkTab|ccTab)\((?:this\s*,\s*)?'([^']+)'(?:\s*,\s*\{\s*kind\s*:\s*'(\w+)')?/.exec(t.getAttribute('onclick') || '');
+    if (!m) return null;
+    if (m[1] === 'mtab') return m[2];
+    if (m[1] === 'tkTab') return 'tickets/' + m[2] + (m[3] ? '-' + m[3] : '');
+    return 'club/' + m[2];
+  }
+  function tabs(){ return Array.prototype.slice.call(document.querySelectorAll('.tab')); }
+  function tabFor(k){ return tabs().filter(function(t){ return keyOf(t) === k; })[0] || null; }
+  var DEFAULT = null, current = null;
+  function hashKey(){ return decodeURIComponent((location.hash || '').slice(1)); }
+  function onActive(t){
+    var k = keyOf(t); if (!k || k === current) return;
+    current = k;
+    var h = hashKey();
+    if (h === k || (!h && k === DEFAULT)) return;          // restoring from the address — no new entry
+    history.pushState({ tab:k }, '', location.pathname + location.search + '#' + k);
+  }
+  function route(){
+    var k = hashKey() || DEFAULT;
+    if (!k || k === current) return;
+    var t = tabFor(k);
+    if (t) t.click();
+    else if (document.getElementById('panel-' + k) && window.mtab) mtab(k);
+  }
+  function boot(){
+    var all = tabs(); if (!all.length) return;
+    DEFAULT = keyOf(all[0]);
+    var a = document.querySelector('.tab.active'); current = a ? keyOf(a) : DEFAULT;
+    var mo = new MutationObserver(function(recs){
+      for (var i = 0; i < recs.length; i++){ var t = recs[i].target; if (t.classList.contains('active')) { onActive(t); return; } }
+    });
+    all.forEach(function(t){ mo.observe(t, { attributes:true, attributeFilter:['class'] }); });
+    window.addEventListener('popstate', route);
+    window.addEventListener('hashchange', route);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
 <script>(function(){if(location.hostname.indexOf("staging")<0)return;document.title="[STAGING] "+document.title;var m=document.createElement("meta");m.name="robots";m.content="noindex";document.head.appendChild(m);var b=document.createElement("div");b.textContent="STAGING \u2014 test copy. Same live database: data changes, emails and Square actions are REAL.";b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#c62828;color:#fff;font:600 12px/1.2 system-ui,sans-serif;text-align:center;padding:5px 8px;pointer-events:none;opacity:.92";document.body.appendChild(b);})();</script>
 <!-- Location pickers as buttons (2026-09-27, Maverick: "change all the location

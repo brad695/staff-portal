@@ -40,5 +40,15 @@
   <h2>Contact</h2>
   <p>Questions about this policy can be sent to <a href="mailto:info@greyscheese.com">info@greyscheese.com</a>. Full details of the text program are in our <a href="terms.html">SMS Terms &amp; Conditions</a>.</p>
 </div>
+<!-- CLEAN-URL: once /<page> is confirmed to serve this page (Render rewrite), drop ".html" from the address bar. -->
+<script>
+(function(){
+  var p = location.pathname; if (!/\.html$/.test(p)) return;
+  var c = p.replace(/index\.html$/, '').replace(/\.html$/, '');
+  fetch(c, { method:'HEAD', cache:'no-store' }).then(function(r){
+    if (r.ok && location.pathname === p) history.replaceState(history.state, '', c + location.search + location.hash);
+  }).catch(function(){});
+})();
+</script>
 </body>
 </html>

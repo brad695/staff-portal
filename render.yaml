@@ -8,6 +8,26 @@ services:
     buildCommand: ""
     staticPublishPath: .
     pullRequestPreviewsEnabled: false
+    # Clean URLs: /manager serves manager.html (pages strip ".html" from the address bar themselves).
+    routes:
+      - type: rewrite
+        source: /manager
+        destination: /manager.html
+      - type: rewrite
+        source: /order
+        destination: /order.html
+      - type: rewrite
+        source: /schedule
+        destination: /schedule.html
+      - type: rewrite
+        source: /labels
+        destination: /labels.html
+      - type: rewrite
+        source: /privacy
+        destination: /privacy.html
+      - type: rewrite
+        source: /terms
+        destination: /terms.html
     headers:
       - path: /*
         name: Cache-Control
@@ -22,6 +42,29 @@ services:
     buildCommand: ""
     staticPublishPath: .
     pullRequestPreviewsEnabled: false
+    # Clean URLs: /manager serves manager.html (pages strip ".html" from the address bar themselves).
+    routes:
+      - type: rewrite
+        source: /manager
+        destination: /manager.html
+      - type: rewrite
+        source: /order
+        destination: /order.html
+      - type: rewrite
+        source: /schedule
+        destination: /schedule.html
+      - type: rewrite
+        source: /labels
+        destination: /labels.html
+      - type: rewrite
+        source: /privacy
+        destination: /privacy.html
+      - type: rewrite
+        source: /terms
+        destination: /terms.html
+      - type: rewrite
+        source: /calendar
+        destination: /calendar.html
     headers:
       - path: /*
         name: Cache-Control

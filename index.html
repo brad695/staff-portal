@@ -1215,6 +1215,48 @@ function calNav(dir){ _calMonth+=dir; if(_calMonth>11){_calMonth=0;_calYear++;} 
 function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().getMonth(); _selDay=fmt(new Date()); renderCalendar(); }
 </script>
 <div style="text-align:center;padding:14px 20px 22px;font-size:0.78rem;color:#8fa0ae;">Greys Fine Cheese &amp; Entertaining · <a href="terms.html" style="color:#0b6aa9;text-decoration:none;font-weight:600;">SMS Terms</a> · <a href="privacy.html" style="color:#0b6aa9;text-decoration:none;font-weight:600;">Privacy Policy</a></div>
+<!-- CLEAN-URL: once /<page> is confirmed to serve this page (Render rewrite), drop ".html" from the address bar. -->
+<script>
+(function(){
+  var p = location.pathname; if (!/\.html$/.test(p)) return;
+  var c = p.replace(/index\.html$/, '').replace(/\.html$/, '');
+  fetch(c, { method:'HEAD', cache:'no-store' }).then(function(r){
+    if (r.ok && location.pathname === p) history.replaceState(history.state, '', c + location.search + location.hash);
+  }).catch(function(){});
+})();
+</script>
+<!-- HISTORY-ROUTER: each section (Specials, Calendar, Events…) becomes a browser history entry (#calendar)
+     so Back / the phone back swipe returns to the previous screen instead of leaving the portal. -->
+<script>
+(function(){
+  var current = 'home';
+  function hashKey(){ return decodeURIComponent((location.hash || '').slice(1)); }
+  function onActive(v){
+    var k = v.id.replace(/^view-/, ''); if (k === current) return;
+    current = k;
+    var h = hashKey();
+    if (h === k || (!h && k === 'home')) return;
+    if (k === 'home') history.pushState({ view:k }, '', location.pathname + location.search);
+    else history.pushState({ view:k }, '', location.pathname + location.search + '#' + k);
+  }
+  function route(){
+    var k = hashKey() || 'home';
+    if (k === current || !document.getElementById('view-' + k) || !window.showView) return;
+    showView(k);
+  }
+  function boot(){
+    var vs = document.querySelectorAll('.view');
+    var mo = new MutationObserver(function(recs){
+      for (var i = 0; i < recs.length; i++){ var v = recs[i].target; if (v.classList.contains('active')) { onActive(v); return; } }
+    });
+    Array.prototype.forEach.call(vs, function(v){ mo.observe(v, { attributes:true, attributeFilter:['class'] }); });
+    window.addEventListener('popstate', route);
+    window.addEventListener('hashchange', route);
+    if (hashKey()) route();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
 <script>(function(){if(location.hostname.indexOf("staging")<0)return;document.title="[STAGING] "+document.title;var m=document.createElement("meta");m.name="robots";m.content="noindex";document.head.appendChild(m);var b=document.createElement("div");b.textContent="STAGING \u2014 test copy. Same live database: data changes, emails and Square actions are REAL.";b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#c62828;color:#fff;font:600 12px/1.2 system-ui,sans-serif;text-align:center;padding:5px 8px;pointer-events:none;opacity:.92";document.body.appendChild(b);})();</script>
 </body>
