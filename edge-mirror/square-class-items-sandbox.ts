@@ -92,6 +92,12 @@ const cleanLine = (v: unknown, max = 200) =>
   String(v ?? "").replace(/[\r\n\t;]+/g, " ").replace(/^\s*(guests|group)\s*:/i, "")
     .replace(/\s{2,}/g, " ").trim().slice(0, max);
 
+// "Base Ticket plus charcuterie and crusty bread" -> "Charcuterie and crusty bread"
+function upgradeName(n: string) {
+  const t = String(n ?? "").trim().replace(/^base\s+ticket\s+plus\s+/i, "");
+  return (t.charAt(0).toUpperCase() + t.slice(1)).slice(0, 255) || "Upgrade";
+}
+
 // ---------------------------------------------------------------- locations
 let SANDBOX_LOC: string | null = null;
 async function locationFor(ev: Record<string, any>): Promise<string> {
@@ -155,7 +161,7 @@ async function ensureTax(): Promise<string> {
 // ------------------------------------------------------------------ catalog
 async function upcomingClasses() {
   const { data, error } = await admin.from("events")
-    .select("id,title,date,time,price,capacity,location,kind,archived")
+    .select("id,title,date,time,price,capacity,location,kind,archived,add_ons")
     .eq("kind", "class").gte("date", todayCentral()).gt("price", 0)
     .order("date").order("time");
   if (error) throw new Error(error.message);
@@ -188,7 +194,23 @@ async function syncCatalog() {
     const desired = g.events.map((ev, i) => ({
       id: ev.id, name: niceWhen(ev.date, ev.time), price: priceOf(ev), ord: i,
     }));
-    const sig = await sha(JSON.stringify({ n: g.title, loc: g.loc, c: categoryId, t: taxId, d: desired }));
+    // Upgrades (charcuterie, wine...) -> one modifier list per item, union of
+    // the group's add-ons keyed by display name. Register price carries the fee.
+    const mods: { key: string; name: string; price: number; addonIds: Record<string, string[]> }[] = [];
+    for (const ev of g.events) {
+      for (const a of (Array.isArray(ev.add_ons) ? ev.add_ons : []) as any[]) {
+        const name = upgradeName(a.name);
+        const price = Math.round(Number(a.price ?? 0) * (1 + FEE_RATE));
+        const key = `${name.toLowerCase()}|${price}`;
+        let m = mods.find((x) => x.key === key);
+        if (!m) mods.push(m = { key, name, price, addonIds: {} });
+        (m.addonIds[ev.id] ??= []).push(String(a.id));
+      }
+    }
+    const sig = await sha(JSON.stringify({
+      n: g.title, loc: g.loc, c: categoryId, t: taxId, d: desired,
+      m: mods.map((m) => [m.name, m.price]), v: 2,
+    }));
     const have = items.get(key);
     if (have && have.sig === sig && g.events.every((ev) => links.get(ev.id)?.square_item_id === have.square_item_id)) {
       out.unchanged++;
@@ -234,6 +256,42 @@ async function syncCatalog() {
       return v;
     });
 
+    // Modifier list: reuse the stored one (and its modifier ids, by name).
+    let ml: Record<string, any> | null = null;
+    if (mods.length && have?.modifier_list_id) {
+      try {
+        ml = (await sq(`/v2/catalog/object/${have.modifier_list_id}`)).object ?? null;
+        if (ml?.is_deleted) ml = null;
+      } catch (e) {
+        if (!(e instanceof SqErr && e.status === 404)) throw e;
+      }
+    }
+    const curMods = new Map<string, any>(
+      ((ml?.modifier_list_data?.modifiers ?? []) as any[])
+        .map((m) => [String(m.modifier_data?.name ?? "").toLowerCase(), m]),
+    );
+    let mlObj: Record<string, any> | null = null;
+    if (mods.length) {
+      mlObj = ml ? structuredClone(ml) : { type: "MODIFIER_LIST", id: "#ml", modifier_list_data: {} };
+      mlObj.present_at_all_locations = false;
+      mlObj.present_at_location_ids = [g.loc];
+      Object.assign(mlObj.modifier_list_data, {
+        name: `Upgrades – ${g.title} (${g.location})`.slice(0, 255),
+        selection_type: "MULTIPLE",
+        modifiers: mods.map((m, i) => {
+          const prior = curMods.get(m.name.toLowerCase());
+          const mo: Record<string, any> = prior ? structuredClone(prior) : { type: "MODIFIER", id: `#m${i}`, modifier_data: {} };
+          mo.present_at_all_locations = false;
+          mo.present_at_location_ids = [g.loc];
+          Object.assign(mo.modifier_data, {
+            name: m.name, price_money: money(m.price), ordinal: i,
+            modifier_list_id: mlObj!.id,
+          });
+          return mo;
+        }),
+      });
+    }
+
     const obj: Record<string, any> = cur ? structuredClone(cur) : { type: "ITEM", id: itemId, item_data: {} };
     obj.present_at_all_locations = false;
     obj.present_at_location_ids = [g.loc];
@@ -246,20 +304,38 @@ async function syncCatalog() {
       reporting_category: { id: categoryId },
       tax_ids: [taxId],
       variations,
+      modifier_list_info: mlObj
+        ? [{ modifier_list_id: mlObj.id, enabled: true, min_selected_modifiers: 0, max_selected_modifiers: mods.length }]
+        : [],
     });
     delete obj.item_data.category_id;
 
     const res = await sq("/v2/catalog/batch-upsert", {
       method: "POST",
-      body: JSON.stringify({ idempotency_key: crypto.randomUUID(), batches: [{ objects: [obj] }] }),
+      body: JSON.stringify({
+        idempotency_key: crypto.randomUUID(),
+        batches: [{ objects: mlObj ? [mlObj, obj] : [obj] }],
+      }),
     });
     const map = new Map<string, string>(
       (res.id_mappings ?? []).map((m: any) => [m.client_object_id, m.object_id]),
     );
     const realItem = map.get("#item") ?? itemId;
+    const realMl = mlObj ? (map.get("#ml") ?? mlObj.id) : null;
+    // Upserted objects come back with their real ids; read the modifiers off it.
+    const savedMl = realMl
+      ? ((res.objects ?? []) as any[]).find((o) => o.id === realMl) ?? null
+      : null;
+    const modIdByName = new Map<string, string>(
+      ((savedMl?.modifier_list_data?.modifiers ?? []) as any[])
+        .map((m) => [String(m.modifier_data?.name ?? "").toLowerCase(), m.id]),
+    );
+    if (have?.modifier_list_id && have.modifier_list_id !== realMl) {
+      try { await sq(`/v2/catalog/object/${have.modifier_list_id}`, { method: "DELETE" }); } catch (_) { /* gone */ }
+    }
     await admin.from("class_square_items").upsert({
       env: ENV, item_key: key, square_item_id: realItem, location_id: g.loc,
-      category_id: categoryId, sig, updated_at: new Date().toISOString(),
+      category_id: categoryId, sig, modifier_list_id: realMl, updated_at: new Date().toISOString(),
     });
     for (const ev of g.events) {
       const link = links.get(ev.id);
@@ -269,6 +345,9 @@ async function syncCatalog() {
       await admin.from("class_square_links").upsert({
         env: ENV, event_id: ev.id, item_key: key, square_item_id: realItem, square_variation_id: vid,
         location_id: g.loc, price_cents: priceOf(ev), sig,
+        modifier_ids: Object.fromEntries(mods.flatMap((m) =>
+          (m.addonIds[ev.id] ?? []).map((aid) => [aid, modIdByName.get(m.name.toLowerCase()) ?? null])
+        ).filter(([, v]) => v)),
         ...(link?.square_variation_id === vid ? {} : { stock_set: null, stock_at: null }),
         updated_at: new Date().toISOString(),
       });
@@ -397,9 +476,18 @@ async function pull(days?: number) {
         const guests = String(li.note ?? "").split(/[,;\n]+/).map((s) => cleanLine(s, 80)).filter(Boolean);
         const notes = [
           `Sold at the register${ENV === "sandbox" ? " [SANDBOX TEST]" : ""} · Square order ${o.id}`,
-          guests.length ? `Guests: ${guests.join("; ")}` : "",
+          guests.length
+            ? `Guests: ${guests.map((gn) => optText ? `${gn} (${optText})` : gn).join("; ")}`
+            : "",
         ].filter(Boolean).join("\n");
         const total = Number(li.total_money?.amount ?? 0);
+        // Upgrades rung as modifiers apply to every seat on the line.
+        const addOns = ((li.modifiers ?? []) as any[]).map((m) => ({
+          name: cleanLine(m.name, 120),
+          qty: qty * Math.max(1, Math.round(Number(m.quantity ?? 1))),
+          price: Math.round(Number(m.base_price_money?.amount ?? 0) / (1 + FEE_RATE)),
+        }));
+        const optText = addOns.map((a) => a.name).join(", ");
         const { data: reg, error } = await admin.from("registrations").insert({
           event_id: eventId,
           code: bookingCode(),
@@ -407,6 +495,7 @@ async function pull(days?: number) {
           email: who.email || "",
           phone: who.phone || "",
           qty,
+          add_ons: addOns,
           notes,
           total,
           square_order_id: o.id,
@@ -483,6 +572,9 @@ async function simulate(body: Record<string, any>) {
         line_items: [{
           catalog_object_id: link.square_variation_id, quantity: String(qty),
           note: String(body.guests ?? "Test Guest One, Test Guest Two"),
+          modifiers: body.upgrade
+            ? Object.values(link.modifier_ids ?? {}).slice(0, 1).map((id) => ({ catalog_object_id: id }))
+            : undefined,
         }],
       },
     }),

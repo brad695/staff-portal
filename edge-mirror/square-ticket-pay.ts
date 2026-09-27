@@ -325,6 +325,8 @@ type Intent = {
   // set, the ticket line references the real item so Square reports online and
   // register sales together. Price stays the ticket price (fee is separate).
   variationId: string | null;
+  // add-on id -> Square CatalogModifier id on that item (upgrades as modifiers)
+  modifierIds: Record<string, string>;
 };
 
 // Catalog-linked ticket lines are on for the staging site first; add the live
@@ -468,19 +470,22 @@ async function buildIntent(body: Record<string, unknown>): Promise<Intent> {
   const { tipCents, tipPercent } = tipFor(body, subtotal - discountCents);
 
   let variationId: string | null = null;
+  let modifierIds: Record<string, string> = {};
   if (body.__catalog === true) {
     try {
       const { data: link } = await admin.from("class_square_links")
-        .select("square_variation_id,location_id")
+        .select("square_variation_id,location_id,modifier_ids")
         .eq("env", env()).eq("event_id", event.id).maybeSingle();
       if (link?.square_variation_id && link.location_id === locationForEvent(event)) {
         variationId = link.square_variation_id;
+        modifierIds = (link.modifier_ids ?? {}) as Record<string, string>;
       }
     } catch (_) { /* no link: ad-hoc line, exactly as before */ }
   }
 
   return {
     variationId,
+    modifierIds,
     tipCents,
     tipPercent,
     event,
@@ -508,7 +513,36 @@ function orderBody(intent: Intent, referenceId?: string) {
     year: "numeric",
   });
 
-  const line_items: Record<string, unknown>[] = [{
+  // Catalog path: one ticket line per upgrade combo, upgrades as the item's
+  // modifiers, so Square reports online sales exactly like the register.
+  // Needs every chosen upgrade to have a modifier; otherwise the old shape.
+  const allMods = intent.addOnCounts.every((x) => intent.modifierIds?.[x.addOn.id]);
+  let catalogLines: Record<string, unknown>[] | null = null;
+  if (intent.variationId && allMods && intent.guests.length) {
+    const combos = new Map<string, number>();
+    for (const g of intent.guests) {
+      const k = [...new Set((g.optIds ?? []).map(String))].sort().join("|");
+      combos.set(k, (combos.get(k) ?? 0) + 1);
+    }
+    const priceOf = new Map(intent.addOnCounts.map((x) => [x.addOn.id, x.addOn.price]));
+    const lines = [...combos.entries()].map(([k, n], i) => ({
+      uid: i === 0 ? "tickets" : `tickets_${i}`,
+      catalog_object_id: intent.variationId,
+      quantity: String(n),
+      base_price_money: money(ev.price),
+      note: clean(ev.location, 40),
+      modifiers: k ? k.split("|").map((id) => ({
+        catalog_object_id: intent.modifierIds[id],
+        base_price_money: money(priceOf.get(id) ?? 0),
+        quantity: "1",
+      })) : undefined,
+    }));
+    // Sanity: the modifier path must price exactly like the ad-hoc path.
+    const seats = lines.reduce((s, l) => s + Number(l.quantity), 0);
+    if (seats === intent.qty) catalogLines = lines;
+  }
+
+  const line_items: Record<string, unknown>[] = catalogLines ?? [{
     uid: "tickets",
     ...(intent.variationId
       ? { catalog_object_id: intent.variationId }
@@ -520,7 +554,7 @@ function orderBody(intent: Intent, referenceId?: string) {
     note: clean(ev.location, 40),
   }];
 
-  for (const { addOn, count } of intent.addOnCounts) {
+  for (const { addOn, count } of catalogLines ? [] : intent.addOnCounts) {
     line_items.push({
       uid: `ao_${addOn.id}`.slice(0, 60),
       name: clean(addOn.name, 400),
