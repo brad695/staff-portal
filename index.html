@@ -198,6 +198,7 @@
     .cd-special{ background:#8fd3b2; } .cd-sched{ background:#eac08c; } .cd-off{ background:#d99a90; }
     .ag-day{ background:var(--surface); border-radius:16px; box-shadow:var(--shadow); padding:13px 16px; margin-bottom:12px; }
     .ag-date{ font-weight:800; font-size:0.95rem; margin-bottom:6px; display:flex; align-items:center; }
+    .ag-day.ag-past{ opacity:.6; }
     .ag-today{ font-size:0.6rem; font-weight:800; background:var(--accent); color:#fff; padding:2px 8px; border-radius:20px; margin-left:7px; text-transform:uppercase; }
     .ag-row{ font-size:0.9rem; padding:7px 0; border-top:1px solid var(--line); display:flex; align-items:flex-start; gap:8px; line-height:1.35; }
     .ag-tag{ font-size:0.58rem; font-weight:800; text-transform:uppercase; letter-spacing:0.2px; padding:3px 8px; border-radius:20px; white-space:nowrap; flex-shrink:0; margin-top:1px; }
@@ -746,7 +747,7 @@ updateWhen(); setInterval(updateWhen, 30000);
 window.addEventListener('DOMContentLoaded', () => { Promise.all([loadItems(), loadSchedules(), loadTimeOff()]).catch(()=>{}).then(renderToday); });
 
 // ═══ CONTENT ITEMS (notes · specials · events) ═══
-let _notes=[], _specials=[], _events=[], _info=[];
+let _notes=[], _specials=[], _events=[], _calEvents=[], _info=[];
 function mapItem(r){ return { id:r.id, type:r.type||'note', title:r.title||'', body:r.body||'', date:r.date||'', time:r.time||'', endDate:r.end_date||'', repeat:r.repeat||'none', repeatUntil:r.repeat_until||'', status:r.status||'none', archived:r.archived===true }; }
 async function loadItems(){
   try{
@@ -754,9 +755,11 @@ async function loadItems(){
     const items = (data||[]).map(mapItem);
     _notes = items.filter(i=>i.type==='note');
     _specials = items.filter(i=>i.type==='special');
+    const _evMap = e=>({ id:e.id, name:e.title, date:e.date, time:e.time, endDate:e.endDate, desc:e.body, repeat:e.repeat, repeatUntil:e.repeatUntil, status:e.status });
+    _calEvents = items.filter(i=>i.type==='event').map(_evMap);   // calendar keeps archived (past) events
     _events = items.filter(i=>i.type==='event' && !i.archived).map(e=>({ id:e.id, name:e.title, date:e.date, time:e.time, endDate:e.endDate, desc:e.body, repeat:e.repeat, repeatUntil:e.repeatUntil, status:e.status }));
     _info = items.filter(i=>i.type==='info');
-  }catch(e){ _notes=[]; _specials=[]; _events=[]; _info=[]; }
+  }catch(e){ _notes=[]; _specials=[]; _events=[]; _calEvents=[]; _info=[]; }
   renderNotes();
   renderEventCards();
   renderStuff();
@@ -1190,7 +1193,7 @@ async function renderCalendar(opt){
   await loadCalMonth(y,m);
   const mS=fmt(new Date(y,m,1)), mE=fmt(new Date(y,m+1,0));
   await Promise.all([ loadCalClasses(mS,mE), loadCalOrders(mS,mE), loadCalExperiences(mS,mE) ]);
-  _calData.ev={}; _events.forEach(ev=>occurrences(ev,mS,mE).forEach(d=>{(_calData.ev[d]=_calData.ev[d]||[]).push({name:ev.name,time:ev.time,desc:ev.desc,status:ev.status,endDate:ev.endDate,repeat:ev.repeat});}));
+  _calData.ev={}; _calEvents.forEach(ev=>occurrences(ev,mS,mE).forEach(d=>{(_calData.ev[d]=_calData.ev[d]||[]).push({name:ev.name,time:ev.time,desc:ev.desc,status:ev.status,endDate:ev.endDate,repeat:ev.repeat});}));
   _calData.sp={}; _specials.forEach(s=>{ if((s.repeat||'none')==='none'&&s.endDate&&s.endDate>s.date){ spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sp[k]=_calData.sp[k]||[]).push(s);}); } else { occurrences(s,mS,mE).forEach(d=>{(_calData.sp[d]=_calData.sp[d]||[]).push(s);}); } });
   _calData.sch={}; _schedules.forEach(s=>{ if(!s.date) return; spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sch[k]=_calData.sch[k]||[]).push(s);}); });
   _calData.off={}; approvedTimeOff().forEach(r=>{ if(!r.date) return; spanDays(r.date,r.endDate,mS,mE,k=>{(_calData.off[k]=_calData.off[k]||[]).push(r);}); });
@@ -1221,7 +1224,7 @@ function agRow(tag,label,text,detail){
 function renderAgenda(y,m,tgt,only){
   const list=document.getElementById((tgt||_calTarget).list); if(!list) return;
   const dim=new Date(y,m+1,0).getDate(), today=fmt(new Date()), can=['CANCELLED','CANCELED','DECLINED','NO_SHOW'];
-  const now=new Date(); const startDay=(y===now.getFullYear() && m===now.getMonth()) ? now.getDate() : 1;
+  const startDay=1;   // whole month, past days included
   let html='', any=false;
   for(let d=(only?+only.slice(8):startDay); d<=(only?+only.slice(8):dim); d++){
     const date=fmt(new Date(y,m,d));
@@ -1257,9 +1260,10 @@ function renderAgenda(y,m,tgt,only){
     off.forEach(n=>rows+=agRow('t-off','Time Off',esc(n.name||n),agDetail([
       ['Reason', n.note], ['Through', (n.endDate&&n.endDate!==date)?fmtDisplay(n.endDate):'']
     ])));
-    html+= only ? rows : '<div class="ag-day"><div class="ag-date">'+dl+(date===today?'<span class="ag-today">Today</span>':'')+'</div>'+rows+'</div>';
+    html+= only ? rows : '<div class="ag-day'+(date<today?' ag-past':'')+(date===today?' ag-is-today':'')+'"><div class="ag-date">'+dl+(date===today?'<span class="ag-today">Today</span>':'')+'</div>'+rows+'</div>';
   }
   list.innerHTML = any ? html : '<div class="empty"><span class="ic">📅</span>'+(only?'Nothing on the calendar.':'Nothing scheduled this month.')+'</div>';
+  if(!only && list.id==='agendaList'){ const t=list.querySelector('.ag-is-today')||[...list.querySelectorAll('.ag-day:not(.ag-past)')][0]; if(t && list.querySelector('.ag-past')) setTimeout(()=>window.scrollTo(0,t.getBoundingClientRect().top+window.scrollY-130),0); }
 }
 function calNav(dir){ _calMonth+=dir; if(_calMonth>11){_calMonth=0;_calYear++;} if(_calMonth<0){_calMonth=11;_calYear--;} renderCalendar(); }
 // ── TODAY card on home ──
