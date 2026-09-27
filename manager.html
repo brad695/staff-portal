@@ -13943,5 +13943,94 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 </script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
 <script>(function(){if(location.hostname.indexOf("staging")<0)return;document.title="[STAGING] "+document.title;var m=document.createElement("meta");m.name="robots";m.content="noindex";document.head.appendChild(m);var b=document.createElement("div");b.textContent="STAGING \u2014 test copy. Same live database: data changes, emails and Square actions are REAL.";b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#c62828;color:#fff;font:600 12px/1.2 system-ui,sans-serif;text-align:center;padding:5px 8px;pointer-events:none;opacity:.92";document.body.appendChild(b);})();</script>
+<!-- Location pickers as buttons (2026-09-27, Maverick: "change all the location
+     drop downs to separate buttons"). Any <select> whose options are only shop
+     names (Memphis / Nashville / Franklin / All locations, optionally with a
+     "(n)" count) is hidden and gets a row of buttons beside it. The select stays
+     the source of truth: clicking a button sets its value and fires a real
+     change event, so vanilla handlers and React onChange both keep working.
+     Opt a select out with data-loc-btns="off". -->
+<style>
+.loc-btns{display:inline-flex;flex-wrap:wrap;gap:6px;vertical-align:middle;}
+.loc-btns button{font:inherit;font-size:13px;font-weight:600;line-height:1.2;padding:7px 14px;border-radius:999px;
+  border:1.5px solid #cfd6de;background:#fff;color:#06273a;cursor:pointer;white-space:nowrap;}
+.loc-btns button:hover{border-color:#06273a;}
+.loc-btns button.on{background:#06273a;border-color:#06273a;color:#fff;}
+.loc-btns button:disabled{opacity:.5;cursor:default;}
+</style>
+<script>
+(function () {
+  var LOC_RE = /^(all locations|all shops|all stores|all|memphis|nashville|franklin)$/i;
+  var bare = function (t) { return String(t || "").trim().replace(/\s*\(\d+\)\s*$/, ""); };
+  function isLocSelect(sel) {
+    if (sel.multiple || sel.dataset.locBtns === "off") return false;
+    var opts = [].slice.call(sel.options).filter(function (o) { return bare(o.text); });
+    if (opts.length < 2 || opts.length > 5) return false;
+    return opts.every(function (o) { return LOC_RE.test(bare(o.text)); }) &&
+      opts.some(function (o) { return /memphis|nashville/i.test(o.text); });
+  }
+  var setVal = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set;
+  function pick(sel, v) {
+    if (sel.value === v) return;
+    setVal.call(sel, v);
+    sel.dispatchEvent(new Event("input", { bubbles: true }));
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+    paint(sel);
+  }
+  function paint(sel) {
+    var g = sel._locBtns;
+    if (!g) return;
+    var opts = [].slice.call(sel.options).filter(function (o) { return bare(o.text); });
+    var sig = opts.map(function (o) { return o.value + "\u0001" + o.text; }).join("\u0002");
+    if (g._sig !== sig) {
+      g._sig = sig;
+      g.innerHTML = "";
+      opts.forEach(function (o) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = o.text.trim();
+        b.dataset.v = o.value;
+        b.addEventListener("click", function () { pick(sel, o.value); });
+        g.appendChild(b);
+      });
+    }
+    [].forEach.call(g.children, function (b) {
+      b.classList.toggle("on", b.dataset.v === sel.value);
+      b.disabled = sel.disabled;
+    });
+  }
+  function enhance(sel) {
+    if (sel._locBtns || !isLocSelect(sel)) return;
+    var g = document.createElement("span");
+    g.className = "loc-btns";
+    g.setAttribute("role", "group");
+    g.setAttribute("aria-label", sel.getAttribute("aria-label") || "Location");
+    sel._locBtns = g;
+    sel.style.display = "none";
+    sel.insertAdjacentElement("afterend", g);
+    sel.addEventListener("change", function () { paint(sel); });
+    paint(sel);
+  }
+  var queued = false;
+  function scan() {
+    queued = false;
+    [].forEach.call(document.querySelectorAll("select"), function (sel) {
+      if (sel._locBtns) {
+        if (sel.style.display !== "none") sel.style.display = "none";
+        if (!sel._locBtns.isConnected) sel.insertAdjacentElement("afterend", sel._locBtns);
+        paint(sel);
+      } else enhance(sel);
+    });
+    [].forEach.call(document.querySelectorAll(".loc-btns"), function (g) {
+      var s = g.previousElementSibling;
+      if (!s || s._locBtns !== g) g.remove();
+    });
+  }
+  function later() { if (!queued) { queued = true; requestAnimationFrame(scan); } }
+  new MutationObserver(later).observe(document.documentElement, { childList: true, subtree: true });
+  setInterval(scan, 1000); // catch values set in code without a change event
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", scan); else scan();
+})();
+</script>
 </body>
 </html>
