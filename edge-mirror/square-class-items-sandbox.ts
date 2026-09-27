@@ -126,7 +126,17 @@ async function findByName(type: string, name: string): Promise<Record<string, an
   });
   return (d.objects ?? []).find((o: any) => !o.is_deleted) ?? null;
 }
-async function ensureCategory(): Promise<string> {
+// One category per shop ("Classes – Memphis"), so each location's menu and
+// reports only carry its own classes.
+const catCache = new Map<string, string>();
+async function ensureCategory(location = ""): Promise<string> {
+  const name = location ? `${CATEGORY_NAME} – ${location}` : CATEGORY_NAME;
+  if (catCache.has(name)) return catCache.get(name)!;
+  const id = await ensureCategoryNamed(name);
+  catCache.set(name, id);
+  return id;
+}
+async function ensureCategoryNamed(CATEGORY_NAME: string): Promise<string> {
   const hit = await findByName("CATEGORY", CATEGORY_NAME);
   if (hit) return hit.id;
   const d = await sq("/v2/catalog/object", {
@@ -170,7 +180,7 @@ async function upcomingClasses() {
 
 async function syncCatalog() {
   const events = await upcomingClasses();
-  const [categoryId, taxId] = await Promise.all([ensureCategory(), ensureTax()]);
+  const taxId = await ensureTax();
 
   const { data: itemRows } = await admin.from("class_square_items").select("*").eq("env", ENV);
   const { data: linkRows } = await admin.from("class_square_links").select("*").eq("env", ENV);
@@ -190,6 +200,7 @@ async function syncCatalog() {
   const out = { groups: groups.size, written: 0, deleted: 0, unchanged: 0 };
 
   for (const [key, g] of groups) {
+    const categoryId = await ensureCategory(String(g.location ?? "").trim());
     const priceOf = (ev: any) => Math.round(Number(ev.price) * (1 + FEE_RATE));
     const desired = g.events.map((ev, i) => ({
       id: ev.id, name: niceWhen(ev.date, ev.time), price: priceOf(ev), ord: i,
