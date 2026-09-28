@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <meta name="theme-color" content="#ffffff"/>
+  <meta name="theme-color" content="#000000"/>
   <title>Portal - GREYS</title>
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -482,6 +482,120 @@ body, .app{ background:var(--bg); color:var(--ink); }
   button, .btn, [role="button"], input[type="button"], input[type="submit"],
   .chip, .loc-chip, .loc-tab, .po-qtab, .po-subtab, .rec-radio, .seg, .seg button,
   .back-btn, .home-btn, .icon-btn, .wk-btn, .sw-btn, .btn-mini { border-radius: 8px !important; }
+</style>
+<!-- HOME-V5 BLACK: dark theme for the whole staff portal page. Screen only (print keeps the white sheet). Delete this block to go back to the light theme. -->
+<style id="home-v5-black">
+@media screen{
+:root{
+  --bg:#000; --surface:#111; --card:#111; --card2:#181818; --line:#222; --line2:#2c2c2c;
+  --ink:#f3f3f1; --sub:#8b8b88; --mute:#5c5c5a;
+  --accent:#e0a21c; --accent-soft:rgba(224,162,28,.16); --wax:#f87171;
+  --shadow:none; --r:14px;
+  --lav:rgba(167,139,250,.14); --lav-i:#c4b5fd;  --mint:rgba(52,211,153,.13); --mint-i:#6ee7b7;
+  --sky:rgba(96,165,250,.14);  --sky-i:#93c5fd;  --peach:rgba(251,146,60,.14); --peach-i:#fdba74;
+  --pink:rgba(244,114,182,.14);--pink-i:#f9a8d4; --butter:rgba(251,191,36,.14); --butter-i:#fcd34d;
+  --gray:rgba(255,255,255,.07);--gray-i:#a3a3a3;
+  color-scheme:dark;
+}
+html, body, .app{ background:#000; color:var(--ink); }
+.app{ padding-bottom:96px; }
+
+/* ── location: one segmented control + icon buttons ── */
+.loc-bar{ gap:8px; padding:14px 16px 0; }
+.loc-tab{ background:#0d0d0d; border:1px solid var(--line); color:var(--sub); font-weight:700; letter-spacing:.2px; box-shadow:none; }
+.loc-tab:hover{ color:var(--ink); border-color:var(--line2); }
+.loc-tab.on{ background:var(--ink); border-color:var(--ink); color:#000; }
+.loc-act{ background:#0d0d0d; border:1px solid var(--line); color:var(--sub); box-shadow:none; }
+.loc-act:hover{ background:#161616; color:var(--ink); }
+
+/* ── tiles: black squares, colored glyph, colored hairline on hover ── */
+.tiles{ gap:10px; }
+.tile{ --c:var(--tile-ic,#a3a3a3); position:relative; overflow:hidden; background:#0d0d0d; border:1px solid var(--line);
+  border-radius:16px; box-shadow:none; transition:border-color .15s, background .15s, transform .1s; }
+.tile::after{ content:""; position:absolute; left:18%; right:18%; top:0; height:2px; border-radius:0 0 2px 2px; background:var(--c); opacity:.85; }
+.tile:hover{ background:#121212; border-color:color-mix(in srgb, var(--c) 45%, #222); }
+.tile .ic{ background:color-mix(in srgb, var(--c) 15%, transparent); border-radius:12px; }
+.tile .ic i{ color:var(--c); }
+.tile .tl{ color:var(--ink); font-weight:700; }
+.tile.on{ border-color:var(--c); box-shadow:0 0 0 1px var(--c); }
+#tile-resys       { --tile-ic:#2dd4bf; }
+#tile-calendar    { --tile-ic:#a78bfa; }
+#tile-myshifts    { --tile-ic:#818cf8; }
+#tile-cheese-entry{ --tile-ic:#fbbf24; }
+#tile-catering    { --tile-ic:#34d399; }
+#tile-stuff       { --tile-ic:#a3a3a3; }
+#tile-specials    { --tile-ic:#fb7185; }
+#tile-events      { --tile-ic:#60a5fa; }
+#tile-orderpad    { --tile-ic:#38bdf8; }
+
+/* ── generic surfaces ── */
+.card, .res-card, .form-card, .ag-day, .cal-grid, .cal-detail, .home-preview,
+.note-card, .req-item, .info-card{ background:var(--card); border:1px solid var(--line); box-shadow:none; color:var(--ink); }
+.note-card{ border-left:3px solid var(--accent); }
+.note-card .nb, .ag-det .k, .c-title, .res-name, .req-name, .form-card h3, .cal-bar h3,
+.home-head h1, .sec-head h2, .res-group-title, #view-calendar .cal-bar h3{ color:var(--ink); }
+.section-label, .res-stats, .cal-legend, .empty, .fg label, .field label, .res-meta, .req-meta,
+.ag-sub, .ag-det, .ag-chev, .res-group-empty, .home-head .when, .c-body, .cal-more{ color:var(--sub); }
+.sec-head{ background:rgba(0,0,0,.86); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border-bottom:1px solid #111; }
+.back-btn, .icon-btn, .cal-nav{ background:#111; border:1px solid var(--line); color:var(--ink); box-shadow:none; }
+.back-btn:hover, .cal-nav:hover{ background:#1a1a1a; }
+.cal-day{ border-color:var(--line) !important; }
+.cal-day.other{ background:#0a0a0a; }
+.cal-day.other .cal-daynum{ color:var(--mute); }
+.cal-day.sel{ background:var(--accent-soft); }
+.pv-row, .ag-row{ border-top-color:var(--line); }
+
+/* ── controls ── */
+.btn-primary, .btn-approve, .cal-today, .botbar .home-btn{ background:var(--accent); color:#000; }
+.btn-primary i, .botbar .home-btn i{ color:#000; }
+.cal-print{ background:#111; border:1px solid var(--line); color:var(--sub); }
+.btn-decline{ background:transparent; border:1px solid rgba(248,113,113,.4); color:#f87171; }
+.botbar .home-btn{ box-shadow:0 0 0 6px #000, 0 10px 30px rgba(224,162,28,.25); }
+.field input, .field select, .field textarea, .fg input, .fg select{ background:#0a0a0a; border:1px solid var(--line2); color:var(--ink); }
+.field input:focus, .field select:focus, .field textarea:focus, .fg input:focus, .fg select:focus{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.pv-title i, .pv-all, .pv-day, .c-day, .info-card .il, .info-card .iv a, .res-contact a, .req{ color:var(--accent); }
+.spin{ border-color:#262626; border-top-color:var(--accent); }
+@keyframes flash{ 0%,100%{ box-shadow:none;} 25%{ box-shadow:0 0 0 3px var(--accent-soft);} }
+
+/* ── agenda tags: colored text + dot, no chip ── */
+.ag-tag{ background:none !important; padding:3px 0 0; border-radius:0; letter-spacing:.6px; font-size:.6rem; display:inline-flex; align-items:center; gap:6px; }
+.ag-tag::before{ content:""; width:7px; height:7px; border-radius:50%; background:currentColor; flex:0 0 7px; box-shadow:0 0 8px currentColor; }
+.t-res{ color:#60a5fa; } .t-cancel{ color:#f87171; } .t-event{ color:#f472b6; } .t-special{ color:#34d399; }
+.t-class{ color:#fbbf24; } .t-exp{ color:#fb923c; } .t-sched{ color:#fdba74; } .t-off{ color:#f87171; }
+.t-pickup{ color:#818cf8; } .t-order{ color:#34d399; } .t-delivery{ color:#facc15; }
+.ag-unpaid{ color:#fb7185; } .ag-strike{ color:var(--mute); }
+.ag-det{ border-left-color:var(--line2); }
+.ag-today{ background:var(--accent); color:#000; }
+.ag-day.ag-is-today{ border-color:color-mix(in srgb, var(--accent) 45%, #222); }
+.xt{ border-top-color:var(--line); }
+.xt-m{ background:#1a1a1a; color:var(--ink); } .xt-out{ background:#2a220f; } .xt-note{ background:#171a2a; }
+.xt-w{ color:var(--sub); } .xt-a{ color:#60a5fa; }
+
+/* ── TODAY: run-of-show card ── */
+.today-card{ background:linear-gradient(180deg,#141414 0%,#0c0c0c 100%); border:1px solid var(--line); border-radius:18px; box-shadow:none; padding:18px 18px 8px; }
+.today-head{ align-items:flex-end; gap:6px; margin-bottom:10px; padding-bottom:14px; border-bottom:1px solid var(--line); }
+.today-title{ display:flex; flex-direction:column-reverse; }
+.today-title #todayLabel{ font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:1.6px; color:var(--accent); margin-top:4px; }
+.today-title small{ font-size:1.55rem; font-weight:800; color:var(--ink); letter-spacing:-.6px; margin:0; line-height:1.05; }
+.today-head .cal-nav{ background:#0a0a0a; }
+.today-head .cal-today{ background:var(--accent); color:#000; }
+.today-head .cal-today.off{ background:#161616; color:var(--mute); }
+.today-list .ag-row{ display:grid; grid-template-columns:92px 1fr; gap:10px; padding:11px 0; font-size:.92rem; color:var(--ink); }
+.today-list .ag-tag{ justify-self:start; }
+.today-list .empty{ color:var(--sub); text-align:center; }
+.today-all{ color:var(--accent); border-top-color:var(--line); }
+.today-all:hover{ color:#f2c14e; }
+
+/* footer line under the app */
+body > div[style*="text-align:center"]{ color:var(--mute) !important; }
+body > div[style*="text-align:center"] a{ color:var(--sub) !important; }
+
+@media(min-width:1000px){
+  .today-card{ padding:22px 26px 10px; }
+  .today-title small{ font-size:1.9rem; }
+  .today-list .ag-row{ grid-template-columns:120px 1fr; }
+}
+}
 </style>
 </head>
 <body>
