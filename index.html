@@ -574,9 +574,12 @@ html, body, .app{ background:#000; color:var(--ink); }
 /* ── TODAY: run-of-show card ── */
 .today-card{ background:linear-gradient(180deg,#141414 0%,#0c0c0c 100%); border:1px solid var(--line); border-radius:18px; box-shadow:none; padding:18px 18px 8px; }
 .today-head{ align-items:flex-end; gap:6px; margin-bottom:10px; padding-bottom:14px; border-bottom:1px solid var(--line); }
-.today-title{ display:flex; flex-direction:column-reverse; }
+.today-head{ flex-wrap:wrap; }
+.today-title{ display:flex; flex-direction:column-reverse; flex:1 1 100%; margin-bottom:10px; }
+.today-head .cal-nav:first-of-type{ margin-left:auto; }
+.tile, .loc-tab, .loc-act, .today-all, .today-head button{ font-family:inherit; }
 .today-title #todayLabel{ font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:1.6px; color:var(--accent); margin-top:4px; }
-.today-title small{ font-size:1.55rem; font-weight:800; color:var(--ink); letter-spacing:-.6px; margin:0; line-height:1.05; }
+.today-title small{ font-size:1.6rem; font-weight:800; color:var(--ink); letter-spacing:-.6px; margin:0; line-height:1.05; }
 .today-head .cal-nav{ background:#0a0a0a; }
 .today-head .cal-today{ background:var(--accent); color:#000; }
 .today-head .cal-today.off{ background:#161616; color:var(--mute); }
