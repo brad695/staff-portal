@@ -9504,7 +9504,7 @@ function AdminDetail({ ev, regs, soldFor, go, onRefund, onUpdate, onAddComp }) {
         {shownRegs.map((r) => (
           <div
             key={r.id}
-            className={"cc-regcard" + (r.refunded ? " refunded" : "")}
+            className={"cc-regcard" + (r.refunded ? " refunded" : "") + (editId === r.id ? " editing" : "")}
           >
             <div className="cc-regcard-top">
               <div className="cc-regcard-who">
@@ -10423,6 +10423,30 @@ select.cc-input{appearance:auto;-webkit-appearance:auto;cursor:pointer;}
 .cc-regcard .cc-guestname{background:#EEF1F4;border-color:#C8D2DC;color:#2A3743;}
 .cc-regcard .cc-guestname em{color:#5A6B7A;}
 .cc-regcard .cc-regedit{margin-top:12px;border-radius:0;border-top:1px dashed #C8D2DC;}
+/* BOOKING CARDS v2 (2026-09-28): grid of compact cards instead of full-width rows */
+.cc-regcards{grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;align-items:stretch;}
+.cc-regcards .cc-regcard{display:flex;flex-direction:column;padding:0;border:1px solid #DCE3EA;border-radius:12px;
+  background:#fff;box-shadow:0 1px 2px rgba(6,39,58,.06),0 4px 14px rgba(6,39,58,.06);overflow:hidden;}
+.cc-regcards .cc-regcard.editing{grid-column:1/-1;}
+.cc-regcards .cc-regcard.refunded{opacity:.7;background:#FAFAFA;}
+.cc-regcards .cc-regcard-top{padding:12px 14px 10px;background:#F4F7FA;border-bottom:1px solid #E3E8EE;align-items:center;}
+.cc-regcards .cc-regcard-name{font-size:15.5px;line-height:1.2;display:flex;flex-wrap:wrap;align-items:center;gap:6px;}
+.cc-regcards .cc-regcard-who .cc-td-sub{font-size:12.5px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cc-regcards .cc-regcard-paid .cc-mono{font-size:17px;}
+.cc-regcards .cc-regcard-paid .cc-td-sub{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;}
+.cc-regcards .cc-badge-refund,.cc-regcards .cc-badge-comp{border-radius:999px;font-size:10px;padding:2px 8px;margin:0;}
+.cc-regcards .cc-rcpt{margin:0;padding:8px 14px 4px;font-size:13px;}
+.cc-regcards .cc-rcpt-row{padding:3px 0;}
+.cc-regcards .cc-rcpt-row.sub{font-size:11.5px;padding:1px 0;}
+.cc-regcards .cc-rcpt-row.total{border-top:1px solid #C8D2DC;margin-top:4px;padding-top:6px;font-weight:700;}
+.cc-regcards .cc-regcard-meta{margin:0;padding:6px 14px 0;}
+.cc-regcards .cc-regcard-meta:empty{display:none;}
+.cc-regcards .cc-regcard > .cc-td-sub{padding:6px 14px 0;font-size:12.5px;}
+.cc-regcards .cc-regcard-actions{margin-top:auto;padding:10px 14px;border-top:1px solid #EEF1F4;gap:6px;}
+.cc-regcards .cc-regcard .cc-mini{border-radius:8px;padding:6px 12px;border-width:1px;flex:1 1 0;text-align:center;}
+.cc-regcards .cc-regcard .cc-regedit{margin:0;padding:12px 14px;}
+.cc-regcards .cc-regcard .cc-mini.danger{border-color:#A52B1E;color:#A52B1E;}
+@media (max-width:640px){.cc-regcards{grid-template-columns:1fr;}}
 
 /* ---- group sharing + booking editor ---- */
 .cc-groupbox{margin-top:14px;border:1.5px dashed #b0a986;border-radius:0;
