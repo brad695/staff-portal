@@ -54,7 +54,7 @@
 //   SQUARE_TICKET_APP_ID       - public application id, handed to the browser
 //   SQUARE_TICKET_LOCATION_ID  - optional; sandbox resolves it off the token
 //   TICKET_TAX_RATE            - default 0.0975
-//   TICKET_FEE_RATE            - default 0.06
+//   TICKET_FEE_RATE            - default 0.04 (was 0.06 until 2026-09-29)
 //   TICKET_FEE_LABEL           - default "Ticketing service fee". NOT a card
 //                                surcharge: brand rules cap those at 3%, bar
 //                                them on debit, and Square does not support
@@ -148,7 +148,7 @@ function locationForEvent(ev: Record<string, any>): string {
 }
 
 const taxRate = () => Number(Deno.env.get("TICKET_TAX_RATE") ?? "0.0975");
-const feeRate = () => Number(Deno.env.get("TICKET_FEE_RATE") ?? "0.06");
+const feeRate = () => Number(Deno.env.get("TICKET_FEE_RATE") ?? "0.04");
 const feeLabel = () => Deno.env.get("TICKET_FEE_LABEL") ?? "Ticketing service fee";
 const taxLabel = () => Deno.env.get("TICKET_TAX_LABEL") ?? "TN Sales Tax";
 

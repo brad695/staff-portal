@@ -22,7 +22,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const admin = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const SQUARE_VERSION = "2025-01-23";
 const TZ = "America/Chicago";
-const FEE_RATE = Number(Deno.env.get("TICKET_FEE_RATE") ?? "0.06");
+const FEE_RATE = Number(Deno.env.get("TICKET_FEE_RATE") ?? "0.04"); // register price = ticket x 1.04 (was 1.06 until 2026-09-29)
 const CATEGORY_NAME = "Classes";
 const PROD_TAX_ID = "2K7XWRVWVXBTAJQIHHQOLFCN"; // TN Standard 9.75% ADDITIVE
 const SANDBOX_TAX_NAME = "TN Sales Tax 9.75% (classes)";
