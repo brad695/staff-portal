@@ -68,6 +68,28 @@ const todayCentral = () => {
   const g = (t: string) => p.find((x) => x.type === t)!.value;
   return `${g("year")}-${g("month")}-${g("day")}`;
 };
+// Register sales stop when online sales do: this many hours before the start
+// (Maverick, 2026-09-29: 12). A class inside the cutoff leaves the catalog like
+// a past one; its link stays a week so late register sales and returns still map.
+const CUTOFF_HOURS = Number(Deno.env.get("TICKET_BOOKING_CUTOFF_HOURS") ?? "12");
+// events.date + events.time are shop-local wall-clock values (America/Chicago).
+function startsAtMs(ev: Record<string, any>): number {
+  const [y, m, d] = String(ev?.date ?? "").split("-").map(Number);
+  const [hh, mm] = String(ev?.time || "00:00").split(":").map(Number);
+  if (!y || !m || !d) return NaN;
+  const guess = Date.UTC(y, m - 1, d, hh || 0, mm || 0);
+  const p: Record<string, string> = {};
+  new Intl.DateTimeFormat("en-US", {
+    timeZone: TZ, hourCycle: "h23", year: "numeric", month: "2-digit",
+    day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).formatToParts(new Date(guess)).forEach((x) => { p[x.type] = x.value; });
+  const shown = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second);
+  return guess - (shown - guess);
+}
+const salesOpen = (ev: Record<string, any>) => {
+  const start = startsAtMs(ev);
+  return !Number.isFinite(start) || Date.now() < start - CUTOFF_HOURS * 3600e3;
+};
 async function sha(s: string) {
   const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   return Array.from(new Uint8Array(b)).slice(0, 12).map((x) => x.toString(16).padStart(2, "0")).join("");
@@ -186,7 +208,7 @@ async function upcomingClasses() {
     .eq("kind", "class").gte("date", todayCentral()).gt("price", 0)
     .order("date").order("time");
   if (error) throw new Error(error.message);
-  return (data ?? []).filter((e) => !e.archived);
+  return (data ?? []).filter((e) => !e.archived && salesOpen(e));
 }
 
 async function syncCatalog() {
