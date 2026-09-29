@@ -152,6 +152,31 @@ const feeRate = () => Number(Deno.env.get("TICKET_FEE_RATE") ?? "0.04");
 const feeLabel = () => Deno.env.get("TICKET_FEE_LABEL") ?? "Ticketing service fee";
 const taxLabel = () => Deno.env.get("TICKET_TAX_LABEL") ?? "TN Sales Tax";
 
+// ---------- online sales cutoff ----------
+// Online booking closes this many hours before an event starts (Maverick,
+// 2026-09-29: 12 hours for classes, Mahjong and events alike). The ticket site
+// drops the event from its list at the same moment; this is the backstop for a
+// page left open past the cutoff. Staff can still add a booking in the manager.
+const cutoffHours = () => Number(Deno.env.get("TICKET_BOOKING_CUTOFF_HOURS") ?? "12");
+// events.date + events.time are shop-local wall-clock values (America/Chicago).
+function startsAtMs(ev: Record<string, any>): number {
+  const [y, m, d] = String(ev?.date ?? "").split("-").map(Number);
+  const [hh, mm] = String(ev?.time || "00:00").split(":").map(Number);
+  if (!y || !m || !d) return NaN;
+  const guess = Date.UTC(y, m - 1, d, hh || 0, mm || 0);
+  const p: Record<string, string> = {};
+  new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago", hourCycle: "h23", year: "numeric", month: "2-digit",
+    day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).formatToParts(new Date(guess)).forEach((x) => { p[x.type] = x.value; });
+  const shown = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second);
+  return guess - (shown - guess);
+}
+function bookingClosed(ev: Record<string, any>): boolean {
+  const start = startsAtMs(ev);
+  return Number.isFinite(start) && Date.now() >= start - cutoffHours() * 3600e3;
+}
+
 // ---------- errors ----------
 // PublicError is safe to show a customer. Everything else is logged with a
 // reference and replaced with a generic line, so Postgres constraint names and
@@ -393,6 +418,13 @@ async function buildIntent(body: Record<string, unknown>): Promise<Intent> {
   if (error) throw new Error(error.message);
   if (!event) throw new PublicError("That class could not be found.");
   if (event.archived) throw new PublicError("That class is no longer on sale.");
+  // A resumed attempt (lost response) already passed this check when it began.
+  if (!body.__resume && bookingClosed(event)) {
+    throw new PublicError(
+      `Online booking for this ${event.kind === "class" ? "class" : "event"} closed ` +
+        `${cutoffHours()} hours before it starts. Please call the shop.`,
+    );
+  }
 
   const context = body.context === "table_reserve" ? "table_reserve" : "book";
 
@@ -687,7 +719,7 @@ async function quote(req: Request, body: Record<string, unknown>) {
     `q:${callerIp(req)}`, QUOTE_LIMIT, QUOTE_WINDOW_SECS,
     "Too many price checks from this connection. Please wait a minute and try again.",
   );
-  const intent = await buildIntent({ ...body, __catalog: catalogAllowed(req) });
+  const intent = await buildIntent({ ...body, __catalog: catalogAllowed(req), __resume: false });
   const { order: _sq, ...totals } = await calculate(intent);
   const left = await seatsLeft(intent.event.id, intent.event.capacity);
   return {
@@ -1112,7 +1144,7 @@ async function pay(req: Request, body: Record<string, unknown>) {
     }
   }
 
-  const intent = await buildIntent({ ...body, __catalog: catalogAllowed(req) });
+  const intent = await buildIntent({ ...body, __catalog: catalogAllowed(req), __resume: !!prior });
   await throttle(intent.buyer.email);
 
   // The ceiling. The client sends the total it actually displayed; if the
