@@ -98,6 +98,17 @@ function upgradeName(n: string) {
   return (t.charAt(0).toUpperCase() + t.slice(1)).slice(0, 255) || "Upgrade";
 }
 
+// Keep the categories an item already has, above all the "Classes" group on
+// the Memphis / Nashville Restaurant menu (added in the Dashboard). Replacing
+// the list on a rewrite dropped the class off the register menu whenever its
+// price, date or upgrades changed. Only the per-shop category is ours: swap it
+// if it changed, leave everything else alone. (2026-09-28)
+function keepCategories(cur: Record<string, any> | null, categoryId: string, prevCategoryId: string | null) {
+  const had = ((cur?.item_data?.categories ?? []) as any[])
+    .filter((c) => c?.id && (c.id === categoryId || c.id !== prevCategoryId));
+  return had.some((c) => c.id === categoryId) ? had : [{ id: categoryId }, ...had];
+}
+
 // ---------------------------------------------------------------- locations
 let SANDBOX_LOC: string | null = null;
 async function locationFor(ev: Record<string, any>): Promise<string> {
@@ -319,7 +330,7 @@ async function syncCatalog() {
       name: itemName.slice(0, 255),
       description: "",
       product_type: "REGULAR",
-      categories: [{ id: categoryId }],
+      categories: keepCategories(cur, categoryId, have?.category_id ?? null),
       reporting_category: { id: categoryId },
       tax_ids: [taxId],
       variations,
