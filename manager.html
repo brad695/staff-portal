@@ -3854,7 +3854,14 @@ const linkBase = () => {
 const groupLink = (eventId, grp) =>
   `${linkBase()}?event=${eventId}&group=${grp}`;
 const TAX_RATE = 0.0975;
-const FEE_RATE = 0.06; // card processing surcharge
+// Ticketing service fee: 4% since 2026-09-29 07:52 UTC (square-ticket-pay v20),
+// 6% before. breakdown() backs the fee out of a stored total, so bookings made
+// before the switch keep 6% and their receipts and reports still add up.
+const FEE_RATE = 0.04;
+const FEE_RATE_BEFORE = 0.06;
+const FEE_SWITCH_AT = Date.parse("2026-09-29T07:52:24Z");
+const feeRateAt = (createdAt) =>
+  Date.parse(createdAt || "") < FEE_SWITCH_AT ? FEE_RATE_BEFORE : FEE_RATE;
 const SUPABASE_URL = "https://vdvtrevhqalmjwhjhjug.supabase.co";
 const SUPABASE_KEY = "sb_publishable_LnlevWReed7K8cFk_f_Mxg_UywktQ5_";
 const db =
@@ -4831,10 +4838,11 @@ function AdminLogin({ onUnlock }) {
 }
 
 // ---------- accounting export ----------
-// Reconstruct subtotal / tax / fee from a stored total (total = (subtotal+tax)*1.06).
-function breakdown(total) {
+// Reconstruct subtotal / tax / fee from a stored total (total = (subtotal+tax)*(1+fee)).
+// Pass the booking's createdAt so pre-switch bookings use the old 6%.
+function breakdown(total, createdAt) {
   total = total || 0;
-  const taxed = Math.round(total / (1 + FEE_RATE)); // subtotal + tax
+  const taxed = Math.round(total / (1 + feeRateAt(createdAt))); // subtotal + tax
   const fee = total - taxed;
   const subtotal = Math.round(taxed / (1 + TAX_RATE));
   const tax = taxed - subtotal;
@@ -4884,7 +4892,7 @@ function exportBookingsCsv(events, regs) {
     .sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""))
     .forEach((r) => {
       const ev = evById[r.eventId] || {};
-      const b = breakdown(r.total);
+      const b = breakdown(r.total, r.createdAt);
       const status = r.refunded ? "Refunded" : r.total === 0 ? "Comp" : "Paid";
       rows.push([
         r.createdAt ? new Date(r.createdAt).toLocaleString() : "",
@@ -6858,7 +6866,7 @@ function AdminReport({ events, regs }) {
   const rActive = rangeRegs.filter((r) => !r.refunded);
   const rT = rActive.reduce(
     (acc, r) => {
-      const b = breakdown(r.total);
+      const b = breakdown(r.total, r.createdAt);
       acc.subtotal += b.subtotal;
       acc.tax += b.tax;
       acc.fee += b.fee;
@@ -6977,7 +6985,7 @@ function AdminReport({ events, regs }) {
                   </tr>
                 )}
                 {rangeRegs.map((r) => {
-                  const b = breakdown(r.total);
+                  const b = breakdown(r.total, r.createdAt);
                   const ev = evById[r.eventId] || {};
                   return (
                     <tr key={r.id} className={r.refunded ? "ref" : ""}>
@@ -7651,8 +7659,8 @@ const CE_SAMPLE_RECEIPT = `
         <tr><td style="padding:4px 0;color:#555">Tickets</td><td style="padding:4px 0;text-align:right"><b>2</b></td></tr>
         <tr><td style="padding:4px 0;color:#555">Subtotal</td><td style="padding:4px 0;text-align:right"><b>$90</b></td></tr>
         <tr><td style="padding:4px 0;color:#555">Sales tax</td><td style="padding:4px 0;text-align:right"><b>$8.78</b></td></tr>
-        <tr><td style="padding:4px 0;color:#555">Ticketing service fee</td><td style="padding:4px 0;text-align:right"><b>$5.40</b></td></tr>
-        <tr><td style="padding:4px 0;color:#555"><b>Total</b></td><td style="padding:4px 0;text-align:right"><b>$104.18</b></td></tr>
+        <tr><td style="padding:4px 0;color:#555">Ticketing service fee</td><td style="padding:4px 0;text-align:right"><b>$3.95</b></td></tr>
+        <tr><td style="padding:4px 0;color:#555"><b>Total</b></td><td style="padding:4px 0;text-align:right"><b>$102.73</b></td></tr>
       </table>`;
 const CE_SAMPLE_SHARE = "https://tickets.greyscheese.com/?booking=sample";
 const CE_SEND_URL =
@@ -8881,7 +8889,7 @@ function CompAdd({ ev, onCancel, onSave }) {
 // Open a printable, full-detail receipt for one booking in a new window.
 function printBookingDoc(reg, ev) {
   if (!reg || !ev || typeof window === "undefined") return;
-  const b = breakdown(reg.total);
+  const b = breakdown(reg.total, reg.createdAt);
   const esc = (s) =>
     String(s == null ? "" : s).replace(/[<>&]/g, (c) =>
       c === "<" ? "&lt;" : c === ">" ? "&gt;" : "&amp;"
@@ -9196,7 +9204,7 @@ function AdminDetail({ ev, regs, soldFor, go, onRefund, onUpdate, onAddComp }) {
                   );
                 })}
                 {(() => {
-                  const b = breakdown(r.total);
+                  const b = breakdown(r.total, r.createdAt);
                   return (
                     <>
                       <div className="cc-rcpt-row sub">
