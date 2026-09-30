@@ -13699,6 +13699,20 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   .tabs.v3 .sect .ico{ color:var(--sc,#06273a); }
   .tabs.v3 .sect.on .ico{ color:#fff; }
 }
+/* short laptop windows: tighter rows so every section, Links included, fits without scrolling */
+@media(min-width:821px) and (max-height:800px){
+  .tabs.v3 .v3-brand{ padding:16px 22px 12px; }
+  .tabs.v3 .v3-search{ margin:0 18px 12px; }
+  .tabs.v3 .v3-list{ padding:8px 0 6px; }
+  .tabs.v3 .sect{ min-height:42px; }
+  .tabs.v3 .v3-link{ min-height:38px; }
+  .tabs.v3 .v3-foot{ padding:6px 0 10px; }
+  .tabs.v3 .subgrp .tab, .tabs.v3 .v3-lkgrp a{ min-height:36px; }
+}
+@media(min-width:821px) and (max-height:600px){
+  .tabs.v3 .v3-brand{ padding:12px 22px 10px; }
+  .tabs.v3 .sect{ min-height:38px; }
+}
 </style>
 <script>
 (function(){
@@ -13781,7 +13795,15 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     lkBtn.addEventListener('click', ()=>{
       const open = !lkGrp.classList.contains('x');
       lkGrp.classList.toggle('x', open); lkBtn.classList.toggle('x', open);
+      if(open) reveal(lkBtn, lkGrp);
     });
+    // an opened section's items can land below the fold: scroll the menu so
+    // they show, without pushing the section's own row off the top
+    function reveal(btn, items){
+      const lb = list.getBoundingClientRect(), ib = items.getBoundingClientRect(), bb = btn.getBoundingClientRect();
+      if(ib.bottom <= lb.bottom) return;
+      list.scrollTop += Math.min(ib.bottom - lb.bottom + 8, bb.top - lb.top);
+    }
 
     G.groups.forEach(g=>{
       const s = SECT[g.name] || ['dot','#9db3c1'];
@@ -13804,6 +13826,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       e.stopPropagation(); e.preventDefault();
       const open = !g.strip.classList.contains('x');
       g.strip.classList.toggle('x', open); b.classList.toggle('x', open);
+      if(open) reveal(b, g.strip);
     }, true);
 
     // page title bar
