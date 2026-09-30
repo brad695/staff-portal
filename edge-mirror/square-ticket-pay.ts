@@ -185,15 +185,57 @@ class PublicError extends Error {}
 
 // A declined card is a normal outcome, not an exception — callers that need to
 // tell "declined" from "our request was malformed" read .status off the error.
-// Square's own decline text is customer-safe, so these are public.
+// .message keeps Square's raw text ("Authorization error: 'TRANSACTION_LIMIT'"),
+// which is what lands in ticket_payments.error for staff. The customer gets
+// .customer instead — a plain sentence for card declines (2026-09-30).
 class SquareFail extends PublicError {
   status: number;
   data: unknown;
+  customer: string;
   constructor(status: number, data: unknown) {
     super(squareError(status, data));
     this.status = status;
     this.data = data;
+    this.customer = customerDecline(data) ?? this.message;
   }
+}
+
+// Square decline codes -> what to tell the buyer. Anything not listed that
+// Square files under PAYMENT_METHOD_ERROR (GENERIC_DECLINE, TRANSACTION_LIMIT,
+// INSUFFICIENT_FUNDS, ...) is the bank saying no, so it gets DECLINE_DEFAULT.
+const CHECK_CVV = "The security code (CVV) didn't match this card. Please check it and try again.";
+const CHECK_ZIP = "The ZIP code didn't match this card. Please check it and try again.";
+const CHECK_EXP = "The expiration date didn't match this card. Please check it and try again.";
+const RE_ENTER = "The card form timed out. Please re-enter your card and try again.";
+const DECLINE_TEXT = new Map<string, string>([
+  ["CVV_FAILURE", CHECK_CVV],
+  ["VERIFY_CVV_FAILURE", CHECK_CVV],
+  ["ADDRESS_VERIFICATION_FAILURE", CHECK_ZIP],
+  ["INVALID_POSTAL_CODE", CHECK_ZIP],
+  ["VERIFY_AVS_FAILURE", CHECK_ZIP],
+  ["INVALID_EXPIRATION", CHECK_EXP],
+  ["EXPIRATION_FAILURE", CHECK_EXP],
+  ["BAD_EXPIRATION", CHECK_EXP],
+  ["CARD_EXPIRED", "This card has expired. Please use another card."],
+  ["CARD_TOKEN_EXPIRED", RE_ENTER],
+  ["CARD_TOKEN_USED", RE_ENTER],
+  ["TEMPORARY_ERROR", "The card network had a temporary problem. Please wait a minute and try again."],
+]);
+const DECLINE_DEFAULT = "Your bank declined this card. Please try another card, or call your bank.";
+const GIFT_DECLINE = "That gift card couldn't be used. Please check the number, or pay by card.";
+
+function customerDecline(data: unknown): string | null {
+  const d = data as {
+    errors?: { code?: string; category?: string }[];
+    payment?: { card_details?: { card?: { card_brand?: string } } };
+  };
+  const errs = Array.isArray(d?.errors) ? d.errors : [];
+  const hit = errs.find((e) => e?.category === "PAYMENT_METHOD_ERROR" || DECLINE_TEXT.has(String(e?.code)));
+  if (!hit) return null;
+  const text = d?.payment?.card_details?.card?.card_brand === "SQUARE_GIFT_CARD"
+    ? GIFT_DECLINE
+    : DECLINE_TEXT.get(String(hit.code)) ?? DECLINE_DEFAULT;
+  return `${text} Nothing was charged.`;
 }
 
 const ref = () => crypto.randomUUID().slice(0, 8);
@@ -1344,7 +1386,8 @@ async function pay(req: Request, body: Record<string, unknown>) {
     }
     const msg = String(e instanceof Error ? e.message : e);
     await fail(msg, e instanceof SquareFail ? e.data : undefined);
-    throw e;
+    // The ledger keeps Square's raw code; the buyer gets the plain sentence.
+    throw e instanceof SquareFail ? new PublicError(e.customer) : e;
   }
   // What the card actually carried: its share of the order plus the whole tip.
   const cardCents = totals!.total_cents - giftCents + intent.tipCents;
