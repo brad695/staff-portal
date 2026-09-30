@@ -3767,10 +3767,11 @@ const LOCATIONS = ["Memphis", "Nashville"];
 // ---------------------------------------------------------------------------
 // TABLE LAYOUTS — one named list of tables per shop.
 // A "table" is a named seat group. Each location gets its own list so a
-// shop can be re-arranged without touching the others. Memphis uses cheese
-// names; Nashville lists its real floor-plan spots from Square. Edit a
-// location's array below (rename, add or remove tables) and the customer
-// table picker and the manager group dropdowns follow automatically.
+// shop can be re-arranged without touching the others. Both shops use cheese
+// names: a name is a group of people who sit together, not a spot on the
+// floor (Nashville: groups only, no table assignment, 2026-09-30). Edit a
+// location's array below (rename, add or remove groups) and the customer
+// group picker and the manager group dropdowns follow automatically.
 // Tables already booked under an old name keep working — GROUP_NAMES below is
 // the union of every layout, and that is what reads existing registrations.
 // ---------------------------------------------------------------------------
@@ -3787,24 +3788,20 @@ const TABLE_LAYOUTS = {
     "Sheep",
     "Cow",
   ],
-  // ↓ Nashville: real floor plan from Square (Sep 2026). Booths seat 2 but
-  //   combine into a 4-top; couches seat 4; the 8 bar seats are singles.
-  //   Classes can seat people at any spot, bar seats included; tabled
-  //   events only sell the whole 4-top spots (ticket site EVENT_TABLES).
+  // ↓ Nashville: groups only (2026-09-30). People who book together are
+  //   grouped; staff pick the actual tables on the night. The floor-plan
+  //   names it used before are in RETIRED_GROUP_NAMES below.
   Nashville: [
-    "Couch Tables 1",
-    "Couch Tables 2",
-    "Couch Tables 3",
-    "Booth Tables 1+2",
-    "Booth Tables 3+4",
-    "Bar Seats 1",
-    "Bar Seats 2",
-    "Bar Seats 3",
-    "Bar Seats 4",
-    "Bar Seats 5",
-    "Bar Seats 6",
-    "Bar Seats 7",
-    "Bar Seats 8",
+    "Cheddar",
+    "Gouda",
+    "Swiss",
+    "Alpine",
+    "Brie",
+    "Comte",
+    "Blue",
+    "Goat",
+    "Sheep",
+    "Cow",
   ],
   // archived (store closed) — kept so old bookings still read correctly
   Franklin: [
@@ -3838,12 +3835,35 @@ const sectionOf = (ev) =>
 const DASH_VIEW = { class: "admin", mahjong: "mahjong", event: "ticketed" };
 const dashFor = (ev, kind) =>
   ev ? DASH_VIEW[sectionOf(ev)] : kind && kind !== "class" ? "ticketed" : "admin";
+// Names no longer offered but still on existing bookings: Nashville used its
+// floor-plan spots as group names 2026-09-20 to 09-30.
+const RETIRED_GROUP_NAMES = [
+  "Couch Tables 1",
+  "Couch Tables 2",
+  "Couch Tables 3",
+  "Booth Tables 1+2",
+  "Booth Tables 3+4",
+  "Bar Seats 1",
+  "Bar Seats 2",
+  "Bar Seats 3",
+  "Bar Seats 4",
+  "Bar Seats 5",
+  "Bar Seats 6",
+  "Bar Seats 7",
+  "Bar Seats 8",
+];
 // Every table name used anywhere, in Memphis order then whatever the other
-// layouts add. Read-side code (existing bookings, group summaries) uses this so
-// a table renamed out of a layout never disappears from an old registration.
-const GROUP_NAMES = Object.values(TABLE_LAYOUTS)
-  .flat()
+// layouts add, then the retired names. Read-side code (existing bookings,
+// group summaries) uses this so a name taken out of a layout never
+// disappears from an old registration.
+const GROUP_NAMES = [...Object.values(TABLE_LAYOUTS).flat(), ...RETIRED_GROUP_NAMES]
   .filter((n, i, a) => a.indexOf(n) === i);
+// A booking editor's group choices: this shop's names, plus the booking's
+// own group if it is an older name, so the dropdown shows what it really is.
+const groupOptionsFor = (loc, current) => {
+  const list = tablesFor(loc);
+  return current && !list.includes(current) ? [...list, current] : list;
+};
 const SITE_URL = "https://tickets.greyscheese.com";
 const linkBase = () => {
   if (SITE_URL) return SITE_URL.replace(/\/+$/, "");
@@ -8708,7 +8728,7 @@ function RegEditor({ reg, ev, onCancel, onSave }) {
             onChange={(e) => setGroup(e.target.value)}
           >
             <option value="">No group</option>
-            {tablesFor(ev && ev.location).map((n) => (
+            {groupOptionsFor(ev && ev.location, reg.group).map((n) => (
               <option key={n} value={n}>
                 {n}
               </option>
