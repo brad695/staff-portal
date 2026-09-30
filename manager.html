@@ -13313,23 +13313,19 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   .v3-title .v3-act .btn:hover{ background:#e3edf2; }
   .v3-title .crumb{ font:500 .72rem 'Poppins',sans-serif; color:#9db3c1; letter-spacing:.6px; text-transform:uppercase; }
   .v3-title h1{ font:600 1.55rem 'Poppins',sans-serif; color:#fff; margin:4px 0 0; letter-spacing:-.3px; }
-  /* "Test Sites" footer row + its flyout (the flyout lives on <body> so the rail can't clip it) */
-  .tabs.v3 .v3-link svg.go{ width:15px; height:15px; margin-left:auto; opacity:.75; }
-  .tabs.v3 .v3-link[aria-expanded="true"]{ background:rgba(255,255,255,.08); color:#fff; }
-  .v3-pop{ position:fixed; z-index:800; width:240px; box-sizing:border-box; padding:6px;
-      background:#0d3850; color:#e4edf2; border:1px solid rgba(255,255,255,.13); border-radius:12px;
-      box-shadow:0 18px 44px rgba(2,20,31,.34), 0 2px 8px rgba(2,20,31,.18); font-family:'Poppins',system-ui,sans-serif; }
-  .v3-pop[hidden]{ display:none; }
-  .v3-pop .hd{ padding:9px 12px 2px; font:600 .66rem 'Poppins',sans-serif; letter-spacing:.9px; text-transform:uppercase; color:#9db3c1; }
-  .v3-pop .note{ padding:0 12px 8px; font:400 .72rem/1.4 'Poppins',sans-serif; color:#9db3c1; }
-  .v3-pop a{ display:flex; align-items:center; gap:12px; min-height:38px; padding:0 12px; border-radius:8px;
-      color:#e4edf2; text-decoration:none; font:400 .85rem 'Poppins',sans-serif; }
-  .v3-pop a:hover, .v3-pop a:focus-visible{ background:rgba(255,255,255,.08); color:#fff; outline:none; }
-  .v3-pop a svg{ width:18px; height:18px; flex:none; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; opacity:.85; }
-  .v3-pop .sep{ height:1px; margin:5px 8px; background:rgba(255,255,255,.11); }
+  /* "Links" section: every site link (live + test copies), styled like the other sections */
+  .tabs.v3 .v3-lkgrp{ display:none; flex-direction:column; gap:2px; align-items:stretch; padding:2px 16px 8px 0; --si:#cbd5e1; }
+  .tabs.v3 .v3-lkgrp.x, .tabs.v3.searching .v3-lkgrp{ display:flex; }
+  .tabs.v3 .v3-lkgrp a{ position:relative; display:flex; align-items:center; min-height:40px; padding:0 14px 0 82px; margin:0;
+      border-radius:0 999px 999px 0; color:var(--pvt); text-decoration:none;
+      font:400 .82rem 'Poppins',sans-serif; letter-spacing:.1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tabs.v3 .v3-lkgrp a:hover{ background:rgba(255,255,255,.05); color:#fff; }
+  .tabs.v3 .v3-lkgrp a svg{ position:absolute; left:56px; top:50%; transform:translateY(-50%); width:16px; height:16px; color:var(--si); }
+  .tabs.v3 .v3-lkgrp .lk-hd{ padding:12px 14px 4px 82px; font:600 .64rem 'Poppins',sans-serif; letter-spacing:.9px; text-transform:uppercase; color:var(--pvm); }
+  .tabs.v3.searching .v3-lkgrp .nomatch, .tabs.v3.searching .v3-lkgrp.nomatch{ display:none; }
 }
 @media(max-width:820px){
-  .v3-pop{ display:none !important; }
+  .tabs.v3 .v3-lk, .tabs.v3 .v3-lkgrp{ display:none !important; }
   .v3-title{ display:none; }
   .tabs.v3 .v3-brand, .tabs.v3 .v3-search, .tabs.v3 .v3-foot, .tabs.v3 .chev, .tabs.v3 .v3-dot{ display:none; }
   .tabs.v3 .v3-list{ display:contents; }
@@ -13355,8 +13351,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     ext:'<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
     out:'<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 16l4-4-4-4M14 12H4"/>',
     dot:'<circle cx="12" cy="12" r="3"/>',
-    flask:'<path d="M9.5 3h5M10.5 3v6.2L5.2 18.4A1.7 1.7 0 0 0 6.7 21h10.6a1.7 1.7 0 0 0 1.5-2.6L13.5 9.2V3"/><path d="M7.4 15h9.2"/>',
-    right:'<path d="M9 6l6 6-6 6"/>',
+    link:'<path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1.4 1.4"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1.4-1.4"/>',
     bag:'<path d="M5.5 8h13l-1 12h-11z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>',
     panel:'<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/>'
   };
@@ -13381,7 +13376,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       if(n) n.data = n.data.replace(/^[\s☀-➿️＋+]*(?:[\uD83C-\uDBFF][\uDC00-\uDFFF][️]?\s*)*/,'').replace(/^\s+/,'');
     }));
 
-    // brand + search on top, list in the middle, links at the bottom
+    // brand + search on top, list in the middle, Logout at the bottom
     const brand = document.createElement('div');
     brand.className = 'v3-brand';
     brand.innerHTML = '<img src="icon-192.png" alt=""><div>GREYS<small>Manager Console</small></div>';
@@ -13390,66 +13385,38 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     search.innerHTML = svg('search')+'<input type="search" placeholder="Search" autocomplete="off">';
     const list = document.createElement('div'); list.className = 'v3-list';
     const foot = document.createElement('div'); foot.className = 'v3-foot';
-    const L = (href, ico, txt, blank)=> '<a class="v3-link" href="'+href+'"'+(blank?' target="_blank" rel="noopener"':'')+'><span class="ico">'+svg(ico)+'</span>'+txt+'</a>';
-    foot.innerHTML = L('index.html','home','Staff Portal')
-      + L('calendar.html','cal','Calendar')
-      + L('https://tickets.greyscheese.com','ext','Ticket Site',1)
-      + L('https://tickets.greyscheese.com/experiences.html','ext','Experiences Site',1)
-      + L('https://brad695.github.io/cheese-club/','ext','Cheese Club',1)
-      + '<button type="button" class="v3-link" id="v3Test" aria-haspopup="menu" aria-expanded="false" aria-controls="v3TestPop"><span class="ico">'+svg('flask')+'</span>Test Sites'+svg('right').replace('<svg','<svg class="go"')+'</button>'
-      + '<button type="button" class="v3-link" id="v3Logout"><span class="ico">'+svg('out')+'</span>Logout</button>';
+    foot.innerHTML = '<button type="button" class="v3-link" id="v3Logout"><span class="ico">'+svg('out')+'</span>Logout</button>';
     Array.from(rail.children).forEach(el=> list.appendChild(el));
     rail.append(brand, search, list, foot);
     foot.querySelector('#v3Logout').addEventListener('click', ()=>{ if(typeof logout==='function') logout(); });
 
-    // Test copies (the staging branches) sit in one flyout instead of a row
-    // each. Same live database: anything saved or booked there is real.
-    const TEST = [
-      ['https://ticket-rennet.onrender.com','ticket','Ticket Site'],
-      ['https://ticket-rennet.onrender.com/experiences.html','spark','Experiences'],
-      ['https://ticket-rennet.onrender.com/order.html','bag','Online Ordering'],
-      null,
-      ['https://greys-staff-portal-staging.onrender.com/','home','Staff Portal'],
-      ['https://greys-staff-portal-staging.onrender.com/manager.html','panel','Manager']
+    // "Links" — the site links, live and the staging test copies, as one more
+    // menu section that opens like the rest. Test copies use the live
+    // database: anything saved or booked there is real.
+    const LINKS = [
+      ['index.html','home','Staff Portal'],
+      ['calendar.html','cal','Calendar'],
+      ['https://tickets.greyscheese.com','ticket','Ticket Site',1],
+      ['https://tickets.greyscheese.com/experiences.html','spark','Experiences Site',1],
+      ['https://brad695.github.io/cheese-club/','box','Cheese Club',1],
+      'Test sites',
+      ['https://ticket-rennet.onrender.com','ticket','Ticket Site',1],
+      ['https://ticket-rennet.onrender.com/experiences.html','spark','Experiences',1],
+      ['https://ticket-rennet.onrender.com/order.html','bag','Online Ordering',1],
+      ['https://greys-staff-portal-staging.onrender.com/','home','Staff Portal',1],
+      ['https://greys-staff-portal-staging.onrender.com/manager.html','panel','Manager',1]
     ];
-    const tBtn = foot.querySelector('#v3Test');
-    const pop = document.createElement('div');
-    pop.className = 'v3-pop'; pop.id = 'v3TestPop'; pop.hidden = true;
-    pop.setAttribute('role','menu'); pop.setAttribute('aria-label','Test sites');
-    pop.innerHTML = '<div class="hd">Test sites</div><div class="note">Live data &mdash; edits are real.</div>'
-      + TEST.map(t=> t ? '<a role="menuitem" href="'+t[0]+'" target="_blank" rel="noopener">'+svg(t[1])+'<span>'+t[2]+'</span></a>'
-                       : '<div class="sep" role="separator"></div>').join('');
-    document.body.appendChild(pop);
-    const popItems = ()=> Array.from(pop.querySelectorAll('a'));
-    function placePop(){
-      const r = tBtn.getBoundingClientRect(), rr = rail.getBoundingClientRect();
-      const h = pop.offsetHeight, vh = window.innerHeight;
-      pop.style.left = Math.round(rr.right + 10) + 'px';
-      pop.style.top = Math.round(Math.max(12, Math.min(r.bottom + 4 - h, vh - h - 12))) + 'px';
-    }
-    function openPop(focusFirst){
-      pop.hidden = false; placePop(); tBtn.setAttribute('aria-expanded','true');
-      if(focusFirst) popItems()[0].focus();
-    }
-    function closePop(refocus){
-      if(pop.hidden) return;
-      pop.hidden = true; tBtn.setAttribute('aria-expanded','false');
-      if(refocus) tBtn.focus();
-    }
-    tBtn.addEventListener('click', e=> pop.hidden ? openPop(e.detail === 0) : closePop());
-    tBtn.addEventListener('keydown', e=>{ if(e.key==='ArrowDown' || e.key==='ArrowUp'){ e.preventDefault(); openPop(true); } });
-    pop.addEventListener('click', e=>{ if(e.target.closest('a')) closePop(); });
-    pop.addEventListener('keydown', e=>{
-      const a = popItems(), i = a.indexOf(document.activeElement);
-      const go = n=>{ e.preventDefault(); a[(n + a.length) % a.length].focus(); };
-      if(e.key==='ArrowDown') go(i + 1); else if(e.key==='ArrowUp') go(i - 1);
-      else if(e.key==='Home') go(0); else if(e.key==='End') go(-1);
-      else if(e.key==='Tab'){ e.preventDefault(); closePop(true); }
+    const lkBtn = document.createElement('button');
+    lkBtn.type = 'button'; lkBtn.className = 'sect hide-mobile v3-lk';
+    lkBtn.innerHTML = '<span class="ico">'+svg('link')+'</span><span class="lbl lbl-desk">Links</span><span class="lbl lbl-phone">Links</span>'
+      + svg('chev').replace('<svg','<svg class="chev"');
+    const lkGrp = document.createElement('div'); lkGrp.className = 'v3-lkgrp';
+    lkGrp.innerHTML = LINKS.map(l=> typeof l === 'string' ? '<div class="lk-hd">'+l+'</div>'
+      : '<a href="'+l[0]+'"'+(l[3] ? ' target="_blank" rel="noopener"' : '')+'>'+svg(l[1])+'<span>'+l[2]+'</span></a>').join('');
+    lkBtn.addEventListener('click', ()=>{
+      const open = !lkGrp.classList.contains('x');
+      lkGrp.classList.toggle('x', open); lkBtn.classList.toggle('x', open);
     });
-    document.addEventListener('keydown', e=>{ if(e.key==='Escape' && !pop.hidden) closePop(true); });
-    // capture phase: the section list stops its own clicks from bubbling
-    document.addEventListener('click', e=>{ if(!pop.hidden && !pop.contains(e.target) && !tBtn.contains(e.target)) closePop(); }, true);
-    window.addEventListener('resize', ()=>{ if(!pop.hidden) placePop(); });
 
     G.groups.forEach(g=>{
       const s = SECT[g.name] || ['dot','#9db3c1'];
@@ -13463,6 +13430,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     const ORDER = ['Events & Reservations','Tickets & Classes','Experiences','Catering','Cheese Case','Staff','Marketing','Cheese Club'];
     const sorted = G.groups.slice().sort((a,b)=>{ const x=ORDER.indexOf(a.name), y=ORDER.indexOf(b.name); return (x<0?99:x)-(y<0?99:y); });
     sorted.forEach(g=> list.appendChild(g.btn));
+    list.append(lkBtn, lkGrp);
     const moreBtn = list.querySelector('.sect.more'); if(moreBtn) list.appendChild(moreBtn);
     list.addEventListener('click', e=>{
       if(!DESK.matches) return;
@@ -13510,7 +13478,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       }
     }
     place();
-    const onBp = ()=>{ place(); closePop(); try{ moveAction(); }catch(e){} };
+    const onBp = ()=>{ place(); try{ moveAction(); }catch(e){} };
     DESK.addEventListener ? DESK.addEventListener('change', onBp) : DESK.addListener(onBp);
 
     // search: filter sub-items across every section, Enter opens the first hit
@@ -13523,10 +13491,18 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
         g.tabs.forEach(t=>{ const hit = !q || t.textContent.toLowerCase().includes(q) || g.name.toLowerCase().includes(q); t.classList.toggle('nomatch', !hit); any = any || hit; });
         g.btn.classList.toggle('nomatch', !any); g.strip.classList.toggle('nomatch', !any);
       });
+      let lkAny = false, testAny = false, test = false;
+      Array.from(lkGrp.children).forEach(el=>{
+        if(el.classList.contains('lk-hd')){ test = true; return; }   // links after the heading are test copies
+        const hit = !q || el.textContent.toLowerCase().includes(q) || 'links'.includes(q) || (test && 'test sites'.includes(q));
+        el.classList.toggle('nomatch', !hit); lkAny = lkAny || hit; if(test) testAny = testAny || hit;
+      });
+      const hd = lkGrp.querySelector('.lk-hd'); if(hd) hd.classList.toggle('nomatch', !testAny);
+      lkBtn.classList.toggle('nomatch', !lkAny); lkGrp.classList.toggle('nomatch', !lkAny);
     });
     inp.addEventListener('keydown', e=>{
       if(e.key==='Escape'){ inp.value=''; inp.dispatchEvent(new Event('input')); }
-      if(e.key==='Enter'){ const t = rail.querySelector('.subgrp .tab:not(.nomatch)'); if(t){ t.click(); inp.value=''; inp.dispatchEvent(new Event('input')); } }
+      if(e.key==='Enter'){ const t = rail.querySelector('.subgrp .tab:not(.nomatch)') || lkGrp.querySelector('a:not(.nomatch)'); if(t){ t.click(); inp.value=''; inp.dispatchEvent(new Event('input')); } }
     });
 
     // red dot on a collapsed section that holds a visible badge
