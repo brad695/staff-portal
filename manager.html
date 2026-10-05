@@ -642,6 +642,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab" onclick="ccTab(this,'roster')">Roster</div>
     <div class="tab" onclick="ccTab(this,'revenue')">Revenue</div>
     <div class="tab" onclick="ccTab(this,'notify')">Notify</div>
+    <div class="tab" onclick="ccTab(this,'news')">Newsletter</div>
   </div>
 
   <div class="main">
@@ -3694,6 +3695,105 @@ window.addEventListener('DOMContentLoaded', async ()=>{
 #panel-cheese .loc-chip{border-radius:2px;}
 #panel-cheese .empty{border:1px dashed #ddd;border-radius:2px;background:#fafafa;color:#666;}
 
+</style>
+<style id="ccnl-style">
+/* Cheese Club → Newsletter (club-newsletter edge function) */
+#panel-cheese .nl-head{margin-bottom:16px}
+#panel-cheese .nl-head-row{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+#panel-cheese .nl-head-row>div{flex:1;min-width:240px}
+#panel-cheese .nl-head h3{font-size:20px;margin:0 0 4px}
+#panel-cheese .nl-head p{margin:0;font-size:14px}
+#panel-cheese .nl-note{margin-top:14px;background:#fdf6e4;border:1px solid #f1dfb1;border-radius:10px;padding:10px 14px;font-size:13.5px;color:#6b5113}
+#panel-cheese .nl-note.nl-err{background:#fbeeec;border-color:#efc9c3;color:#8c3b2e}
+#panel-cheese .nl-nudge{margin-top:12px;font-size:14px;color:var(--ink);background:#eef4ef;border:1px solid #d3e4d8;border-radius:10px;padding:10px 14px}
+#panel-cheese .nl-list{display:flex;flex-direction:column;gap:8px}
+#panel-cheese .nl-row{display:grid;grid-template-columns:150px 1fr auto;gap:14px;align-items:center;width:100%;text-align:left;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font:inherit;color:var(--ink);cursor:pointer;box-shadow:var(--shadow)}
+#panel-cheese .nl-row:hover{border-color:#c9d6cc}
+#panel-cheese .nl-row:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+#panel-cheese .nl-row-m{font-weight:600;font-size:14px}
+#panel-cheese .nl-row-s{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#4a545e}
+#panel-cheese .nl-pill{display:inline-block;padding:4px 10px;border-radius:999px;font:600 12px Inter,sans-serif;white-space:nowrap;background:#eef1f6;color:#46546e}
+#panel-cheese .nl-pill.nl-draft{background:#efece6;color:#6f6557}
+#panel-cheese .nl-pill.nl-scheduled{background:#e7eefb;color:#2f4f8f}
+#panel-cheese .nl-pill.nl-sending{background:#fdf3e2;color:#92400e}
+#panel-cheese .nl-pill.nl-sent{background:#e6f3e7;color:#2f7d3a}
+#panel-cheese .nl-pill.nl-canceled{background:#f2e3e1;color:#9a4034}
+#panel-cheese .nl-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+#panel-cheese .nl-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start}
+#panel-cheese .nl-compose{padding:20px}
+#panel-cheese .nl-fields{display:grid;grid-template-columns:170px 1fr;gap:12px}
+#panel-cheese .nl-compose label.fld span small{font-weight:400}
+#panel-cheese .nl-tools{display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:var(--alt);border:1px solid var(--line);border-bottom:none;border-radius:10px 10px 0 0}
+#panel-cheese .nl-tools button{background:#fff;border:1px solid var(--line);border-radius:7px;padding:6px 10px;font:500 13px Inter,sans-serif;color:var(--ink);cursor:pointer;min-height:34px}
+#panel-cheese .nl-tools button:hover{border-color:#b9c7bd}
+#panel-cheese .nl-tools button.on{background:var(--green);border-color:var(--green);color:#fff}
+#panel-cheese .nl-tools select{width:auto;padding:6px 8px;font-size:13px;border-radius:7px;min-height:34px}
+#panel-cheese .nl-edit{min-height:380px;max-height:62vh;overflow:auto;border:1.5px solid var(--line);border-radius:0 0 10px 10px;padding:18px 20px;background:#fff;font:16px/1.6 Arial,Helvetica,sans-serif;color:#06273A}
+#panel-cheese .nl-edit:focus{outline:none;border-color:var(--green)}
+#panel-cheese .nl-edit h2{font:700 22px Georgia,'Times New Roman',serif;color:#06273A;margin:18px 0 8px}
+#panel-cheese .nl-edit h3{font:700 13px Arial,Helvetica,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#896D39;margin:18px 0 6px}
+#panel-cheese .nl-edit p{margin:0 0 12px}
+#panel-cheese .nl-edit ul,#panel-cheese .nl-edit ol{margin:0 0 12px;padding-left:22px}
+#panel-cheese .nl-edit a{color:#896D39;text-decoration:underline}
+#panel-cheese .nl-edit img{max-width:100%;height:auto;display:block;margin:8px 0 14px;border-radius:4px}
+#panel-cheese .nl-edit hr{border:0;border-top:1px solid #E2DACA;margin:18px 0}
+#panel-cheese .nl-edit blockquote{margin:0 0 12px;padding:10px 14px;border-left:3px solid #896D39;background:#FBF8F2}
+#panel-cheese .nl-src{display:block;width:100%;min-height:380px;border-radius:0 0 10px 10px;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace}
+#panel-cheese .nl-src[hidden],#panel-cheese .nl-edit[hidden]{display:none}
+#panel-cheese .nl-hint{font-size:12.5px;margin:10px 0 0}
+#panel-cheese .nl-hint code{font-size:12px;background:var(--alt);padding:1px 5px;border-radius:5px}
+#panel-cheese .nl-side{display:flex;flex-direction:column;gap:14px;position:sticky;top:88px}
+#panel-cheese .nl-card{padding:18px}
+#panel-cheese .nl-card h4{font-size:16px;margin:0 0 10px}
+#panel-cheese .nl-opt{display:flex;gap:9px;align-items:flex-start;font-size:14px;margin:0 0 8px;cursor:pointer}
+#panel-cheese .nl-opt input{width:auto;margin-top:3px;accent-color:var(--green)}
+#panel-cheese .nl-opt small{display:block;color:var(--muted);font-size:12px}
+#panel-cheese .nl-sub{font:600 12px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+#panel-cheese .nl-checks{display:flex;flex-direction:column;gap:6px}
+#panel-cheese .nl-chk{display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer}
+#panel-cheese .nl-chk input{width:auto;accent-color:var(--green)}
+#panel-cheese .nl-count{margin-top:14px;padding:10px 12px;background:var(--alt);border-radius:10px;font-size:14px}
+#panel-cheese .nl-people{margin-top:10px;font-size:13px}
+#panel-cheese .nl-people summary{cursor:pointer;color:var(--green);font-weight:600}
+#panel-cheese .nl-people>div,#panel-cheese .nl-sent .nl-people .nl-person{max-height:220px;overflow:auto}
+#panel-cheese .nl-person{padding:6px 0;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:4px 8px}
+#panel-cheese .nl-person small{flex-basis:100%;color:var(--muted)}
+#panel-cheese .nl-row2{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+#panel-cheese .nl-fld{margin:0 0 14px}
+#panel-cheese .nl-lbl{display:block;font-weight:600;font-size:13px;margin-bottom:6px}
+#panel-cheese .nl-inline{display:flex;gap:8px;align-items:stretch}
+#panel-cheese .nl-inline input{flex:1;min-width:0}
+#panel-cheese .nl-inline .btn{flex:none}
+#panel-cheese .nl-sched .btn{margin-top:8px}
+#panel-cheese .nl-go{width:100%;margin-top:4px}
+#panel-cheese .nl-del{width:100%;margin-top:10px}
+#panel-cheese .nl-sent h3{font-size:22px;margin:0 0 4px}
+#panel-cheese .nl-sent>p{font-size:14px;margin:0 0 14px}
+#panel-cheese .nl-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 14px}
+#panel-cheese .nl-stats div{background:var(--alt);border-radius:10px;padding:12px 14px}
+#panel-cheese .nl-stats b{display:block;font:600 24px Archivo,Georgia,serif}
+#panel-cheese .nl-stats span{font-size:12px;color:var(--muted)}
+#panel-cheese .nl-bar{height:8px;background:var(--alt);border-radius:99px;overflow:hidden;margin:4px 0 6px}
+#panel-cheese .nl-bar i{display:block;height:100%;background:var(--green);transition:width .4s}
+#panel-cheese .nl-overlay{position:fixed;inset:0;background:rgba(31,42,45,.5);z-index:150;display:grid;place-items:center;padding:16px}
+#panel-cheese .nl-pv{background:#fff;border-radius:14px;width:min(760px,100%);height:min(88vh,980px);display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow)}
+#panel-cheese .nl-pv-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line)}
+#panel-cheese .nl-pv-sub{font-size:12.5px;min-width:0;flex:1 1 200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#panel-cheese .nl-pv-sp{flex:0 0 0}
+#panel-cheese .nl-pv-frame{flex:1;background:#F3EFE6;display:flex;justify-content:center;overflow:auto}
+#panel-cheese .nl-pv-frame iframe{border:0;width:100%;height:100%;background:#fff;transition:width .2s}
+@media(max-width:1100px){
+  #panel-cheese .nl-grid{grid-template-columns:minmax(0,1fr)}
+  #panel-cheese .nl-side{position:static}
+}
+@media(max-width:640px){
+  #panel-cheese .nl-fields{grid-template-columns:minmax(0,1fr)}
+  #panel-cheese .nl-compose,#panel-cheese .nl-card{padding:16px}
+  #panel-cheese .nl-row{grid-template-columns:1fr;gap:6px}
+  #panel-cheese .nl-row-s{white-space:normal}
+  #panel-cheese .nl-stats b{font-size:20px}
+  #panel-cheese .nl-edit{min-height:300px;padding:14px}
+}
 </style>
 
 <!-- ═══════════ TICKETS & CLASSES back office (React, compiled at runtime like the original ticket site) ═══════════ -->
@@ -10968,6 +11068,423 @@ function editClub(c,onSaved){
   m.append($(`<button class="btn btn-ghost" style="width:100%;margin-top:8px" onclick="ccCloseModal()">Cancel</button>`));
   document.getElementById('ccModalBg').classList.add('show');
 }
+/* ====== NEWSLETTER — monthly email to Cheese Club members (club-newsletter edge function) ======
+   Members are the Square club's club_members (active + paused by default, one email per address).
+   Drafts, preview, test, schedule and send all go through club-newsletter; photos go to the public
+   email-assets bucket. */
+const NL={list:null,cur:null,failed:[],dirty:false,body:null,draw:0,aud:null,audKey:'',audSeq:0,audT:0,poll:0,range:null,src:false,testTo:''};
+try{NL.testTo=localStorage.getItem('ccnl_test_to')||'';}catch(e){}
+const nlCall=(action,p)=>ccFnJson('club-newsletter',Object.assign({action},p||{}));
+const NL_WORD={draft:'Draft',scheduled:'Scheduled',sending:'Sending',sent:'Sent',canceled:'Stopped'};
+const nlWhen=iso=>iso?new Date(iso).toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+const nlMonth=m=>m?fmtMonth(String(m).slice(0,10)):'No month set';
+const nlLive=()=>ADMIN_TAB==='news';
+function nlPill(n){
+  let t=NL_WORD[n.status]||n.status;
+  if(n.status==='scheduled')t+=' · '+nlWhen(n.send_at);
+  if(n.status==='sending')t+=' · '+(n.sent_count||0)+' of '+(n.recipient_count||0);
+  if(n.status==='sent')t+=' · '+(n.sent_count||0)+' delivered'+(n.failed_count?' · '+n.failed_count+' failed':'');
+  return '<span class="nl-pill nl-'+esc(n.status)+'">'+esc(t)+'</span>';
+}
+function nlAudText(a){
+  a=a||{};const parts=[a.who==='active'?'Active members':'All current members'];
+  const names=(NL.list&&NL.list.clubs||[]).filter(c=>(a.clubs||[]).includes(c.slug)).map(c=>c.name);
+  if(names.length)parts.push(names.join(', '));
+  if((a.shops||[]).length)parts.push(a.shops.map(s=>s==='memphis'?'Memphis':'Nashville').join(' & ')+' pickup');
+  return parts.join(' · ');
+}
+const NL_TEMPLATE=`<h2>Hi {{first_name}},</h2>
+<p>Your {{month}} box is ready <b>{{pickup}}</b> at Greys {{shop}} — or come by any time later that week.</p>
+<h3>This month's cheeses</h3>
+<ul><li><b>Cheese name</b> — where it's from, the milk, and what it tastes like.</li><li><b>Cheese name</b> — …</li><li><b>Cheese name</b> — …</li></ul>
+<h3>Pair it with</h3>
+<p>A wine, beer or snack from the shop that goes with this month's box.</p>
+<h3>News from the shop</h3>
+<p>Classes, events and new arrivals worth knowing about.</p>
+<p>See you at pickup!<br>— The GREYS crew</p>`;
+
+// paste from Google Docs / Word / web pages: keep the structure, drop their styling
+function nlClean(html){
+  const t=document.createElement('template');t.innerHTML=html;
+  const KEEP={P:1,BR:1,B:1,STRONG:1,I:1,EM:1,U:1,A:1,UL:1,OL:1,LI:1,H2:1,H3:1,BLOCKQUOTE:1,HR:1,IMG:1};
+  const swap=(el,tag)=>{const n=document.createElement(tag);while(el.firstChild)n.appendChild(el.firstChild);el.replaceWith(n);return n;};
+  const walk=node=>{
+    [...node.childNodes].forEach(ch=>{
+      if(ch.nodeType===8){ch.remove();return;}
+      if(ch.nodeType!==1)return;
+      let tag=ch.tagName;
+      if(/^(SCRIPT|STYLE|META|LINK|TITLE|IFRAME|OBJECT|EMBED|SVG|FORM|INPUT|BUTTON|SELECT|TEXTAREA)$/.test(tag)){ch.remove();return;}
+      const css=ch.getAttribute('style')||'';
+      const heavy=/font-weight\s*:\s*(bold|[6-9]00)/i.test(css), slant=/font-style\s*:\s*italic/i.test(css);
+      if((tag==='B'||tag==='STRONG')&&/font-weight\s*:\s*(normal|[1-4]00)/i.test(css)){walk(ch);ch.replaceWith(...ch.childNodes);return;}
+      if(tag==='H1')ch=swap(ch,'H2'); else if(/^H[4-6]$/.test(tag))ch=swap(ch,'H3'); else if(tag==='DIV')ch=swap(ch,'P');
+      walk(ch);
+      tag=ch.tagName;
+      if(!KEEP[tag]){
+        let inner=[...ch.childNodes];
+        if(tag==='SPAN'&&(heavy||slant)){let w=document.createElement(heavy?'B':'I');inner.forEach(x=>w.appendChild(x));if(heavy&&slant){const i=document.createElement('I');i.appendChild(w);w=i;}inner=[w];}
+        ch.replaceWith(...inner);return;
+      }
+      [...ch.attributes].forEach(a=>{const keep=(tag==='A'&&a.name==='href')||(tag==='IMG'&&(a.name==='src'||a.name==='alt'));if(!keep)ch.removeAttribute(a.name);});
+      if(tag==='A'&&!/^(https?:|mailto:)/i.test(ch.getAttribute('href')||''))ch.removeAttribute('href');
+      if(tag==='IMG'&&!/^https:\/\//i.test(ch.getAttribute('src')||''))ch.remove();
+    });
+  };
+  walk(t.content);
+  return t.innerHTML.replace(/<p>(\s|&nbsp;|<br>)*<\/p>/gi,'').trim();
+}
+// photos: shrink to 1200px wide (keeps emails light), then into the public email-assets bucket
+async function nlUpload(file){
+  if(!/^image\/(jpeg|png|gif|webp)$/.test(file.type))throw new Error('Pick a JPG, PNG, GIF or WebP photo.');
+  let blob=file,ext=(file.type.split('/')[1]||'jpg').replace('jpeg','jpg');
+  if(file.type!=='image/gif'){
+    const img=await new Promise((res,rej)=>{const u=URL.createObjectURL(file),i=new Image();i.onload=()=>{URL.revokeObjectURL(u);res(i);};i.onerror=()=>{URL.revokeObjectURL(u);rej(new Error('That photo could not be read.'));};i.src=u;});
+    const w=Math.min(1200,img.naturalWidth||1200),h=Math.round((img.naturalHeight||800)*w/(img.naturalWidth||1200));
+    const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
+    blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.85));ext='jpg';
+    if(!blob)throw new Error('That photo could not be prepared.');
+  }
+  if(blob.size>10*1024*1024)throw new Error('That photo is too big (10 MB max).');
+  const path='club-newsletter/'+Date.now()+'-'+Math.random().toString(36).slice(2,8)+'.'+ext;
+  const {error}=await sb.storage.from('email-assets').upload(path,blob,{contentType:ext==='jpg'?'image/jpeg':'image/'+ext,upsert:false});
+  if(error)throw new Error('Upload failed: '+error.message);
+  return sb.storage.from('email-assets').getPublicUrl(path).data.publicUrl;
+}
+
+async function drawNewsletter(body){
+  NL.body=body;const my=++NL.draw;clearTimeout(NL.poll);
+  if(NL.cur)return nlEditor();
+  body.innerHTML='';body.append($(`<div class="muted" style="padding:6px 2px">Loading newsletters…</div>`));
+  try{NL.list=await nlCall('list');}catch(e){if(my!==NL.draw)return;body.innerHTML='';body.append($(`<div class="empty">${esc(e.message)}</div>`));return;}
+  if(my!==NL.draw||!nlLive())return;
+  nlList();
+}
+function nlList(){
+  const body=NL.body,d=NL.list,items=d.newsletters||[];body.innerHTML='';
+  const head=$(`<div class="card nl-head"><div class="nl-head-row"><div><h3>Cheese Club newsletter</h3><p class="muted">Write this month's email to club members. It goes to everyone with an active or paused membership (one copy per email address), each with their own unsubscribe link.</p></div><button type="button" class="btn btn-primary btn-sm" data-new>+ New newsletter</button></div></div>`);
+  if(d.env==='sandbox')head.append($(`<div class="nl-note"><b>Test mode.</b> The club runs on the Square sandbox, so newsletters go only to test sign-ups.</div>`));
+  const done=items.some(n=>String(n.month||'').slice(0,10)===d.default_month&&['sent','sending','scheduled'].includes(n.status));
+  if(!done)head.append($(`<div class="nl-nudge">Nothing sent or scheduled for <b>${esc(nlMonth(d.default_month))}</b> yet.</div>`));
+  head.querySelector('[data-new]').addEventListener('click',()=>nlOpen(null));
+  body.append(head);
+  if(!items.length){body.append($(`<div class="empty">No newsletters yet — start one with “New newsletter”.</div>`));return;}
+  const list=$(`<div class="nl-list"></div>`);
+  items.forEach(n=>{
+    const row=$(`<button type="button" class="nl-row"><span class="nl-row-m">${esc(nlMonth(n.month))}</span><span class="nl-row-s">${esc(n.subject||'(no subject yet)')}</span>${nlPill(n)}</button>`);
+    row.addEventListener('click',()=>nlOpen(n.id));list.append(row);
+  });
+  body.append(list);
+  if(items.some(n=>n.status==='sending')){const my=NL.draw;NL.poll=setTimeout(()=>{if(my===NL.draw&&nlLive()&&!NL.cur)drawNewsletter(NL.body);},8000);}
+}
+async function nlOpen(id){
+  clearTimeout(NL.poll);NL.draw++;
+  if(!id){NL.cur={id:null,status:'draft',month:NL.list.default_month,subject:'',preheader:'',body_html:'',audience:{who:'current',clubs:[],shops:[]}};NL.failed=[];NL.dirty=false;NL.src=false;return nlEditor();}
+  NL.body.innerHTML='';NL.body.append($(`<div class="muted" style="padding:6px 2px">Loading…</div>`));
+  try{const d=await nlCall('get',{id});NL.cur=d.newsletter;NL.failed=d.failed||[];NL.dirty=false;NL.src=false;nlEditor();}
+  catch(e){toast(e.message,true);NL.cur=null;drawNewsletter(NL.body);}
+}
+function nlBack(){
+  if(NL.dirty&&!confirm('Leave without saving your changes?'))return;
+  NL.cur=null;NL.dirty=false;drawNewsletter(NL.body);
+}
+function nlEditor(){
+  const n=NL.cur;clearTimeout(NL.poll);
+  if(!['draft','scheduled'].includes(n.status))return nlSent();
+  const body=NL.body;body.innerHTML='';
+  const clubs=(NL.list&&NL.list.clubs)||[],a=n.audience||{who:'current',clubs:[],shops:[]};
+  const top=$(`<div class="nl-top"><button type="button" class="btn btn-ghost btn-sm" data-back>← All newsletters</button>${n.id?nlPill(n):'<span class="nl-pill nl-draft">New draft</span>'}</div>`);
+  top.querySelector('[data-back]').addEventListener('click',nlBack);
+  const grid=$(`<div class="nl-grid">
+    <div class="card nl-compose">
+      <div class="nl-fields">
+        <label class="fld nl-f-month"><span>Box month</span><input type="month" data-f="month"></label>
+        <label class="fld nl-f-subj"><span>Subject</span><input data-f="subject" maxlength="200" placeholder="Your {{month}} box is here"></label>
+      </div>
+      <label class="fld"><span>Preview text <small class="muted">— shows next to the subject in the inbox</small></span><input data-f="preheader" maxlength="200" placeholder="What's inside and when to pick it up"></label>
+      <div class="nl-tools" role="toolbar" aria-label="Formatting">
+        <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
+        <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
+        <button type="button" data-cmd="h2" title="Big heading">Heading</button>
+        <button type="button" data-cmd="h3" title="Small section title">Section</button>
+        <button type="button" data-cmd="p" title="Normal text">Text</button>
+        <button type="button" data-cmd="ul" title="Bulleted list">• List</button>
+        <button type="button" data-cmd="ol" title="Numbered list">1. List</button>
+        <button type="button" data-cmd="link" title="Add a link">Link</button>
+        <button type="button" data-cmd="photo" title="Add a photo">Photo</button>
+        <button type="button" data-cmd="hr" title="Divider line">Line</button>
+        <select data-merge aria-label="Insert a member detail"><option value="">+ Member detail</option><option value="{{first_name}}">First name</option><option value="{{club}}">Their club</option><option value="{{pickup}}">Pickup date</option><option value="{{month}}">Month</option><option value="{{shop}}">Their shop</option></select>
+        <button type="button" data-cmd="template" title="Start from the monthly template">Template</button>
+        <button type="button" data-cmd="src" title="Edit the HTML">HTML</button>
+      </div>
+      <div class="nl-edit" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Newsletter text" data-ed></div>
+      <textarea class="nl-src" data-src aria-label="Newsletter HTML" hidden></textarea>
+      <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" data-file hidden>
+      <p class="muted nl-hint">Member details like <code>{{first_name}}</code> and <code>{{pickup}}</code> are filled in for each person when it sends.</p>
+    </div>
+    <div class="nl-side">
+      <div class="card nl-card">
+        <h4>Who gets it</h4>
+        <label class="nl-opt"><input type="radio" name="nlwho" value="current"> <span>All current members <small>active + paused</small></span></label>
+        <label class="nl-opt"><input type="radio" name="nlwho" value="active"> <span>Active only <small>skip paused</small></span></label>
+        <div class="nl-sub">Clubs</div>
+        <div class="nl-checks" data-clubs></div>
+        <div class="nl-sub">Pickup shop</div>
+        <select data-shop><option value="">Both shops</option><option value="memphis">Memphis</option><option value="nashville">Nashville</option></select>
+        <div class="nl-count" data-count aria-live="polite">Counting…</div>
+        <details class="nl-people"><summary>See who</summary><div data-people></div></details>
+      </div>
+      <div class="card nl-card">
+        <h4>Send</h4>
+        <div class="nl-row2"><button type="button" class="btn btn-ghost btn-sm" data-preview>Preview</button><button type="button" class="btn btn-ghost btn-sm" data-save>Save draft</button></div>
+        <div class="nl-fld"><label class="nl-lbl" for="nl-testto">Send a test to</label><div class="nl-inline"><input id="nl-testto" type="email" data-testto placeholder="you@greyscheese.com" autocomplete="email"><button type="button" class="btn btn-ghost btn-sm" data-test>Send test</button></div></div>
+        <div data-sched></div>
+        <button type="button" class="btn btn-primary nl-go" data-send>Send now</button>
+        ${n.id?'<button type="button" class="btn btn-danger btn-sm nl-del" data-delete>Delete draft</button>':''}
+      </div>
+    </div>
+  </div>`);
+  body.append(top,grid);
+  const q=s=>grid.querySelector(s);
+  const ed=q('[data-ed]'),src=q('[data-src]'),file=q('[data-file]');
+  q('[data-f="month"]').value=String(n.month||'').slice(0,7);
+  q('[data-f="subject"]').value=n.subject||'';
+  q('[data-f="preheader"]').value=n.preheader||'';
+  ed.innerHTML=n.body_html||'';
+  q('[data-testto]').value=NL.testTo;
+  grid.querySelectorAll('[data-f]').forEach(i=>i.addEventListener('input',()=>{NL.dirty=true;}));
+  // who gets it
+  grid.querySelector(`input[name="nlwho"][value="${a.who==='active'?'active':'current'}"]`).checked=true;
+  const ck=q('[data-clubs]');
+  ck.append($(`<label class="nl-chk"><input type="checkbox" data-all ${!(a.clubs||[]).length?'checked':''}> All clubs</label>`));
+  clubs.forEach(c=>ck.append($(`<label class="nl-chk"><input type="checkbox" data-club="${esc(c.slug)}" ${(a.clubs||[]).includes(c.slug)?'checked':''}> ${esc(c.name)}</label>`)));
+  q('[data-shop]').value=(a.shops||[]).length===1?a.shops[0]:'';
+  ck.addEventListener('change',e=>{
+    const t=e.target;
+    if(t.matches('[data-all]')){if(t.checked)ck.querySelectorAll('[data-club]').forEach(x=>x.checked=false);else t.checked=true;}
+    else{const any=[...ck.querySelectorAll('[data-club]')].some(x=>x.checked);ck.querySelector('[data-all]').checked=!any;}
+    NL.dirty=true;nlCount();
+  });
+  grid.querySelectorAll('input[name="nlwho"]').forEach(r=>r.addEventListener('change',()=>{NL.dirty=true;nlCount();}));
+  q('[data-shop]').addEventListener('change',()=>{NL.dirty=true;nlCount();});
+  // schedule box
+  const sched=q('[data-sched]');
+  if(n.status==='scheduled'){
+    sched.append($(`<div class="nl-note nl-sched">Scheduled for <b>${esc(nlWhen(n.send_at))}</b>. Edits you save still go out then.<br><button type="button" class="btn btn-ghost btn-sm" data-unsched>Unschedule</button></div>`));
+    sched.querySelector('[data-unsched]').addEventListener('click',()=>nlAct('cancel','Unscheduled — it is a draft again.'));
+  }else{
+    sched.append($(`<div class="nl-fld"><label class="nl-lbl" for="nl-when">Or schedule it</label><div class="nl-inline"><input id="nl-when" type="datetime-local" data-when><button type="button" class="btn btn-ghost btn-sm" data-schedule>Schedule</button></div></div>`));
+    const w=sched.querySelector('[data-when]'),soon=new Date(Date.now()+10*60000);soon.setSeconds(0,0);
+    w.min=new Date(soon.getTime()-soon.getTimezoneOffset()*60000).toISOString().slice(0,16);
+    sched.querySelector('[data-schedule]').addEventListener('click',async()=>{
+      if(!w.value){toast('Pick a day and time first.',true);w.focus();return;}
+      const t=new Date(w.value);if(isNaN(t)||t.getTime()<Date.now()+60000){toast('Pick a time in the future.',true);return;}
+      if(!(await nlSave(true)))return;
+      try{const d=await nlCall('send',{id:NL.cur.id,send_at:t.toISOString()});NL.cur=Object.assign(NL.cur,d.newsletter||{});toast('Scheduled for '+nlWhen(NL.cur.send_at)+'.');nlEditor();}
+      catch(e){toast(e.message,true);}
+    });
+  }
+  // editor
+  try{document.execCommand('defaultParagraphSeparator',false,'p');document.execCommand('styleWithCSS',false,false);}catch(e){}
+  if(!ed.innerHTML.trim())ed.innerHTML='<p><br></p>';
+  ed.addEventListener('input',()=>{NL.dirty=true;});
+  const keep=()=>{const s=window.getSelection();if(s&&s.rangeCount&&ed.contains(s.anchorNode))NL.range=s.getRangeAt(0).cloneRange();};
+  ['keyup','mouseup','input','focus'].forEach(ev=>ed.addEventListener(ev,keep));
+  const restore=()=>{ed.focus();const s=window.getSelection();if(NL.range&&ed.contains(NL.range.startContainer)){s.removeAllRanges();s.addRange(NL.range);}else{const r=document.createRange();r.selectNodeContents(ed);r.collapse(false);s.removeAllRanges();s.addRange(r);}};
+  const insertHtml=h=>{restore();document.execCommand('insertHTML',false,h);NL.dirty=true;keep();};
+  ed.addEventListener('paste',e=>{
+    const cd=e.clipboardData;if(!cd)return;e.preventDefault();
+    const h=cd.getData('text/html'),t=cd.getData('text/plain');
+    if(h)insertHtml(nlClean(h)||esc(t));
+    else insertHtml(t.split(/\r?\n\s*\r?\n/).map(p=>'<p>'+esc(p).replace(/\r?\n/g,'<br>')+'</p>').join(''));
+  });
+  ed.addEventListener('drop',e=>{if(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length){e.preventDefault();nlPhoto(e.dataTransfer.files[0],insertHtml);}});
+  file.addEventListener('change',()=>{const f=file.files&&file.files[0];file.value='';if(f)nlPhoto(f,insertHtml);});
+  const merge=q('[data-merge]');
+  merge.addEventListener('change',()=>{const v=merge.value;merge.value='';if(v){restore();document.execCommand('insertText',false,v);NL.dirty=true;keep();}});
+  q('.nl-tools').addEventListener('mousedown',e=>{if(e.target.closest('button'))e.preventDefault();});
+  q('.nl-tools').addEventListener('click',e=>{
+    const b=e.target.closest('button[data-cmd]');if(!b)return;const c=b.dataset.cmd;
+    if(c==='src'){nlToggleSrc(ed,src,b);return;}
+    if(NL.src){toast('Switch back from HTML to use the formatting buttons.',true);return;}
+    if(c==='photo'){keep();file.click();return;}
+    if(c==='template'){
+      if(ed.textContent.trim()&&!confirm('Replace what you have written with the monthly template?'))return;
+      ed.innerHTML=NL_TEMPLATE;NL.dirty=true;return;
+    }
+    restore();
+    if(c==='bold'||c==='italic')document.execCommand(c);
+    else if(c==='h2'||c==='h3'||c==='p')document.execCommand('formatBlock',false,'<'+c+'>');
+    else if(c==='ul')document.execCommand('insertUnorderedList');
+    else if(c==='ol')document.execCommand('insertOrderedList');
+    else if(c==='hr')document.execCommand('insertHorizontalRule');
+    else if(c==='link'){
+      const sel=window.getSelection(),txt=sel?String(sel):'';
+      let url=prompt('Link to (web address or email):','https://');
+      if(!url)return;url=url.trim();
+      if(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(url))url='mailto:'+url;
+      else if(!/^(https?:|mailto:)/i.test(url))url='https://'+url.replace(/^\/+/,'');
+      restore();
+      if(txt)document.execCommand('createLink',false,url);else document.execCommand('insertHTML',false,'<a href="'+esc(url)+'">'+esc(url.replace(/^mailto:/,''))+'</a>');
+    }
+    NL.dirty=true;keep();
+  });
+  // actions
+  q('[data-save]').addEventListener('click',()=>nlSave(false));
+  q('[data-preview]').addEventListener('click',()=>nlPreview());
+  q('[data-test]').addEventListener('click',async()=>{
+    const to=q('[data-testto]').value.trim();
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)){toast('Enter the email address for the test.',true);q('[data-testto]').focus();return;}
+    NL.testTo=to;try{localStorage.setItem('ccnl_test_to',to);}catch(e){}
+    if(!nlHasContent())return;
+    const b=q('[data-test]');b.disabled=true;b.textContent='Sending…';
+    try{await nlCall('test',Object.assign(nlCollect(),{to}));toast('Test sent to '+to+'.');}
+    catch(e){toast(e.message,true);}
+    finally{b.disabled=false;b.textContent='Send test';}
+  });
+  q('[data-send]').addEventListener('click',async()=>{
+    if(!nlHasContent())return;
+    const cnt=NL.aud?NL.aud.count:null;
+    if(cnt===0){toast('Nobody matches who this goes to.',true);return;}
+    if(!confirm('Send “'+(nlCollect().subject)+'” to '+(cnt==null?'all matching':cnt)+' member'+(cnt===1?'':'s')+' now?'))return;
+    if(!(await nlSave(true)))return;
+    const b=q('[data-send]');b.disabled=true;b.textContent='Sending…';
+    try{const d=await nlCall('send',{id:NL.cur.id});NL.cur=Object.assign(NL.cur,d.newsletter||{});toast(NL.cur.status==='sent'?'Sent to '+NL.cur.sent_count+' member'+(NL.cur.sent_count===1?'':'s')+'.':'Sending…');nlEditor();}
+    catch(e){toast(e.message,true);b.disabled=false;nlSendLabel();}
+  });
+  const del=q('[data-delete]');
+  if(del)del.addEventListener('click',async()=>{
+    if(!confirm('Delete this draft?'))return;
+    try{await nlCall('delete',{id:NL.cur.id});NL.cur=null;NL.dirty=false;toast('Draft deleted.');drawNewsletter(NL.body);}catch(e){toast(e.message,true);}
+  });
+  NL.aud=null;NL.audKey='';nlCount();
+}
+function nlToggleSrc(ed,src,btn){
+  if(!NL.src){src.value=ed.innerHTML.replace(/<\/(p|h2|h3|ul|ol|li|blockquote)>/gi,'</$1>\n').trim();ed.hidden=true;src.hidden=false;NL.src=true;btn.classList.add('on');src.oninput=()=>{NL.dirty=true;};src.focus();}
+  else{ed.innerHTML=src.value;src.hidden=true;ed.hidden=false;NL.src=false;btn.classList.remove('on');NL.dirty=true;}
+}
+async function nlPhoto(f,insertHtml){
+  toast('Uploading photo…');
+  try{const url=await nlUpload(f);insertHtml('<img src="'+esc(url)+'" alt="">');toast('Photo added.');}
+  catch(e){toast(e.message,true);}
+}
+function nlAudience(){
+  const g=NL.body,club=[...g.querySelectorAll('[data-club]')].filter(x=>x.checked).map(x=>x.dataset.club);
+  const shop=(g.querySelector('[data-shop]')||{}).value||'';
+  const who=(g.querySelector('input[name="nlwho"]:checked')||{}).value==='active'?'active':'current';
+  return {who,clubs:club,shops:shop?[shop]:[]};
+}
+function nlCollect(){
+  const g=NL.body,v=s=>{const e=g.querySelector(s);return e?e.value:'';};
+  const ed=g.querySelector('[data-ed]'),src=g.querySelector('[data-src]');
+  const html=NL.src?src.value:ed.innerHTML;
+  return {id:NL.cur&&NL.cur.id||undefined,month:v('[data-f="month"]'),subject:v('[data-f="subject"]').trim(),preheader:v('[data-f="preheader"]').trim(),body_html:/^(\s|<p><br><\/p>)*$/i.test(html)?'':html,audience:nlAudience()};
+}
+function nlHasContent(){
+  const c=nlCollect();
+  if(!c.subject){toast('Add a subject first.',true);NL.body.querySelector('[data-f="subject"]').focus();return false;}
+  if(!c.body_html.replace(/<[^>]*>/g,'').trim()){toast('Write the newsletter first.',true);return false;}
+  return true;
+}
+async function nlSave(quiet){
+  const c=nlCollect();
+  if(!quiet&&!c.subject&&!c.body_html){toast('Nothing to save yet.',true);return false;}
+  if(quiet&&NL.cur.id&&!NL.dirty)return true;
+  const b=NL.body.querySelector('[data-save]');if(b){b.disabled=true;b.textContent='Saving…';}
+  try{
+    const d=await nlCall('save',c);NL.cur=Object.assign({},NL.cur,d.newsletter);NL.dirty=false;
+    if(!quiet){toast('Draft saved.');nlEditor();}
+    return true;
+  }catch(e){toast(e.message,true);return false;}
+  finally{if(b&&document.body.contains(b)){b.disabled=false;b.textContent='Save draft';}}
+}
+function nlSendLabel(){
+  const b=NL.body&&NL.body.querySelector('[data-send]');if(!b||b.disabled)return;
+  const n=NL.aud?NL.aud.count:null;
+  b.textContent=n==null?'Send now':n===0?'Nobody to send to':'Send now to '+n+' member'+(n===1?'':'s');
+}
+function nlCount(){
+  clearTimeout(NL.audT);
+  const out=NL.body.querySelector('[data-count]');if(!out)return;
+  const aud=nlAudience(),key=JSON.stringify(aud);
+  if(key===NL.audKey&&NL.aud)return;
+  out.textContent='Counting…';
+  NL.audT=setTimeout(async()=>{
+    const seq=++NL.audSeq;
+    try{
+      const d=await nlCall('audience',{audience:aud});if(seq!==NL.audSeq)return;
+      NL.aud=d;NL.audKey=key;
+      const o=NL.body.querySelector('[data-count]'),pp=NL.body.querySelector('[data-people]');if(!o)return;
+      o.innerHTML='Goes to <b>'+d.count+'</b> member'+(d.count===1?'':'s')+(d.opted_out?' <span class="muted">· '+d.opted_out+' unsubscribed</span>':'');
+      if(pp)pp.innerHTML=(d.recipients||[]).map(r=>'<div class="nl-person"><b>'+esc(r.name||'—')+'</b> <span class="muted">'+esc(r.email)+'</span><small>'+esc((r.clubs||[]).join(', '))+'</small></div>').join('')||'<div class="muted">Nobody yet.</div>';
+      nlSendLabel();
+    }catch(e){if(seq===NL.audSeq){const o=NL.body.querySelector('[data-count]');if(o)o.textContent=e.message;}}
+  },300);
+}
+async function nlPreview(c){
+  c=c||nlCollect();
+  const ov=$(`<div class="nl-overlay" role="dialog" aria-modal="true" aria-label="Email preview"><div class="nl-pv"><div class="nl-pv-bar"><b>Preview</b><span class="nl-pv-sub muted"></span><span class="nl-pv-sp"></span><button type="button" class="btn btn-ghost btn-sm" data-w="600">Computer</button><button type="button" class="btn btn-ghost btn-sm" data-w="375">Phone</button><button type="button" class="btn btn-primary btn-sm" data-close>Close</button></div><div class="nl-pv-frame"><div class="muted" style="padding:30px;text-align:center">Building the preview…</div></div></div></div>`);
+  const close=()=>{ov.remove();document.removeEventListener('keydown',esc_);};
+  const esc_=e=>{if(e.key==='Escape')close();};
+  ov.addEventListener('click',e=>{if(e.target===ov||e.target.closest('[data-close]'))close();});
+  document.addEventListener('keydown',esc_);
+  NL.body.append(ov);ov.querySelector('[data-close]').focus();
+  try{
+    const d=await nlCall('preview',c);
+    ov.querySelector('.nl-pv-sub').textContent=d.subject+(d.to?' — shown as it goes to '+d.to:'');
+    const f=document.createElement('iframe');f.title='Email preview';f.setAttribute('sandbox','');f.srcdoc=d.html;
+    const fr=ov.querySelector('.nl-pv-frame');fr.innerHTML='';fr.append(f);
+    ov.querySelectorAll('[data-w]').forEach(b=>b.addEventListener('click',()=>{f.style.width=b.dataset.w==='375'?'375px':'100%';}));
+  }catch(e){ov.querySelector('.nl-pv-frame').innerHTML='<div class="empty">'+esc(e.message)+'</div>';}
+}
+async function nlAct(action,msg){
+  try{const d=await nlCall(action,{id:NL.cur.id});NL.cur=Object.assign(NL.cur,d.newsletter||{});toast(msg);nlEditor();}
+  catch(e){toast(e.message,true);}
+}
+// sent / sending / stopped: read-only, with progress while it sends
+function nlSent(){
+  const n=NL.cur,body=NL.body;body.innerHTML='';
+  const top=$(`<div class="nl-top"><button type="button" class="btn btn-ghost btn-sm" data-back>← All newsletters</button>${nlPill(n)}</div>`);
+  top.querySelector('[data-back]').addEventListener('click',()=>{NL.cur=null;drawNewsletter(NL.body);});
+  const pct=n.recipient_count?Math.round(100*((n.sent_count||0)+(n.failed_count||0))/n.recipient_count):0;
+  const card=$(`<div class="card nl-sent">
+    <h3>${esc(n.subject||'(no subject)')}</h3>
+    <p class="muted">${esc(nlMonth(n.month))} · ${esc(nlAudText(n.audience))}${n.started_at?' · started '+esc(nlWhen(n.started_at)):''}${n.finished_at?' · finished '+esc(nlWhen(n.finished_at)):''}</p>
+    <div class="nl-stats"><div><b>${n.recipient_count||0}</b><span>members</span></div><div><b>${n.sent_count||0}</b><span>delivered</span></div><div><b>${n.failed_count||0}</b><span>failed</span></div></div>
+    ${n.status==='sending'?`<div class="nl-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div><p class="muted">Sending — you can leave this page; it keeps going.</p>`:''}
+    ${n.last_error?`<div class="nl-note nl-err">${esc(n.last_error)}</div>`:''}
+    <div class="nl-row2"></div>
+  </div>`);
+  const acts=card.querySelector('.nl-row2');
+  const pv=$(`<button type="button" class="btn btn-ghost btn-sm">See the email</button>`);pv.addEventListener('click',nlPreviewSaved);acts.append(pv);
+  const dup=$(`<button type="button" class="btn btn-ghost btn-sm">Copy into a new draft</button>`);
+  dup.addEventListener('click',async()=>{
+    try{const d=await nlCall('save',{month:NL.list?NL.list.default_month:n.month,subject:n.subject,preheader:n.preheader,body_html:n.body_html,audience:n.audience});NL.cur=d.newsletter;NL.dirty=false;toast('Copied into a new draft.');nlEditor();}
+    catch(e){toast(e.message,true);}
+  });
+  acts.append(dup);
+  if(n.status==='sending'){
+    const stop=$(`<button type="button" class="btn btn-danger btn-sm">Stop sending</button>`);
+    stop.addEventListener('click',()=>{if(confirm('Stop sending? Members who already got it keep it; nobody else will.'))nlAct('cancel','Stopped.');});
+    acts.append(stop);
+  }
+  if(NL.failed.length){
+    card.append($(`<details class="nl-people" open><summary>${NL.failed.length} didn't go out</summary>${NL.failed.map(f=>'<div class="nl-person"><b>'+esc(f.email)+'</b><small>'+esc(f.error||'')+'</small></div>').join('')}</details>`));
+  }
+  body.append(top,card);
+  if(n.status==='sending'){
+    const my=NL.draw;
+    NL.poll=setTimeout(async()=>{
+      if(my!==NL.draw||!nlLive()||!NL.cur||NL.cur.id!==n.id)return;
+      try{await nlCall('run');const d=await nlCall('get',{id:n.id});if(my!==NL.draw||!NL.cur||NL.cur.id!==n.id)return;NL.cur=d.newsletter;NL.failed=d.failed||[];}catch(e){}
+      if(my===NL.draw&&nlLive()&&NL.cur&&NL.cur.id===n.id)nlSent();
+    },3000);
+  }
+}
+function nlPreviewSaved(){
+  const n=NL.cur;
+  nlPreview({id:n.id,month:String(n.month||'').slice(0,7),subject:n.subject||'',preheader:n.preheader||'',body_html:n.body_html||'',audience:n.audience||{}});
+}
+
 async function viewAdmin(){
   const el=$(`<div class="wrap" style="padding:0"></div>`);
 
@@ -11207,7 +11724,7 @@ async function viewAdmin(){
       finally{rbtn.disabled=false;rbtn.textContent='Send pickup reminders now';}
     });
   };
-  const draws={ov:drawOv,subs:drawSubs,members:drawMembers,orders:drawOrders,roster:drawRoster,revenue:drawRevenue,notify:drawNotify};
+  const draws={ov:drawOv,subs:drawSubs,members:drawMembers,orders:drawOrders,roster:drawRoster,revenue:drawRevenue,notify:drawNotify,news:()=>drawNewsletter(body)};
   const NAV=[
     {t:'ov',label:'Clubs',ico:'🧀'},
     {t:'subs',label:'Subscriptions',ico:'📋'},
@@ -11216,6 +11733,7 @@ async function viewAdmin(){
     {t:'roster',label:'Roster',ico:'📅'},
     {t:'revenue',label:'Revenue',ico:'💵'},
     {t:'notify',label:'Notify',ico:'✉️'},
+    {t:'news',label:'Newsletter',ico:'📰'},
   ];
   if(!draws[ADMIN_TAB]) ADMIN_TAB='ov';
   const selectTab=(t)=>{ ADMIN_TAB=t; nav.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.t===t)); const mx=el.querySelector('#ccMetrics'); if(mx) mx.style.display=(t==='ov')?'':'none'; draws[t](); };
