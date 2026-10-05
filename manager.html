@@ -637,6 +637,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab" onclick="ccTab(this,'revenue')">Revenue</div>
     <div class="tab" onclick="ccTab(this,'notify')">Notify</div>
     <div class="tab" onclick="ccTab(this,'news')">Newsletter</div>
+    <div class="tab" onclick="ccTab(this,'comps')">Comps</div>
   </div>
 
   <div class="main">
@@ -3787,6 +3788,74 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   #panel-cheese .nl-stats b{font-size:20px}
   #panel-cheese .nl-edit{min-height:300px;padding:14px}
 }
+</style>
+<style id="cccp-style">
+/* Cheese Club → Comps (prepaid & comp memberships, square-club comp_* actions) */
+#panel-cheese .cp-head{margin-bottom:14px}
+#panel-cheese .cp-head h3{font-size:20px;margin:0 0 4px}
+#panel-cheese .cp-head p{margin:0;font-size:14px}
+#panel-cheese .cp-stats{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:14px;font-size:14px;color:var(--muted)}
+#panel-cheese .cp-stats b{color:var(--ink);font-size:16px}
+#panel-cheese .cp-toggle{margin:0 0 10px 2px;font-size:13.5px;color:var(--muted)}
+#panel-cheese .cp-list{display:flex;flex-direction:column;gap:8px}
+#panel-cheese .cp-row{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1.2fr) auto;gap:14px;align-items:center;width:100%;text-align:left;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:13px 16px;font:inherit;color:var(--ink);cursor:pointer;box-shadow:var(--shadow)}
+#panel-cheese .cp-row:hover{border-color:#c9d6cc}
+#panel-cheese .cp-row:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+#panel-cheese .cp-row>span{min-width:0}
+#panel-cheese .cp-row small{display:block;color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#panel-cheese .cp-who b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#panel-cheese .cp-club,#panel-cheese .cp-left{font-size:14px}
+#panel-cheese .cp-tags{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end}
+#panel-cheese .cp-pill,#panel-cheese .cp-flag{display:inline-block;padding:4px 10px;border-radius:999px;font:600 12px Inter,sans-serif;white-space:nowrap}
+#panel-cheese .cp-pill.cp-prepaid{background:#e6f3e7;color:#2f7d3a}
+#panel-cheese .cp-pill.cp-comp{background:#e7eefb;color:#2f4f8f}
+#panel-cheese .cp-pill.cp-monthly{background:#efece6;color:#6f6557}
+#panel-cheese .cp-pill.cp-ended{background:#f2e3e1;color:#9a4034}
+#panel-cheese .cp-flag{background:#eef1f6;color:#46546e;font-weight:500}
+#panel-cheese .cp-flag.cp-soon{background:#fdf3e2;color:#92400e;font-weight:600}
+#panel-cheese .cp-flag.cp-keep{background:#e6f3e7;color:#2f7d3a}
+#panel-cheese .cp-form{padding:20px;margin-bottom:14px;max-width:820px}
+#panel-cheese .cp-form h3{font-size:20px;margin:0 0 12px}
+#panel-cheese .cp-kinds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 16px}
+#panel-cheese .cp-kind{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer;font-size:14px}
+#panel-cheese .cp-kind:has(input:checked){border-color:var(--green);background:#f3f8f4}
+#panel-cheese .cp-kind input{width:auto;margin-top:3px;accent-color:var(--green)}
+#panel-cheese .cp-kind small{display:block;color:var(--muted);font-size:12.5px}
+#panel-cheese .cp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px}
+#panel-cheese .cp-form input:not([type=checkbox]):not([type=radio]),#panel-cheese .cp-form select,#panel-cheese .cp-form textarea{width:100%}
+#panel-cheese .cp-form textarea{resize:vertical;font:inherit}
+#panel-cheese .cp-form [hidden],#panel-cheese .cp-head [hidden]{display:none!important}
+#panel-cheese .cp-open{margin-top:8px;font-size:13.5px}
+#panel-cheese .cp-21{margin:0 0 12px;font-size:14px}
+#panel-cheese .cp-sum{margin:0 0 14px;padding:10px 12px;background:var(--alt);border-radius:10px;font-size:14px}
+#panel-cheese .cp-err{margin:0 0 12px;background:#fbeeec;border:1px solid #efc9c3;color:#8c3b2e;border-radius:10px;padding:9px 12px;font-size:13.5px}
+#panel-cheese .cp-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+#panel-cheese .cp-title h3{margin:0 0 2px}
+#panel-cheese .cp-title p{margin:0 0 12px;font-size:13.5px}
+#panel-cheese .cp-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 18px;margin:0 0 6px}
+#panel-cheese .cp-facts div{min-width:0}
+#panel-cheese .cp-facts dt{font:600 11.5px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 2px}
+#panel-cheese .cp-facts dd{margin:0;font-size:14px;overflow-wrap:anywhere}
+#panel-cheese .cp-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+#panel-cheese .cp-acts:empty{display:none}
+#panel-cheese .cp-confirm{margin-top:12px;padding:12px 14px;border:1px solid #efc9c3;background:#fdf7f6;border-radius:10px;font-size:14px}
+#panel-cheese .cp-confirm p{margin:0}
+#panel-cheese .cp-small{font-size:13px;margin:10px 0 0}
+@media(max-width:900px){
+  #panel-cheese .cp-row{grid-template-columns:minmax(0,1fr) auto;gap:6px 12px}
+  #panel-cheese .cp-club,#panel-cheese .cp-left{grid-column:1/2}
+  #panel-cheese .cp-tags{grid-column:2/3;grid-row:1/2}
+}
+@media(max-width:640px){
+  #panel-cheese .cp-row{grid-template-columns:minmax(0,1fr)}
+  #panel-cheese .cp-club,#panel-cheese .cp-left,#panel-cheese .cp-tags{grid-column:auto;grid-row:auto}
+  #panel-cheese .cp-tags{justify-content:flex-start}
+  #panel-cheese .cp-kinds,#panel-cheese .cp-grid,#panel-cheese .cp-facts{grid-template-columns:minmax(0,1fr)}
+  #panel-cheese .cp-form{padding:16px}
+}
+/* the console theme makes .btn-danger solid red but leaves the text red too — make it readable */
+#panel-cheese .btn-danger{color:#fff}
+#panel-cheese .btn-danger:hover{background:#8f2418;border-color:#8f2418;color:#fff}
 </style>
 
 <!-- ═══════════ TICKETS & CLASSES back office (React, compiled at runtime like the original ticket site) ═══════════ -->
@@ -11118,6 +11187,274 @@ function nlPreviewSaved(){
   nlPreview({id:n.id,month:String(n.month||'').slice(0,7),subject:n.subject||'',preheader:n.preheader||'',body_html:n.body_html||'',audience:n.audience||{}});
 }
 
+/* ====== COMPS — prepaid & comp memberships (square-club comp_* actions) ======
+   Guests who paid up front (prepaid) or are on the house (comp): no card and no Square subscription.
+   They get a box every month through their last box, can skip a month on their membership page (the
+   last box moves out a month), and about a month before the last box they're emailed a link to keep
+   it going monthly. Everything goes through the square-club edge function with the manager's session. */
+const CP={data:null,body:null,draw:0,cur:null,showEnded:false,mode:'list',busy:false};
+const cpCall=(action,p)=>ccFnJson('square-club',Object.assign({action},p||{}));
+const cpLive=()=>ADMIN_TAB==='comps';
+const CP_SHOP={memphis:'Memphis',nashville:'Nashville'};
+const cpLong=m=>m?fmtMonth(String(m).slice(0,10)):'';
+const cpShort=m=>m?new Date(String(m).slice(0,10)+'T00:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}):'';
+const cpDay=iso=>iso?new Date(String(iso).length>10?iso:iso+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+function cpAddMonths(m,k){let [y,mo]=String(m).slice(0,7).split('-').map(Number);const t=y*12+(mo-1)+k;return Math.floor(t/12)+'-'+String(t%12+1).padStart(2,'0')+'-01';}
+function cpMonths(from,n){const out=[];for(let i=0;i<n;i++)out.push(cpAddMonths(from,i));return out;}
+const cpName=m=>((m.first_name||'')+' '+(m.last_name||'')).trim()||m.email;
+function cpPill(m){
+  if(m.kind==='monthly')return '<span class="cp-pill cp-monthly">Now monthly</span>';
+  if(m.ended)return '<span class="cp-pill cp-ended">Ended</span>';
+  return m.kind==='comp'?'<span class="cp-pill cp-comp">On us</span>':'<span class="cp-pill cp-prepaid">Prepaid</span>';
+}
+function cpBoxes(m){
+  if(m.kind==='monthly')return 'Pays monthly through Square'+(m.billing_start?' since '+cpShort(m.billing_start):'');
+  if(m.ended)return 'Ended'+(m.canceled_date?' '+cpDay(m.canceled_date):'');
+  if(m.open_ended)return 'No end date';
+  return m.boxes_left+' of '+m.boxes_total+' left · last box '+cpShort(m.last_month);
+}
+
+async function drawComps(body){
+  CP.body=body;const my=++CP.draw;CP.mode='list';CP.cur=null;
+  body.innerHTML='';body.append($(`<div class="muted" style="padding:6px 2px">Loading memberships…</div>`));
+  try{CP.data=await cpCall('comp_list');}catch(e){if(my!==CP.draw)return;body.innerHTML='';body.append($(`<div class="empty">${esc(e.message)}</div>`));return;}
+  if(my!==CP.draw||!cpLive())return;
+  cpList();
+}
+async function cpReload(id){
+  const my=++CP.draw;
+  try{CP.data=await cpCall('comp_list');}catch(e){toast(e.message,true);return;}
+  if(my!==CP.draw||!cpLive())return;
+  if(id){const m=(CP.data.members||[]).find(x=>x.id===id);if(m){CP.cur=m;CP.mode='edit';return cpEdit();}}
+  cpList();
+}
+function cpList(){
+  const d=CP.data,body=CP.body;body.innerHTML='';CP.mode='list';CP.cur=null;
+  const all=d.members||[];
+  const live=all.filter(m=>!m.ended&&m.kind!=='monthly');
+  const shown=CP.showEnded?all:all.filter(m=>!m.ended);
+  const boxesNow=live.filter(m=>m.this_month==='box').length, soon=live.filter(m=>m.ending_soon).length;
+  const head=$(`<div class="card cp-head"><div class="nl-head-row"><div><h3>Comp &amp; prepaid memberships</h3><p class="muted">For guests who paid up front or are on the house — nothing is ever charged. They get a box every month through their last box and can skip a month on their membership page (the last box moves out a month). About a month before the last box they get an email to keep it going monthly.</p></div><button type="button" class="btn btn-primary btn-sm" data-add>+ Add membership</button></div></div>`);
+  if(d.env==='sandbox')head.append($(`<div class="nl-note"><b>Test mode.</b> The club runs on the Square sandbox, so memberships added here are test memberships and their emails say [TEST]. Add the real guests once the club is live.</div>`));
+  head.append($(`<div class="cp-stats"><span><b>${live.length}</b> active</span><span><b>${boxesNow}</b> box${boxesNow===1?'':'es'} for ${esc(cpLong(d.month).replace(/ \d{4}$/,''))}</span>${soon?`<span><b>${soon}</b> ending soon</span>`:''}</div>`));
+  head.querySelector('[data-add]').addEventListener('click',()=>cpAdd());
+  body.append(head);
+  if(all.some(m=>m.ended)){
+    const bar=$(`<label class="nl-chk cp-toggle"><input type="checkbox" ${CP.showEnded?'checked':''}> Show ended memberships</label>`);
+    bar.querySelector('input').addEventListener('change',e=>{CP.showEnded=e.target.checked;cpList();});
+    body.append(bar);
+  }
+  if(!shown.length){body.append($(`<div class="empty">No comp or prepaid memberships yet — add one with “Add membership”.</div>`));return;}
+  const list=$(`<div class="cp-list"></div>`);
+  shown.forEach(m=>{
+    const tags=[cpPill(m)];
+    if(m.ending_soon)tags.push('<span class="cp-flag cp-soon">Ending soon</span>');
+    if(m.then_monthly&&m.kind!=='monthly')tags.push(`<span class="cp-flag cp-keep">Monthly from ${esc(cpShort(m.billing_start))}</span>`);
+    if(m.skipping)tags.push(`<span class="cp-flag">Skipping ${esc(cpShort(m.skipping.month))}</span>`);
+    const next=m.next_box&&!m.ended?`Next box ${esc(m.next_box.month_label.replace(/ \d{4}$/,''))} · ${esc(m.next_box.pickup_label)}`:'';
+    const row=$(`<button type="button" class="cp-row"><span class="cp-who"><b>${esc(cpName(m))}</b><small>${esc(m.email)}</small></span><span class="cp-club">${esc(m.club.name)}<small>${esc(CP_SHOP[m.shop]||m.shop)} · ${esc(m.code)}</small></span><span class="cp-left">${esc(cpBoxes(m))}<small>${next}</small></span><span class="cp-tags">${tags.join('')}</span></button>`);
+    row.addEventListener('click',()=>{CP.cur=m;CP.mode='edit';cpEdit();});
+    list.append(row);
+  });
+  body.append(list);
+}
+
+// the shop list follows the club (the wine clubs are Memphis only)
+function cpShopOpts(sel,club,keep){
+  const shops=(club&&club.shops&&club.shops.length)?club.shops:['memphis','nashville'];
+  const cur=keep&&shops.includes(keep)?keep:shops[0];
+  sel.innerHTML=shops.map(s=>`<option value="${s}" ${s===cur?'selected':''}>${CP_SHOP[s]}</option>`).join('');
+}
+function cpErr(box,msg){const e=box.querySelector('[data-err]');e.textContent=msg||'';e.hidden=!msg;if(msg)e.scrollIntoView({block:'nearest'});}
+
+function cpAdd(){
+  CP.mode='add';
+  const d=CP.data,body=CP.body,clubs=d.clubs||[];body.innerHTML='';
+  const months=cpMonths(d.month,13);
+  const top=$(`<div class="nl-top"><button type="button" class="btn btn-ghost btn-sm" data-back>← Comp &amp; prepaid</button></div>`);
+  top.querySelector('[data-back]').addEventListener('click',()=>cpList());
+  const f=$(`<div class="card cp-form">
+    <h3>Add a membership</h3>
+    <div class="cp-kinds" role="radiogroup" aria-label="Type of membership">
+      <label class="cp-kind"><input type="radio" name="cpkind" value="prepaid" checked><span><b>Prepaid</b><small>They paid up front — a year, or any number of boxes</small></span></label>
+      <label class="cp-kind"><input type="radio" name="cpkind" value="comp"><span><b>Comp</b><small>On the house</small></span></label>
+    </div>
+    <div class="cp-grid">
+      <div class="nl-fld"><label class="nl-lbl" for="cp-first">First name</label><input id="cp-first" data-f="first_name" maxlength="60" autocomplete="off"></div>
+      <div class="nl-fld"><label class="nl-lbl" for="cp-last">Last name</label><input id="cp-last" data-f="last_name" maxlength="60" autocomplete="off"></div>
+      <div class="nl-fld"><label class="nl-lbl" for="cp-email">Email <small class="muted">— their membership link goes here</small></label><input id="cp-email" type="email" data-f="email" maxlength="200" autocomplete="off"></div>
+      <div class="nl-fld"><label class="nl-lbl" for="cp-phone">Mobile <small class="muted">— optional</small></label><input id="cp-phone" type="tel" data-f="phone" maxlength="40" autocomplete="off"></div>
+      <div class="nl-fld"><label class="nl-lbl" for="cp-club">Club</label><select id="cp-club" data-f="club">${clubs.map(c=>`<option value="${esc(c.slug)}">${esc(c.name)}</option>`).join('')}</select></div>
+      <div class="nl-fld"><label class="nl-lbl" for="cp-shop">Pickup shop</label><select id="cp-shop" data-f="shop"></select></div>
+      <div class="nl-fld"><label class="nl-lbl" for="cp-firstm">First box</label><select id="cp-firstm" data-f="first_month">${months.map(m=>`<option value="${m}">${esc(cpLong(m))}</option>`).join('')}</select></div>
+      <div class="nl-fld"><label class="nl-lbl" for="cp-boxes">How many boxes</label><input id="cp-boxes" type="number" inputmode="numeric" min="1" max="36" step="1" value="12" data-f="boxes"><label class="nl-chk cp-open" hidden><input type="checkbox" data-open> No end date</label></div>
+    </div>
+    <label class="nl-chk cp-21" hidden><input type="checkbox" data-21> This club includes wine — I checked they're 21 or older</label>
+    <div class="cp-sum" data-sum aria-live="polite"></div>
+    <div class="nl-fld"><label class="nl-lbl" for="cp-note">Note for staff <small class="muted">— what they paid, where, who okayed it</small></label><textarea id="cp-note" data-f="note" rows="2" maxlength="500"></textarea></div>
+    <label class="nl-chk"><input type="checkbox" data-mail checked> Email them a welcome with their membership link</label>
+    <div class="cp-err" data-err role="alert" hidden></div>
+    <div class="cp-btns"><button type="button" class="btn btn-primary" data-go>Add membership</button><button type="button" class="btn btn-ghost" data-cancel>Cancel</button></div>
+  </div>`);
+  body.append(top,f);
+  const q=s=>f.querySelector(s),club=()=>clubs.find(c=>c.slug===q('[data-f="club"]').value);
+  q('[data-f="first_month"]').value=d.default_first||d.month;
+  cpShopOpts(q('[data-f="shop"]'),club());
+  const kind=()=>f.querySelector('input[name="cpkind"]:checked').value;
+  const sync=()=>{
+    const c=club(),comp=kind()==='comp',open=comp&&q('[data-open]').checked;
+    q('.cp-open').hidden=!comp; if(!comp)q('[data-open]').checked=false;
+    q('[data-f="boxes"]').disabled=open;
+    q('.cp-21').hidden=!(c&&c.age_21);
+    const fm=q('[data-f="first_month"]').value,n=Math.round(Number(q('[data-f="boxes"]').value));
+    let t;
+    if(open)t=`On us from <b>${esc(cpLong(fm))}</b> — no end date.`;
+    else if(n>=1&&n<=36)t=`<b>${n} box${n===1?'':'es'}</b>: ${esc(cpLong(fm))}${n>1?' through '+esc(cpLong(cpAddMonths(fm,n-1))):''}. ${comp?'On the house':'Already paid for'} — nothing is charged.`;
+    else t='Boxes: 1 to 36.';
+    q('[data-sum]').innerHTML=t;
+  };
+  f.addEventListener('change',e=>{if(e.target.matches('[data-f="club"]'))cpShopOpts(q('[data-f="shop"]'),club(),q('[data-f="shop"]').value);sync();});
+  q('[data-f="boxes"]').addEventListener('input',sync);
+  sync();
+  q('[data-cancel]').addEventListener('click',()=>cpList());
+  q('[data-go]').addEventListener('click',async()=>{
+    if(CP.busy)return;
+    const v=k=>q(`[data-f="${k}"]`).value.trim();
+    const p={kind:kind(),first_name:v('first_name'),last_name:v('last_name'),email:v('email'),phone:v('phone'),club:v('club'),shop:v('shop'),first_month:v('first_month'),note:v('note'),send_email:q('[data-mail]').checked};
+    if(p.kind==='comp'&&q('[data-open]').checked)p.open_ended=true;else p.boxes=Number(v('boxes'));
+    if(club()&&club().age_21)p.age_21=q('[data-21]').checked;
+    if(!p.first_name)return cpErr(f,'Add their first name.');
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.email))return cpErr(f,'Check the email address — their membership link goes there.');
+    if(club()&&club().age_21&&!p.age_21)return cpErr(f,'Tick the box to confirm they’re 21 or older.');
+    cpErr(f,'');CP.busy=true;const b=q('[data-go]');b.disabled=true;b.textContent='Adding…';
+    try{
+      const r=await cpCall('comp_add',p);
+      toast(r.email_sent?'Added — welcome email sent to '+p.email+'.':r.email_sent===false?'Added — but the welcome email didn’t go out. Use “Resend welcome email”.':'Added.',r.email_sent===false);
+      CP.busy=false;cpReload(null);
+    }catch(e){CP.busy=false;b.disabled=false;b.textContent='Add membership';cpErr(f,e.message);}
+  });
+  q('[data-f="first_name"]').focus();
+}
+
+function cpEdit(){
+  const m=CP.cur,d=CP.data,body=CP.body,clubs=d.clubs||[];body.innerHTML='';
+  const top=$(`<div class="nl-top"><button type="button" class="btn btn-ghost btn-sm" data-back>← Comp &amp; prepaid</button>${cpPill(m)}</div>`);
+  top.querySelector('[data-back]').addEventListener('click',()=>cpList());
+  const fact=(k,v)=>v?`<div><dt>${k}</dt><dd>${v}</dd></div>`:'';
+  let keep='';
+  if(m.kind==='monthly')keep='Switched to monthly'+(m.billing_start?' on '+esc(cpDay(m.billing_start)):'');
+  else if(m.then_monthly)keep=`Card added (${esc(m.card_label||'card on file')}) — monthly from ${esc(cpDay(m.billing_start))}`;
+  else if(!m.open_ended&&!m.ended)keep=m.keep_mailed_at?'Email sent '+esc(cpDay(m.keep_mailed_at)):m.keep_from?'Email goes out about '+esc(cpDay(m.keep_from)):'';
+  const info=$(`<div class="card cp-form">
+    <div class="cp-title"><h3>${esc(cpName(m))}</h3><p class="muted">${esc(m.club.name)} · ${esc(CP_SHOP[m.shop]||m.shop)} pickup · Membership ${esc(m.code)}</p></div>
+    <dl class="cp-facts">
+      ${fact('Boxes',esc(cpBoxes(m)))}
+      ${fact('First box',esc(cpLong(m.first_month)))}
+      ${fact('Last box',m.kind==='monthly'?'':m.open_ended?'No end date':esc(cpLong(m.last_month)))}
+      ${fact('This month',m.kind==='monthly'||m.ended?'':m.this_month==='box'?'Box ✓':m.this_month==='skipped'?'Skipped':'No box')}
+      ${fact('Next box',m.next_box&&!m.ended?esc(m.next_box.month_label)+' · pick up '+esc(m.next_box.pickup_label):'')}
+      ${fact('Skipping',m.skipping?esc(m.skipping.label):'')}
+      ${fact('Keep it going',keep)}
+      ${fact('Email',esc(m.email)+(m.phone?' · '+esc(m.phone):''))}
+      ${fact('Added',esc(m.added_by||'')+(m.created_at?' · '+esc(cpDay(m.created_at)):''))}
+      ${fact('Note',m.note?esc(m.note):'')}
+    </dl>
+    <div class="cp-acts"></div>
+    <div class="cp-confirm" data-confirm hidden></div>
+  </div>`);
+  body.append(top,info);
+  const acts=info.querySelector('.cp-acts'),conf=info.querySelector('[data-confirm]');
+  const act=(label,cls,fn)=>{const b=$(`<button type="button" class="btn ${cls} btn-sm">${esc(label)}</button>`);b.addEventListener('click',fn);acts.append(b);return b;};
+  const run=async(btn,action,p,msg)=>{
+    if(CP.busy)return;CP.busy=true;btn.disabled=true;
+    try{const r=await cpCall(action,Object.assign({id:m.id},p||{}));toast(msg);CP.busy=false;if(r.member){CP.cur=r.member;}cpReload(m.id);}
+    catch(e){CP.busy=false;btn.disabled=false;toast(e.message,true);}
+  };
+  if(m.kind==='monthly'){
+    info.append($(`<p class="muted cp-small">This guest added a card and now pays monthly through Square, like any member. They manage it from their membership page.</p>`));
+    return;
+  }
+  if(!m.ended){
+    if(m.can_skip)act('Skip '+cpShort(m.can_skip.month),'btn-ghost',e=>run(e.currentTarget,'comp_skip',{},'Skipped '+cpLong(m.can_skip.month)+'.'+(m.open_ended?'':' The last box moved out a month.')));
+    if(m.skipping)act('Undo skip ('+cpShort(m.skipping.month)+')','btn-ghost',e=>run(e.currentTarget,'comp_skip',{undo:true},'Skip undone.'));
+    act('Resend welcome email','btn-ghost',e=>run(e.currentTarget,'comp_resend',{},'Welcome email sent to '+m.email+'.'));
+    act('End membership','btn-danger',()=>{
+      conf.hidden=false;
+      conf.innerHTML='';
+      conf.append($(`<p>End ${esc(cpName(m))}'s membership?${m.then_monthly?' Their card comes off and the monthly plan is stopped.':''}</p>`));
+      const row=$(`<div class="cp-btns"></div>`);
+      const after=$(`<button type="button" class="btn btn-danger btn-sm">After this month's box</button>`),now=$(`<button type="button" class="btn btn-danger btn-sm">Right away</button>`),no=$(`<button type="button" class="btn btn-ghost btn-sm">Never mind</button>`);
+      after.addEventListener('click',()=>run(after,'comp_end',{when:'after'},'Ends after this month’s box.'));
+      now.addEventListener('click',()=>run(now,'comp_end',{when:'now'},'Membership ended.'));
+      no.addEventListener('click',()=>{conf.hidden=true;});
+      row.append(after,now,no);conf.append(row);conf.scrollIntoView({block:'nearest'});
+    });
+  }
+  // edit (or bring back an ended one)
+  const notStarted=!m.ended&&String(m.first_month)>String(d.month);
+  const lastOpts=cpMonths(d.month,49);
+  const ed=$(`<div class="card cp-form">
+    <h3>${m.ended?'Bring it back':'Change it'}</h3>
+    ${m.ended?'<p class="muted cp-small">Pick a last box this month or later to start the boxes again.</p>':''}
+    <div class="cp-kinds" role="radiogroup" aria-label="Type of membership">
+      <label class="cp-kind"><input type="radio" name="cpkind2" value="prepaid" ${m.kind==='prepaid'?'checked':''}><span><b>Prepaid</b><small>They paid up front</small></span></label>
+      <label class="cp-kind"><input type="radio" name="cpkind2" value="comp" ${m.kind==='comp'?'checked':''}><span><b>Comp</b><small>On the house</small></span></label>
+    </div>
+    <div class="cp-grid">
+      <div class="nl-fld"><label class="nl-lbl" for="cpe-first">First name</label><input id="cpe-first" data-f="first_name" maxlength="60"></div>
+      <div class="nl-fld"><label class="nl-lbl" for="cpe-last">Last name</label><input id="cpe-last" data-f="last_name" maxlength="60"></div>
+      <div class="nl-fld"><label class="nl-lbl" for="cpe-email">Email</label><input id="cpe-email" type="email" data-f="email" maxlength="200"></div>
+      <div class="nl-fld"><label class="nl-lbl" for="cpe-phone">Mobile</label><input id="cpe-phone" type="tel" data-f="phone" maxlength="40"></div>
+      <div class="nl-fld"><label class="nl-lbl" for="cpe-club">Club</label><select id="cpe-club" data-f="club">${clubs.map(c=>`<option value="${esc(c.slug)}">${esc(c.name)}</option>`).join('')}</select></div>
+      <div class="nl-fld"><label class="nl-lbl" for="cpe-shop">Pickup shop</label><select id="cpe-shop" data-f="shop"></select></div>
+      ${notStarted?`<div class="nl-fld"><label class="nl-lbl" for="cpe-firstm">First box</label><select id="cpe-firstm" data-f="first_month">${cpMonths(d.month,13).map(x=>`<option value="${x}">${esc(cpLong(x))}</option>`).join('')}</select></div>`:''}
+      <div class="nl-fld"><label class="nl-lbl" for="cpe-lastm">Last box</label><select id="cpe-lastm" data-f="last_month"><option value="">No end date</option>${lastOpts.map(x=>`<option value="${x}">${esc(cpLong(x))}</option>`).join('')}</select></div>
+    </div>
+    <label class="nl-chk cp-21" hidden><input type="checkbox" data-21> This club includes wine — I checked they're 21 or older</label>
+    <div class="nl-fld"><label class="nl-lbl" for="cpe-note">Note for staff</label><textarea id="cpe-note" data-f="note" rows="2" maxlength="500"></textarea></div>
+    <div class="cp-err" data-err role="alert" hidden></div>
+    <div class="cp-btns"><button type="button" class="btn btn-primary" data-save>${m.ended?'Bring it back':'Save changes'}</button></div>
+  </div>`);
+  body.append(ed);
+  const q=s=>ed.querySelector(s),club=()=>clubs.find(c=>c.slug===q('[data-f="club"]').value);
+  q('[data-f="first_name"]').value=m.first_name||'';q('[data-f="last_name"]').value=m.last_name||'';
+  q('[data-f="email"]').value=m.email||'';q('[data-f="phone"]').value=m.phone||'';q('[data-f="note"]').value=m.note||'';
+  if(clubs.some(c=>c.slug===m.club.slug))q('[data-f="club"]').value=m.club.slug;
+  cpShopOpts(q('[data-f="shop"]'),club(),m.shop);
+  const lastSel=q('[data-f="last_month"]');
+  lastSel.value=m.open_ended?'':(lastOpts.includes(m.last_month)?m.last_month:lastOpts[0]);
+  const kind=()=>ed.querySelector('input[name="cpkind2"]:checked').value;
+  const firstSel=q('[data-f="first_month"]');
+  if(firstSel){
+    firstSel.value=m.first_month;let was=m.first_month;
+    firstSel.addEventListener('change',()=>{
+      const k=(Number(firstSel.value.slice(0,4))*12+Number(firstSel.value.slice(5,7)))-(Number(was.slice(0,4))*12+Number(was.slice(5,7)));
+      if(lastSel.value){const nl=cpAddMonths(lastSel.value,k);if(lastOpts.includes(nl))lastSel.value=nl;}
+      was=firstSel.value;
+    });
+  }
+  const sync=()=>{
+    const c=club();
+    lastSel.querySelector('option[value=""]').disabled=kind()!=='comp';
+    if(kind()!=='comp'&&!lastSel.value)lastSel.value=lastOpts[Math.min(11,lastOpts.length-1)];
+    q('.cp-21').hidden=!(c&&c.age_21&&c.slug!==m.club.slug&&!m.club.age_21);
+  };
+  ed.addEventListener('change',e=>{if(e.target.matches('[data-f="club"]'))cpShopOpts(q('[data-f="shop"]'),club(),q('[data-f="shop"]').value);sync();});
+  sync();
+  q('[data-save]').addEventListener('click',async e=>{
+    if(CP.busy)return;
+    const v=k=>q(`[data-f="${k}"]`).value.trim();
+    const p={id:m.id,kind:kind(),first_name:v('first_name'),last_name:v('last_name'),email:v('email'),phone:v('phone'),club:v('club'),shop:v('shop'),note:v('note'),last_month:lastSel.value||null};
+    if(firstSel)p.first_month=firstSel.value;
+    if(p.last_month&&p.first_month&&p.last_month<p.first_month)return cpErr(ed,'The last box can’t come before the first one.');
+    if(!q('.cp-21').hidden)p.age_21=q('[data-21]').checked;
+    if(m.ended)p.restore=true;
+    const btn=e.currentTarget;CP.busy=true;btn.disabled=true;cpErr(ed,'');
+    try{const r=await cpCall('comp_update',p);CP.busy=false;toast(m.ended?'Membership is back on.':'Saved.');CP.cur=r.member;cpReload(m.id);}
+    catch(err){CP.busy=false;btn.disabled=false;cpErr(ed,err.message);}
+  });
+}
+
 async function viewAdmin(){
   const el=$(`<div class="wrap" style="padding:0"></div>`);
 
@@ -11357,7 +11694,7 @@ async function viewAdmin(){
       finally{rbtn.disabled=false;rbtn.textContent='Send pickup reminders now';}
     });
   };
-  const draws={ov:drawOv,subs:drawSubs,members:drawMembers,orders:drawOrders,roster:drawRoster,revenue:drawRevenue,notify:drawNotify,news:()=>drawNewsletter(body)};
+  const draws={ov:drawOv,subs:drawSubs,members:drawMembers,orders:drawOrders,roster:drawRoster,revenue:drawRevenue,notify:drawNotify,news:()=>drawNewsletter(body),comps:()=>drawComps(body)};
   const NAV=[
     {t:'ov',label:'Clubs',ico:'🧀'},
     {t:'subs',label:'Subscriptions',ico:'📋'},
@@ -11367,6 +11704,7 @@ async function viewAdmin(){
     {t:'revenue',label:'Revenue',ico:'💵'},
     {t:'notify',label:'Notify',ico:'✉️'},
     {t:'news',label:'Newsletter',ico:'📰'},
+    {t:'comps',label:'Comps',ico:'🎟️'},
   ];
   if(!draws[ADMIN_TAB]) ADMIN_TAB='ov';
   const selectTab=(t)=>{ ADMIN_TAB=t; nav.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.t===t)); const mx=el.querySelector('#ccMetrics'); if(mx) mx.style.display=(t==='ov')?'':'none'; draws[t](); };
