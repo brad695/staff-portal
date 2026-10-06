@@ -1779,7 +1779,8 @@ async function inqThread(){
   }).join('') || '<div class="rec-empty">No messages.</div>';
   el.scrollTop = el.scrollHeight;
 }
-function inqTime(t){ const [h,m]=String(t).split(':').map(Number); return ((h%12)||12)+':'+String(m).padStart(2,'0')+(h>=12?' PM':' AM'); }
+// inquiry times are '18:00' when a slot is held (Memphis), or words: '12–2 pm', '4–7 pm', 'after 7' (2026-10-06)
+function inqTime(t){ if(!/^\d{1,2}:\d{2}/.test(String(t))) return String(t); const [h,m]=String(t).split(':').map(Number); return ((h%12)||12)+':'+String(m).padStart(2,'0')+(h>=12?' PM':' AM'); }
 function inqClose(){ document.getElementById('inqModal').style.display='none'; INQ_CUR=null; }
 function inqLink(){
   const r = INQ_CUR; if(!r) return INQ_SITE;
@@ -1789,7 +1790,7 @@ function inqLink(){
   if(r.preferred_date) p.set('date', r.preferred_date);
   if(r.party_size) p.set('party', r.party_size);
   // the slot they picked is held for them (48 h); the link pays for that same reservation
-  if(r.preferred_time) p.set('time', r.preferred_time);
+  if(r.preferred_time && /^\d{2}:\d{2}$/.test(r.preferred_time)) p.set('time', r.preferred_time);
   if(r.reservation_id && r.reservation_code && r.hold_expires_at){ p.set('hold', r.reservation_id); p.set('hc', r.reservation_code); }
   if(first) p.set('first', first); if(rest.length) p.set('last', rest.join(' '));
   if(r.email) p.set('email', r.email); if(r.phone) p.set('phone', r.phone);
