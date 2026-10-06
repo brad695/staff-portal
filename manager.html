@@ -583,7 +583,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <a class="head-link" href="index.html">Portal</a>
     <a class="head-link" href="https://tickets.greyscheese.com" target="_blank" rel="noopener">Ticket Site</a>
     <a class="head-link" href="https://tickets.greyscheese.com/experiences.html" target="_blank" rel="noopener">Experiences</a>
-    <a class="head-link" href="https://brad695.github.io/cheese-club/" target="_blank" rel="noopener">Cheese Club</a>
+    <a class="head-link" href="https://www.greyscheese.com/cheeseclub" target="_blank" rel="noopener">Cheese Club</a>
     <a class="head-link" href="manager.html">Manager</a>
     <button class="head-link" id="logoutBtn" style="background:none;cursor:pointer;font-family:inherit;font-size:0.8rem;" onclick="logout()">Logout</button>
   </div>
@@ -635,15 +635,10 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab" onclick="mtab('catering')">💼 Catering Leads <span id="catBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
     <div class="tab" onclick="mtab('preorders')">📅 Pre-Orders</div>
     <div class="tab-head">Cheese Club</div>
-    <div class="tab" onclick="ccTab(this,'ov')">Clubs</div>
-    <div class="tab" onclick="ccTab(this,'subs')">Subscriptions</div>
     <div class="tab" onclick="ccTab(this,'members')">Members</div>
-    <div class="tab" onclick="ccTab(this,'orders')">Orders</div>
-    <div class="tab" onclick="ccTab(this,'roster')">Roster</div>
-    <div class="tab" onclick="ccTab(this,'revenue')">Revenue</div>
-    <div class="tab" onclick="ccTab(this,'notify')">Notify</div>
+    <div class="tab" onclick="ccTab(this,'boxes')">Boxes</div>
     <div class="tab" onclick="ccTab(this,'news')">Newsletter</div>
-    <div class="tab" onclick="ccTab(this,'comps')">Comps</div>
+    <div class="tab" onclick="ccTab(this,'ov')">Clubs</div>
   </div>
 
   <div class="main">
@@ -3863,6 +3858,104 @@ window.addEventListener('DOMContentLoaded', async ()=>{
 /* the console theme makes .btn-danger solid red but leaves the text red too — make it readable */
 #panel-cheese .btn-danger{color:#fff}
 #panel-cheese .btn-danger:hover{background:#8f2418;border-color:#8f2418;color:#fff}
+</style>
+<style id="ccmb-style">
+/* Cheese Club → Members / Boxes / Clubs (square-club roster, member, boxes actions) */
+#panel-cheese .mb-st,#panel-cheese .mb-kind,#panel-cheese .mb-box{display:inline-block;padding:4px 10px;border-radius:999px;font:600 12px Inter,sans-serif;white-space:nowrap;line-height:1.25}
+#panel-cheese .mb-t-ok{background:#e6f3e7;color:#2f7d3a}
+#panel-cheese .mb-t-wait{background:#e7eefb;color:#2f4f8f}
+#panel-cheese .mb-t-pause{background:#fdf3e2;color:#92400e}
+#panel-cheese .mb-t-end{background:#efece6;color:#6f6557}
+#panel-cheese .mb-t-bad{background:#fbeeec;color:#9a2f22}
+#panel-cheese .mb-kind{background:#eef1f6;color:#46546e;font-weight:500}
+#panel-cheese .mb-k-square{background:#e3edf2;color:#06273a}
+#panel-cheese .mb-k-prepaid{background:#e6f3e7;color:#2f7d3a}
+#panel-cheese .mb-k-comp{background:#e7eefb;color:#2f4f8f}
+#panel-cheese .mb-b-paid{background:#e6f3e7;color:#2f7d3a}
+#panel-cheese .mb-b-picked_up{background:#06273a;color:#fff}
+#panel-cheese .mb-b-failed{background:#fbeeec;color:#9a2f22}
+#panel-cheese .mb-b-skipped,#panel-cheese .mb-b-refunded{background:#efece6;color:#6f6557}
+#panel-cheese .mb-b-scheduled{background:#eef1f6;color:#46546e}
+#panel-cheese .cp-stats .mb-attn,#panel-cheese .cp-stats .mb-attn b{color:#9a2f22}
+#panel-cheese .mb-flag-bad{background:#fbeeec;color:#9a2f22;font-weight:600;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+#panel-cheese .mb-21{background:#fdf3e2;color:#92400e;font-weight:600;margin-left:4px}
+#panel-cheese .mb-sum{padding:14px 18px;margin-bottom:14px;max-width:620px}
+#panel-cheese .mb-sum table,#panel-cheese .mb-tbl{width:100%;border-collapse:collapse;font-size:14px}
+#panel-cheese .mb-sum th,#panel-cheese .mb-sum td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+#panel-cheese .mb-sum th:first-child,#panel-cheese .mb-sum td:first-child{text-align:left;white-space:normal}
+#panel-cheese .mb-sum th,#panel-cheese .mb-tbl th{font:600 11.5px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+#panel-cheese .mb-sum tfoot td{border-bottom:0;font-weight:600}
+#panel-cheese .mb-sum .cp-small{margin:8px 0 0}
+#panel-cheese .mb-bar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin:0 0 12px}
+#panel-cheese .mb-q{flex:1 1 260px;min-width:0;max-width:420px}
+#panel-cheese .mb-club{width:auto;min-width:170px}
+#panel-cheese .mb-chips{display:flex;flex-wrap:wrap;gap:6px}
+#panel-cheese .mb-chip{background:#fff;border:1.5px solid var(--line);border-radius:999px;padding:6px 12px;font:600 13px Inter,sans-serif;color:var(--ink);cursor:pointer;min-height:34px}
+#panel-cheese .mb-chip small{font-weight:500;color:var(--muted);margin-left:2px}
+#panel-cheese .mb-chip:hover{border-color:#9db3c1}
+#panel-cheese .mb-chip.on{background:#06273a;border-color:#06273a;color:#fff}
+#panel-cheese .mb-chip.on small{color:#d8e3ef}
+#panel-cheese .mb-chip:focus-visible,#panel-cheese .bx-tick:focus-visible{outline:2px solid #06273a;outline-offset:2px}
+#panel-cheese .mb-row{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,1fr) 250px}
+#panel-cheese .mb-row .cp-left small{margin-top:3px}
+#panel-cheese .mb-card .cp-title{margin-bottom:6px}
+#panel-cheese .mb-prob{margin:0 0 12px}
+#panel-cheese .mb-link{margin-top:12px;padding:12px 14px;background:var(--alt);border-radius:10px;font-size:14px}
+#panel-cheese .mb-link input{width:100%;margin-top:8px;font:13px ui-monospace,Menlo,Consolas,monospace}
+#panel-cheese .mb-link[hidden]{display:none}
+#panel-cheese .mb-hist h3{font-size:18px;margin:0 0 10px}
+#panel-cheese .mb-tbl th,#panel-cheese .mb-tbl td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+#panel-cheese .mb-tbl .num{text-align:right;white-space:nowrap}
+#panel-cheese .mb-tbl td small{display:block;color:var(--muted);font-size:12.5px;margin-top:3px}
+#panel-cheese .mb-log{list-style:none;margin:0;padding:0;font-size:14px}
+#panel-cheese .mb-log li{display:grid;grid-template-columns:160px minmax(0,1fr) auto;gap:10px;padding:7px 0;border-top:1px solid var(--line)}
+#panel-cheese .mb-log li:first-child{border-top:0}
+#panel-cheese .mb-when,#panel-cheese .mb-who{color:var(--muted);font-size:13px}
+#panel-cheese .mb-who{text-align:right;overflow-wrap:anywhere}
+#panel-cheese .mb-what small{color:var(--muted)}
+#panel-cheese .bx-nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
+#panel-cheese .bx-nav b{font:600 20px Archivo,Georgia,serif;min-width:170px;text-align:center}
+#panel-cheese .bx-when{margin:8px 0 0;font-size:14px;color:#4a545e}
+#panel-cheese .bx-shops{margin:0 0 12px}
+#panel-cheese .bx-shop{padding:16px 18px;margin-bottom:14px}
+#panel-cheese .bx-shop-h{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between;margin-bottom:8px}
+#panel-cheese .bx-shop-h h3{font-size:20px;margin:0}
+#panel-cheese .bx-shop-h h3 small{font:500 14px Inter,sans-serif;color:var(--muted)}
+#panel-cheese .bx-clubs{display:flex;flex-wrap:wrap;gap:6px}
+#panel-cheese .bx-tbl td{vertical-align:middle}
+#panel-cheese .bx-ck{width:86px;text-align:center}
+#panel-cheese .bx-tick{width:40px;height:40px;border-radius:10px;border:2px solid #b9c4cd;background:#fff;color:#fff;font:700 20px/1 Inter,sans-serif;cursor:pointer;display:inline-grid;place-items:center}
+#panel-cheese .bx-tick:hover{border-color:#06273a}
+#panel-cheese .bx-tick.on{background:#06273a;border-color:#06273a}
+#panel-cheese .bx-tick:disabled{opacity:.5}
+#panel-cheese .bx-done td{color:var(--muted)}
+#panel-cheese .bx-done .bx-who b{text-decoration:line-through;text-decoration-color:#9db3c1}
+#panel-cheese .bx-bad td{background:#fdf7f6}
+#panel-cheese .bx-who{color:var(--ink);text-decoration:none}
+#panel-cheese .bx-who:hover b{text-decoration:underline}
+#panel-cheese .bx-tbl td>small{display:block}
+#panel-cheese .bx-sq{margin:0 0 14px;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+#panel-cheese .bx-sqline{display:block;margin-top:8px;font:600 12.5px Inter,sans-serif;color:#2f7d3a}
+#panel-cheese .bx-sqline.bad{color:#9a2f22}
+#panel-cheese .ec-shops>div{display:flex;gap:18px;padding:6px 0 4px}
+#panel-cheese .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media(max-width:900px){
+  #panel-cheese .mb-row{grid-template-columns:minmax(0,1fr) auto}
+}
+@media(max-width:640px){
+  #panel-cheese .mb-row{grid-template-columns:minmax(0,1fr)}
+  #panel-cheese .mb-log li{grid-template-columns:minmax(0,1fr);gap:2px}
+  #panel-cheese .mb-who{text-align:left}
+  #panel-cheese .mb-q,#panel-cheese .mb-club{flex:1 1 100%;max-width:none}
+  #panel-cheese .bx-shop{padding:12px}
+  #panel-cheese .bx-tbl thead{display:none}
+  #panel-cheese .bx-tbl,#panel-cheese .bx-tbl tbody{display:block}
+  #panel-cheese .bx-tbl tr{display:grid;grid-template-columns:52px minmax(0,1fr);gap:4px 10px;padding:10px 4px;border-bottom:1px solid var(--line)}
+  #panel-cheese .bx-tbl td{border:0;padding:0}
+  #panel-cheese .bx-tbl td.bx-ck{grid-row:1/4;width:auto;align-self:center;text-align:left}
+  #panel-cheese .bx-tbl td:not(.bx-ck){grid-column:2}
+  #panel-cheese .bx-nav b{min-width:0;flex:1}
+}
 </style>
 
 <!-- ═══════════ TICKETS & CLASSES back office (React, compiled at runtime like the original ticket site) ═══════════ -->
@@ -10966,7 +11059,7 @@ ReactDOM.createRoot(document.getElementById("tk-root")).render(<App />);
 (function(){
   const SUPABASE_URL = SB_URL, SUPABASE_KEY = SB_KEY;   // same Supabase project
   const S = { session:null, member:null, clubs:[], fulfillment:[], cohorts:[] };
-  let ADMIN_TAB = 'ov';
+  let ADMIN_TAB = 'members';
   const money = c => "$" + (c/100).toFixed(0);
   const money2 = c => "$" + (c/100).toFixed(2);
   const $ = (h)=>{const t=document.createElement('template');t.innerHTML=h.trim();return t.content.firstElementChild;};
@@ -11000,7 +11093,11 @@ ReactDOM.createRoot(document.getElementById("tk-root")).render(<App />);
       await loadCatalog();
       await refreshMember();
       app.innerHTML='';
-      if(!(S.member && S.member.is_admin)){ app.append(viewNoAdmin()); return; }
+      // any console admin (is_app_admin) runs the club; the old cc_members flag still counts too
+      if(!(S.member && S.member.is_admin)){
+        const { data: ok } = await sb.rpc('cc_is_admin');
+        if(ok !== true){ app.append(viewNoAdmin()); return; }
+      }
       app.append(await viewAdmin());
     }catch(e){ app.innerHTML='<div class="empty">Could not load: '+esc(e.message||e)+'</div>'; }
   }
@@ -11018,63 +11115,6 @@ async function ccFn(slug, payload){
   return res;
 }
 async function ccFnJson(slug, payload){ const r=await ccFn(slug,payload); let j={}; try{j=await r.json();}catch(e){} if(!r.ok||j.error) throw new Error(j.error||('Request failed ('+r.status+')')); return j; }
-// Current open cohort's month (yyyy-mm-dd), or this month if none is open.
-function adminDefaultMonth(){ const c=S.cohorts.find(x=>x.status==='open')||S.cohorts[S.cohorts.length-1]; if(c) return c.month; const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01'; }
-function ymToDate(v){ return /^\d{4}-\d{2}$/.test(v)? v+'-01' : v; }
-// 2nd Wednesday (pickup day) of a 'YYYY-MM' or 'YYYY-MM-01' month.
-function ccSecondWednesday(ym){ const [y,m]=ym.split('-').map(Number); const first=new Date(Date.UTC(y,m-1,1)); const dow=first.getUTCDay(); const fw=1+((3-dow+7)%7); return new Date(Date.UTC(y,m-1,fw+7)); }
-// Opens a clean, print-optimized roster sheet for the given month (yyyy-mm[-01]),
-// grouped by pickup/fulfillment location with a check-off column for pickup day.
-async function printRoster(month, onlyLabels){
-  let j; try{ j=await ccFnJson('cc-admin',{action:'roster',month}); }catch(e){ toast(e.message,true); return; }
-  let rows=j.roster||[];
-  const filtered=Array.isArray(onlyLabels)&&onlyLabels.length;
-  if(filtered){ const set=new Set(onlyLabels); rows=rows.filter(r=>set.has(r.fulfillment_label||'Unassigned')); }
-  const locNote=filtered?onlyLabels.join(' · '):'All locations';
-  const pickup=ccSecondWednesday(month);
-  const pickupLabel=pickup.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric',timeZone:'UTC'});
-  const monthLabel=new Date(ymToDate(month)+'T00:00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'});
-  const e2=s=>(s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-  const groups={}; rows.forEach(r=>{const k=r.fulfillment_label||'Unassigned';(groups[k]=groups[k]||[]).push(r);});
-  let bodyHtml='';
-  Object.keys(groups).sort().forEach(k=>{
-    const list=groups[k].sort((a,b)=>((a.full_name||a.email||'').localeCompare(b.full_name||b.email||'')));
-    bodyHtml+=`<h2>${e2(k)} <span class="cnt">· ${list.length}</span></h2><table><thead><tr><th class="chk">✓</th><th>Member</th><th>Tier</th><th>Order</th><th class="note">Notes</th></tr></thead><tbody>`;
-    list.forEach(r=>{bodyHtml+=`<tr><td class="chk"></td><td><b>${e2(r.full_name||'—')}</b><div class="sub">${e2(r.email)}${r.phone?' · '+e2(r.phone):''}</div></td><td>${e2(r.club_name)}</td><td>${e2(r.order_status||'—')}</td><td class="note"></td></tr>`;});
-    bodyHtml+='</tbody></table>';
-  });
-  if(!rows.length) bodyHtml='<p style="margin-top:24px">No active members for this month.</p>';
-  const html=`<!doctype html><html><head><meta charset="utf-8"><title>Cheese Club Roster — ${monthLabel}</title><style>
-    *{box-sizing:border-box}
-    body{font:14px/1.4 -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#111;margin:28px}
-    .toolbar{margin-bottom:14px}
-    .toolbar button{font:14px sans-serif;padding:8px 16px;background:#1f5137;color:#fff;border:none;border-radius:6px;cursor:pointer}
-    header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1f5137;padding-bottom:10px;margin-bottom:8px}
-    h1{font:600 22px Georgia,serif;color:#1f5137;margin:0}
-    .meta{text-align:right;font-size:13px;color:#333}
-    .meta b{color:#111}
-    h2{font:600 15px Georgia,serif;margin:20px 0 6px;color:#163b28;border-left:4px solid #c99a3f;padding-left:8px}
-    h2 .cnt{color:#888;font-weight:400;font-size:13px}
-    table{width:100%;border-collapse:collapse;margin-bottom:6px}
-    th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top}
-    th{background:#f2f1ee;font-size:11px;text-transform:uppercase;letter-spacing:.03em}
-    td.chk,th.chk{width:30px;text-align:center}
-    td.chk{height:28px}
-    th.note,td.note{width:150px}
-    .sub{font-size:11px;color:#666}
-    tbody tr{page-break-inside:avoid}
-    footer{margin-top:18px;font-size:11px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:8px}
-    @media print{body{margin:12mm}.toolbar{display:none}}
-  </style></head><body>
-    <div class="toolbar"><button onclick="window.print()">Print / Save as PDF</button></div>
-    <header><h1>Greys Fine Cheeses — Cheese Club</h1><div class="meta"><div><b>${monthLabel}</b> pickup roster</div><div>Pickup: <b>${pickupLabel}</b></div><div>${e2(locNote)}</div><div>${rows.length} active membership${rows.length===1?'':'s'}</div></div></header>
-    ${bodyHtml}
-    <footer>Generated ${new Date().toLocaleString('en-US')} · Greys Fine Cheeses Cheese Club</footer>
-  </body></html>`;
-  const w=window.open('','_blank');
-  if(!w){toast('Allow pop-ups to open the printable roster.',true);return;}
-  w.document.write(html); w.document.close(); w.focus();
-}
 // Admin: add or edit a club. Writes go through the cc_clubs_admin_write RLS
 // policy (cc_is_admin()), so this uses the operator's own session.
 function editClub(c,onSaved){
@@ -11083,6 +11123,7 @@ function editClub(c,onSaved){
   const ta='width:100%;font:inherit;padding:10px;border:1.5px solid var(--line);border-radius:10px';
   const row=(label,inner)=>`<label class="fld"><span>${label}</span>${inner}</label>`;
   const slugify=s=>(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+  const shops=Array.isArray(c.shops)&&c.shops.length?c.shops:['memphis','nashville'];
   m.innerHTML=`<h3>${isNew?'Add a club':'Edit club'}</h3>`+(isNew?'':`<p class="muted" style="font-size:13px;margin-top:-6px">${esc(c.slug||'')}</p>`);
   const wrap=$(`<div style="max-height:62vh;overflow:auto;padding-right:4px"></div>`);
   wrap.innerHTML=
@@ -11097,7 +11138,9 @@ function editClub(c,onSaved){
     row('Sort order',`<input id="ec_sort" type="number" step="1" value="${c.sort_order||0}">`)+
     row('Description',`<textarea id="ec_desc" rows="3" style="${ta}">${esc(c.description||'')}</textarea>`)+
     row(`What's inside`,`<textarea id="ec_inside" rows="3" style="${ta}">${esc(c.whats_inside||'')}</textarea>`)+
-    `<label class="opt" style="margin-top:6px"><input id="ec_active" type="checkbox" ${c.active?'checked':''}><div class="meta"><b>Active</b><small>Visible on the storefront</small></div></label>`+
+    `<div class="fld ec-shops"><span>Picked up at</span><div><label class="nl-chk"><input id="ec_shop_memphis" type="checkbox" ${shops.includes('memphis')?'checked':''}> Memphis</label><label class="nl-chk"><input id="ec_shop_nashville" type="checkbox" ${shops.includes('nashville')?'checked':''}> Nashville</label></div></div>`+
+    `<label class="opt"><input id="ec_21" type="checkbox" ${c.age_21?'checked':''}><div class="meta"><b>Includes wine — 21+</b><small>Sign-up asks them to confirm they're 21 or older</small></div></label>`+
+    `<label class="opt" style="margin-top:6px"><input id="ec_active" type="checkbox" ${c.active?'checked':''}><div class="meta"><b>Active</b><small>Shown on the Cheese Club page</small></div></label>`+
     `<label class="opt"><input id="ec_pickup" type="checkbox" ${c.pickup_only?'checked':''}><div class="meta"><b>Pickup only</b><small>No delivery or shipping</small></div></label>`;
   m.append(wrap);
   const save=$(`<button class="btn btn-primary" style="width:100%;margin-top:12px">${isNew?'Create club':'Save changes'}</button>`);
@@ -11106,6 +11149,8 @@ function editClub(c,onSaved){
     if(!(price>=0)){toast('Enter a valid price.',true);return;}
     const name=wrap.querySelector('#ec_name').value.trim();
     if(!name){toast('Name is required.',true);return;}
+    const pickShops=['memphis','nashville'].filter(x=>wrap.querySelector('#ec_shop_'+x).checked);
+    if(!pickShops.length){toast('Pick at least one shop.',true);return;}
     const patch={
       name,
       monthly_price_cents:price,
@@ -11118,7 +11163,9 @@ function editClub(c,onSaved){
       description:wrap.querySelector('#ec_desc').value.trim()||null,
       whats_inside:wrap.querySelector('#ec_inside').value.trim()||null,
       active:wrap.querySelector('#ec_active').checked,
-      pickup_only:wrap.querySelector('#ec_pickup').checked
+      pickup_only:wrap.querySelector('#ec_pickup').checked,
+      shops:pickShops,
+      age_21:wrap.querySelector('#ec_21').checked
     };
     save.disabled=true;save.textContent='Saving…';
     let error;
@@ -11561,7 +11608,6 @@ function nlPreviewSaved(){
    it going monthly. Everything goes through the square-club edge function with the manager's session. */
 const CP={data:null,body:null,draw:0,cur:null,showEnded:false,mode:'list',busy:false};
 const cpCall=(action,p)=>ccFnJson('square-club',Object.assign({action},p||{}));
-const cpLive=()=>ADMIN_TAB==='comps';
 const CP_SHOP={memphis:'Memphis',nashville:'Nashville'};
 const cpLong=m=>m?fmtMonth(String(m).slice(0,10)):'';
 const cpShort=m=>m?new Date(String(m).slice(0,10)+'T00:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}):'';
@@ -11581,50 +11627,10 @@ function cpBoxes(m){
   return m.boxes_left+' of '+m.boxes_total+' left · last box '+cpShort(m.last_month);
 }
 
-async function drawComps(body){
-  CP.body=body;const my=++CP.draw;CP.mode='list';CP.cur=null;
-  body.innerHTML='';body.append($(`<div class="muted" style="padding:6px 2px">Loading memberships…</div>`));
-  try{CP.data=await cpCall('comp_list');}catch(e){if(my!==CP.draw)return;body.innerHTML='';body.append($(`<div class="empty">${esc(e.message)}</div>`));return;}
-  if(my!==CP.draw||!cpLive())return;
-  cpList();
-}
-async function cpReload(id){
-  const my=++CP.draw;
-  try{CP.data=await cpCall('comp_list');}catch(e){toast(e.message,true);return;}
-  if(my!==CP.draw||!cpLive())return;
-  if(id){const m=(CP.data.members||[]).find(x=>x.id===id);if(m){CP.cur=m;CP.mode='edit';return cpEdit();}}
-  cpList();
-}
-function cpList(){
-  const d=CP.data,body=CP.body;body.innerHTML='';CP.mode='list';CP.cur=null;
-  const all=d.members||[];
-  const live=all.filter(m=>!m.ended&&m.kind!=='monthly');
-  const shown=CP.showEnded?all:all.filter(m=>!m.ended);
-  const boxesNow=live.filter(m=>m.this_month==='box').length, soon=live.filter(m=>m.ending_soon).length;
-  const head=$(`<div class="card cp-head"><div class="nl-head-row"><div><h3>Comp &amp; prepaid memberships</h3><p class="muted">For guests who paid up front or are on the house — nothing is ever charged. They get a box every month through their last box and can skip a month on their membership page (the last box moves out a month). About a month before the last box they get an email to keep it going monthly.</p></div><button type="button" class="btn btn-primary btn-sm" data-add>+ Add membership</button></div></div>`);
-  if(d.env==='sandbox')head.append($(`<div class="nl-note"><b>Test mode.</b> The club runs on the Square sandbox, so memberships added here are test memberships and their emails say [TEST]. Add the real guests once the club is live.</div>`));
-  head.append($(`<div class="cp-stats"><span><b>${live.length}</b> active</span><span><b>${boxesNow}</b> box${boxesNow===1?'':'es'} for ${esc(cpLong(d.month).replace(/ \d{4}$/,''))}</span>${soon?`<span><b>${soon}</b> ending soon</span>`:''}</div>`));
-  head.querySelector('[data-add]').addEventListener('click',()=>cpAdd());
-  body.append(head);
-  if(all.some(m=>m.ended)){
-    const bar=$(`<label class="nl-chk cp-toggle"><input type="checkbox" ${CP.showEnded?'checked':''}> Show ended memberships</label>`);
-    bar.querySelector('input').addEventListener('change',e=>{CP.showEnded=e.target.checked;cpList();});
-    body.append(bar);
-  }
-  if(!shown.length){body.append($(`<div class="empty">No comp or prepaid memberships yet — add one with “Add membership”.</div>`));return;}
-  const list=$(`<div class="cp-list"></div>`);
-  shown.forEach(m=>{
-    const tags=[cpPill(m)];
-    if(m.ending_soon)tags.push('<span class="cp-flag cp-soon">Ending soon</span>');
-    if(m.then_monthly&&m.kind!=='monthly')tags.push(`<span class="cp-flag cp-keep">Monthly from ${esc(cpShort(m.billing_start))}</span>`);
-    if(m.skipping)tags.push(`<span class="cp-flag">Skipping ${esc(cpShort(m.skipping.month))}</span>`);
-    const next=m.next_box&&!m.ended?`Next box ${esc(m.next_box.month_label.replace(/ \d{4}$/,''))} · ${esc(m.next_box.pickup_label)}`:'';
-    const row=$(`<button type="button" class="cp-row"><span class="cp-who"><b>${esc(cpName(m))}</b><small>${esc(m.email)}</small></span><span class="cp-club">${esc(m.club.name)}<small>${esc(CP_SHOP[m.shop]||m.shop)} · ${esc(m.code)}</small></span><span class="cp-left">${esc(cpBoxes(m))}<small>${next}</small></span><span class="cp-tags">${tags.join('')}</span></button>`);
-    row.addEventListener('click',()=>{CP.cur=m;CP.mode='edit';cpEdit();});
-    list.append(row);
-  });
-  body.append(list);
-}
+// Prepaid / comp memberships open from Cheese Club → Members (they're listed with everyone else), so
+// after a change the membership is reloaded through the Members tab, and "back" goes to that list.
+const cpHome=()=>mbBack();
+function cpReload(id){ return id ? mbOpen(id) : mbBack(); }
 
 // the shop list follows the club (the wine clubs are Memphis only)
 function cpShopOpts(sel,club,keep){
@@ -11638,8 +11644,8 @@ function cpAdd(){
   CP.mode='add';
   const d=CP.data,body=CP.body,clubs=d.clubs||[];body.innerHTML='';
   const months=cpMonths(d.month,13);
-  const top=$(`<div class="nl-top"><button type="button" class="btn btn-ghost btn-sm" data-back>← Comp &amp; prepaid</button></div>`);
-  top.querySelector('[data-back]').addEventListener('click',()=>cpList());
+  const top=$(`<div class="nl-top"><button type="button" class="btn btn-ghost btn-sm" data-back>← Members</button></div>`);
+  top.querySelector('[data-back]').addEventListener('click',()=>cpHome());
   const f=$(`<div class="card cp-form">
     <h3>Add a membership</h3>
     <div class="cp-kinds" role="radiogroup" aria-label="Type of membership">
@@ -11683,7 +11689,7 @@ function cpAdd(){
   f.addEventListener('change',e=>{if(e.target.matches('[data-f="club"]'))cpShopOpts(q('[data-f="shop"]'),club(),q('[data-f="shop"]').value);sync();});
   q('[data-f="boxes"]').addEventListener('input',sync);
   sync();
-  q('[data-cancel]').addEventListener('click',()=>cpList());
+  q('[data-cancel]').addEventListener('click',()=>cpHome());
   q('[data-go]').addEventListener('click',async()=>{
     if(CP.busy)return;
     const v=k=>q(`[data-f="${k}"]`).value.trim();
@@ -11697,7 +11703,7 @@ function cpAdd(){
     try{
       const r=await cpCall('comp_add',p);
       toast(r.email_sent?'Added — welcome email sent to '+p.email+'.':r.email_sent===false?'Added — but the welcome email didn’t go out. Use “Resend welcome email”.':'Added.',r.email_sent===false);
-      CP.busy=false;cpReload(null);
+      CP.busy=false;cpReload(r.member&&r.member.id);
     }catch(e){CP.busy=false;b.disabled=false;b.textContent='Add membership';cpErr(f,e.message);}
   });
   q('[data-f="first_name"]').focus();
@@ -11705,8 +11711,8 @@ function cpAdd(){
 
 function cpEdit(){
   const m=CP.cur,d=CP.data,body=CP.body,clubs=d.clubs||[];body.innerHTML='';
-  const top=$(`<div class="nl-top"><button type="button" class="btn btn-ghost btn-sm" data-back>← Comp &amp; prepaid</button>${cpPill(m)}</div>`);
-  top.querySelector('[data-back]').addEventListener('click',()=>cpList());
+  const top=$(`<div class="nl-top"><button type="button" class="btn btn-ghost btn-sm" data-back>← Members</button>${cpPill(m)}</div>`);
+  top.querySelector('[data-back]').addEventListener('click',()=>cpHome());
   const fact=(k,v)=>v?`<div><dt>${k}</dt><dd>${v}</dd></div>`:'';
   let keep='';
   if(m.kind==='monthly')keep='Switched to monthly'+(m.billing_start?' on '+esc(cpDay(m.billing_start)):'');
@@ -11822,316 +11828,443 @@ function cpEdit(){
   });
 }
 
+/* ====== MEMBERS — everyone in the club, in one list (square-club roster / member / member_act /
+   member_link / member_update) ======
+   Monthly members pay through Square (skip / pause / resume / cancel / undo go to Square once their
+   subscription has started, and are row changes before their first 1st — the same rules as their own
+   membership page). Prepaid and comp memberships are added and changed here too, with the comp editor
+   above. Every change the shop makes is logged in club_log as staff:<email>. */
+const MB={data:null,body:null,draw:0,q:'',filter:'current',shop:'',club:'',cur:null,busy:false};
+const mbCall=(action,p)=>ccFnJson('square-club',Object.assign({action},p||{}));
+const mbLive=()=>ADMIN_TAB==='members';
+const MB_SHOP={memphis:'Memphis',nashville:'Nashville'};
+const mbMoney=c=>'$'+(Math.round(Number(c)||0)/100).toFixed(2).replace(/\.00$/,'');
+const mbDay=iso=>iso?new Date(String(iso).length>10?iso:iso+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+const mbWhen=iso=>iso?new Date(iso).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}):'';
+const mbMonth=m=>m?new Date(String(m).slice(0,10)+'T12:00:00').toLocaleDateString('en-US',{month:'long'}):'';
+const MB_FILTERS=[['current','Current'],['monthly','Monthly'],['comp','Prepaid & comp'],['paused','Paused & skipping'],['ending','Ending & ended'],['attention','Needs attention'],['all','All']];
+function mbMatch(m,f){
+  if(f==='current')return m.live;
+  if(f==='monthly')return m.live&&m.billing==='square';
+  if(f==='comp')return m.live&&m.billing!=='square';
+  if(f==='paused')return m.live&&(m.tone==='pause'||!!(m.comp&&m.comp.skipping));
+  if(f==='ending')return m.tone==='end'||!!(m.comp&&m.comp.ending_soon);
+  if(f==='attention')return !!m.problem||m.tone==='bad';
+  return true;
+}
+const mbSt=(label,tone)=>`<span class="mb-st mb-t-${esc(tone||'ok')}">${esc(label)}</span>`;
+const mbKind=m=>`<span class="mb-kind mb-k-${esc(m.billing)}">${esc(m.kind_label||m.billing)}</span>`;
+
+async function drawMembers(body){
+  MB.body=body;const my=++MB.draw;MB.cur=null;
+  body.innerHTML='';body.append($(`<div class="muted" style="padding:6px 2px">Loading members…</div>`));
+  try{MB.data=await mbCall('roster');}catch(e){if(my!==MB.draw)return;body.innerHTML='';body.append($(`<div class="empty">${esc(e.message)}</div>`));return;}
+  if(my!==MB.draw||!mbLive())return;
+  mbList();
+}
+function mbBack(){ MB.cur=null; return drawMembers(MB.body); }
+
+function mbList(){
+  const d=MB.data,body=MB.body;body.innerHTML='';MB.cur=null;
+  const all=d.members||[];
+  const live=all.filter(m=>m.live),attn=all.filter(m=>mbMatch(m,'attention'));
+  const nBox=(d.summary&&d.summary.boxes_this_month)||0;
+  const head=$(`<div class="card cp-head"><div class="nl-head-row"><div><h3>Members</h3><p class="muted">Everyone in the Cheese Club — monthly members who pay through Square, and prepaid or comp memberships. Open a member to skip a month, pause, cancel, send their membership link or change their details.</p></div><button type="button" class="btn btn-primary btn-sm" data-add>+ Add prepaid or comp</button></div></div>`);
+  if(d.env==='sandbox')head.append($(`<div class="nl-note"><b>Test mode.</b> The club runs on the Square sandbox, so these are test members and nothing here charges a real card. Real members show up here once the club is live.</div>`));
+  head.append($(`<div class="cp-stats"><span><b>${live.length}</b> current member${live.length===1?'':'s'}</span><span><b>${nBox}</b> box${nBox===1?'':'es'} for ${esc(mbMonth(d.month))} · pick up ${esc(d.pickup_label||'')}</span>${attn.length?`<span class="mb-attn"><b>${attn.length}</b> need${attn.length===1?'s':''} attention</span>`:''}</div>`));
+  head.querySelector('[data-add]').addEventListener('click',()=>{CP.body=body;CP.data=d;cpAdd();});
+  body.append(head);
+
+  // active members by club and shop — what to plan boxes around
+  const by=(d.summary&&d.summary.by_club)||[];
+  if(by.some(c=>c.total>0)){
+    const tot=by.reduce((t,c)=>({m:t.m+c.memphis,n:t.n+c.nashville}),{m:0,n:0});
+    const sum=$(`<div class="card mb-sum"><table><thead><tr><th>Active members</th><th>Memphis</th><th>Nashville</th><th>Total</th></tr></thead><tbody>${by.map(c=>`<tr><td>${esc(c.name)}</td><td>${c.memphis||'–'}</td><td>${c.nashville||'–'}</td><td><b>${c.total}</b></td></tr>`).join('')}</tbody><tfoot><tr><td>All clubs</td><td>${tot.m}</td><td>${tot.n}</td><td><b>${tot.m+tot.n}</b></td></tr></tfoot></table><p class="muted cp-small">Not counting paused or ended memberships. Prepaid and comp members are included.</p></div>`);
+    body.append(sum);
+  }
+
+  const bar=$(`<div class="mb-bar">
+    <input type="search" class="mb-q" placeholder="Search name, email, phone or membership code" aria-label="Search members">
+    <div class="mb-chips" role="tablist" aria-label="Show">${MB_FILTERS.map(([k,l])=>`<button type="button" class="mb-chip${MB.filter===k?' on':''}" data-f="${k}">${esc(l)} <small>${all.filter(m=>mbMatch(m,k)).length}</small></button>`).join('')}</div>
+    <div class="mb-chips mb-shops">${[['','All shops'],['memphis','Memphis'],['nashville','Nashville']].map(([k,l])=>`<button type="button" class="mb-chip${MB.shop===k?' on':''}" data-s="${k}">${l}</button>`).join('')}</div>
+    <select class="mb-club" aria-label="Club" data-loc-btns="off"><option value="">All clubs</option>${(d.clubs||[]).map(c=>`<option value="${esc(c.slug)}" ${MB.club===c.slug?'selected':''}>${esc(c.name)}</option>`).join('')}</select>
+  </div>`);
+  const q=bar.querySelector('.mb-q');q.value=MB.q;
+  body.append(bar);
+  const list=$(`<div class="cp-list mb-list"></div>`);body.append(list);
+  const paint=()=>{
+    const s=MB.q.trim().toLowerCase(),digits=s.replace(/\D/g,'');
+    const shown=all.filter(m=>mbMatch(m,MB.filter)&&(!MB.shop||m.shop===MB.shop)&&(!MB.club||m.club.slug===MB.club)&&(!s||
+      [m.name,m.email,m.code,m.club.name].join(' ').toLowerCase().includes(s)||(digits.length>=3&&String(m.phone||'').replace(/\D/g,'').includes(digits))));
+    list.innerHTML='';
+    if(!shown.length){list.append($(`<div class="empty">${all.length?'Nobody matches.':'No members yet.'}</div>`));return;}
+    shown.forEach(m=>{
+      const tags=[mbKind(m)];
+      if(m.problem)tags.push(`<span class="cp-flag mb-flag-bad" title="${esc(m.problem)}">⚠ ${esc(m.problem.length>34?m.problem.slice(0,32)+'…':m.problem)}</span>`);
+      if(m.comp&&m.comp.ending_soon&&m.live)tags.push('<span class="cp-flag cp-soon">Ending soon</span>');
+      if(m.comp&&m.comp.skipping)tags.push(`<span class="cp-flag">Skipping ${esc(cpShort(m.comp.skipping.month))}</span>`);
+      if(m.comp&&m.comp.then_monthly)tags.push(`<span class="cp-flag cp-keep">Monthly from ${esc(cpShort(m.comp.billing_start))}</span>`);
+      const next=m.next_box?`Next box ${esc(m.next_box.month_label.replace(/ \d{4}$/,''))} · ${esc(m.next_box.pickup_label)}`:m.live?'':(m.canceled_date?'Ended '+esc(mbDay(m.canceled_date)):'');
+      const row=$(`<button type="button" class="cp-row mb-row" data-id="${esc(m.id)}"><span class="cp-who"><b>${esc(m.name)}</b><small>${esc(m.email)}${m.phone?' · '+esc(m.phone):''}</small></span><span class="cp-club">${esc(m.club.name)}<small>${esc(MB_SHOP[m.shop]||m.shop)} · ${esc(m.code)}</small></span><span class="cp-left">${mbSt(m.label,m.tone)}<small>${next}</small></span><span class="cp-tags">${tags.join('')}</span></button>`);
+      row.addEventListener('click',()=>mbOpen(m.id));
+      list.append(row);
+    });
+  };
+  q.addEventListener('input',()=>{MB.q=q.value;paint();});
+  bar.querySelectorAll('[data-f]').forEach(b=>b.addEventListener('click',()=>{MB.filter=b.dataset.f;bar.querySelectorAll('[data-f]').forEach(x=>x.classList.toggle('on',x===b));paint();}));
+  bar.querySelectorAll('[data-s]').forEach(b=>b.addEventListener('click',()=>{MB.shop=b.dataset.s;bar.querySelectorAll('[data-s]').forEach(x=>x.classList.toggle('on',x===b));paint();}));
+  bar.querySelector('.mb-club').addEventListener('change',e=>{MB.club=e.target.value;paint();});
+  paint();
+}
+
+async function mbOpen(id){
+  if(!id)return mbBack();
+  const body=MB.body,my=++MB.draw;MB.cur=id;
+  body.innerHTML='';body.append($(`<div class="muted" style="padding:6px 2px">Loading member…</div>`));
+  let r;
+  try{
+    if(!MB.data)MB.data=await mbCall('roster');
+    r=await mbCall('member',{id});
+  }catch(e){
+    if(my!==MB.draw)return;body.innerHTML='';
+    const top=$(`<div class="nl-top"><button type="button" class="btn btn-ghost btn-sm" data-back>← Members</button></div>`);
+    top.querySelector('[data-back]').addEventListener('click',()=>mbBack());
+    body.append(top,$(`<div class="empty">${esc(e.message)}</div>`));return;
+  }
+  if(my!==MB.draw||!mbLive())return;
+  if(r.comp){
+    // prepaid / comp: the comp editor, then the same history every member gets
+    CP.body=body;CP.data=Object.assign({},MB.data,{month:r.month});CP.cur=r.comp;CP.mode='edit';
+    cpEdit();
+    body.append(mbHistory(r));
+    return;
+  }
+  mbDetail(r);
+}
+
+// one monthly member: what's happening, the shop's changes, their details, boxes and activity
+function mbDetail(r){
+  const body=MB.body,v=r.member,i=r.info;body.innerHTML='';
+  const failed=i.status==='failed'||i.status==='pending';
+  const tone=failed?'bad':v.square_status==='CANCELED'||v.ends?'end':v.square_status==='PAUSED'||v.skipping||/^Pausing/.test(v.status_label)?'pause':/^Starts/.test(v.status_label)?'wait':'ok';
+  const label=failed?(i.status==='failed'?'Sign-up failed':'Sign-up not finished'):v.status_label;
+  const top=$(`<div class="nl-top"><button type="button" class="btn btn-ghost btn-sm" data-back>← Members</button>${mbSt(label,tone)}<span class="mb-kind mb-k-square">Monthly</span></div>`);
+  top.querySelector('[data-back]').addEventListener('click',()=>mbBack());
+  const fact=(k,val)=>val?`<div><dt>${k}</dt><dd>${val}</dd></div>`:'';
+  const shop=v.shop&&v.shop.label?v.shop.label:(MB_SHOP[i.shop]||i.shop);
+  const probs=[];
+  if(failed&&i.error)probs.push('The card didn’t go through: '+esc(i.error));
+  else if(failed)probs.push('They started signing up but never finished — nothing was charged.');
+  else if(i.error)probs.push(esc(i.error));
+  if(i.sync_error)probs.push('Couldn’t reach Square just now, so this may be a little out of date ('+esc(i.sync_error)+').');
+  const nb=v.upcoming?`${esc(v.upcoming.month_label)} · pick up ${esc(v.upcoming.pickup_short||v.upcoming.pickup_label)}${v.upcoming.paid?' · paid':v.upcoming.charge_label?' · charged '+esc(v.upcoming.charge_label):''}`:'';
+  const first=i.first_charge_cents>0?`${mbMoney(i.first_charge_cents)} at sign-up for the ${esc(mbMonth(i.first_box_month))} box${i.receipt_url?` · <a href="${esc(i.receipt_url)}" target="_blank" rel="noopener">receipt</a>`:''}`:'';
+  const card=$(`<div class="card cp-form mb-card">
+    <div class="cp-title"><h3>${esc(i.name)}</h3><p class="muted">${esc(v.club.name)} · ${esc(shop)} pickup · Membership ${esc(i.code)}</p></div>
+    ${probs.map(p=>`<div class="nl-note nl-err mb-prob">${p}</div>`).join('')}
+    <dl class="cp-facts">
+      ${fact('Status',esc(label))}
+      ${failed?'':fact('Next charge',v.next_charge?`${mbMoney(v.next_charge.cents)} on ${esc(v.next_charge.label)}`:v.ends?'None — the membership is ending':'None')}
+      ${failed?'':fact('Next box',nb)}
+      ${fact('Skipping',v.skipping?esc(v.skipping.month_label):'')}
+      ${fact('Coming up',(v.scheduled||[]).map(a=>esc(a.label)).join(', '))}
+      ${fact('Ends',v.ends?esc(v.ends.label):'')}
+      ${fact('Card',i.card?esc(i.card):'')}
+      ${fact('Monthly',v.monthly_cents?mbMoney(v.monthly_cents)+' on the 1st':'')}
+      ${fact('Joined',esc(mbDay(i.created_at)))}
+      ${fact('First charge',first)}
+      ${fact('Email',`<a href="mailto:${esc(i.email)}">${esc(i.email)}</a>${i.phone?' · <a href="tel:'+esc(String(i.phone).replace(/[^\d+]/g,''))+'">'+esc(i.phone)+'</a>':''}`)}
+      ${fact('Birthday',i.birthday?esc(mbDay(i.birthday)):'')}
+      ${fact('Newsletter',i.newsletter_opt_out?'Unsubscribed':'')}
+      ${fact('Note',i.note?esc(i.note):'')}
+    </dl>
+    <div class="cp-acts"></div>
+    <div class="cp-confirm" data-confirm hidden></div>
+    <div class="mb-link" data-link hidden></div>
+  </div>`);
+  body.append(top,card);
+  const acts=card.querySelector('.cp-acts'),conf=card.querySelector('[data-confirm]'),linkBox=card.querySelector('[data-link]');
+  const btn=(text,cls,fn)=>{const b=$(`<button type="button" class="btn ${cls} btn-sm">${esc(text)}</button>`);b.addEventListener('click',fn);acts.append(b);return b;};
+  const act=async(b,op,extra,msg)=>{
+    if(MB.busy)return;MB.busy=true;b.disabled=true;
+    try{await mbCall('member_act',Object.assign({id:i.id,op},extra||{}));toast(msg);MB.busy=false;mbOpen(i.id);}
+    catch(e){MB.busy=false;b.disabled=false;toast(e.message,true);}
+  };
+  const ask=(text,yes,cls,go)=>{
+    conf.hidden=false;conf.innerHTML='';
+    conf.append($(`<p>${text}</p>`));
+    const row=$(`<div class="cp-btns"></div>`),y=$(`<button type="button" class="btn ${cls} btn-sm">${esc(yes)}</button>`),n=$(`<button type="button" class="btn btn-ghost btn-sm">Never mind</button>`);
+    y.addEventListener('click',()=>go(y));n.addEventListener('click',()=>{conf.hidden=true;});
+    row.append(y,n);conf.append(row);conf.scrollIntoView({block:'nearest'});
+  };
+  if(!failed){
+    const c=v.can||{};
+    if(c.skip)btn('Skip '+c.skip.month_label,'btn-ghost',e=>act(e.currentTarget,'skip',{},`Skipping ${c.skip.month_label} — no charge or box that month.`));
+    if(c.undo_pause)btn(v.skipping?'Undo skip ('+v.skipping.month_label+')':'Undo pause','btn-ghost',e=>act(e.currentTarget,'undo',{action_id:c.undo_pause},v.skipping?'Skip undone.':'Pause undone.'));
+    if(c.pause)btn('Pause','btn-ghost',()=>ask(`Pause ${esc(i.first_name||i.name)}'s membership${v.next_charge?' from '+esc(v.next_charge.label):''}? No charges or boxes until it's resumed.`,'Pause it','btn-primary',b=>act(b,'pause',{},'Paused.')));
+    if(c.resume)btn('Resume','btn-primary',e=>act(e.currentTarget,'resume',{},'Resumes on the 1st.'));
+    if(c.undo_cancel)btn('Undo cancel','btn-primary',e=>act(e.currentTarget,'undo',{action_id:c.undo_cancel},'Cancel undone — the membership carries on.'));
+    if(c.cancel)btn('Cancel membership','btn-danger',()=>ask(`Cancel ${esc(i.first_name||i.name)}'s membership? It ends ${v.next_charge?esc(v.next_charge.label.replace(/^\w+, /,'')):'at the end of this month'} and nothing more is charged${v.upcoming&&v.upcoming.paid?' — they still get the '+esc(v.upcoming.month_label)+' box they paid for':''}. You can undo it until then.`,'Cancel membership','btn-danger',b=>act(b,'cancel',{},'Canceled — undo any time before it ends.')));
+    btn('Email their membership link','btn-ghost',async e=>{
+      const b=e.currentTarget;if(MB.busy)return;MB.busy=true;b.disabled=true;
+      try{const x=await mbCall('member_link',{id:i.id});toast(x.sent?`Emailed to ${i.email} — the link works for ${x.days} days.`:'The email didn’t go out — use Copy link instead.',!x.sent);}
+      catch(err){toast(err.message,true);}
+      MB.busy=false;b.disabled=false;
+    });
+    btn('Copy link','btn-ghost',async e=>{
+      const b=e.currentTarget;if(MB.busy)return;MB.busy=true;b.disabled=true;
+      try{
+        const x=await mbCall('member_link',{id:i.id,send:false});
+        let copied=false;try{await navigator.clipboard.writeText(x.url);copied=true;}catch(_){}
+        linkBox.hidden=false;linkBox.innerHTML='';
+        linkBox.append($(`<div><b>${copied?'Copied.':'Their link:'}</b> Text or email it to them — it opens their membership page and works for ${x.days} days.</div>`));
+        const inp=$(`<input type="text" readonly>`);inp.value=x.url;inp.addEventListener('focus',()=>inp.select());linkBox.append(inp);
+        if(copied)toast('Link copied.');
+      }catch(err){toast(err.message,true);}
+      MB.busy=false;b.disabled=false;
+    });
+  }
+
+  // their details (and a note for the shop)
+  const ed=$(`<div class="card cp-form">
+    <h3>Change details</h3>
+    <div class="cp-grid">
+      <div class="nl-fld"><label class="nl-lbl" for="mbe-first">First name</label><input id="mbe-first" data-f="first_name" maxlength="60"></div>
+      <div class="nl-fld"><label class="nl-lbl" for="mbe-last">Last name</label><input id="mbe-last" data-f="last_name" maxlength="60"></div>
+      <div class="nl-fld"><label class="nl-lbl" for="mbe-email">Email <small class="muted">— receipts and their membership link go here</small></label><input id="mbe-email" type="email" data-f="email" maxlength="200"></div>
+      <div class="nl-fld"><label class="nl-lbl" for="mbe-phone">Mobile</label><input id="mbe-phone" type="tel" data-f="phone" maxlength="40"></div>
+    </div>
+    <div class="nl-fld"><label class="nl-lbl" for="mbe-note">Note for staff</label><textarea id="mbe-note" data-f="note" rows="2" maxlength="500"></textarea></div>
+    <p class="muted cp-small">To move them to a different club or pickup shop, cancel this membership and have them join again.</p>
+    <div class="cp-err" data-err role="alert" hidden></div>
+    <div class="cp-btns"><button type="button" class="btn btn-primary" data-save>Save changes</button></div>
+  </div>`);
+  const qf=s=>ed.querySelector(s);
+  qf('[data-f="first_name"]').value=i.first_name||'';qf('[data-f="last_name"]').value=i.last_name||'';
+  qf('[data-f="email"]').value=i.email||'';qf('[data-f="phone"]').value=i.phone||'';qf('[data-f="note"]').value=i.note||'';
+  qf('[data-save]').addEventListener('click',async e=>{
+    if(MB.busy)return;
+    const val=k=>qf(`[data-f="${k}"]`).value.trim();
+    const p={id:i.id,first_name:val('first_name'),last_name:val('last_name'),email:val('email'),phone:val('phone'),note:val('note')};
+    if(!p.first_name)return cpErr(ed,'Add their first name.');
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.email))return cpErr(ed,'Check the email address.');
+    const b=e.currentTarget;MB.busy=true;b.disabled=true;cpErr(ed,'');
+    try{
+      const x=await mbCall('member_update',p);MB.busy=false;
+      toast(!x.changed?'Nothing to change.':x.square_ok===false?'Saved here — but Square still has the old details.':'Saved.',x.square_ok===false);
+      if(x.changed)mbOpen(i.id);else b.disabled=false;
+    }catch(err){MB.busy=false;b.disabled=false;cpErr(ed,err.message);}
+  });
+  if(!failed)body.append(ed);
+  body.append(mbHistory(r));
+}
+
+const MB_ACT={join:'Joined online',started:'Billing started in Square',start_failed:'Couldn’t start in Square',skip:'Skipped a month',undo_skip:'Undid a skipped month',
+  pause:'Paused',resume:'Resumed',cancel:'Canceled',undo:'Undid a change',card:'Changed their card',keep:'Chose to keep it going monthly',undo_keep:'Stopped “keep it going”',
+  keep_mail:'Sent the “keep it going” email',manage_link:'Asked for a membership link',staff_link:'Shop sent their membership link',staff_update:'Shop changed their details',
+  comp_add:'Added by the shop',comp_update:'Shop changed the membership',comp_skip:'Skipped a month',comp_end_now:'Ended by the shop',comp_end_after_month:'Set to end after this month',
+  comp_resend:'Shop resent the welcome email',monthly_from_prepaid:'Switched to monthly billing',prepaid_ended:'Ended — last prepaid box',picked_up:'Box picked up',undo_picked_up:'Pickup un-ticked',
+  newsletter_unsub:'Unsubscribed from the newsletter',newsletter_resub:'Resubscribed to the newsletter'};
+function mbActLine(l){
+  const a=String(l.action||''),d=l.detail||{};
+  let what=MB_ACT[a]||(a.endsWith('_failed')?(MB_ACT[a.slice(0,-7)]||a.slice(0,-7))+' — failed':a.replace(/_/g,' '));
+  const bits=[];
+  if(d.month&&/skip|picked|end/.test(a))bits.push(mbMonth(d.month)+(String(d.month).slice(0,4)!==String(new Date().getFullYear())?' '+String(d.month).slice(0,4):''));
+  if(a==='join'&&d.charged_cents)bits.push(mbMoney(d.charged_cents)+' charged');
+  if(a==='card'&&d.card)bits.push(d.card);
+  if(a==='staff_link')bits.push(d.sent?'emailed':d.sent===false?'email failed':'copied');
+  if(d.error)bits.push(String(d.error).slice(0,160));
+  const who=l.actor==='member'?'Member':l.actor==='system'||l.actor==='cron'?'Automatic':String(l.actor||'').startsWith('staff:')?String(l.actor).slice(6):String(l.actor||'');
+  return `<li><span class="mb-when">${esc(mbWhen(l.at))}</span><span class="mb-what">${esc(what)}${bits.length?' <small>· '+esc(bits.join(' · '))+'</small>':''}</span><span class="mb-who">${esc(who==='cron'?'Automatic':who)}</span></li>`;
+}
+const BOX_WORD={paid:'Paid',picked_up:'Picked up',failed:'Payment failed',skipped:'Skipped',refunded:'Refunded',scheduled:'Due'};
+const BOX_KIND={first_box:'Charged at sign-up',renewal:'Monthly charge',prepaid:'Prepaid',comp:'On us'};
+function mbHistory(r){
+  const boxes=r.boxes||[],log=r.log||[];
+  const el=$(`<div class="card cp-form mb-hist">
+    <h3>Boxes</h3>
+    ${boxes.length?`<table class="mb-tbl"><thead><tr><th>Month</th><th>Box</th><th>How</th><th class="num">Charged</th></tr></thead><tbody>${boxes.map(b=>`<tr><td>${esc(b.month_label)}</td><td><span class="mb-box mb-b-${esc(b.status)}">${esc(BOX_WORD[b.status]||b.status)}</span></td><td>${esc(BOX_KIND[b.kind]||b.kind)}</td><td class="num">${b.amount_cents?mbMoney(b.amount_cents):'—'}</td></tr>`).join('')}</tbody></table>`:'<p class="muted">No boxes yet.</p>'}
+    <h3 style="margin-top:22px">Activity</h3>
+    ${log.length?`<ul class="mb-log">${log.map(mbActLine).join('')}</ul>`:'<p class="muted">Nothing yet.</p>'}
+  </div>`);
+  return el;
+}
+// from anywhere in the console (the Boxes list): open one member
+window.ccOpenMember=function(id){
+  const t=document.querySelector(`.tab[onclick*="ccTab(this,'members')"]`);
+  if(t)t.click(); else if(window.ccShow)ccShow('members');
+  setTimeout(()=>mbOpen(id),0);
+};
+
+/* ====== BOXES — who picks up what each month (square-club boxes / box_pickup) ======
+   A box row exists once it's paid: on the 1st for monthly members (Square's invoice) and prepaid / comp
+   members (the sync run), or at sign-up for someone who joined before the order deadline. Tick each one
+   off at pickup; the print-out is the same list on paper. */
+const BX={data:null,body:null,draw:0,month:null,shop:'',busy:false};
+const bxLive=()=>ADMIN_TAB==='boxes';
+const BX_HAND=s=>s==='paid'||s==='picked_up';
+function bxAddMonths(m,k){let [y,mo]=String(m).slice(0,7).split('-').map(Number);const t=y*12+(mo-1)+k;return Math.floor(t/12)+'-'+String(t%12+1).padStart(2,'0')+'-01';}
+async function drawBoxes(body,month){
+  BX.body=body;const my=++BX.draw;
+  if(month!==undefined)BX.month=month;
+  body.innerHTML='';body.append($(`<div class="muted" style="padding:6px 2px">Loading boxes…</div>`));
+  try{BX.data=await mbCall('boxes',BX.month?{month:BX.month}:{});}catch(e){if(my!==BX.draw)return;body.innerHTML='';body.append($(`<div class="empty">${esc(e.message)}</div>`));return;}
+  if(my!==BX.draw||!bxLive())return;
+  BX.month=BX.data.month;
+  bxView();
+}
+function bxView(){
+  const d=BX.data,body=BX.body;body.innerHTML='';
+  const all=d.boxes||[];
+  const hand=all.filter(b=>BX_HAND(b.status)),picked=all.filter(b=>b.status==='picked_up'),failed=all.filter(b=>b.status==='failed'),skipped=all.filter(b=>b.status==='skipped'),due=all.filter(b=>b.status==='scheduled');
+  const charged=all.filter(b=>BX_HAND(b.status)).reduce((t,b)=>t+b.cents,0),refunded=all.filter(b=>b.status==='refunded').reduce((t,b)=>t+b.cents,0);
+  const isNow=d.month===d.this_month;
+  const head=$(`<div class="card cp-head">
+    <div class="nl-head-row"><div><h3>Boxes</h3><p class="muted">Who picks up what each month. A box shows up here once it's paid — monthly members are charged on the 1st, and anyone who joins before the order deadline is charged that day. Tick each box off when it's picked up.</p></div>
+    <button type="button" class="btn btn-primary btn-sm" data-print ${hand.length?'':'disabled'}>Print pickup list</button></div>
+    <div class="bx-nav"><button type="button" class="btn btn-ghost btn-sm" data-prev aria-label="Previous month">‹</button><b>${esc(d.month_label)}</b><button type="button" class="btn btn-ghost btn-sm" data-next aria-label="Next month">›</button>${isNow?'':'<button type="button" class="btn btn-ghost btn-sm" data-now>This month</button>'}</div>
+    <p class="bx-when">Pick up <b>${esc(d.pickup_label)}</b> or any time later that week · order deadline ${esc(d.deadline_label)}</p>
+  </div>`);
+  if(d.env==='sandbox')head.append($(`<div class="nl-note"><b>Test mode.</b> These are test boxes from the Square sandbox — nobody is coming to pick them up.</div>`));
+  head.append($(`<div class="cp-stats"><span><b>${hand.length}</b> box${hand.length===1?'':'es'} to hand out</span><span><b>${picked.length}</b> picked up</span>${failed.length?`<span class="mb-attn"><b>${failed.length}</b> payment${failed.length===1?'':'s'} failed</span>`:''}${skipped.length?`<span><b>${skipped.length}</b> skipped</span>`:''}${due.length?`<span><b>${due.length}</b> not charged yet</span>`:''}<span><b>${mbMoney(charged)}</b> charged${refunded?` · ${mbMoney(refunded)} refunded`:''}</span></div>`));
+  head.querySelector('[data-prev]').addEventListener('click',()=>drawBoxes(body,bxAddMonths(d.month,-1)));
+  head.querySelector('[data-next]').addEventListener('click',()=>drawBoxes(body,bxAddMonths(d.month,1)));
+  const nowB=head.querySelector('[data-now]');if(nowB)nowB.addEventListener('click',()=>drawBoxes(body,d.this_month));
+  head.querySelector('[data-print]').addEventListener('click',()=>bxPrint());
+  body.append(head);
+  if(!all.length){
+    body.append($(`<div class="empty">${d.month>d.this_month?`No boxes for ${esc(d.month_label)} yet — they show up when members are charged on the 1st.`:`No boxes for ${esc(d.month_label)}.`}</div>`));
+    return;
+  }
+  const count=s=>all.filter(b=>b.shop===s&&BX_HAND(b.status)).length;
+  const chips=$(`<div class="mb-chips bx-shops">${[['','All shops'],['memphis','Memphis'],['nashville','Nashville']].map(([k,l])=>`<button type="button" class="mb-chip${BX.shop===k?' on':''}" data-s="${k}">${l}${k?` <small>${count(k)}</small>`:''}</button>`).join('')}</div>`);
+  chips.querySelectorAll('[data-s]').forEach(b=>b.addEventListener('click',()=>{BX.shop=b.dataset.s;bxView();}));
+  body.append(chips);
+  ['memphis','nashville'].filter(s=>!BX.shop||BX.shop===s).forEach(shop=>{
+    const rows=all.filter(b=>b.shop===shop);
+    if(!rows.length)return;
+    const give=rows.filter(b=>BX_HAND(b.status));
+    const byClub={};give.forEach(b=>{byClub[b.club.name]=(byClub[b.club.name]||0)+1;});
+    const sec=$(`<div class="card bx-shop">
+      <div class="bx-shop-h"><h3>${esc(MB_SHOP[shop])} <small>· ${give.length} box${give.length===1?'':'es'}</small></h3><div class="bx-clubs">${Object.keys(byClub).sort().map(k=>`<span class="cp-flag">${esc(k)} <b>${byClub[k]}</b></span>`).join('')}</div></div>
+      <div class="table-scroll"><table class="mb-tbl bx-tbl"><thead><tr><th class="bx-ck">Picked up</th><th>Member</th><th>Club</th><th>Box</th></tr></thead><tbody></tbody></table></div>
+    </div>`);
+    const tb=sec.querySelector('tbody');
+    rows.forEach(b=>{
+      const on=b.status==='picked_up',can=BX_HAND(b.status);
+      const kind=b.kind==='prepaid'?'Prepaid':b.kind==='comp'?'On us':b.kind==='first_box'?'Paid at sign-up':'Paid on the 1st';
+      const tr=$(`<tr class="${b.status==='failed'?'bx-bad':''}${on?' bx-done':''}">
+        <td class="bx-ck">${can?`<button type="button" class="bx-tick${on?' on':''}" aria-pressed="${on}" title="${on?'Picked up — click to undo':'Mark picked up'}"><span aria-hidden="true">${on?'✓':''}</span><span class="sr">${on?'Picked up':'Not picked up'}</span></button>`:''}</td>
+        <td><a href="#" class="bx-who" data-id="${esc(b.member_id)}"><b>${esc(b.name)}</b></a><small>${esc(b.phone||b.email)}${b.note?' · '+esc(b.note):''}</small></td>
+        <td>${esc(b.club.name)}${b.club.age_21?' <span class="cp-flag mb-21">21+ · check ID</span>':''}</td>
+        <td><span class="mb-box mb-b-${esc(b.status)}">${esc(BOX_WORD[b.status]||b.status)}</span><small>${b.status==='failed'?'Don’t hand it out until it’s paid':esc(kind)+(b.cents?' · '+mbMoney(b.cents):'')}</small></td>
+      </tr>`);
+      const tick=tr.querySelector('.bx-tick');
+      if(tick)tick.addEventListener('click',async()=>{
+        if(BX.busy)return;BX.busy=true;tick.disabled=true;
+        try{const x=await mbCall('box_pickup',{id:b.id,picked:!on});b.status=x.box.status;BX.busy=false;bxView();toast(x.box.status==='picked_up'?`${b.name} — picked up.`:'Un-ticked.');}
+        catch(e){BX.busy=false;tick.disabled=false;toast(e.message,true);}
+      });
+      tr.querySelector('.bx-who').addEventListener('click',e=>{e.preventDefault();window.ccOpenMember(b.member_id);});
+      tb.append(tr);
+    });
+    body.append(sec);
+  });
+}
+function bxPrint(){
+  const d=BX.data,e2=s=>(s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const shops=['memphis','nashville'].filter(s=>!BX.shop||BX.shop===s);
+  let html='';
+  shops.forEach(shop=>{
+    const give=(d.boxes||[]).filter(b=>b.shop===shop&&BX_HAND(b.status)).sort((a,z)=>a.name.localeCompare(z.name));
+    const held=(d.boxes||[]).filter(b=>b.shop===shop&&b.status==='failed');
+    if(!give.length&&!held.length)return;
+    html+=`<section><h2>${e2(MB_SHOP[shop])} <span class="cnt">· ${give.length} box${give.length===1?'':'es'}</span></h2><table><thead><tr><th class="chk">✓</th><th>Member</th><th>Club</th><th>Notes</th></tr></thead><tbody>`;
+    give.forEach(b=>{html+=`<tr><td class="chk">${b.status==='picked_up'?'✓':''}</td><td><b>${e2(b.name)}</b><div class="sub">${e2(b.phone||b.email)}</div></td><td>${e2(b.club.name)}</td><td>${[b.club.age_21?'<b>21+ · check ID</b>':'',b.kind==='prepaid'?'Prepaid':b.kind==='comp'?'On us':'',b.note?e2(b.note):''].filter(Boolean).join(' · ')}</td></tr>`;});
+    html+='</tbody></table>';
+    if(held.length)html+=`<p class="held"><b>Payment failed — hold until paid:</b> ${held.map(b=>e2(b.name)+' ('+e2(b.club.name)+')').join(', ')}</p>`;
+    html+='</section>';
+  });
+  const w=window.open('','_blank');
+  if(!w){toast('Allow pop-ups to print the pickup list.',true);return;}
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Cheese Club pickup — ${e2(d.month_label)}</title><style>
+    *{box-sizing:border-box}body{font:14px/1.4 -apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#111;margin:28px}
+    .bar{margin-bottom:14px}.bar button{font:14px sans-serif;padding:8px 16px;background:#06273a;color:#fff;border:0;border-radius:6px;cursor:pointer}
+    header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #06273a;padding-bottom:10px;margin-bottom:6px}
+    h1{font:600 22px Georgia,serif;margin:0;color:#06273a}.meta{text-align:right;font-size:13px}
+    h2{font:600 16px Georgia,serif;margin:22px 0 6px;border-left:4px solid #896D39;padding-left:8px}h2 .cnt{color:#888;font-weight:400;font-size:13px}
+    table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top}
+    th{background:#f2f1ee;font-size:11px;text-transform:uppercase;letter-spacing:.03em}td.chk,th.chk{width:34px;text-align:center}
+    .sub{font-size:11px;color:#666}.held{font-size:13px;margin:8px 0 0}tbody tr{page-break-inside:avoid}section{page-break-inside:auto}
+    footer{margin-top:18px;font-size:11px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:8px}
+    @media print{body{margin:12mm}.bar{display:none}}
+  </style></head><body><div class="bar"><button onclick="window.print()">Print</button></div>
+  <header><h1>GREYS Cheese Club — pickup</h1><div class="meta"><div><b>${e2(d.month_label)}</b></div><div>Pick up ${e2(d.pickup_label)} or later that week</div>${d.env==='sandbox'?'<div><b>TEST — sandbox boxes</b></div>':''}</div></header>
+  ${html||'<p>No boxes to hand out.</p>'}
+  <footer>Printed ${new Date().toLocaleString('en-US')} · GREYS Fine Cheeses</footer></body></html>`);
+  w.document.close();w.focus();
+}
+
 async function viewAdmin(){
   const el=$(`<div class="wrap" style="padding:0"></div>`);
-
-  const [subsR,membersR,ordersR]=await Promise.all([
-    sb.from('cc_subscriptions').select('*, cc_clubs(*), cc_members(*), cc_fulfillment_options(*)').order('created_at',{ascending:false}),
-    sb.from('cc_members').select('*').order('created_at',{ascending:false}),
-    sb.from('cc_orders').select('*, cc_cohorts(*), cc_subscriptions(*, cc_clubs(*), cc_members(*), cc_fulfillment_options(type,label))')
-  ]);
-  const subs=subsR.data||[], members=membersR.data||[], orders=ordersR.data||[];
-  const active=subs.filter(s=>s.status==='active');
-  const mrr=active.reduce((t,s)=>t+s.cc_clubs.monthly_price_cents+(s.cc_fulfillment_options?s.cc_fulfillment_options.surcharge_cents:0),0);
-  el.append($(`<div class="metrics" id="ccMetrics"><div class="metric"><div class="k">Active subscriptions</div><div class="v">${active.length}</div></div><div class="metric"><div class="k">Members</div><div class="v">${members.length}</div></div><div class="metric"><div class="k">Est. monthly revenue</div><div class="v">${money(mrr)}</div></div><div class="metric"><div class="k">Paused / cancelled</div><div class="v">${subs.filter(s=>s.status!=='active').length}</div></div></div>`));
   const shell=$(`<div class="admin-shell"></div>`);
   const nav=$(`<div class="admin-nav"></div>`);
   const body=$(`<div class="admin-main"></div>`);
   shell.append(nav);shell.append(body);el.append(shell);
-  const drawOv=async()=>{body.innerHTML='';
-    body.append($(`<div class="muted" style="margin-bottom:12px">Add a club, or edit a club's name, price, description or visibility — changes go live immediately.</div>`));
-    const {data:allClubs}=await sb.from('cc_clubs').select('*').order('sort_order');
-    const clubs=allClubs||S.clubs;
+  // Clubs: the club editor (cc_clubs — what the Cheese Club page offers), with who's in each club and
+  // whether Square has the club at the same price
+  const drawOv=async()=>{
+    body.innerHTML='';
+    body.append($(`<div class="muted" style="margin-bottom:12px">Add a club, or change a club's name, price, description, photo or what's inside. The Cheese Club page shows the active clubs.</div>`));
+    const [cr,rr]=await Promise.all([sb.from('cc_clubs').select('*').order('sort_order'),(MB.data?Promise.resolve(MB.data):mbCall('roster')).catch(()=>null)]);
+    if(ADMIN_TAB!=='ov')return;
+    if(rr)MB.data=rr;
+    const clubs=cr.data||S.clubs;
+    const counts={};((rr&&rr.summary&&rr.summary.by_club)||[]).forEach(c=>{counts[c.slug]=c;});
+    const sq={};((rr&&rr.square)||[]).forEach(s=>{sq[s.club_id]=s;});
     const nextSort=clubs.reduce((mx,c)=>Math.max(mx,c.sort_order||0),0)+1;
     const addBtn=$(`<button class="btn btn-primary btn-sm" style="margin-bottom:14px">+ Add a club</button>`);
-    addBtn.addEventListener('click',()=>editClub({monthly_price_cents:0,active:true,pickup_only:false,accent:'#1f5137',sort_order:nextSort},drawOv));
+    addBtn.addEventListener('click',()=>editClub({monthly_price_cents:0,active:true,pickup_only:true,accent:'#1f5137',sort_order:nextSort},drawOv));
     body.append(addBtn);
+    const off=clubs.filter(c=>c.active&&(!sq[c.id]||sq[c.id].square_price_cents!==c.monthly_price_cents));
+    if(rr&&off.length){
+      const warn=$(`<div class="nl-note bx-sq"><b>Square needs updating.</b> ${off.map(c=>esc(c.name)+(sq[c.id]&&sq[c.id].square_price_cents!=null?` — Square charges ${mbMoney(sq[c.id].square_price_cents)}, the club says ${mbMoney(c.monthly_price_cents)}`:' — not set up in Square yet')).join('; ')}.${rr.env==='production'?' This changes the club prices in Square: new sign-ups pay the new price.':''} <button type="button" class="btn btn-primary btn-sm" data-sync>Update Square</button></div>`);
+      warn.querySelector('[data-sync]').addEventListener('click',async e=>{
+        const b=e.currentTarget;
+        if(rr.env==='production'&&!confirm('Update the club prices in Square? New sign-ups pay the new price.'))return;
+        b.disabled=true;b.textContent='Updating…';
+        try{await mbCall('setup',{env:rr.env,confirm:rr.env==='production'});toast('Square is up to date.');MB.data=null;drawOv();}
+        catch(err){toast(err.message,true);b.disabled=false;b.textContent='Update Square';}
+      });
+      body.append(warn);
+    }
     const g=$(`<div class="clubs" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px"></div>`);
-    clubs.forEach(c=>{const n=active.filter(s=>s.club_id===c.id).length;
-      const card=$(`<div class="card"><div style="height:6px;width:48px;border-radius:9px;background:${esc(c.accent)};margin-bottom:12px"></div><h3 style="font-size:19px">${esc(c.name)}${c.active?'':' <span class="pill cancelled" style="font-size:10px;vertical-align:middle">hidden</span>'}</h3><div style="font:600 26px Archivo">${money(c.monthly_price_cents)}<span style="font:500 14px Inter;color:var(--muted)">/mo</span></div><div class="muted" style="font-size:13px;margin-top:4px">${n} active member${n===1?'':'s'}</div></div>`);
+    clubs.forEach(c=>{
+      const n=counts[c.slug],s=sq[c.id];
+      const who=n&&n.total?`${n.total} active member${n.total===1?'':'s'}${n.memphis&&n.nashville?` <small>(Memphis ${n.memphis} · Nashville ${n.nashville})</small>`:n.memphis?' <small>(Memphis)</small>':' <small>(Nashville)</small>'}`:'No active members';
+      const sqLine=!c.active?'':!s?'<span class="bx-sqline bad">Not in Square yet</span>':s.square_price_cents==null?'<span class="bx-sqline bad">Not in Square yet</span>':s.square_price_cents!==c.monthly_price_cents?`<span class="bx-sqline bad">Square: ${mbMoney(s.square_price_cents)}</span>`:'<span class="bx-sqline">In Square ✓</span>';
+      const shops=(c.shops||[]).map(x=>MB_SHOP[x]||x).join(' & ');
+      const card=$(`<div class="card"><div style="height:6px;width:48px;border-radius:9px;background:${esc(c.accent)};margin-bottom:12px"></div><h3 style="font-size:19px">${esc(c.name)}${c.active?'':' <span class="pill cancelled" style="font-size:10px;vertical-align:middle">hidden</span>'}</h3><div style="font:600 26px Archivo">${money(c.monthly_price_cents)}<span style="font:500 14px Inter;color:var(--muted)">/mo</span></div><div class="muted" style="font-size:13px;margin-top:4px">${who}</div><div class="muted" style="font-size:12.5px;margin-top:2px">${esc(shops)}${c.age_21?' · 21+':''}</div>${sqLine}</div>`);
       const eb=$(`<button class="btn btn-ghost btn-sm" style="margin-top:12px">Edit club</button>`);
-      eb.addEventListener('click',()=>editClub(c,drawOv));
-      card.append(eb); g.append(card);});
-    body.append(g);};
-  const drawSubs=()=>{body.innerHTML='';
-    const ctl=$(`<label class="fld" style="max-width:360px"><span>Search</span><input id="subq" placeholder="Name, email, or club"></label>`);
-    const holder=$(`<div></div>`); body.append(ctl,holder);
-    const paint=()=>{
-      const q=ctl.querySelector('#subq').value.trim().toLowerCase();
-      const list=subs.filter(s=>{ if(!q) return true; const mem=s.cc_members||{}; return [mem.full_name,mem.email,s.cc_clubs&&s.cc_clubs.name].filter(Boolean).join(' ').toLowerCase().includes(q); });
-      holder.innerHTML='';
-      const t=$(`<div class="table-scroll"><table><thead><tr><th>Member</th><th>Club</th><th>Fulfillment</th><th>Status</th><th>Gift</th><th>Started</th><th></th></tr></thead><tbody></tbody></table></div>`);
-      const tb=t.querySelector('tbody');
-      list.forEach(s=>{
-        const tr=$(`<tr><td><b>${esc((s.cc_members&&(s.cc_members.full_name||s.cc_members.email))||'—')}</b><br><small class="muted">${esc((s.cc_members&&s.cc_members.email)||'')}</small></td><td>${esc(s.cc_clubs?s.cc_clubs.name:'—')}</td><td>${esc((s.cc_fulfillment_options&&s.cc_fulfillment_options.label)||'—')}</td><td><span class="pill ${s.status}">${s.status}</span></td><td>${s.is_gift?'🎁':''}</td><td>${new Date(s.started_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td><td class="actcell"></td></tr>`);
-        const eb=$(`<button class="btn btn-ghost btn-sm">Edit</button>`);
-        eb.addEventListener('click',()=>editSubscription(s));
-        tr.querySelector('.actcell').append(eb);
-        tb.append(tr);
-      });
-      if(!list.length)tb.append($(`<tr><td colspan="7"><div class="empty">${subs.length?'No subscriptions match your search.':'No subscriptions yet.'}</div></td></tr>`));
-      holder.append(t);
-    };
-    ctl.querySelector('#subq').addEventListener('input',paint);
-    paint();
+      eb.addEventListener('click',()=>editClub(c,()=>{MB.data=null;drawOv();}));
+      card.append(eb);g.append(card);
+    });
+    body.append(g);
   };
-  function editMember(m,onSaved){
-    const md=document.getElementById('ccModal');const optIn=m.email_opt_in!==false;
-    md.innerHTML=`<h3>Edit member</h3><p class="muted" style="font-size:13px;margin-top:0">${esc(m.email)}</p>`;
-    const wrap=$(`<div>
-      <label class="fld"><span>Full name</span><input id="em_name" value="${esc(m.full_name||'')}"></label>
-      <label class="fld"><span>Phone</span><input id="em_phone" value="${esc(m.phone||'')}"></label>
-      <label class="fld"><span>Birthday</span><input id="em_bday" type="date" value="${esc(m.birthday||'')}"></label>
-      <label class="fld"><span>Street</span><input id="em_street" value="${esc(m.address_street||'')}"></label>
-      <div style="display:flex;gap:10px"><label class="fld" style="flex:2"><span>City</span><input id="em_city" value="${esc(m.address_city||'')}"></label><label class="fld" style="flex:1"><span>State</span><input id="em_state" value="${esc(m.address_state||'')}"></label><label class="fld" style="flex:1"><span>ZIP</span><input id="em_zip" value="${esc(m.address_zip||'')}"></label></div>
-      <label class="fld"><span>Cheese preferences & allergies</span><textarea id="em_diet" rows="2">${esc(m.dietary_prefs||'')}</textarea></label>
-      <label class="fld"><span>Internal notes (admin only)</span><textarea id="em_notes" rows="2" placeholder="Not shown to the member">${esc(m.admin_notes||'')}</textarea></label>
-      <label class="opt ${optIn?'sel':''}"><input id="em_optin" type="checkbox" ${optIn?'checked':''}><div class="meta"><b>Email opt-in</b><small>Receives Cheese Club broadcasts.</small></div></label>
-      <label class="opt ${m.is_admin?'sel':''}"><input id="em_admin" type="checkbox" ${m.is_admin?'checked':''}><div class="meta"><b>Partner (admin) access</b><small>Can open the Partner Portal.</small></div></label>
-    </div>`);
-    wrap.querySelectorAll('.opt input[type=checkbox]').forEach(ck=>ck.addEventListener('change',()=>ck.closest('.opt').classList.toggle('sel',ck.checked)));
-    md.append(wrap);
-    const save=$(`<button class="btn btn-primary" style="width:100%;margin-top:6px">Save changes</button>`);
-    save.addEventListener('click',async()=>{
-      save.disabled=true;save.textContent='Saving…';
-      const patch={
-        full_name:wrap.querySelector('#em_name').value.trim()||null,
-        phone:wrap.querySelector('#em_phone').value.trim()||null,
-        birthday:wrap.querySelector('#em_bday').value||null,
-        address_street:wrap.querySelector('#em_street').value.trim()||null,
-        address_city:wrap.querySelector('#em_city').value.trim()||null,
-        address_state:wrap.querySelector('#em_state').value.trim()||null,
-        address_zip:wrap.querySelector('#em_zip').value.trim()||null,
-        dietary_prefs:wrap.querySelector('#em_diet').value.trim()||null,
-        admin_notes:wrap.querySelector('#em_notes').value.trim()||null,
-        email_opt_in:wrap.querySelector('#em_optin').checked,
-        is_admin:wrap.querySelector('#em_admin').checked
-      };
-      try{const j=await ccFnJson('cc-admin',{action:'member_update',member_id:m.id,patch});closeModal();toast('Member updated.');if(onSaved)onSaved(j.member||patch);}
-      catch(e){toast(e.message,true);save.disabled=false;save.textContent='Save changes';}
-    });
-    md.append(save);
-    md.append($(`<button class="btn btn-ghost" style="width:100%;margin-top:8px" onclick="ccCloseModal()">Cancel</button>`));
-    document.getElementById('ccModalBg').classList.add('show');
-  }
-  const drawMembers=()=>{body.innerHTML='';const t=$(`<div class="table-scroll"><table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Subscriptions</th><th>Role</th><th></th></tr></thead><tbody></tbody></table></div>`);const tb=t.querySelector('tbody');
-    members.forEach(m=>{const n=subs.filter(s=>s.member_id===m.id).length;const tr=$(`<tr><td><b>${esc(m.full_name||'—')}</b>${m.admin_notes?' <span title="Has internal notes">📝</span>':''}</td><td>${esc(m.email)}</td><td>${esc(m.phone||'—')}</td><td>${n}</td><td>${m.is_admin?'<span class="pill paid">admin</span>':'member'}</td><td></td></tr>`);const eb=$(`<button class="btn btn-ghost btn-sm">Edit</button>`);eb.addEventListener('click',()=>editMember(m,updated=>{Object.assign(m,updated);drawMembers();}));tr.lastElementChild.append(eb);tb.append(tr);});body.append(t);};
-  const drawOrders=()=>{body.innerHTML='';const t=$(`<div class="table-scroll"><table><thead><tr><th>Member</th><th>Club</th><th>Cohort</th><th>Amount</th><th>Status</th><th>Shipping</th></tr></thead><tbody></tbody></table></div>`);const tb=t.querySelector('tbody');
-    orders.sort((a,b)=>(((b.cc_cohorts&&b.cc_cohorts.month)||'').localeCompare((a.cc_cohorts&&a.cc_cohorts.month)||''))).forEach(o=>{
-      const sub=o.cc_subscriptions||{}; const fft=sub.cc_fulfillment_options&&sub.cc_fulfillment_options.type;
-      const tr=$(`<tr><td>${esc((sub.cc_members&&(sub.cc_members.full_name||sub.cc_members.email))||'—')}</td><td>${esc((sub.cc_clubs&&sub.cc_clubs.name)||'—')}</td><td>${o.cc_cohorts?fmtMonth(o.cc_cohorts.month):'—'}</td><td>${money2(o.amount_cents)}</td><td><span class="pill ${o.status}">${o.status}</span></td><td class="lblcell"></td></tr>`);
-      const cell=tr.querySelector('.lblcell');
-      if(fft==='shipping'){
-        if(o.label_url){cell.append($(`<a class="btn btn-ghost btn-sm" href="${esc(o.label_url)}" target="_blank">View label</a>`)); if(o.tracking_number)cell.append($(`<div class="muted" style="font-size:11px;margin-top:4px">${esc(o.tracking_number)}</div>`));}
-        else{const wrap=$(`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><select class="lblorigin" style="padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;font-size:12px"><option value="memphis">Ship from Memphis</option><option value="nashville">Ship from Nashville</option></select></div>`);const b=$(`<button class="btn btn-primary btn-sm">Create label</button>`);b.addEventListener('click',()=>createLabel(o,b,wrap.querySelector('.lblorigin').value));wrap.append(b);cell.append(wrap);}
-      }else{cell.append($(`<span class="muted" style="font-size:12px">${fft==='delivery'?'Local delivery':(fft==='pickup'?'Pickup':'—')}</span>`));}
-      tb.append(tr);
-    });
-    if(!orders.length)tb.append($(`<tr><td colspan="6"><div class="empty">No orders yet.</div></td></tr>`));body.append(t);};
-  // --- Roster (active members for a month) + CSV export ---
-  const drawRoster=()=>{
-    body.innerHTML='';
-    const ctl=$(`<div style="margin-bottom:14px">
-      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap"><label class="fld" style="margin:0"><span>Month</span><input id="rmonth" type="month" value="${adminDefaultMonth().slice(0,7)}"></label><button id="rload" class="btn btn-ghost btn-sm">Load</button><button id="rprint" class="btn btn-ghost btn-sm">🖨 Print</button><button id="rcsv" class="btn btn-primary btn-sm">Export CSV</button></div>
-      <div style="margin-top:12px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px"><span class="muted" style="font-size:12px">Locations to print</span><a id="rloctoggle" class="muted" style="font-size:12px;cursor:pointer">Select none</a></div><div id="rlocs" class="loc-checks"></div></div>
-    </div>`);
-    const out=$(`<div></div>`); body.append(ctl); body.append(out);
-    const monthVal=()=>ymToDate(ctl.querySelector('#rmonth').value)||adminDefaultMonth();
-    // Location checkboxes — one per fulfillment option, all checked by default.
-    const locsWrap=ctl.querySelector('#rlocs');
-    const locChip=(label)=>{const l=$(`<label class="loc-chip"><input type="checkbox" value="${esc(label)}" checked><span>${esc(label)}</span></label>`);l.querySelector('input').addEventListener('change',e=>{l.classList.toggle('off',!e.target.checked);syncToggle();});locsWrap.append(l);};
-    const hasChip=(lbl)=>Array.from(locsWrap.querySelectorAll('input')).some(i=>i.value===lbl);
-    const ensureChip=(lbl)=>{if(!hasChip(lbl))locChip(lbl);};
-    (S.fulfillment||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)).forEach(f=>ensureChip(f.label));
-    const selectedLabels=()=>Array.from(locsWrap.querySelectorAll('input:checked')).map(i=>i.value);
-    const syncToggle=()=>{const all=locsWrap.querySelectorAll('input').length,on=selectedLabels().length;ctl.querySelector('#rloctoggle').textContent=on===all?'Select none':'Select all';};
-    ctl.querySelector('#rloctoggle').addEventListener('click',()=>{const on=selectedLabels().length,all=locsWrap.querySelectorAll('input').length,check=on!==all;locsWrap.querySelectorAll('input').forEach(i=>{i.checked=check;i.closest('.loc-chip').classList.toggle('off',!check);});syncToggle();});
-    const load=async()=>{
-      out.innerHTML=''; out.append($(`<div class="empty">Loading…</div>`));
-      try{
-        const j=await ccFnJson('cc-admin',{action:'roster',month:monthVal()});
-        (j.roster||[]).forEach(r=>ensureChip(r.fulfillment_label||'Unassigned'));syncToggle();
-        out.innerHTML='';
-        out.append($(`<div class="muted" style="margin:2px 0 10px">${j.count} active membership${j.count===1?'':'s'} for ${fmtMonth(monthVal())}.</div>`));
-        const t=$(`<div class="table-scroll"><table><thead><tr><th>Name</th><th>Email</th><th>Tier</th><th>Fulfillment</th><th>Subscription</th><th>Order</th></tr></thead><tbody></tbody></table></div>`);
-        const tb=t.querySelector('tbody');
-        (j.roster||[]).forEach(r=>tb.append($(`<tr><td><b>${esc(r.full_name||'—')}</b></td><td>${esc(r.email)}</td><td>${esc(r.club_name)}</td><td>${esc(r.fulfillment_label||'—')}</td><td><span class="pill ${r.subscription_status}">${r.subscription_status}</span></td><td>${r.order_status?`<span class="pill ${r.order_status}">${r.order_status}</span>`:'—'}</td></tr>`)));
-        if(!(j.roster||[]).length)tb.append($(`<tr><td colspan="6"><div class="empty">No active members this month.</div></td></tr>`));
-        out.append(t);
-      }catch(e){out.innerHTML='';out.append($(`<div class="empty">${esc(e.message)}</div>`));}
-    };
-    ctl.querySelector('#rload').addEventListener('click',load);
-    ctl.querySelector('#rprint').addEventListener('click',()=>{const sel=selectedLabels();if(!sel.length){toast('Select at least one location to print.',true);return;}printRoster(monthVal(),sel);});
-    ctl.querySelector('#rcsv').addEventListener('click',async(ev)=>{
-      const b=ev.target;b.disabled=true;b.textContent='Exporting…';
-      try{
-        const m=monthVal(); const r=await ccFn('cc-admin',{action:'roster_csv',month:m});
-        if(!r.ok)throw new Error('Export failed ('+r.status+')');
-        const blob=await r.blob(); const url=URL.createObjectURL(blob);
-        const a=document.createElement('a');a.href=url;a.download='cheese-club-roster-'+m+'.csv';document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);
-        toast('Roster exported.');
-      }catch(e){toast(e.message,true);}finally{b.disabled=false;b.textContent='Export CSV';}
-    });
-    load();
-  };
-  // --- Realized revenue per billing month ---
-  const drawRevenue=async()=>{
-    body.innerHTML='';
-    body.append($(`<div class="muted" style="margin:2px 0 14px">Realized revenue per billing month — paid orders, net of refunds.</div>`));
-    const wrap=$(`<div class="empty">Loading…</div>`); body.append(wrap);
-    let rows=[];
-    try{ const j=await ccFnJson('cc-admin',{action:'revenue'}); rows=j.revenue||[]; }
-    catch(e){ wrap.textContent=e.message; return; }
-    wrap.remove();
-    if(!rows.length){ body.append($(`<div class="empty">No revenue yet.</div>`)); return; }
-    const statuses=[...new Set(rows.map(r=>r.cohort_status).filter(Boolean))];
-    const ctl=$(`<div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px">
-      <label class="fld" style="margin:0;flex:1;min-width:200px"><span>Search month</span><input id="revq" placeholder="e.g. July or 2026"></label>
-      <label class="fld" style="margin:0"><span>Status</span><select id="revst"><option value="">All statuses</option>${statuses.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('')}</select></label>
-    </div>`);
-    const metricsHolder=$(`<div></div>`);
-    const tableHolder=$(`<div></div>`);
-    body.append(ctl,metricsHolder,tableHolder);
-    const paint=()=>{
-      const q=ctl.querySelector('#revq').value.trim().toLowerCase();
-      const st=ctl.querySelector('#revst').value;
-      const filtered=rows.filter(r=>{
-        const okQ=!q||fmtMonth(r.month).toLowerCase().includes(q)||(r.month||'').includes(q);
-        return okQ && (!st||r.cohort_status===st);
-      });
-      const net=filtered.reduce((t,r)=>t+(r.net_revenue_cents||0),0);
-      const gross=filtered.reduce((t,r)=>t+(r.gross_paid_cents||0),0);
-      metricsHolder.innerHTML='';
-      metricsHolder.append($(`<div class="metrics"><div class="metric"><div class="k">Net revenue${q||st?' (filtered)':''}</div><div class="v">${money(net)}</div></div><div class="metric"><div class="k">Gross${q||st?' (filtered)':''}</div><div class="v">${money(gross)}</div></div><div class="metric"><div class="k">Months shown</div><div class="v">${filtered.length}</div></div></div>`));
-      tableHolder.innerHTML='';
-      if(!filtered.length){tableHolder.append($(`<div class="empty">No months match your search.</div>`));return;}
-      const t=$(`<div class="table-scroll"><table><thead><tr><th>Month</th><th>Status</th><th>Billable</th><th>Paid</th><th>Failed</th><th>Refunded</th><th>Gross</th><th>Refunds</th><th>Net</th></tr></thead><tbody></tbody></table></div>`);
-      const tb=t.querySelector('tbody');
-      filtered.forEach(r=>tb.append($(`<tr><td><b>${fmtMonth(r.month)}</b></td><td><span class="pill ${r.cohort_status==='open'?'active':'scheduled'}">${esc(r.cohort_status)}</span></td><td>${r.billable_orders}</td><td>${r.paid_orders}</td><td>${r.failed_orders}</td><td>${r.refunded_orders}</td><td>${money2(r.gross_paid_cents)}</td><td>${money2(r.refunded_cents)}</td><td><b>${money2(r.net_revenue_cents)}</b></td></tr>`)));
-      tableHolder.append(t);
-    };
-    ctl.querySelector('#revq').addEventListener('input',paint);
-    ctl.querySelector('#revst').addEventListener('change',paint);
-    paint();
-  };
-  // --- Notify: broadcast (preview→confirm) + pickup reminders ---
-  const drawNotify=()=>{
-    body.innerHTML='';
-    const bc=$(`<div class="card" style="margin-bottom:18px"><h3 style="font-size:18px;margin-top:0">Broadcast to active members</h3><p class="muted" style="font-size:13px;margin-top:-4px">Emails the active roster for the chosen month — for changes, updates or substitutions. You preview recipients before anything sends.</p></div>`);
-    const month=$(`<label class="fld"><span>Audience month</span><input id="bmonth" type="month" value="${adminDefaultMonth().slice(0,7)}"></label>`);
-    const subj=$(`<label class="fld"><span>Subject</span><input id="bsubj" placeholder="Substitution notice for this month's box"></label>`);
-    const bodyf=$(`<label class="fld"><span>Message (HTML allowed)</span><textarea id="bbody" rows="6" style="width:100%;font:inherit;padding:10px;border:1.5px solid var(--line);border-radius:10px" placeholder="Hi there — a quick update about your upcoming box…"></textarea></label>`);
-    const previewBtn=$(`<button class="btn btn-ghost btn-sm">Preview recipients</button>`);
-    const pv=$(`<div style="margin-top:12px"></div>`);
-    bc.append(month,subj,bodyf,previewBtn,pv); body.append(bc);
-    previewBtn.addEventListener('click',async()=>{
-      previewBtn.disabled=true;pv.innerHTML='';pv.append($(`<div class="muted">Loading recipients…</div>`));
-      try{
-        const m=ymToDate(month.querySelector('#bmonth').value)||adminDefaultMonth();
-        const j=await ccFnJson('cc-broadcast',{month:m});
-        pv.innerHTML='';
-        const list=(j.recipients||[]).map(r=>esc(r.name||r.email)+' &lt;'+esc(r.email)+'&gt;').join('<br>');
-        pv.append($(`<div class="note">${j.recipient_count} recipient${j.recipient_count===1?'':'s'}${j.testMode?' · <b>TEST MODE</b> (all mail redirected)':''}<div class="muted" style="font-size:12px;margin-top:6px;max-height:150px;overflow:auto">${list||'No active members.'}</div></div>`));
-        if(j.recipient_count>0){
-          const send=$(`<button class="btn btn-primary btn-sm" style="margin-top:10px">Send to ${j.recipient_count} member${j.recipient_count===1?'':'s'}</button>`);
-          send.addEventListener('click',async()=>{
-            const subject=subj.querySelector('#bsubj').value.trim(); const html=bodyf.querySelector('#bbody').value.trim();
-            if(!subject||!html){toast('Add a subject and message first.',true);return;}
-            if(!confirm('Send this email to '+j.recipient_count+' member(s)?'))return;
-            send.disabled=true;send.textContent='Sending…';
-            try{ const res=await ccFnJson('cc-broadcast',{month:m,subject,html,send:true}); toast('Sent to '+res.sent+' member(s)'+(res.failed?' · '+res.failed+' failed':'')+(res.testMode?' (test mode)':'')+'.'); }
-            catch(e){toast(e.message,true);send.disabled=false;send.textContent='Send';}
-          });
-          pv.append(send);
-        }
-      }catch(e){pv.innerHTML='';pv.append($(`<div class="empty">${esc(e.message)}</div>`));}
-      finally{previewBtn.disabled=false;}
-    });
-    const rmonth=adminDefaultMonth();
-    const rc=$(`<div class="card"><h3 style="font-size:18px;margin-top:0">Pickup reminders</h3><p class="muted" style="font-size:13px;margin-top:-4px">Reminders auto-send 24h before the 2nd-Wednesday pickup. You can also send this month's now — already-reminded orders are skipped.</p></div>`);
-    const rstat=$(`<div class="muted" style="margin-bottom:10px">Checking…</div>`);
-    const rbtn=$(`<button class="btn btn-primary btn-sm">Send pickup reminders now</button>`);
-    rc.append(rstat,rbtn); body.append(rc);
-    (async()=>{ try{ const j=await ccFnJson('cc-pickup-reminder',{month:rmonth,dry:true}); rstat.innerHTML=`Pickup for <b>${fmtMonth(rmonth)}</b> is <b>${j.pickup}</b>. <b>${j.eligible}</b> reminder${j.eligible===1?'':'s'} pending${j.testMode?' · <b>TEST MODE</b>':''}.`; }catch(e){ rstat.textContent=e.message; } })();
-    rbtn.addEventListener('click',async()=>{
-      if(!confirm('Send pickup reminders for '+fmtMonth(rmonth)+' now?'))return;
-      rbtn.disabled=true;rbtn.textContent='Sending…';
-      try{ const j=await ccFnJson('cc-pickup-reminder',{month:rmonth}); toast('Reminders sent: '+j.sent+(j.failed?' · '+j.failed+' failed':'')+(j.testMode?' (test mode)':'')+'.'); }
-      catch(e){toast(e.message,true);}
-      finally{rbtn.disabled=false;rbtn.textContent='Send pickup reminders now';}
-    });
-  };
-  const draws={ov:drawOv,subs:drawSubs,members:drawMembers,orders:drawOrders,roster:drawRoster,revenue:drawRevenue,notify:drawNotify,news:()=>drawNewsletter(body),comps:()=>drawComps(body)};
+  const draws={members:()=>drawMembers(body),boxes:()=>drawBoxes(body),news:()=>drawNewsletter(body),ov:drawOv};
   const NAV=[
-    {t:'ov',label:'Clubs',ico:'🧀'},
-    {t:'subs',label:'Subscriptions',ico:'📋'},
     {t:'members',label:'Members',ico:'👥'},
-    {t:'orders',label:'Orders',ico:'📦'},
-    {t:'roster',label:'Roster',ico:'📅'},
-    {t:'revenue',label:'Revenue',ico:'💵'},
-    {t:'notify',label:'Notify',ico:'✉️'},
+    {t:'boxes',label:'Boxes',ico:'📦'},
     {t:'news',label:'Newsletter',ico:'📰'},
-    {t:'comps',label:'Comps',ico:'🎟️'},
+    {t:'ov',label:'Clubs',ico:'🧀'},
   ];
-  if(!draws[ADMIN_TAB]) ADMIN_TAB='ov';
-  const selectTab=(t)=>{ ADMIN_TAB=t; nav.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.t===t)); const mx=el.querySelector('#ccMetrics'); if(mx) mx.style.display=(t==='ov')?'':'none'; draws[t](); };
+  if(!draws[ADMIN_TAB]) ADMIN_TAB='members';
+  const selectTab=(t)=>{ if(!draws[t]) t='members'; ADMIN_TAB=t; nav.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.t===t)); draws[t](); };
   window.ccShow = selectTab;
   NAV.forEach(it=>{const b=$(`<button data-t="${it.t}"><span class="ico">${it.ico}</span>${esc(it.label)}</button>`);b.addEventListener('click',()=>selectTab(it.t));nav.append(b);});
   if(window.__ccPending){ ADMIN_TAB=window.__ccPending; window.__ccPending=null; }
   selectTab(ADMIN_TAB);
   return el;
-}
-// Admin: edit a member's subscription (tier, fulfillment, status, gift).
-// Writes go through the cc_subs_owner_update RLS policy (cc_is_admin()).
-function editSubscription(s){
-  const m=document.getElementById('ccModal');
-  const clubs=S.clubs.slice();
-  if(s.cc_clubs && !clubs.find(c=>c.id===s.cc_clubs.id)) clubs.push(s.cc_clubs);
-  const ffs=S.fulfillment.filter(f=>!f.coming_soon);
-  const memberName=(s.cc_members&&(s.cc_members.full_name||s.cc_members.email))||'this member';
-  const row=(label,inner)=>`<label class="fld"><span>${label}</span>${inner}</label>`;
-  const statusOpts=['active','paused','cancelled'];
-  m.innerHTML=`<h3>Edit subscription</h3><p class="muted" style="font-size:13px;margin-top:-6px">${esc(memberName)}</p>`;
-  const wrap=$(`<div></div>`);
-  wrap.innerHTML=
-    row('Membership tier',`<select id="es_club">${clubs.map(c=>`<option value="${c.id}" ${c.id===s.club_id?'selected':''}>${esc(c.name)} — ${money(c.monthly_price_cents)}/mo</option>`).join('')}</select>`)+
-    row('Fulfillment',`<select id="es_ff">${ffs.map(f=>`<option value="${f.id}" ${f.id===s.fulfillment_option_id?'selected':''}>${esc(f.label)}</option>`).join('')}</select>`)+
-    row('Status',`<select id="es_status">${statusOpts.map(st=>`<option value="${st}" ${st===s.status?'selected':''}>${st}</option>`).join('')}</select>`)+
-    `<div id="es_pausedwrap" style="display:${s.status==='paused'?'block':'none'}">${row('Paused until',`<input id="es_paused" type="month" value="${s.paused_until?esc(s.paused_until.slice(0,7)):''}">`)}</div>`+
-    `<label class="opt" style="margin-top:2px"><input id="es_gift" type="checkbox" ${s.is_gift?'checked':''}><div class="meta"><b>Gift 🎁</b><small>Marked as a gift membership</small></div></label>`;
-  m.append(wrap);
-  wrap.querySelector('#es_status').addEventListener('change',e=>{wrap.querySelector('#es_pausedwrap').style.display=e.target.value==='paused'?'block':'none';});
-  const save=$(`<button class="btn btn-primary" style="width:100%;margin-top:12px">Save changes</button>`);
-  save.addEventListener('click',async()=>{
-    const status=wrap.querySelector('#es_status').value;
-    const patch={
-      club_id:wrap.querySelector('#es_club').value,
-      fulfillment_option_id:wrap.querySelector('#es_ff').value,
-      status,
-      is_gift:wrap.querySelector('#es_gift').checked,
-      cancelled_at: status==='cancelled' ? (s.cancelled_at||new Date().toISOString()) : null,
-      paused_until: status==='paused' ? ((wrap.querySelector('#es_paused').value||'')?wrap.querySelector('#es_paused').value+'-01':null) : null,
-    };
-    save.disabled=true;save.textContent='Saving…';
-    const {error}=await sb.from('cc_subscriptions').update(patch).eq('id',s.id);
-    if(error){toast(error.message,true);save.disabled=false;save.textContent='Save changes';return;}
-    closeModal();toast('Subscription updated.');ccRender();
-  });
-  m.append(save);
-  m.append($(`<button class="btn btn-ghost" style="width:100%;margin-top:8px" onclick="ccCloseModal()">Cancel</button>`));
-  document.getElementById('ccModalBg').classList.add('show');
-}
-async function createLabel(o, btn, origin){
-  btn.disabled=true;btn.textContent='Creating…';
-  try{
-    const {data:{session}}=await sb.auth.getSession();
-    const r=await fetch(SUPABASE_URL+'/functions/v1/cc-shipstation',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+session.access_token},body:JSON.stringify({action:'label',order_id:o.id,origin:origin||'memphis'})});
-    const j=await r.json();
-    if(j.configured===false){toast('ShipStation is not configured.',true);}
-    else if(!j.ok){toast(j.error||'Could not create label.',true);}
-    else{ if(j.label_url) window.open(j.label_url,'_blank'); toast('Label created'+(j.tracking?' · '+j.tracking:'')+'.'); ccRender(); return; }
-  }catch(e){toast('Could not create label.',true);}
-  btn.disabled=false;btn.textContent='Create label';
 }
 function viewNoAdmin(){return $(`<div class="empty">This area is for store operators only — this login doesn't have Cheese Club admin rights.</div>`);}
 })();
@@ -14646,13 +14779,14 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       ['index.html','home','Staff Portal'],
       ['https://tickets.greyscheese.com','ticket','Ticket Site',1],
       ['https://tickets.greyscheese.com/experiences.html','spark','Experiences Site',1],
-      ['https://brad695.github.io/cheese-club/','box','Cheese Club',1]
+      ['https://www.greyscheese.com/cheeseclub','box','Cheese Club',1]
     ];
     // the staging test copies sit in one "Test sites" dropdown inside Links
     const TEST_LINKS = [
       ['https://ticket-rennet.onrender.com','ticket','Ticket Site',1],
       ['https://ticket-rennet.onrender.com/experiences.html','spark','Experiences',1],
       ['https://ticket-rennet.onrender.com/order.html','bag','Online Ordering',1],
+      ['https://ticket-rennet.onrender.com/club.html','box','Cheese Club',1],
       ['https://greys-staff-portal-staging.onrender.com/','home','Staff Portal',1],
       ['https://greys-staff-portal-staging.onrender.com/manager.html','panel','Manager',1]
     ];
