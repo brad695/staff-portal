@@ -14,6 +14,8 @@
 //   list   {source, source_ids[]}                                   admin
 //   sweep  {}  reconcile: release holds whose event/experience is gone or moved,
 //              hold confirmed experiences that have none.          public (idempotent)
+//              At-home experiences (rb_experience_types.at_home) happen at the guest's
+//              place, so they never hold tables (v7, 2026-10-05).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CORS = {
@@ -308,14 +310,15 @@ async function sweep() {
     const ok = new Map((data || []).map((r: any) => [String(r.id), r]));
     for (const h of ev) { const r: any = ok.get(h.source_id); if (!r || r.archived || r.block_scope !== "tables" || WIX_LOCS[locKey(r.location)] !== h.wix_location_id) stale.push(h); }
   }
-  // Experiences: follow rb_reservations (cancelled / moved → release; confirmed/pending with no hold → hold)
+  // Experiences: follow rb_reservations (cancelled / moved → release; confirmed/pending with no hold → hold).
+  // At-home experiences never hold tables.
   const { data: exps } = await admin.from("rb_reservations")
-    .select("id, status, starts_at, ends_at, party_size, location, guest_name, rb_experience_types(name)")
+    .select("id, status, starts_at, ends_at, party_size, location, guest_name, rb_experience_types(name, at_home)")
     .eq("kind", "experience").gte("ends_at", new Date().toISOString());
   const expMap = new Map((exps || []).map((r: any) => [String(r.id), r]));
   for (const h of bySrc("experience")) {
     const r: any = expMap.get(h.source_id);
-    if (!r || !LIVE_EXP.includes(r.status) || Date.parse(r.starts_at) !== Date.parse(h.starts_at) || Date.parse(r.ends_at) !== Date.parse(h.ends_at)) stale.push(h);
+    if (!r || r.rb_experience_types?.at_home || !LIVE_EXP.includes(r.status) || Date.parse(r.starts_at) !== Date.parse(h.starts_at) || Date.parse(r.ends_at) !== Date.parse(h.ends_at)) stale.push(h);
   }
   const relErrs = await releaseRows(stale);
   report.errors.push(...relErrs);
@@ -326,6 +329,7 @@ async function sweep() {
   const { data: recentFail } = await admin.from("table_holds").select("source_id").eq("source", "experience").eq("status", "failed").gte("created_at", since);
   const skip = new Set((recentFail || []).map((r: any) => r.source_id));
   for (const r of (exps || []) as any[]) {
+    if (r.rb_experience_types?.at_home) continue; // at the guest's place: no tables to hold
     if (!LIVE_EXP.includes(r.status) || heldIds.has(String(r.id)) || skip.has(String(r.id))) continue;
     if (Date.parse(r.starts_at) < Date.now()) continue;
     const out = await doHold({
