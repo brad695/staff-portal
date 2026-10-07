@@ -9,6 +9,8 @@
 //   inventory each date's Square stock = seats left (capacity - seats taken).
 //   pull      completed register orders with a class line -> a registration on
 //             that class. Returns reduce / refund the registration.
+//   refunds   a refund made in Square on a ticket-site order (return order) ->
+//             ticket_payments + registration (2026-10-07)
 //
 // ENV below decides sandbox vs production. The sandbox copy writes register
 // sales as canceled + refunded test rows: it shares the LIVE database, so a
@@ -481,6 +483,68 @@ async function customerOf(order: Record<string, any>) {
   return { name: r.display_name ?? "", email: String(r.email_address ?? "").toLowerCase(), phone: r.phone_number ?? "" };
 }
 
+// A refund taken in Square itself (Dashboard, POS or the Refunds API) creates a
+// RETURN order pointing back at the sale. For a ticket-site order that return
+// never reached ticket_payments, so the booking stayed "paid" and the seats
+// stayed held (2026-10-07). Read the refunded-to-date total off the payment(s)
+// and mirror exactly what square-ticket-pay's admin refund() writes.
+// pull() only looks back to the last pulled_to minus 10 minutes, so an older
+// refund needs a manual backfill: {"action":"pull","days":N}.
+async function syncTicketRefund(sourceOrderId: string): Promise<boolean> {
+  if (!sourceOrderId) return false;
+  try {
+    const { data: row } = await admin.from("ticket_payments").select("*")
+      .eq("square_order_id", sourceOrderId).eq("square_env", ENV)
+      .in("status", ["paid", "partially_refunded"]).limit(1).maybeSingle();
+    if (!row) return false;
+
+    // Split-tender rows carry a second payment; refunded_money on each is
+    // "the total amount of the payment refunded to date".
+    const ids = [row.square_payment_id, row.gift_payment_id]
+      .filter((id, i, all) => !!id && all.indexOf(id) === i) as string[];
+    let refunded = 0;
+    const refundIds: string[] = [];
+    for (const pid of ids) {
+      const p = (await sq(`/v2/payments/${pid}`)).payment ?? {};
+      refunded += Math.round(Number(p.refunded_money?.amount ?? 0));
+      for (const rid of (p.refund_ids ?? []) as string[]) refundIds.push(String(rid));
+    }
+
+    // Same total square-ticket-pay refund() works from: the tip rode on the card.
+    const total = Math.round(Number(row.total_cents ?? 0)) + Math.round(Number(row.tip_cents ?? 0));
+    const already = Math.round(Number(row.refunded_cents ?? 0));
+    // The portal's own refund() already updated the row, so that case lands
+    // here as a no-op. Never decrease.
+    if (refunded <= already) return false;
+
+    const full = refunded >= total;
+    const status = full ? "refunded" : "partially_refunded";
+    const now = new Date().toISOString();
+    // The ledger's existing ids came from the Refunds API; Payment.refund_ids
+    // uses the PaymentRefund id format. Union the strings, don't normalise.
+    const union = Array.from(new Set([...((row.square_refund_ids ?? []) as string[]), ...refundIds]));
+
+    await admin.from("ticket_payments").update({
+      refunded_cents: refunded, status, square_refund_ids: union, updated_at: now,
+    }).eq("id", row.id);
+
+    if (row.registration_id) {
+      // ticket_seats_taken() excludes refunded=true rows, so a full refund
+      // releases the seats exactly like the portal refund does; a partial
+      // refund keeps them, same as today.
+      await admin.from("registrations").update({
+        payment_status: status, refunded_cents: refunded,
+        refunded: full, refunded_at: full ? now : null,
+      }).eq("id", row.registration_id);
+    }
+    return true;
+  } catch (e) {
+    // One bad row must not stop the 5-minute sync.
+    console.error("ticket refund sync", sourceOrderId, String(e instanceof Error ? e.message : e).slice(0, 300));
+    return false;
+  }
+}
+
 async function pull(days?: number) {
   const { data: state } = await admin.from("square_sync_state").select("*").eq("id", STATE_ID).maybeSingle();
   const since = days
@@ -492,8 +556,12 @@ async function pull(days?: number) {
 
   const { data: links } = await admin.from("class_square_links").select("event_id,square_variation_id").eq("env", ENV);
   const varToEvent = new Map((links ?? []).map((l) => [l.square_variation_id, l.event_id]));
-  const out = { scanned: 0, added: 0, returns: 0, skipped_online: 0 };
-  if (!varToEvent.size) return { ...out, note: "no class items yet" };
+  const out = { scanned: 0, added: 0, returns: 0, ticket_refunds: 0, skipped_online: 0 };
+  // No class links for this env used to return early here. The scan has to run
+  // either way now: a refund made in Square on a ticket-site order only reaches
+  // ticket_payments through the returns loop below (2026-10-07). An empty
+  // varToEvent already makes the register-sale (line item) part a no-op.
+  const note = varToEvent.size ? undefined : "no class items yet";
 
   let cursor: string | undefined;
   do {
@@ -575,6 +643,9 @@ async function pull(days?: number) {
 
       // Returns: a return order points back at the sale it came from.
       for (const ret of o.returns ?? []) {
+        // The skip above is for the ORIGINAL ticket-site order. This return is a
+        // different order and is not in ticket_payments, so it gets here.
+        if (await syncTicketRefund(String(ret.source_order_id ?? ""))) out.ticket_refunds++;
         for (const rl of ret.return_line_items ?? []) {
           const { data: sale } = await admin.from("class_register_sales").select("*")
             .eq("env", ENV).eq("square_order_id", ret.source_order_id ?? "")
@@ -612,7 +683,7 @@ async function pull(days?: number) {
     id: STATE_ID, last_run_at: startedAt, last_ok_at: startedAt, last_error: null,
     stats: { ...(state?.stats ?? {}), pulled_to: startedAt, last_pull: out },
   });
-  return out;
+  return note ? { ...out, note } : out;
 }
 
 // ----------------------------------------------- sandbox: fake a register sale

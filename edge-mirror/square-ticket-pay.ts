@@ -317,6 +317,35 @@ async function square(path: string, init: RequestInit = {}) {
   return data;
 }
 
+// A declined card (or any refusal before capture) used to leave the Square
+// order OPEN with a FAILED tender. Cancel it so it doesn't sit in Square as an
+// unpaid sale (2026-10-07). Square: UpdateOrder needs the current version and a
+// NEW idempotency key, and an order can't be canceled once a payment completed.
+async function cancelUnpaidOrder(orderId: string): Promise<string> {
+  try {
+    const got = await square(`/v2/orders/${orderId}`);
+    const order = (got?.order ?? {}) as Record<string, any>;
+    const state = String(order.state ?? "");
+    if (state !== "OPEN") return `skipped: ${state || "unknown"}`;
+    // Any tender that is not FAILED/VOIDED means money moved. Gift cards report
+    // under card_details too, and a tender with no status is treated as live.
+    for (const t of (order.tenders ?? []) as Record<string, any>[]) {
+      const st = String(t?.card_details?.status ?? "");
+      if (st !== "FAILED" && st !== "VOIDED") return `skipped: tender ${st || "unknown"}`;
+    }
+    await square(`/v2/orders/${orderId}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        idempotency_key: `cx_${orderId}_${order.version}`.slice(0, 192),
+        order: { location_id: order.location_id, version: order.version, state: "CANCELED" },
+      }),
+    });
+    return "canceled";
+  } catch (e) {
+    return `error: ${String(e instanceof Error ? e.message : e).slice(0, 120)}`;
+  }
+}
+
 const cents = (v: unknown) => Math.round(Number(v ?? 0));
 const money = (amount: number) => ({ amount: cents(amount), currency: CURRENCY });
 const clean = (v: unknown, max = 200) => String(v ?? "").trim().slice(0, max);
@@ -396,11 +425,19 @@ type Intent = {
   modifierIds: Record<string, string>;
 };
 
-// Catalog-linked ticket lines are on for the staging site first; add the live
-// origin here (or set CLASS_CATALOG_ONLINE=all) once register tests pass.
+// Catalog-linked ticket lines are on for the staging site first; still off for
+// the live site until Brad sets the secret after register tests. CLASS_CATALOG_ONLINE
+// is either "all" (every origin) or a comma-separated list of exact origins to
+// allow alongside staging (2026-10-07). Unset keeps staging only. Events with no
+// class_square_links row for this env (e.g. Mahjong, which is kind 'event_tabled'
+// and not synced by square-class-items) fall back to the ad-hoc line as before.
 function catalogAllowed(req: Request) {
-  if ((Deno.env.get("CLASS_CATALOG_ONLINE") ?? "") === "all") return true;
-  return (req.headers.get("Origin") ?? "") === "https://ticket-rennet.onrender.com";
+  const setting = (Deno.env.get("CLASS_CATALOG_ONLINE") ?? "").trim().toLowerCase();
+  if (setting === "all") return true;
+  const origin = (req.headers.get("Origin") ?? "").trim().toLowerCase();
+  if (origin === "https://ticket-rennet.onrender.com") return true;
+  // filter(Boolean) means an empty Origin header can never match an empty entry.
+  return setting.split(",").map((s) => s.trim()).filter(Boolean).includes(origin);
 }
 
 // Tip presets the page offers. Anything else must come in as a flat amount.
@@ -1302,7 +1339,7 @@ async function pay(req: Request, body: Record<string, unknown>) {
       .update({ payment_status: "failed" }).eq("id", regId);
   };
 
-  let sq: Record<string, any>;
+  let sq: Record<string, any> = {};
   let totals: Totals;
   let payment: Record<string, any>;
   // Split tender bookkeeping. Authorised-but-uncaptured payments are cancelled
@@ -1384,8 +1421,13 @@ async function pay(req: Request, body: Record<string, unknown>) {
         try { await square(`/v2/payments/${p.id}/cancel`, { method: "POST" }); } catch (_) {/* best effort */}
       }
     }
+    // Cancel the order we just created, so a decline doesn't leave an unpaid
+    // sale open in Square (2026-10-07). Skipped on a Square 5xx or a network
+    // error, where the charge may have landed after all.
+    const safeToCancel = (!(e instanceof SquareFail) || e.status < 500) && !(e instanceof TypeError);
+    const cx = safeToCancel && sq?.id ? await cancelUnpaidOrder(sq.id) : "";
     const msg = String(e instanceof Error ? e.message : e);
-    await fail(msg, e instanceof SquareFail ? e.data : undefined);
+    await fail(cx ? `${msg} [order ${cx}]` : msg, e instanceof SquareFail ? e.data : undefined);
     // The ledger keeps Square's raw code; the buyer gets the plain sentence.
     throw e instanceof SquareFail ? new PublicError(e.customer) : e;
   }
