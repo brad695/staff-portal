@@ -836,6 +836,43 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   }).catch(function(){});
 })();
 </script>
+<!-- HOME-TILE LINKS: the portal home's Schedule tile opens schedule.html#timeoff (Request time off) or #swap (Shift swaps).
+     Signed in: scroll to that card and flash it. Not signed in: point at the employee-ID box first, then jump right after sign-in. -->
+<style>
+@keyframes cardFlash{ 0%,100%{ box-shadow:var(--shadow); } 35%{ box-shadow:0 0 0 3px #e0a21c, var(--shadow); } }
+.card.flash-card{ animation:cardFlash 1.6s ease 1; }
+.login-hint{ font-size:.84rem; font-weight:700; color:#92400e; background:#fdf3dc; border-radius:10px; padding:8px 10px; margin:0 0 10px; }
+</style>
+<script>
+(function(){
+  function want(){ var h=(location.hash||'').slice(1); return (h==='timeoff' || h==='swap') ? h : ''; }
+  function flash(el){ if(!el) return; el.scrollIntoView({ behavior:'smooth', block:'start' });
+    el.classList.remove('flash-card'); void el.offsetWidth; el.classList.add('flash-card'); }
+  function go(){
+    var h=want(); if(!h) return;
+    if(!ME){
+      var card=document.getElementById('loginCard'); if(!card) return;
+      if(!document.getElementById('loginHint')){
+        var p=document.createElement('div'); p.id='loginHint'; p.className='login-hint';
+        p.textContent = h==='timeoff' ? 'Sign in with your employee ID to request time off.' : 'Sign in with your employee ID to swap a shift.';
+        card.insertBefore(p, document.getElementById('loginEmail'));
+      }
+      flash(card);
+      setTimeout(function(){ var i=document.getElementById('loginEmail'); if(i) i.focus({ preventScroll:true }); }, 350);
+      return;   // keep the hash: the jump happens right after sign-in
+    }
+    var hint=document.getElementById('loginHint'); if(hint) hint.remove();
+    if(h==='timeoff') flash(document.getElementById('roCard'));
+    else { var inc=document.getElementById('swapIncoming');
+      flash(inc && inc.textContent.trim() ? document.getElementById('swapCard') : document.getElementById('myCard')); }
+    history.replaceState(history.state, '', location.pathname + location.search);
+  }
+  var _enter=window.enter;
+  if(typeof _enter==='function') window.enter=function(){ var r=_enter.apply(this, arguments); setTimeout(go, 700); return r; };
+  window.addEventListener('DOMContentLoaded', function(){ if(!localStorage.getItem('greys_emp_id')) setTimeout(go, 300); });
+  window.addEventListener('hashchange', go);
+})();
+</script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
 <script>(function(){if(location.hostname.indexOf("staging")<0)return;document.title="[STAGING] "+document.title;var m=document.createElement("meta");m.name="robots";m.content="noindex";document.head.appendChild(m);var b=document.createElement("div");b.textContent="STAGING \u2014 test copy. Same live database: data changes, emails and Square actions are REAL.";b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#c62828;color:#fff;font:600 12px/1.2 system-ui,sans-serif;text-align:center;padding:5px 8px;pointer-events:none;opacity:.92";document.body.appendChild(b);})();</script>
 </body>
