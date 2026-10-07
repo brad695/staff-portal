@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <meta name="theme-color" content="#161618"/>
+  <meta name="theme-color" content="#ffffff"/>
   <title>Portal - GREYS</title>
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -791,6 +791,64 @@ body > div[style*="text-align:center"]{ background:#161618; }
 }
 }
 @media print{ .dash{ display:none !important; } }
+</style>
+<!-- HOME-V7 WHITE: white page under the v6 dashboard; the dark-page (v5) pieces re-inked for a light page. Delete this block to go back to the dark gray page. -->
+<style id="home-v7-white">
+@media screen{
+:root{
+  --bg:#fff; --surface:#fff; --card:#fff; --card2:#f7f8fa; --line:#e7e9ee; --line2:#d9dce3;
+  --ink:#161a1f; --sub:#6b7280; --mute:#9ca3af;
+  --accent:#e0a21c; --accent-soft:#fdf3dc; --wax:#b3261e;
+  --shadow:0 1px 2px rgba(18,26,38,.05), 0 4px 14px rgba(18,26,38,.06);
+  --lav:#f2ecfe;   --lav-i:#7c3aed;  --mint:#e7f5ef;  --mint-i:#047857;  --sky:#e6f0fb;    --sky-i:#0369a1;
+  --peach:#fdf1e3; --peach-i:#b45309; --pink:#fdeef1; --pink-i:#be123c;  --butter:#fdf3e2; --butter-i:#92400e;
+  --gray:#eef0f3;  --gray-i:#475569;
+  color-scheme:light;
+}
+html, body, .app, .sec-head{ background:#fff !important; color:var(--ink); }
+.sec-head{ border-bottom:1px solid var(--line); }
+body > div[style*="text-align:center"]{ background:#fff; }
+
+/* location bar: light segmented control, the open shop in ink */
+.loc-tab{ background:#f3f4f6; border-color:#f3f4f6; color:#6b7280; }
+.loc-tab:hover{ color:var(--ink); border-color:var(--line2); }
+.loc-tab.on{ background:#161a1f; border-color:#161a1f; color:#fff; }
+.loc-act{ background:#f3f4f6; border-color:#f3f4f6; color:#4b5563; }
+.loc-act:hover{ background:#e9eaee; color:var(--ink); }
+
+/* white cards on a white page: hairline + soft shadow */
+.back-btn, .icon-btn, .cal-nav, .cal-print, .home-preview, .note-card, .card, .res-card, .form-card, .req-item, .info-card{
+  background:#fff; border:1px solid var(--line); box-shadow:var(--shadow); color:var(--ink); }
+.note-card{ border-left:3px solid var(--accent); }
+.cal-print{ color:var(--sub); }
+.back-btn:hover, .cal-nav:hover{ background:#f5f6f8; }
+.field input, .field select, .field textarea, .fg input, .fg select{ background:#fff; border-color:var(--line2); color:var(--ink); }
+.cal-day.other{ background:#f9fafb; }
+.spin{ border-color:#e5e7eb; border-top-color:var(--accent); }
+.botbar .home-btn{ box-shadow:0 0 0 6px #fff, 0 8px 20px rgba(224,162,28,.35); }
+/* gold text is too pale on white: links and day labels use a deeper gold */
+.pv-title i, .pv-all, .pv-day, .c-day, .info-card .il, .info-card .iv a, .res-contact a, .req, .today-all, .today-title #todayLabel{ color:#a16207; }
+.today-all:hover{ color:#854d0e; }
+
+/* agenda tags: the darker inks the Today card already uses */
+.ag-tag::before{ box-shadow:none; }
+.t-res{ color:#1d4ed8; } .t-cancel{ color:#b91c1c; } .t-event{ color:#be185d; } .t-special{ color:#047857; }
+.t-class{ color:#b45309; } .t-exp{ color:#c2410c; } .t-sched{ color:#c2410c; } .t-off{ color:#b91c1c; }
+.t-pickup{ color:#4338ca; } .t-order{ color:#047857; } .t-delivery{ color:#a16207; }
+.ag-unpaid{ color:#be123c; } .ag-strike{ color:#a3a3a0; }
+.xt-m{ background:#f3f4f6; color:var(--ink); } .xt-out{ background:#fdf3dc; } .xt-note{ background:#eef2ff; } .xt-w{ color:#6b7280; } .xt-a{ color:#0b6aa9; }
+
+/* Today card + calendar day cards: hairline instead of the heavy dark-page shadow */
+.today-card{ border:1px solid var(--line); box-shadow:0 1px 2px rgba(18,26,38,.05), 0 10px 28px -12px rgba(18,26,38,.18); }
+#view-calendar .ag-day{ border-color:var(--line); box-shadow:var(--shadow); }
+#view-calendar .cal-bar h3{ color:var(--ink); }
+
+/* dashboard tiles: softer shadow on white; the two pale cards get a hairline */
+.dash .wg{ box-shadow:0 12px 24px -16px rgba(15,23,42,.45), inset 0 1px 0 rgba(255,255,255,.10); }
+@media (hover:hover){ .dash .wg:hover{ box-shadow:0 18px 30px -16px rgba(15,23,42,.5), inset 0 1px 0 rgba(255,255,255,.10); } }
+.dash .wg-sch{ box-shadow:inset 0 0 0 1px #d6e1fb, 0 12px 24px -18px rgba(15,23,42,.35); }
+.dash .wg-stf{ box-shadow:inset 0 0 0 1px #f1dfb0, 0 12px 24px -18px rgba(15,23,42,.35); }
+}
 </style>
 </head>
 <body>
