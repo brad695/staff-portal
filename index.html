@@ -787,6 +787,14 @@ body > div[style*="text-align:center"]{ background:#161618; }
 .wg-stf .wg-list{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:14px; row-gap:8px; }
 .wg-stf .wg-row i{ flex:none; font-size:14px; color:#c2410c; }
 
+/* TODAY card = the next 7 days: a dated heading per day; reservations fold into one row that opens to the list */
+.today-list .wk-day{ padding:12px 0 2px; border-top:1px solid #ececea; }
+.today-list .wk-day:first-child{ border-top:none; padding-top:0; }
+.today-list .wk-date{ font-size:.74rem; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:#6b7280; margin-bottom:2px; }
+.today-list .wk-today .wk-date{ color:#a16207; }
+.today-list .wk-date + .ag-row{ border-top:none; }
+.today-list .wk-none{ font-size:.86rem; color:#9ca3af; padding:6px 0 10px; }
+
 @media(max-width:360px){
   .dash{ gap:10px; padding:12px 12px 4px; }
   .dash .wg{ padding:12px 11px 11px; }
@@ -932,9 +940,9 @@ body > div[style*="text-align:center"]{ background:#fff; }
     <div class="today-card">
       <div class="today-head">
         <div class="today-title"><span id="todayLabel">Today</span><small id="todayDate"></small></div>
-        <button class="cal-nav" onclick="todayStep(-1)" aria-label="Previous day">‹</button>
+        <button class="cal-nav" onclick="todayStep(-1)" aria-label="Previous week">‹</button>
         <button class="cal-today" id="todayBtn" onclick="todayStep(0)">Today</button>
-        <button class="cal-nav" onclick="todayStep(1)" aria-label="Next day">›</button>
+        <button class="cal-nav" onclick="todayStep(1)" aria-label="Next week">›</button>
       </div>
       <div id="todayList" class="today-list"><div class="empty"><span class="spin"></span> Loading…</div></div>
       <button class="today-all" onclick="showView('calendar')">Full calendar →</button>
@@ -1682,26 +1690,63 @@ function renderAgenda(y,m,tgt,only){
     off.forEach(n=>rows+=agRow('t-off','Time Off',esc(n.name||n),agDetail([
       ['Reason', n.note], ['Through', (n.endDate&&n.endDate!==date)?fmtDisplay(n.endDate):'']
     ])));
-    html+= only ? rows : '<div class="ag-day'+(date<today?' ag-past':'')+(date===today?' ag-is-today':'')+'"><div class="ag-date">'+dl+(date===today?'<span class="ag-today">Today</span>':'')+'</div>'+rows+'</div>';
+    html+= only ? rows : '<div class="ag-day'+(date<today?' ag-past':'')+(date===today?' ag-is-today':'')+'" data-date="'+date+'"><div class="ag-date">'+dl+(date===today?'<span class="ag-today">Today</span>':'')+'</div>'+rows+'</div>';
   }
   list.innerHTML = any ? html : '<div class="empty"><span class="ic">📅</span>'+(only?'Nothing on the calendar.':'Nothing scheduled this month.')+'</div>';
   if(!only && list.id==='agendaList'){ const t=list.querySelector('.ag-is-today')||[...list.querySelectorAll('.ag-day:not(.ag-past)')][0]; if(t && list.querySelector('.ag-past')) setTimeout(()=>window.scrollTo(0,t.getBoundingClientRect().top+window.scrollY-130),0); }
 }
 function calNav(dir){ _calMonth+=dir; if(_calMonth>11){_calMonth=0;_calYear++;} if(_calMonth<0){_calMonth=11;_calYear--;} renderCalendar(); }
-// ── TODAY card on home ──
-let _todayOff=0, _todaySeq=0;
+// ── TODAY card on home: today + the next 6 days; ‹ › step a week, "Today" comes back ──
+// Each month in the window renders once into a hidden box (the same rows as the full calendar),
+// then the seven day cards are picked out by data-date. Reservations fold into one row per day.
+let _todayOff=0, _todaySeq=0;   // _todayOff = weeks from this one
+function wkRange(a,b){ const o={ month:'short', day:'numeric' };
+  return a.getMonth()===b.getMonth() ? a.toLocaleDateString('en-US',o)+' – '+b.getDate() : a.toLocaleDateString('en-US',o)+' – '+b.toLocaleDateString('en-US',o); }
+function wkResRow(list){
+  if(!list || !list.length) return '';
+  const can=['CANCELLED','CANCELED','DECLINED','NO_SHOW'], ok=list.filter(r=>!can.includes(r.status));
+  const guests=ok.reduce((n,r)=>n+(Number(r.party)||0),0);
+  const det=list.map(r=>{ const t=esc(r.time)+' · '+esc(r.name)+' · 👥'+esc(r.party);
+    return '<div>'+(can.includes(r.status)?'<span class="ag-strike">'+t+'</span>':t)+'</div>'; }).join('');
+  return ok.length ? agRow('t-res','Reserved', ok.length+' reservation'+(ok.length===1?'':'s')+' · '+guests+' guest'+(guests===1?'':'s'), det)
+                   : agRow('t-cancel','Cancelled', list.length+' cancelled', det);
+}
 async function renderToday(){
   const list=document.getElementById('todayList'); if(!list) return;
-  const d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()+_todayOff);
-  const date=fmt(d), seq=++_todaySeq;
-  document.getElementById('todayLabel').textContent=_todayOff===0?'Today':_todayOff===1?'Tomorrow':_todayOff===-1?'Yesterday':d.toLocaleDateString('en-US',{weekday:'long'});
-  document.getElementById('todayDate').textContent=d.toLocaleDateString('en-US',{weekday:_todayOff&&Math.abs(_todayOff)>1?undefined:'long',month:'long',day:'numeric'});
-  document.getElementById('todayBtn').classList.toggle('off',_todayOff===0);
+  const start=new Date(); start.setHours(12,0,0,0); start.setDate(start.getDate()+_todayOff*7);
+  const days=[]; for(let i=0;i<7;i++){ const x=new Date(start); x.setDate(start.getDate()+i); days.push(x); }
+  const seq=++_todaySeq, w=_todayOff;
+  document.getElementById('todayLabel').textContent = w===0 ? 'Next 7 days' : w===1 ? 'Next week' : w===-1 ? 'Last week' : (w>0 ? 'In '+w+' weeks' : (-w)+' weeks ago');
+  document.getElementById('todayDate').textContent = wkRange(days[0], days[6]);
+  document.getElementById('todayBtn').classList.toggle('off', w===0);
   list.innerHTML='<div class="empty"><span class="spin"></span> Loading…</div>';
-  const tmp='todayTmp'+seq; const box=document.createElement('div'); box.id=tmp; box.hidden=true; document.body.appendChild(box);
-  try{ await renderCalendar({ y:d.getFullYear(), m:d.getMonth(), target:{ list:tmp }, only:date }); }catch(e){}
-  if(seq===_todaySeq) list.innerHTML=box.innerHTML;
-  box.remove();
+  const months=[]; days.forEach(x=>{ if(!months.some(mo=>mo.y===x.getFullYear() && mo.m===x.getMonth())) months.push({ y:x.getFullYear(), m:x.getMonth() }); });
+  const cards={}, resBy={};
+  for(const mo of months){
+    const box=document.createElement('div'); box.id='todayTmp'+seq+'_'+mo.m; box.hidden=true; document.body.appendChild(box);
+    try{
+      await renderCalendar({ y:mo.y, m:mo.m, target:{ list:box.id } });
+      days.forEach(x=>{ if(x.getMonth()===mo.m){ const k=fmt(x); resBy[k]=(_calData.res[k]||[]).slice(); } });   // read before the next render resets it
+      box.querySelectorAll('.ag-day[data-date]').forEach(el=>{ cards[el.getAttribute('data-date')]=el; });
+    }catch(e){}
+    box.remove();
+  }
+  if(seq!==_todaySeq) return;
+  const today=fmt(new Date());
+  list.innerHTML = days.map(x=>{
+    const k=fmt(x), el=cards[k];
+    let rows='';
+    if(el){
+      const h=el.querySelector('.ag-date'); if(h) h.remove();
+      const resRows=[...el.querySelectorAll('.ag-row')].filter(r=>r.querySelector('.ag-tag.t-res, .ag-tag.t-cancel'));
+      if(resRows.length){ const sum=document.createElement('div'); sum.innerHTML=wkResRow(resBy[k]);
+        if(sum.firstElementChild) resRows[0].parentNode.insertBefore(sum.firstElementChild, resRows[0]);
+        resRows.forEach(r=>r.remove()); }
+      rows=el.innerHTML;
+    }
+    const lbl=(k===today ? 'Today · ' : '')+x.toLocaleDateString('en-US',{ weekday:'long', month:'short', day:'numeric' });
+    return '<div class="wk-day'+(k===today?' wk-today':'')+'"><div class="wk-date">'+lbl+'</div>'+(rows||'<div class="wk-none">Nothing on the calendar</div>')+'</div>';
+  }).join('');
 }
 function todayStep(n){ _todayOff = n===0 ? 0 : _todayOff+n; renderToday(); }
 function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().getMonth(); _selDay=fmt(new Date()); renderCalendar(); }
