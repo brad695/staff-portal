@@ -1669,15 +1669,18 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
   function nowHHMM(){ var d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
   function fail(id){ var el=$(id); if(el && /Loading/.test(el.textContent)) el.textContent='Couldn’t load'; }
   // whole numbers count up when they change; anything else is set as text
+  // (a background tab never runs animation frames, so a timer always lands the final number)
   function setNum(el, v){
     if(!el) return;
-    var to=Number(v), from=Number(el.getAttribute('data-v'));
+    var to=Number(v), from=Number(el.getAttribute('data-v')), tok=(el._tok=(el._tok||0)+1);
     if(!isFinite(to)){ el.textContent=v; el.removeAttribute('data-v'); return; }
     el.setAttribute('data-v', to);
-    if(reduce || to===from){ el.textContent=to.toLocaleString(); return; }
+    function done(){ if(el._tok===tok){ el._tok++; el.textContent=to.toLocaleString(); } }
+    if(reduce || document.hidden || to===from){ done(); return; }
     var a=isFinite(from)?from:0, t0=performance.now(), dur=700;
-    (function step(now){ var k=Math.min(1,((now||performance.now())-t0)/dur), e=1-Math.pow(1-k,3);
-      el.textContent=Math.round(a+(to-a)*e).toLocaleString(); if(k<1) requestAnimationFrame(step); })(t0);
+    (function step(now){ if(el._tok!==tok) return; var k=Math.min(1,((now||performance.now())-t0)/dur), e=1-Math.pow(1-k,3);
+      el.textContent=Math.round(a+(to-a)*e).toLocaleString(); if(k<1) requestAnimationFrame(step); else done(); })(t0);
+    setTimeout(done, dur+300);
   }
 
   // ── RESYS: today's bookings, guests, next seating, requests waiting on approval ──
