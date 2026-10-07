@@ -14880,6 +14880,401 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 
 })();
 </script>
+<!-- CAT-TEMPLATES (2026-10-07): HoneyBook templates inside Catering Leads.
+     Data: catering_templates (admin-only RLS: email / package / contract) + site_content 'catering_template_vars'
+     (scheduling link + shop address/phone per store). Reply box: email templates. Proposal: 📦 packages (+ a live
+     "Gratuity (N%)" line), 📜 agreement templates, ✉️ templates for the email message. 📚 Templates manager next to
+     ↻ Refresh. Agreement fill-ins the catering fn doesn't know ({{today}} {{venue}} {{client_*}} {{shop_*}}
+     {{occasion}}) are filled into the saved contract_text when the proposal is saved. -->
+<style id="cat-tpl-css">
+  #ctplModal .rec-card{ max-height:none !important; display:block; }
+  #ctplModal .ctpl-tabs{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:12px 0; }
+  #ctplModal .ctpl-list{ display:flex; flex-direction:column; gap:6px; }
+  #ctplModal .ctpl-row{ display:flex; align-items:center; gap:10px; padding:9px 12px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; cursor:pointer; }
+  #ctplModal .ctpl-row:hover{ border-color:#06273a; }
+  #ctplModal .ctpl-row.off{ opacity:.55; }
+  #ctplModal .ctpl-cat{ font-size:.72rem; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:#64748b; margin:12px 0 2px; }
+  #ctplModal .ctpl-tag{ font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:999px; background:#e3edf2; color:#06273a; white-space:nowrap; }
+  #ctplModal .ctpl-pp{ font-size:.72rem; display:flex; gap:4px; align-items:center; justify-content:center; }
+  #ctplModal textarea{ width:100%; box-sizing:border-box; }
+  .ctpl-hint{ font-size:.76rem; color:#64748b; margin-top:4px; line-height:1.4; }
+  .ctpl-att{ margin-top:8px; padding:8px 10px; border-radius:8px; background:#fffbeb; color:#92400e; font-size:.8rem; }
+  @media (max-width:640px){ #ctplModal .ctpl-pp{ display:none; } }
+</style>
+<div id="ctplModal" class="rec-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:985;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 10px;" onclick="if(event.target===this)ctplClose()">
+  <div class="rec-card" style="background:#fff;max-width:900px;width:100%;border-radius:14px;padding:22px;">
+    <div style="display:flex;align-items:center;gap:10px;"><h3 style="margin:0;flex:1;">📚 Catering templates</h3><button class="btn btn-ghost btn-sm" onclick="ctplClose()">✕</button></div>
+    <div id="ctplBody"></div>
+  </div>
+</div>
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const CATS = {
+    email: ['Inquiry replies','Experiences','Proposals & deposits','Follow-ups & reminders'],
+    package: ['Catering','Private events & off-site','Classes','Experiences','Older (HoneyBook 2021)'],
+    contract: ['Agreements']
+  };
+  const LATE_KEYS = ['today','venue','client_email','client_phone','client_address','shop_address','shop_phone','occasion'];
+  const GRAT_RE = /^gratuity\s*\((\d+(?:\.\d+)?)\s*%\)/i;
+  let ALL = null, VARS = {}, LOADING = null;
+
+  async function load(force){
+    if(ALL && !force) return ALL;
+    if(LOADING) return LOADING;
+    LOADING = (async () => {
+      const [t, v] = await Promise.all([
+        sb.from('catering_templates').select('*').order('sort').order('title'),
+        sb.from('site_content').select('data').eq('key','catering_template_vars').maybeSingle()
+      ]);
+      const rows = (!t.error && t.data) ? t.data : [];
+      ALL = rows.length ? rows : null;            // empty = not signed in yet → try again next time
+      VARS = (v && v.data && v.data.data) || VARS || {};
+      return rows;
+    })();
+    try { return await LOADING; } finally { LOADING = null; }
+  }
+  const rowsOf = kind => (ALL || []).filter(t => t.kind === kind);
+  const byId = id => (ALL || []).find(t => t.id === id);
+
+  /* ---------- fill-ins ---------- */
+  function longDate(ymd){ if(!ymd) return ''; const d = new Date(String(ymd).slice(0,10)+'T12:00:00'); return isNaN(d) ? String(ymd) : d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
+  const cur = () => (typeof CAT_CUR !== 'undefined' && CAT_CUR) || null;
+  // the proposal form only counts if it was drawn for the lead that is open now
+  const formOk = () => { const b = $('catQuote'), r = cur(); return !!(b && r && b.dataset.lead === r.id && $('cq_name')); };
+  function ctx(){
+    const r = cur() || {}, ok = formOk();
+    const val = (id, k) => { if(ok){ const e = $(id); if(e) return String(e.value||'').trim(); } return r[k] == null ? '' : String(r[k]).trim(); };
+    const loc = val('cq_loc','location') || 'Memphis';
+    const name = val('cq_name','name'), addr = val('cq_addr','address');
+    const shop = (VARS.shops || {})[loc] || {};
+    const time = val('cq_time','event_time');
+    return {
+      first_name: name.split(/\s+/)[0] || '', name, company: val('cq_company','company'),
+      event_date: longDate(val('cq_date','event_date')), event_time: time ? catTime(time) : '',
+      guests: val('cq_guests','guests'), occasion: val('cq_occ','occasion'), location: loc, code: r.code || '',
+      venue: addr || ('GREYS ' + loc + (shop.address ? ', ' + shop.address : '')),
+      schedule_link: (VARS.schedule_link || {})[loc] || '',
+      client_email: val('cq_email','email'), client_phone: val('cq_phone','phone'), client_address: addr,
+      shop_address: shop.address || '', shop_phone: shop.phone || '',
+      today: longDate(new Date().toLocaleDateString('en-CA'))
+    };
+  }
+  // emails: blanks show as [event date] so they stand out; agreements: blanks stay blank
+  function fill(text, opt){
+    opt = opt || {}; const c = ctx();
+    return String(text || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => {
+      if(opt.only && opt.only.indexOf(k) < 0) return m;
+      if(!(k in c)) return m;
+      if(c[k]) return c[k];
+      if(opt.contract) return k === 'occasion' ? 'event' : '';
+      return '[' + k.replace(/_/g,' ') + ']';
+    });
+  }
+  const autoGrow = ta => { if(ta) ta.rows = Math.min(18, Math.max(ta.rows || 3, String(ta.value).split('\n').length + 1)); };
+
+  /* ---------- pickers ---------- */
+  function groups(kind, loc){
+    const rows = rowsOf(kind).filter(t => t.active);
+    const mine = rows.filter(t => !t.location || t.location === loc), other = rows.filter(t => t.location && t.location !== loc);
+    const cats = [...new Set([...(CATS[kind] || []), ...mine.map(t => t.category || '')])];
+    let h = '';
+    cats.forEach(c => { const rs = mine.filter(t => (t.category || '') === c); if(rs.length) h += '<optgroup label="'+esc(c || 'Other')+'">' + rs.map(t => '<option value="t:'+t.id+'">'+esc(t.title)+'</option>').join('') + '</optgroup>'; });
+    if(other.length) h += '<optgroup label="Other store">' + other.map(t => '<option value="t:'+t.id+'">'+esc(t.title)+' · '+esc(t.location)+'</option>').join('') + '</optgroup>';
+    return h;
+  }
+  const locOf = () => { const s = $('cq_loc'); return (s && s.value) || ((cur() || {}).location) || 'Memphis'; };
+  const MANAGE = '<option value="manage">✏️ Edit templates…</option>';
+
+  async function fillQuick(){
+    const sel = $('catQuick'); if(!sel) return;
+    await load();
+    if(!cur()) return;
+    const quick = (typeof CAT_QUICK !== 'undefined' ? CAT_QUICK : []).map((x,i) => '<option value="'+i+'">'+esc(x[0])+'</option>').join('');
+    sel.innerHTML = '<option value="">Templates &amp; quick replies…</option>' + (quick ? '<optgroup label="Quick replies">'+quick+'</optgroup>' : '')
+      + groups('email', (cur() || {}).location || 'Memphis') + MANAGE;
+  }
+  function pkgOptions(){ const s = $('catPkg'); if(s) s.innerHTML = '<option value="">📦 Add a package…</option>' + groups('package', locOf()) + MANAGE; }
+  function msgOptions(){ const s = $('catMsgTpl'); if(s) s.innerHTML = '<option value="">✉️ Use an email template…</option>' + groups('email', locOf()); }
+  function ctrOptions(){
+    const s = $('catCtrTpl'); if(!s) return;
+    s.innerHTML = '<option value="">📜 Agreement templates…</option><option value="default">The current default agreement</option>'
+      + rowsOf('contract').filter(t => t.active).map(t => '<option value="t:'+t.id+'">'+esc(t.title)+'</option>').join('') + MANAGE;
+  }
+  function refreshPickers(){ const m = $('catModal'); if(m && m.style.display !== 'none' && cur()){ fillQuick(); pkgOptions(); msgOptions(); ctrOptions(); } }
+
+  // reply box
+  function pickReply(sel){
+    const val = sel.value; sel.value = '';
+    if(val === 'manage') return ctplOpen('email');
+    const t = byId(val.slice(2)); if(!t) return;
+    const ta = $('catBody'), body = fill(t.body);
+    ta.value = ta.value.trim() ? ta.value.replace(/\s+$/,'') + '\n\n' + body : body;
+    autoGrow(ta); ta.focus();
+    const notes = [];
+    if((t.attachments || []).length) notes.push('📎 In HoneyBook this email attached ' + t.attachments.join(', ') + ' — nothing is attached here.');
+    if(/\[[a-z ]+\]/.test(body)) notes.push('Fill in the [bracketed] parts before sending.');
+    $('catMsg').textContent = notes.join(' ');
+  }
+
+  // proposal editor
+  async function decorate(){
+    const box = $('catQuote'), r = cur(); if(!box) return;
+    box.dataset.lead = r ? r.id : '';
+    if(!$('catItems')) return;                       // signed / invoiced view — nothing to add
+    await load();
+    const menu = $('catMenu');
+    if(menu && !$('catPkg')){
+      menu.insertAdjacentHTML('beforebegin', '<select id="catPkg" class="loc-sel" style="max-width:340px;" onchange="ctplPkg(this)"></select>');
+      menu.parentNode.insertAdjacentHTML('beforeend', '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplGrat()" title="Adds a Gratuity (20%) line that recalculates as items change — rename it to change the %">＋ Gratuity</button>');
+    }
+    const ctr = $('cq_contract');
+    if(ctr && !$('catCtrTpl')){
+      ctr.insertAdjacentHTML('beforebegin', '<select id="catCtrTpl" class="loc-sel" style="margin-bottom:6px;max-width:100%;" onchange="ctplCtr(this)"></select>');
+      const hint = ctr.parentNode.querySelector('.hint');
+      if(hint) hint.insertAdjacentHTML('beforeend', ' Agreement templates also fill {{venue}} {{occasion}} {{client_email}} {{client_phone}} {{client_address}} {{shop_address}} {{shop_phone}} {{today}} when you save.');
+    }
+    const m = $('cq_msg');
+    if(m && !$('catMsgTpl')) m.insertAdjacentHTML('beforebegin', '<select id="catMsgTpl" class="loc-sel" style="margin-bottom:6px;max-width:100%;" onchange="ctplMsg(this)"></select>');
+    const ls = $('cq_loc');
+    if(ls && !ls.__ctpl){ ls.__ctpl = true; ls.addEventListener('change', () => { pkgOptions(); msgOptions(); }); }
+    pkgOptions(); ctrOptions(); msgOptions();
+  }
+  function setGrat(pct){
+    pct = Number(pct) || 0; if(!(pct > 0)) return;
+    const line = { name: 'Gratuity (' + pct + '%)', qty: 1, price_cents: 0, note: '' };
+    const i = CAT_ITEMS.findIndex(it => GRAT_RE.test(it.name || ''));
+    if(i >= 0) CAT_ITEMS.splice(i, 1);
+    CAT_ITEMS.push(line);                             // keep it last so it reads like a total line
+  }
+  window.ctplGrat = function(){
+    const g = CAT_ITEMS.find(it => GRAT_RE.test(it.name || ''));
+    setGrat(g ? GRAT_RE.exec(g.name)[1] : 20);
+    catItemsRender();
+  };
+  window.ctplPkg = function(sel){
+    const val = sel.value; sel.value = ''; if(!val) return;
+    if(val === 'manage') return ctplOpen('package');
+    const t = byId(val.slice(2)); if(!t) return;
+    const guests = Number(($('cq_guests') || {}).value) || 0;
+    (t.items || []).forEach(it => CAT_ITEMS.push({ name: it.name || '', qty: it.pp ? guests : (Number(it.qty) || 0),
+      price_cents: Math.max(0, Math.round(Number(it.price_cents) || 0)), note: String(it.note || '').slice(0, 300) }));
+    if(t.gratuity_pct) setGrat(t.gratuity_pct);
+    if(t.deposit_pct != null && $('cq_dep')) $('cq_dep').value = t.deposit_pct;
+    const note = $('cq_note');
+    if(note && t.body){ const b = fill(t.body); if(note.value.indexOf(b.slice(0, 80)) < 0) note.value = note.value.trim() ? note.value.trim() + '\n\n' + b : b; autoGrow(note); }
+    catItemsRender();
+    const zero = CAT_ITEMS.some(it => !(Number(it.qty) > 0));
+    $('cqMsg').textContent = '✓ Added “' + t.title + '”' + (zero ? ' — set the quantities you need; lines left at 0 are dropped when you save.' : '.');
+  };
+  window.ctplMsg = function(sel){
+    const val = sel.value; sel.value = ''; const t = byId(val.slice(2)); if(!t) return;
+    const ta = $('cq_msg'), body = fill(t.body);
+    ta.value = ta.value.trim() ? ta.value.trim() + '\n\n' + body : body; autoGrow(ta);
+    if(/\[[a-z ]+\]/.test(body)) $('cqMsg').textContent = 'Fill in the [bracketed] parts of the message before sending.';
+  };
+  window.ctplCtr = async function(sel){
+    const val = sel.value; sel.value = ''; if(!val) return;
+    if(val === 'manage') return ctplOpen('contract');
+    const ta = $('cq_contract'); if(!ta) return;
+    const text = val === 'default' ? await catTemplate() : ((byId(val.slice(2)) || {}).body || '');
+    if(ta.value.trim() && ta.value !== text && !confirm('Replace the agreement text on this proposal?')) return;
+    ta.value = text;
+    $('cqMsg').textContent = '✓ Agreement swapped — its fill-ins are completed when you save.';
+  };
+
+  /* ---------- 📚 manager ---------- */
+  const MG = { kind: 'email', edit: null };
+  const BLANK = k => ({ kind: k, title: '', category: (CATS[k] || [''])[0], subject: '', body: '', items: [], deposit_pct: null, gratuity_pct: null, location: null, attachments: [], active: true, sort: 999 });
+  window.ctplOpen = async function(kind, preset){
+    if(typeof kind === 'string') MG.kind = kind;
+    MG.edit = null;
+    $('ctplModal').style.display = 'flex';
+    $('ctplBody').innerHTML = '<div class="rec-empty">Loading…</div>';
+    await load(true);
+    if(preset) MG.edit = Object.assign(BLANK(MG.kind), preset);
+    mgRender();
+  };
+  window.ctplClose = function(){ $('ctplModal').style.display = 'none'; refreshPickers(); };
+  window.ctplTab = function(k){ MG.kind = k; MG.edit = null; mgRender(); };
+  window.ctplBack = function(){ MG.edit = null; mgRender(); };
+  window.ctplNew = function(){ MG.edit = BLANK(MG.kind); mgRender(); };
+  window.ctplEdit = function(id){ const t = byId(id); if(!t) return; MG.edit = JSON.parse(JSON.stringify(t)); mgRender(); };
+  window.ctplDup = function(){ const t = JSON.parse(JSON.stringify(MG.edit)); delete t.id; t.title = t.title + ' (copy)'; t.source = 'portal'; t.source_ref = null; MG.edit = t; mgRender(); };
+  function preview(t){
+    if(t.kind === 'package'){
+      const n = (t.items || []).length, tot = (t.items || []).reduce((s, it) => s + Math.round((Number(it.qty) || 0) * (it.price_cents || 0)), 0);
+      return n + ' line' + (n === 1 ? '' : 's') + (tot ? ' · ' + catMoney(tot) + ' as set' : '') + (t.gratuity_pct ? ' · ' + Number(t.gratuity_pct) + '% gratuity' : '') + (t.deposit_pct != null ? ' · ' + t.deposit_pct + '% deposit' : '');
+    }
+    return String(t.body || '').replace(/\s+/g, ' ').slice(0, 150);
+  }
+  function mgRender(){
+    if(MG.edit) return mgEdit();
+    const n = k => rowsOf(k).length;
+    const tabs = [['email','✉️ Emails'],['package','📦 Packages'],['contract','📜 Agreements'],['settings','⚙️ Links & shop info']];
+    let h = '<div class="ctpl-tabs">' + tabs.map(([k,l]) => '<button class="chip'+(MG.kind===k?' on':'')+'" onclick="ctplTab(\''+k+'\')">'+l+(k!=='settings'?' · '+n(k):'')+'</button>').join('')
+      + '<div style="flex:1"></div>' + (MG.kind !== 'settings' ? '<button class="btn btn-gold btn-sm" onclick="ctplNew()">＋ New</button>' : '') + '</div>';
+    if(MG.kind === 'settings') h += settingsHtml();
+    else {
+      const rows = rowsOf(MG.kind), cats = [...new Set([...(CATS[MG.kind] || []), ...rows.map(t => t.category || '')])];
+      h += '<div class="ctpl-list">';
+      cats.forEach(c => { const rs = rows.filter(t => (t.category || '') === c); if(!rs.length) return;
+        h += '<div class="ctpl-cat">'+esc(c || 'Other')+'</div>' + rs.map(t => '<div class="ctpl-row'+(t.active?'':' off')+'" onclick="ctplEdit(\''+t.id+'\')">'
+          + '<div style="flex:1;min-width:0;"><div style="font-weight:700;">'+esc(t.title)+'</div><div class="ctpl-hint" style="margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(preview(t))+'</div></div>'
+          + (t.location ? '<span class="ctpl-tag">'+esc(t.location)+'</span>' : '') + (t.active ? '' : '<span class="ctpl-tag" style="background:#f1f5f9;color:#64748b;">hidden</span>') + '</div>').join(''); });
+      if(!rows.length) h += '<div class="rec-empty">Nothing here yet.</div>';
+      h += '</div>';
+    }
+    $('ctplBody').innerHTML = h;
+  }
+  function mgEdit(){
+    const t = MG.edit, k = t.kind;
+    const cats = [...new Set([...(CATS[k] || []), ...rowsOf(k).map(x => x.category || '')])].filter(Boolean);
+    const what = k === 'email' ? 'emails' : k === 'package' ? 'packages' : 'agreements';
+    let h = '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" onclick="ctplBack()">← All '+what+'</button></div>'
+      + '<div class="cat-grid" style="margin-top:12px;">'
+      +   '<div class="rf" style="grid-column:1/-1;"><label>Name</label><input id="ctE_title" value="'+esc(t.title)+'"></div>'
+      +   '<div class="rf"><label>Group</label><input id="ctE_cat" list="ctE_cats" value="'+esc(t.category || '')+'"><datalist id="ctE_cats">'+cats.map(c => '<option value="'+esc(c)+'">').join('')+'</datalist></div>'
+      +   '<div class="rf"><label>Store</label><select id="ctE_loc" data-loc-btns="off"><option value="">Both stores</option>'+['Memphis','Nashville'].map(l => '<option'+(t.location===l?' selected':'')+'>'+l+'</option>').join('')+'</select></div>'
+      +   (k === 'package' ? '<div class="rf"><label>Deposit %</label><input id="ctE_dep" type="number" min="0" max="100" value="'+(t.deposit_pct==null?'':esc(t.deposit_pct))+'" placeholder="leave as is"></div>'
+          + '<div class="rf"><label>Gratuity %</label><input id="ctE_grat" type="number" min="0" max="50" step="any" value="'+(t.gratuity_pct==null?'':Number(t.gratuity_pct))+'" placeholder="none"></div>' : '')
+      + '</div>'
+      + (k === 'email' ? '<div class="rf" style="margin-top:10px;"><label>HoneyBook subject (for reference)</label><input id="ctE_subj" value="'+esc(t.subject || '')+'"><div class="ctpl-hint">Portal emails keep the “Your GREYS catering question [#code]” subject so customer replies land back in the thread.</div></div>' : '')
+      + (k === 'package' ? '<h4 style="margin:16px 0 6px;">Lines</h4><div id="ctE_items"></div><button class="btn btn-ghost btn-sm" style="margin-top:8px;" onclick="ctplAddLine()">＋ Line</button>'
+          + '<div class="ctpl-hint">Qty 0 = optional — the line is dropped when the proposal is saved unless someone sets a qty. “pp” fills the qty with the guest count. Notes over 300 characters get cut on the proposal.</div>' : '')
+      + '<div class="rf" style="margin-top:14px;"><label>'+(k === 'email' ? 'Email text' : k === 'package' ? 'Note for the customer (added to the proposal’s customer note)' : 'Agreement text')+'</label>'
+      +   '<textarea id="ctE_body" rows="'+(k === 'contract' ? 18 : k === 'email' ? 12 : 6)+'">'+esc(t.body || '')+'</textarea>'
+      +   '<div class="ctpl-hint">Fill-ins: {{first_name}} {{name}} {{company}} {{event_date}} {{event_time}} {{guests}} {{occasion}} {{venue}} {{location}} {{schedule_link}}'
+      +   (k === 'contract' ? '<br>Filled by the proposal: {{total}} {{deposit}} {{deposit_pct}} {{balance_due_date}} {{code}} · filled when saved: {{today}} {{client_email}} {{client_phone}} {{client_address}} {{shop_address}} {{shop_phone}}' : '') + '</div></div>'
+      + ((t.attachments || []).length ? '<div class="ctpl-att">📎 HoneyBook attached: '+esc(t.attachments.join(', '))+' — portal emails can’t attach files.</div>' : '')
+      + '<label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:.9rem;"><input type="checkbox" id="ctE_active"'+(t.active !== false ? ' checked' : '')+'> Show in the pickers</label>'
+      + (t.source_ref ? '<div class="ctpl-hint">From '+esc(t.source_ref)+'</div>' : '')
+      + '<div class="cat-actions"><span class="save-msg" id="ctE_msg"></span>'
+      +   (t.id ? '<button class="btn btn-ghost btn-sm" onclick="ctplDelete()">🗑 Delete</button><button class="btn btn-ghost btn-sm" onclick="ctplDup()">⧉ Duplicate</button>' : '')
+      +   '<button class="btn btn-gold" onclick="ctplSave()">💾 Save</button></div>';
+    $('ctplBody').innerHTML = h;
+    if(k === 'package') linesRender();
+  }
+  function linesRender(){
+    const el = $('ctE_items'), L = MG.edit.items || (MG.edit.items = []);
+    el.innerHTML = L.length ? '<div class="cat-items">' + L.map((it, i) => '<div class="cat-item">'
+      + '<input class="ci-name" value="'+esc(it.name || '')+'" placeholder="Item" oninput="ctplLine('+i+',\'name\',this.value)">'
+      + '<input class="ci-qty" type="number" step="any" min="0" value="'+esc(it.qty == null ? 0 : it.qty)+'" title="Qty" oninput="ctplLine('+i+',\'qty\',Number(this.value)||0)">'
+      + '<input class="ci-price" type="number" step="0.01" min="0" value="'+((it.price_cents || 0) / 100).toFixed(2)+'" title="Price each" oninput="ctplLine('+i+',\'price_cents\',Math.round(Number(this.value)*100)||0)">'
+      + '<label class="ctpl-pp" title="Fill the qty with the guest count"><input type="checkbox"'+(it.pp ? ' checked' : '')+' onchange="ctplLine('+i+',\'pp\',this.checked)">pp</label>'
+      + '<button class="btn btn-ghost btn-sm" onclick="ctplDelLine('+i+')" title="Remove">✕</button>'
+      + '<input class="ci-note" maxlength="300" value="'+esc(it.note || '')+'" placeholder="Note (optional)" oninput="ctplLine('+i+',\'note\',this.value)">'
+      + '</div>').join('') + '</div>' : '<div class="rec-empty" style="padding:12px;">No lines yet.</div>';
+  }
+  window.ctplLine = function(i, k, v){ const it = MG.edit.items[i]; if(!it) return; if(k === 'pp' && !v) delete it.pp; else it[k] = v; };
+  window.ctplAddLine = function(){ (MG.edit.items = MG.edit.items || []).push({ name: '', qty: 1, price_cents: 0, note: '' }); linesRender(); };
+  window.ctplDelLine = function(i){ MG.edit.items.splice(i, 1); linesRender(); };
+  window.ctplSave = async function(){
+    const t = MG.edit, msg = $('ctE_msg');
+    const row = { kind: t.kind, title: $('ctE_title').value.trim(), category: $('ctE_cat').value.trim(), location: $('ctE_loc').value || null,
+      body: $('ctE_body').value, active: $('ctE_active').checked, updated_at: new Date().toISOString() };
+    if(!row.title){ msg.textContent = 'Give it a name first.'; return; }
+    if(t.kind === 'email') row.subject = $('ctE_subj').value.trim() || null;
+    if(t.kind === 'package'){
+      const d = $('ctE_dep').value.trim(), g = $('ctE_grat').value.trim();
+      row.deposit_pct = d === '' ? null : Math.min(100, Math.max(0, Math.round(Number(d) || 0)));
+      row.gratuity_pct = (g === '' || !(Number(g) > 0)) ? null : Math.min(50, Number(g));
+      row.items = (t.items || []).map(it => Object.assign({ name: String(it.name || '').trim(), qty: Number(it.qty) || 0,
+        price_cents: Math.max(0, Math.round(it.price_cents || 0)), note: String(it.note || '').trim().slice(0, 300) }, it.pp ? { pp: true } : {})).filter(it => it.name);
+    }
+    msg.textContent = 'Saving…';
+    const res = t.id
+      ? await sb.from('catering_templates').update(row).eq('id', t.id).select().single()
+      : await sb.from('catering_templates').insert(Object.assign({ source: 'portal', sort: t.sort || 999, attachments: t.attachments || [] }, row)).select().single();
+    if(res.error){ msg.textContent = '❌ ' + res.error.message; return; }
+    MG.edit = res.data; await load(true); mgEdit();
+    $('ctE_msg').textContent = '✓ Saved';
+  };
+  window.ctplDelete = async function(){
+    const t = MG.edit; if(!t.id) return;
+    if(!confirm('Delete “' + t.title + '”?\n\n(Unticking “Show in the pickers” hides it instead.)')) return;
+    const { error } = await sb.from('catering_templates').delete().eq('id', t.id);
+    if(error){ $('ctE_msg').textContent = '❌ ' + error.message; return; }
+    MG.edit = null; await load(true); mgRender();
+  };
+  function settingsHtml(){
+    const s = VARS.schedule_link || {}, sh = VARS.shops || {};
+    return '<div class="ctpl-hint" style="margin:4px 0 6px;">Used by {{schedule_link}}, {{venue}}, {{shop_address}} and {{shop_phone}} — picked by the lead’s store.</div>'
+      + ['Memphis','Nashville'].map(l => '<h4 style="margin:14px 0 6px;">'+l+'</h4><div class="cat-grid">'
+        + '<div class="rf" style="grid-column:1/-1;"><label>Scheduling link (book-a-call page)</label><input id="ctS_link_'+l+'" value="'+esc(s[l] || '')+'" placeholder="https://…"></div>'
+        + '<div class="rf" style="grid-column:1/-1;"><label>Shop address</label><input id="ctS_addr_'+l+'" value="'+esc((sh[l] || {}).address || '')+'"></div>'
+        + '<div class="rf"><label>Shop phone</label><input id="ctS_phone_'+l+'" value="'+esc((sh[l] || {}).phone || '')+'"></div></div>').join('')
+      + '<div class="cat-actions"><span class="save-msg" id="ctS_msg"></span><button class="btn btn-gold" onclick="ctplSaveVars()">💾 Save</button></div>';
+  }
+  window.ctplSaveVars = async function(){
+    const data = Object.assign({}, VARS, { schedule_link: {}, shops: {} });
+    ['Memphis','Nashville'].forEach(l => { data.schedule_link[l] = $('ctS_link_'+l).value.trim(); data.shops[l] = { address: $('ctS_addr_'+l).value.trim(), phone: $('ctS_phone_'+l).value.trim() }; });
+    const { error } = await sb.from('site_content').upsert({ key: 'catering_template_vars', data, updated_at: new Date().toISOString() });
+    $('ctS_msg').textContent = error ? '❌ ' + error.message : '✓ Saved';
+    if(!error) VARS = data;
+  };
+  window.ctplSaveReply = function(){
+    const body = ($('catBody').value || '').trim();
+    if(!body){ $('catMsg').textContent = 'Write the reply first, then save it as a template.'; return; }
+    const first = ((cur() || {}).name || '').split(/\s+/)[0];
+    const b = first && first.length > 1 ? body.replace(new RegExp('\\b' + first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'g'), '{{first_name}}') : body;
+    ctplOpen('email', { body: b });
+  };
+
+  /* ---------- wire into the existing catering code ---------- */
+  function wrap(name, make){ const o = window[name]; if(typeof o === 'function' && !o.__ctpl){ const f = make(o); f.__ctpl = true; window[name] = f; } }
+  function boot(){
+    wrap('catOpen', o => function(){ const p = o.apply(this, arguments); fillQuick(); return p; });
+    wrap('catQuickPick', o => function(sel){ const v = sel.value; if(v === 'manage' || v.indexOf('t:') === 0) return pickReply(sel); return o.apply(this, arguments); });
+    wrap('catQuoteRender', o => function(){ const r = o.apply(this, arguments); decorate().catch(e => console.warn('catering templates', e)); return r; });
+    // live gratuity line: "Gratuity (N%)" = N% of every other line
+    wrap('catTotals', o => function(){
+      try{
+        let base = 0; CAT_ITEMS.forEach(it => { if(!GRAT_RE.test(it.name || '')) base += Math.round((Number(it.qty) || 0) * (it.price_cents || 0)); });
+        const rows = document.querySelectorAll('#catItems .cat-item');
+        CAT_ITEMS.forEach((it, i) => {
+          const m = GRAT_RE.exec(it.name || ''); if(!m) return;
+          const per = Math.round(Math.round(base * Number(m[1]) / 100) / ((Number(it.qty) > 0) ? Number(it.qty) : 1));
+          it.price_cents = per; it.note = m[1] + '% of ' + catMoney(base);
+          const row = rows[i]; if(!row) return;
+          const p = row.querySelector('.ci-price'), n = row.querySelector('.ci-note');
+          if(p && document.activeElement !== p) p.value = (per / 100).toFixed(2);
+          if(n && document.activeElement !== n) n.value = it.note;
+        });
+      }catch(e){}
+      return o.apply(this, arguments);
+    });
+    // agreement fill-ins the catering fn doesn't know: fill them into what gets saved, keep the textarea as typed
+    wrap('catSaveQuote', o => function(){
+      const ta = $('cq_contract'); let raw = null;
+      try{ if(ta && /\{\{\s*(today|venue|client_email|client_phone|client_address|shop_address|shop_phone|occasion)\s*\}\}/.test(ta.value)){ raw = ta.value; ta.value = fill(raw, { only: LATE_KEYS, contract: true }); } }catch(e){}
+      const p = o.apply(this, arguments);           // builds its payload before its first await
+      if(raw != null && ta) ta.value = raw;
+      return p;
+    });
+    // don't let one customer's filled-in details become the default agreement
+    wrap('catSaveTemplate', o => function(){
+      try{ const t = ($('cq_contract') || {}).value || '', r = cur() || {};
+        if([r.email, r.phone, r.address].some(x => x && String(x).trim().length > 4 && t.indexOf(String(x).trim()) >= 0)){
+          $('cqMsg').textContent = '⚠ This agreement has this customer’s details in it — pick the template again from 📜 before saving it as the default.'; return; } }catch(e){}
+      return o.apply(this, arguments);
+    });
+    wrap('catRender', o => function(){
+      const r = o.apply(this, arguments);
+      try{ const chips = $('catChips');
+        if(chips && !chips.querySelector('.ctpl-btn')){
+          const ref = [...chips.querySelectorAll('button')].find(b => /Refresh/.test(b.textContent));
+          const html = '<button class="btn btn-ghost btn-sm ctpl-btn" onclick="ctplOpen()">📚 Templates</button>';
+          if(ref) ref.insertAdjacentHTML('afterend', html); else chips.insertAdjacentHTML('beforeend', html);
+        } }catch(e){}
+      return r;
+    });
+    const noteBtn = document.querySelector('#catConvo button[onclick="catLog(true)"]');
+    if(noteBtn && !$('ctplSaveReplyBtn')) noteBtn.insertAdjacentHTML('afterend', '<button class="btn btn-ghost btn-sm" id="ctplSaveReplyBtn" onclick="ctplSaveReply()" title="Save what is in the reply box as a template">💾 Save as template</button>');
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
 <script>(function(){if(location.hostname.indexOf("staging")<0)return;document.title="[STAGING] "+document.title;var m=document.createElement("meta");m.name="robots";m.content="noindex";document.head.appendChild(m);var b=document.createElement("div");b.textContent="STAGING \u2014 test copy. Same live database: data changes, emails and Square actions are REAL.";b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#c62828;color:#fff;font:600 12px/1.2 system-ui,sans-serif;text-align:center;padding:5px 8px;pointer-events:none;opacity:.92";document.body.appendChild(b);})();</script>
 </body>
