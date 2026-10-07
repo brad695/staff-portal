@@ -692,12 +692,10 @@ body > div[style*="text-align:center"]{ background:#161618; }
 .wg-t{ display:block; flex:1 1 auto; min-width:0; font-weight:800; font-size:1.05rem; letter-spacing:-.35px; line-height:1.12; color:var(--fg); }
 .wg-chip{ display:block; flex:none; font-size:.66rem; font-weight:800; letter-spacing:.2px; line-height:1; padding:5px 7px; border-radius:6px; background:var(--chip); color:var(--fg); white-space:nowrap; }
 .wg-chip[hidden]{ display:none; }
-.wg-go{ flex:none; font-size:18px; line-height:1; color:var(--fg2); }
 .wg-foot{ display:block; margin-top:auto; font-size:.74rem; font-weight:700; line-height:1.3; color:var(--fg2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .wg-foot b{ color:var(--fg); font-weight:800; }
 .wg-pill{ display:inline-flex; align-items:center; gap:4px; padding:3px 7px; border-radius:6px; background:#fde68a; color:#422006; font-weight:800; }
 .wg-pill i{ font-size:13px; }
-.wg-dot{ display:inline-block; width:7px; height:7px; border-radius:2px; background:#e0a21c; margin-right:6px; vertical-align:1px; }
 .wg-flag{ color:#fde68a; }
 .wg-empty{ display:flex; align-items:center; gap:6px; font-size:.78rem; font-weight:600; color:var(--fg2); padding-top:2px; }
 .wg-empty i{ font-size:16px; }
@@ -736,18 +734,6 @@ body > div[style*="text-align:center"]{ background:#161618; }
 .wg-res .wg-hrs + .wg-foot{ margin-top:0; }
 .wg-res .wg-hrs:empty + .wg-foot{ margin-top:auto; }
 
-/* CALENDAR — white month card, gold = today, violet dot = something on that day */
-.dash .wg-cal{ --fg:#111827; --fg2:#6b7280; --chip:#f3f4f6; background:#fff; }
-.wg-grid{ display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); row-gap:3px; text-align:center; margin-top:-1px; }
-.wg-grid .w{ display:block; font-size:.56rem; font-weight:800; color:#9ca3af; padding-bottom:2px; }
-.wg-grid .d{ display:block; position:relative; width:19px; height:19px; margin:0 auto; border-radius:6px; font-size:.68rem; font-weight:700; line-height:19px; color:#1f2937; }
-.wg-grid .d.past{ color:#9ca3af; }
-.wg-grid .d.blank{ visibility:hidden; }
-.wg-grid .d.has::after{ content:""; position:absolute; left:50%; bottom:-2px; width:4px; height:4px; margin-left:-2px; border-radius:1px; background:#7c3aed; }
-.wg-grid .d.past.has::after{ background:#c4b5fd; }
-.wg-grid .d.now{ background:#e0a21c; color:#111; font-weight:800; }
-.wg-grid .d.now::after{ display:none; }
-
 /* SCHEDULE — soft sky card with the people on today */
 .dash .wg-sch{ --fg:#0f1d3a; --fg2:#4b5878; --chip:rgba(15,29,58,.08); background:#e7eeff; }
 .wg-big[hidden]{ display:none; }
@@ -781,8 +767,9 @@ body > div[style*="text-align:center"]{ background:#161618; }
 .wg-row .nm small{ display:block; margin-top:2px; font-size:.68rem; font-weight:700; color:var(--fg2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .wg-row .nm small em{ font-style:normal; color:#fde68a; }
 
-/* STUFF TO KNOW — cream note card */
-.dash .wg-stf{ --fg:#2b1d05; --fg2:#7a6236; --chip:rgba(43,29,5,.09); background:#fff3d4; }
+/* STUFF TO KNOW — cream note card, two columns wide (5 tiles: full width on phones, beside Catering on bigger screens) */
+.dash .wg-stf{ --fg:#2b1d05; --fg2:#7a6236; --chip:rgba(43,29,5,.09); background:#fff3d4; grid-column:span 2; min-height:0; }
+.wg-stf .wg-list{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:14px; row-gap:8px; }
 .wg-stf .wg-row i{ flex:none; font-size:14px; color:#c2410c; }
 
 @media(max-width:360px){
@@ -798,7 +785,6 @@ body > div[style*="text-align:center"]{ background:#161618; }
   .dash{ gap:16px; padding:18px 28px 6px; }
   .dash .wg{ min-height:224px; padding:18px 18px 15px; border-radius:20px !important; }
   .wg-t{ font-size:1.18rem; }
-  .wg-grid .d{ width:24px; height:22px; line-height:22px; font-size:.74rem; }
   .wg-row{ font-size:.86rem; }
   .dash .wg-chz .wg-greysie{ width:146px; height:146px; top:-8px; right:-18px; }
   .wg-hrs .hr{ flex-basis:36px; }
@@ -834,19 +820,14 @@ body > div[style*="text-align:center"]{ background:#161618; }
         <span class="wg-hrs" id="wgResHrs"></span>
         <span class="wg-foot" id="wgResFoot">Loading&hellip;</span>
       </button>
-      <button class="wg wg-cal" id="tile-calendar" style="--i:1" onclick="showView('calendar')" aria-label="Calendar">
-        <span class="wg-head"><span class="wg-t" id="wgCalMonth">Calendar</span><i class="ti ti-chevron-right wg-go"></i></span>
-        <span class="wg-grid" id="wgCalGrid"></span>
-        <span class="wg-foot" id="wgCalFoot">Loading&hellip;</span>
-      </button>
-      <button class="wg wg-sch" id="tile-myshifts" style="--i:2" onclick="location.href='schedule.html'" aria-label="Schedule">
+      <button class="wg wg-sch" id="tile-myshifts" style="--i:1" onclick="location.href='schedule.html'" aria-label="Schedule">
         <span class="wg-head"><span class="wg-t">Schedule</span><span class="wg-chip opt">Today</span></span>
         <span class="wg-ppl" id="wgSchPpl"></span>
         <span class="wg-big"><b id="wgSchN">&ndash;</b><span id="wgSchLbl">on today</span></span>
         <span class="wg-sub" id="wgSchWho"></span>
         <span class="wg-foot" id="wgSchFoot">Loading&hellip;</span>
       </button>
-      <button class="wg wg-chz" id="tile-cheese-entry" style="--i:3" onclick="location.href='manager.html#plu'" aria-label="Cheese Entry">
+      <button class="wg wg-chz" id="tile-cheese-entry" style="--i:2" onclick="location.href='manager.html#plu'" aria-label="Cheese Entry">
         <img class="wg-greysie" src="greysie-cheesemonger-sticker.svg" alt="" width="132" height="132">
         <svg class="wg-wave" viewBox="0 0 200 100" preserveAspectRatio="none" aria-hidden="true"><path d="M0 24 C 28 6, 60 30, 98 17 S 162 0, 200 14 L 200 100 L 0 100 Z"/></svg>
         <span class="wg-t">Cheese<br>Entry</span>
@@ -854,12 +835,12 @@ body > div[style*="text-align:center"]{ background:#161618; }
         <span class="wg-chz-n"><b id="wgChzN">&ndash;</b><span>cheeses</span></span>
         <span class="wg-foot" id="wgChzFoot">Loading&hellip;</span>
       </button>
-      <button class="wg wg-cat" id="tile-catering" style="--i:4" onclick="location.href='manager.html#preorders'" aria-label="Catering">
+      <button class="wg wg-cat" id="tile-catering" style="--i:3" onclick="location.href='manager.html#preorders'" aria-label="Catering">
         <span class="wg-head"><span class="wg-t">Catering</span><span class="wg-chip opt">7 days</span></span>
         <span class="wg-list" id="wgCatList"></span>
         <span class="wg-foot" id="wgCatFoot">Loading&hellip;</span>
       </button>
-      <button class="wg wg-stf" id="tile-stuff" style="--i:5" onclick="showView('stuff')" aria-label="Stuff to Know">
+      <button class="wg wg-stf" id="tile-stuff" style="--i:4" onclick="showView('stuff')" aria-label="Stuff to Know">
         <span class="wg-head"><span class="wg-t">Stuff to Know</span><span class="wg-chip" id="wgStfN" hidden></span></span>
         <span class="wg-list" id="wgStfList"></span>
         <span class="wg-foot" id="wgStfFoot">Loading&hellip;</span>
@@ -1649,7 +1630,7 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
 </script>
 <div style="text-align:center;padding:14px 20px 22px;font-size:0.78rem;color:#8fa0ae;">Greys Fine Cheese &amp; Entertaining · <a href="terms.html" style="color:#0b6aa9;text-decoration:none;font-weight:600;">SMS Terms</a> · <a href="privacy.html" style="color:#0b6aa9;text-decoration:none;font-weight:600;">Privacy Policy</a></div>
 <!-- HOME-V6 WIDGETS: fills the home tiles with live numbers. Read-only, same public key and the same feeds this page already uses
-     (portal-api reservations, the square-orders feed, portal_shifts, cheese_items, Stuff to Know, and the month the Today card loads).
+     (portal-api reservations, the square-orders feed, portal_shifts, cheese_items and Stuff to Know).
      Refreshes every 5 minutes while the home screen is open, and when the app comes back to the front. -->
 <script>
 (function(){
@@ -1813,42 +1794,17 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
     }catch(e){ fail('wgChzFoot'); }
   }
 
-  // ── STUFF TO KNOW: first three titles (re-drawn whenever the page reloads its items) ──
+  // ── STUFF TO KNOW: first four titles (re-drawn whenever the page reloads its items) ──
   function stuff(){
     var items=(typeof _info!=='undefined' && _info) ? _info : [];
     var n=$('wgStfN'); n.textContent=items.length; n.hidden=!items.length;
-    $('wgStfList').innerHTML = items.slice(0,3).map(function(x){
+    $('wgStfList').innerHTML = items.slice(0,4).map(function(x){
       return '<span class="wg-row"><i class="ti ti-bookmark"></i><span class="who">'+esc(x.title)+'</span></span>'; }).join('')
       || '<span class="wg-empty"><i class="ti ti-notes"></i>Nothing here yet</span>';
-    $('wgStfFoot').textContent = items.length>3 ? '+'+(items.length-3)+' more →' : (items.length ? 'Tap to read →' : 'Managers add these in the console');
-  }
-
-  // ── CALENDAR: this month at a glance, from the month the Today card already loaded ──
-  var CAL=null;
-  function calSnap(y,m){
-    var dim=new Date(y,m+1,0).getDate(), c={};
-    for(var d=1; d<=dim; d++){ var k=fmt(new Date(y,m,d)), n=0;
-      ['ev','sp','cls','ord','exp'].forEach(function(b){ n+=((_calData[b]||{})[k]||[]).length; });
-      c[k]=n; }
-    CAL={ y:y, m:m, c:c };
-    drawCal();
-  }
-  function drawCal(){
-    var now=new Date(), y=now.getFullYear(), m=now.getMonth(), today=fmt(now), ok=CAL && CAL.y===y && CAL.m===m;
-    $('wgCalMonth').textContent=now.toLocaleDateString('en-US',{ month:'long' });
-    var h='', lead=new Date(y,m,1).getDay(), dim=new Date(y,m+1,0).getDate();
-    'SMTWTFS'.split('').forEach(function(w){ h+='<span class="w">'+w+'</span>'; });
-    for(var i=0;i<lead;i++) h+='<span class="d blank"></span>';
-    for(var d=1; d<=dim; d++){ var k=fmt(new Date(y,m,d)), n=ok ? (CAL.c[k]||0) : 0;
-      h+='<span class="d'+(k<today?' past':'')+(k===today?' now':'')+(n?' has':'')+'">'+d+'</span>'; }
-    $('wgCalGrid').innerHTML=h;
-    if(ok){ var t=CAL.c[today]||0;
-      $('wgCalFoot').innerHTML='<span class="wg-dot"></span>'+(t ? '<b>'+t+'</b> thing'+(t>1?'s':'')+' today' : 'Nothing on today'); }
+    $('wgStfFoot').textContent = items.length>4 ? '+'+(items.length-4)+' more →' : (items.length ? 'Tap to read →' : 'Managers add these in the console');
   }
 
   // hook the page's own render functions so the tiles follow the same data
-  var _ra=window.renderAgenda;
-  if(_ra) window.renderAgenda=function(y,m){ var r=_ra.apply(this,arguments); try{ var n=new Date(); if(y===n.getFullYear() && m===n.getMonth()) calSnap(y,m); }catch(e){} return r; };
   var _rs=window.renderStuff;
   if(_rs) window.renderStuff=function(){ var r=_rs.apply(this,arguments); try{ stuff(); }catch(e){} return r; };
   var _rsc=window.renderSchedCards;
@@ -1858,11 +1814,11 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
   function refresh(){ last=Date.now(); resys(); orders(); shifts(); }
   var _sv=window.showView;
   if(_sv) window.showView=function(name){ var r=_sv.apply(this,arguments); if(name==='home' && Date.now()-last>60e3){ refresh(); } return r; };
-  function boot(){ drawCal(); refresh(); cheese(); }
+  function boot(){ refresh(); cheese(); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
   setInterval(function(){ if(document.visibilityState==='visible' && $('view-home').classList.contains('active')) refresh(); }, 5*60e3);
   var rz=0; window.addEventListener('resize', function(){ clearTimeout(rz); rz=setTimeout(drawSched, 150); });
-  document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible' && Date.now()-last>2*60e3){ drawCal(); refresh(); cheese(); } });
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible' && Date.now()-last>2*60e3){ refresh(); cheese(); } });
 })();
 </script>
 <!-- CLEAN-URL: once /<page> is confirmed to serve this page (Render rewrite), drop ".html" from the address bar. -->
