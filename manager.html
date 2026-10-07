@@ -742,7 +742,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
   <div id="panel-catering" class="panel">
     <div class="section-card">
       <h2>💼 Catering Leads</h2>
-      <div class="hint">Requests from <strong>tickets.greyscheese.com/catering.html</strong> (and any you add by hand). Reply here and it's emailed from info@greyscheese.com; their replies come back in automatically (Gmail sync). Build the <strong>Proposal</strong>, send it, and the customer signs online — that <strong>creates a Square invoice</strong> (deposit now, balance before the event) with the signed agreement attached. Payment status refreshes from Square every 15 minutes.</div>
+      <div class="hint">Requests from <strong>tickets.greyscheese.com/catering.html</strong> (and any you add by hand). Reply here and it's emailed from info@greyscheese.com; their replies come back in automatically (Gmail sync). Build the <strong>Proposal</strong>, send it, and the customer signs online — that <strong>creates a Square invoice</strong> (deposit now, balance before the event) with the signed agreement attached. No proposal needed? <strong>🧾 Save &amp; send invoice</strong> skips the signature and emails the Square invoice right away. Payment status refreshes from Square every 15 minutes.</div>
       <div class="toolbar" id="catChips"></div>
       <div class="rec-list" id="catList"><div class="rec-empty">Loading…</div></div>
     </div>
@@ -1846,14 +1846,18 @@ async function inqSetStage(v){
 /* ---- Catering leads (HoneyBook-style) ----
    Tables: catering_leads · catering_messages (in / out / note) · catering_quotes, admin-only by RLS.
    Everything that emails or touches Square goes through the `catering` edge function:
-   reply / log / new_lead / save_quote / send_quote / create_invoice / cancel_invoice / contract_url / sync.
+   reply / log / new_lead / save_quote / send_quote / send_invoice / create_invoice / cancel_invoice / contract_url / sync.
+   🧾 Save & send invoice (send_invoice) skips the proposal + signature: the quote is marked invoice_only and
+   Square invoices them right away (same deposit % / balance date); the lead moves to 'Invoiced'.
    The customer signs at tickets.greyscheese.com/catering.html?q=<sign_token>; signing creates the Square
    invoice (deposit + balance) with the signed PDF attached. The `catering-invoice-sync` cron refreshes
    payment status every 15 min; "↻ Payment status" does it on demand. */
 const CAT_URL = SB_URL + '/functions/v1/catering';
 const CAT_SITE = 'https://tickets.greyscheese.com/catering.html';
-const CAT_STAGES = { new:'New', replied:'Replied', quoted:'Quoting', contract_sent:'Proposal sent', signed:'Signed', deposit_paid:'Deposit paid', paid:'Paid', lost:'Lost' };
+const CAT_STAGES = { new:'New', replied:'Replied', quoted:'Quoting', contract_sent:'Proposal sent', signed:'Signed', invoiced:'Invoiced', deposit_paid:'Deposit paid', paid:'Paid', lost:'Lost' };
 const CAT_QSTAT = { draft:'Draft', sent:'Sent — waiting for signature', signed:'Signed — invoice pending', invoiced:'Invoiced — deposit due', deposit_paid:'Deposit paid', paid:'Paid in full', canceled:'Canceled' };
+const catQStat = q => q.invoice_only && q.status==='signed' ? 'Invoice pending'
+  : q.status==='invoiced' && !(q.deposit_pct>0 && q.deposit_pct<100) ? 'Invoiced — payment due' : (CAT_QSTAT[q.status]||q.status);
 const CAT_FUL = { pickup:'Pick-up', delivery:'Delivery', onsite:'On-site service' };
 let CAT_ROWS = [], CAT_FILTER = 'open', CAT_CUR = null, CAT_Q = null, CAT_QUOTES = [], CAT_ITEMS = [], CAT_MENU = null, CAT_TEMPLATE = '';
 const CAT_QUICK = [
@@ -2026,7 +2030,7 @@ function catBalDefault(){
 function catQuoteRender(copyFrom){
   const box = document.getElementById('catQuote'), r = CAT_CUR, q = CAT_Q;
   const locked = q && !['draft','sent'].includes(q.status);
-  const history = CAT_QUOTES.filter(x=>x!==q).map(x=>'<span class="pill pill-mid" style="margin-right:6px;">'+esc(new Date(x.created_at).toLocaleDateString())+' · '+catMoney(x.total_cents)+' · '+esc(CAT_QSTAT[x.status]||x.status)+'</span>').join('');
+  const history = CAT_QUOTES.filter(x=>x!==q).map(x=>'<span class="pill pill-mid" style="margin-right:6px;">'+esc(new Date(x.created_at).toLocaleDateString())+' · '+catMoney(x.total_cents)+' · '+esc(catQStat(x))+'</span>').join('');
   if(locked){ box.innerHTML = catLockedHtml(q) + (history?'<div class="hint" style="margin-top:14px;">Earlier proposals: '+history+'</div>':''); return; }
   const src = q || copyFrom || null;
   CAT_ITEMS = src ? JSON.parse(JSON.stringify(src.items||[])) : [];
@@ -2056,15 +2060,16 @@ function catQuoteRender(copyFrom){
     +   '<div class="rf"><label>Balance due</label><input id="cq_bal" type="date" value="'+esc((q&&q.balance_due_date)||'')+'"><span style="font-size:.72rem;color:#64748b;">Blank = 3 days before the event</span></div>'
     + '</div>'
     + '<div id="catTotals" class="cat-tot"></div>'
-    + '<div class="rf" style="margin-top:14px;"><label>Note on the proposal (the customer sees this)</label><textarea id="cq_note" rows="2">'+esc((src&&src.customer_note)||'')+'</textarea></div>'
+    + '<div class="rf" style="margin-top:14px;"><label>Note for the customer (shows on the proposal or invoice)</label><textarea id="cq_note" rows="2">'+esc((src&&src.customer_note)||'')+'</textarea></div>'
     + '<details style="margin-top:14px;"><summary style="cursor:pointer;font-weight:700;">📜 Agreement text</summary>'
     +   '<div class="hint" style="margin:8px 0;">Placeholders fill in automatically: {{name}} {{event_date}} {{guests}} {{total}} {{deposit_pct}} {{deposit}} {{balance_due_date}}. Changes here apply to this proposal only.</div>'
     +   '<textarea id="cq_contract" rows="14" style="width:100%;font-family:inherit;font-size:.85rem;">'+esc((src&&src.contract_text)||CAT_TEMPLATE)+'</textarea>'
     +   '<div style="margin-top:6px;"><button class="btn btn-ghost btn-sm" onclick="catSaveTemplate()">Save as the default for new proposals</button></div></details>'
-    + '<div class="rf" style="margin-top:14px;"><label>Message with the proposal email (optional)</label><textarea id="cq_msg" rows="3" placeholder="Leave blank for the standard note"></textarea></div>'
+    + '<div class="rf" style="margin-top:14px;"><label>Message with the email (optional)</label><textarea id="cq_msg" rows="3" placeholder="Leave blank for the standard note"></textarea></div>'
     + '<div class="cat-actions">'
     +   '<span class="save-msg" id="cqMsg"></span>'
     +   '<button class="btn btn-ghost" onclick="catSaveQuote(false)">💾 Save draft</button>'
+    +   '<button class="btn btn-ghost" id="cqInv" onclick="catSaveQuote(\'invoice\')" title="Skip the proposal and signature — Square emails them the invoice now">🧾 Save &amp; send invoice</button>'
     +   '<button class="btn btn-gold" id="cqSend" onclick="catSaveQuote(true)">📨 Save &amp; send proposal</button>'
     + '</div>'
     + (history?'<div class="hint" style="margin-top:14px;">Earlier proposals: '+history+'</div>':'');
@@ -2152,6 +2157,7 @@ async function catSaveQuote(send){
     if(['new','replied'].includes(CAT_CUR.stage)){ await sb.from('catering_leads').update({ stage:'quoted' }).eq('id', CAT_CUR.id); CAT_CUR.stage='quoted'; document.getElementById('catStage').value='quoted'; }
     out.textContent = '✓ Draft saved'; catLoad(); return;
   }
+  if(send==='invoice') return catSendInvoice(r.data.env, v('cq_msg'));
   if(!confirm('Email the proposal to '+CAT_CUR.email+'? They\'ll be able to sign it and pay the deposit.')){ out.textContent = '✓ Saved (not sent)'; return; }
   document.getElementById('cqSend').disabled = true; out.textContent = 'Sending…';
   const s = await catApi('send_quote', { quote_id: CAT_Q.id, message: v('cq_msg') });
@@ -2161,17 +2167,40 @@ async function catSaveQuote(send){
   await catQuoteLoad(); document.getElementById('cqMsg').textContent = '✓ Proposal sent to '+CAT_CUR.email;
   catThread(); catLoad();
 }
+/* 🧾 invoice without a proposal — the quote was just saved; confirm, then the catering fn invoices it */
+async function catSendInvoice(env, message){
+  const q = CAT_Q, out = document.getElementById('cqMsg');
+  const tot = q.total_cents, dep = Number(q.deposit_pct)||0, split = dep>0 && dep<100;
+  const today = new Date().toLocaleDateString('en-CA');
+  let bal = q.balance_due_date || catBalDefault(); if(!bal || bal < today) bal = today;
+  const sched = split ? dep+'% deposit ('+catMoney(Math.round(tot*dep/100))+') due now, balance due '+fmtDisplay(bal)
+    : dep>=100 ? 'Full amount due now' : 'Full amount due '+fmtDisplay(bal);
+  if(!confirm('Send a Square invoice to '+CAT_CUR.email+' for '+catMoney(tot)+'?\n'+sched+'.\n\nNo proposal or signature — it goes straight to payment.'
+    + (q.status==='sent' ? '\nThe proposal already sent to them will stop working.' : '')
+    + (env==='sandbox' ? '\n\n⚠ Square is in SANDBOX (test) mode — this will NOT be a real invoice.' : ''))){ out.textContent = '✓ Saved (not sent)'; return; }
+  ['cqInv','cqSend'].forEach(id=>{ const b = document.getElementById(id); if(b) b.disabled = true; });
+  out.textContent = 'Creating the Square invoice…';
+  const s = await catApi('send_invoice', { quote_id: q.id, message });
+  if(s.ok && ['new','replied','quoted','contract_sent','signed','lost'].includes(CAT_CUR.stage)){ CAT_CUR.stage = 'invoiced'; document.getElementById('catStage').value = 'invoiced'; }
+  await catQuoteLoad();
+  const m = document.getElementById('cqMsg');
+  if(m) m.textContent = s.ok
+    ? '✓ Invoice'+(s.data.quote && s.data.quote.invoice_number ? ' #'+s.data.quote.invoice_number : '')+' sent to '+CAT_CUR.email+(s.data.email && s.data.email!=='sent' ? ' — Square emailed it, but our note didn\'t send' : '')
+    : '❌ '+(s.data.error||'Could not send the invoice');
+  catThread(); catLoad();
+}
 function catLockedHtml(q){
   const split = q.deposit_pct>0 && q.deposit_pct<100, dep = Math.round(q.total_cents*q.deposit_pct/100);
   const items = (q.items||[]).map(it=>'<tr><td>'+esc(it.name)+(it.note?'<div style="font-size:.78rem;color:#64748b;">'+esc(it.note)+'</div>':'')+'</td><td class="n">'+esc(it.qty)+'</td><td class="n">'+catMoney(it.price_cents)+'</td><td class="n">'+catMoney(Math.round(it.qty*it.price_cents))+'</td></tr>').join('');
   const pill = q.status==='paid'?'pill-ok':q.status==='canceled'?'pill-bad':q.status==='deposit_paid'?'pill-ok':'pill-req';
-  return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="pill '+pill+'">'+esc(CAT_QSTAT[q.status]||q.status)+'</span>'
+  return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="pill '+pill+'">'+esc(catQStat(q))+'</span>'
     + (q.square_env==='sandbox'?'<span class="pill pill-bad">Square SANDBOX</span>':'') + '<div style="flex:1"></div>'
     + (q.pdf_path?'<button class="btn btn-ghost btn-sm" onclick="catPdf(\''+q.id+'\')">📄 Signed PDF</button>':'')
     + (q.invoice_url?'<a class="btn btn-ghost btn-sm" target="_blank" href="'+esc(q.invoice_url)+'">🧾 Invoice'+(q.invoice_number?' #'+esc(q.invoice_number):'')+'</a>':'')
     + (q.square_invoice_id?'<button class="btn btn-ghost btn-sm" onclick="catSync(\''+q.id+'\')">↻ Payment status</button>':'')
     + '</div>'
     + (q.signed_at?'<div style="margin:12px 0 0;font-size:.88rem;">✍️ Signed by <b>'+esc(q.signed_name)+'</b> · '+esc(inqWhen(q.signed_at))+(q.signed_ip?' <span style="color:#64748b;">· IP '+esc(q.signed_ip)+'</span>':'')+'</div>':'')
+    + (q.invoice_only?'<div style="margin:12px 0 0;font-size:.88rem;">🧾 Invoiced straight from the portal — no proposal or signature.</div>':'')
     + (q.invoice_error && !q.square_invoice_id ? '<div style="margin:12px 0;padding:10px 12px;background:#fef2f2;color:#991b1b;border-radius:8px;">Square invoice failed: '+esc(q.invoice_error)+'<div style="margin-top:8px;"><button class="btn btn-gold btn-sm" onclick="catRetryInvoice(\''+q.id+'\')">Retry invoice</button></div></div>' : '')
     + '<table class="cat-tbl"><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th></tr></thead><tbody>'+items+'</tbody></table>'
     + '<div class="cat-tot">'
@@ -2184,14 +2213,14 @@ function catLockedHtml(q){
     + '</div>'
     + '<div class="cat-actions">'
     +   '<span class="save-msg" id="cqMsg"></span>'
-    +   (['signed','invoiced'].includes(q.status)?'<button class="btn btn-ghost btn-sm" onclick="catCancelInvoice(\''+q.id+'\')">Cancel '+(q.square_invoice_id?'invoice':'proposal')+'</button>':'')
-    +   '<button class="btn btn-ghost btn-sm" onclick="catNewProposal()">＋ New proposal (copy this one)</button>'
+    +   (['signed','invoiced'].includes(q.status)?'<button class="btn btn-ghost btn-sm" onclick="catCancelInvoice(\''+q.id+'\')">Cancel '+(q.square_invoice_id||q.invoice_only?'invoice':'proposal')+'</button>':'')
+    +   '<button class="btn btn-ghost btn-sm" onclick="catNewProposal()">＋ New proposal / invoice (copy this one)</button>'
     + '</div>'
     + (q.synced_at?'<div class="cat-foot">Square checked '+esc(inqWhen(q.synced_at))+' · '+esc((q.invoice_status||'—').replace(/_/g,' ').toLowerCase())+'</div>':'');
 }
 function catNewProposal(){
   const from = CAT_Q; CAT_Q = null;
-  if(from && ['signed','invoiced','deposit_paid','paid'].includes(from.status) && !confirm('This lead already has a signed proposal. Start a new one anyway?')){ CAT_Q = from; return; }
+  if(from && ['signed','invoiced','deposit_paid','paid'].includes(from.status) && !confirm((from.invoice_only?'This lead already has an invoice.':'This lead already has a signed proposal.')+' Start a new one anyway?')){ CAT_Q = from; return; }
   catQuoteRender(from ? { items: from.items, customer_note: from.customer_note, contract_text: '' } : null);
 }
 async function catPdf(id){
@@ -2214,7 +2243,7 @@ async function catRetryInvoice(id){
   catThread();
 }
 async function catCancelInvoice(id){
-  if(!confirm('Cancel this proposal'+(CAT_Q&&CAT_Q.square_invoice_id?' and its Square invoice':'')+'? The customer\'s link will stop working.')) return;
+  if(!confirm(CAT_Q&&CAT_Q.invoice_only ? 'Cancel this Square invoice? The customer\'s pay link will stop working.' : 'Cancel this proposal'+(CAT_Q&&CAT_Q.square_invoice_id?' and its Square invoice':'')+'? The customer\'s link will stop working.')) return;
   const r = await catApi('cancel_invoice', { quote_id:id });
   if(!r.ok){ document.getElementById('cqMsg').textContent = '❌ '+(r.data.error||'failed'); return; }
   await catQuoteLoad(); catThread();
