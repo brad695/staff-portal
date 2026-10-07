@@ -760,7 +760,22 @@ body > div[style*="text-align:center"]{ background:#161618; }
 .wg-chz-n span{ display:block; font-size:.82rem; font-weight:700; color:var(--fg2); }
 .wg-chz .wg-foot{ margin-top:-4px; }
 
-/* CATERING — green card, the next three orders */
+/* SCHEDULE actions: the card opens the schedule; the two buttons jump straight to time off / swaps on schedule.html */
+.dash .wg .wg-cover{ position:absolute; inset:0; z-index:1; border-radius:inherit; }
+.dash .wg .wg-cover:focus-visible{ outline:3px solid #e0a21c; outline-offset:-3px; }
+.wg-acts{ display:flex; flex-direction:column; gap:6px; position:relative; z-index:2; margin-top:2px; }
+.wg-btn{ display:flex; align-items:center; justify-content:center; gap:6px; min-height:32px; padding:0 8px; border-radius:9px;
+  background:#fff; color:#3730a3; border:1px solid #cfdaf8; font-size:.76rem; font-weight:800; text-decoration:none; white-space:nowrap;
+  box-shadow:0 1px 2px rgba(15,29,58,.06); transition:background .15s, transform .1s; }
+.wg-btn i{ font-size:15px; line-height:1; }
+.wg-btn:hover{ background:#f5f7ff; }
+.wg-btn:active{ transform:scale(.97); }
+.wg-btn:focus-visible{ outline:3px solid #e0a21c; outline-offset:2px; }
+@media(max-width:639px){ .wg-sch:not(.sch-empty) .wg-sub{ display:none; } }
+@media(min-width:1000px){ .wg-acts{ flex-direction:row; } .wg-btn{ flex:1 1 0; } }
+
+/* CATERING LEADS — green card: unread first, then the open pipeline, then booked events */
+.wg-row .nm b .dot{ display:inline-block; width:7px; height:7px; border-radius:2px; background:#fde68a; margin-right:5px; vertical-align:1px; }
 .dash .wg-cat{ --chip:rgba(0,30,18,.24); background:linear-gradient(155deg,#0b7f57 0%,#0a6e4c 52%,#065c40 100%); }
 .wg-row .nm{ display:block; flex:1 1 auto; min-width:0; }
 .wg-row .nm b{ display:block; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -878,13 +893,18 @@ body > div[style*="text-align:center"]{ background:#fff; }
         <span class="wg-hrs" id="wgResHrs"></span>
         <span class="wg-foot" id="wgResFoot">Loading&hellip;</span>
       </button>
-      <button class="wg wg-sch" id="tile-myshifts" style="--i:1" onclick="location.href='schedule.html'" aria-label="Schedule">
+      <div class="wg wg-sch" id="tile-myshifts" style="--i:1">
+        <a class="wg-cover" href="schedule.html" aria-label="Schedule"></a>
         <span class="wg-head"><span class="wg-t">Schedule</span><span class="wg-chip opt">Today</span></span>
         <span class="wg-ppl" id="wgSchPpl"></span>
         <span class="wg-big"><b id="wgSchN">&ndash;</b><span id="wgSchLbl">on today</span></span>
         <span class="wg-sub" id="wgSchWho"></span>
         <span class="wg-foot" id="wgSchFoot">Loading&hellip;</span>
-      </button>
+        <span class="wg-acts">
+          <a class="wg-btn" href="schedule.html#timeoff"><i class="ti ti-beach"></i>Request off</a>
+          <a class="wg-btn" href="schedule.html#swap"><i class="ti ti-switch-horizontal"></i>Shift swap</a>
+        </span>
+      </div>
       <button class="wg wg-chz" id="tile-cheese-entry" style="--i:2" onclick="location.href='manager.html#plu'" aria-label="Cheese Entry">
         <img class="wg-greysie" src="greysie-cheesemonger-sticker.svg" alt="" width="132" height="132">
         <svg class="wg-wave" viewBox="0 0 200 100" preserveAspectRatio="none" aria-hidden="true"><path d="M0 24 C 28 6, 60 30, 98 17 S 162 0, 200 14 L 200 100 L 0 100 Z"/></svg>
@@ -893,10 +913,10 @@ body > div[style*="text-align:center"]{ background:#fff; }
         <span class="wg-chz-n"><b id="wgChzN">&ndash;</b><span>cheeses</span></span>
         <span class="wg-foot" id="wgChzFoot">Loading&hellip;</span>
       </button>
-      <button class="wg wg-cat" id="tile-catering" style="--i:3" onclick="location.href='manager.html#preorders'" aria-label="Catering">
-        <span class="wg-head"><span class="wg-t">Catering</span><span class="wg-chip opt">7 days</span></span>
-        <span class="wg-list" id="wgCatList"></span>
-        <span class="wg-foot" id="wgCatFoot">Loading&hellip;</span>
+      <button class="wg wg-cat" id="tile-catering" style="--i:3" onclick="location.href='manager.html#catering'" aria-label="Catering leads">
+        <span class="wg-head"><span class="wg-t">Catering Leads</span><span class="wg-chip opt" id="wgLeadChip" hidden></span></span>
+        <span class="wg-list" id="wgLeadList"></span>
+        <span class="wg-foot" id="wgLeadFoot">Loading&hellip;</span>
       </button>
       <button class="wg wg-stf" id="tile-stuff" style="--i:4" onclick="showView('stuff')" aria-label="Stuff to Know">
         <span class="wg-head"><span class="wg-t">Stuff to Know</span><span class="wg-chip" id="wgStfN" hidden></span></span>
@@ -1688,7 +1708,7 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
 </script>
 <div style="text-align:center;padding:14px 20px 22px;font-size:0.78rem;color:#8fa0ae;">Greys Fine Cheese &amp; Entertaining · <a href="terms.html" style="color:#0b6aa9;text-decoration:none;font-weight:600;">SMS Terms</a> · <a href="privacy.html" style="color:#0b6aa9;text-decoration:none;font-weight:600;">Privacy Policy</a></div>
 <!-- HOME-V6 WIDGETS: fills the home tiles with live numbers. Read-only, same public key and the same feeds this page already uses
-     (portal-api reservations, the square-orders feed, portal_shifts, cheese_items and Stuff to Know).
+     (portal-api reservations, catering leads, portal_shifts, cheese_items and Stuff to Know).
      Refreshes every 5 minutes while the home screen is open, and when the app comes back to the front. -->
 <script>
 (function(){
@@ -1700,7 +1720,6 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
 
   function hm(d){ var h=d.getHours(), m=d.getMinutes(), ap=h>=12?'p':'a'; h=(h%12)||12; return h+(m?':'+String(m).padStart(2,'0'):'')+ap; }
   function hmT(t){ if(!t) return ''; var a=String(t).split(':').map(Number), d=new Date(); d.setHours(a[0]||0,a[1]||0,0,0); return hm(d); }
-  function money(c){ var d=(c||0)/100; return d>=1000 ? '$'+(d/1000).toFixed(1).replace(/\.0$/,'')+'K' : '$'+Math.round(d).toLocaleString(); }
   function first(n){ return String(n||'').trim().split(/\s+/)[0] || ''; }
   function inits(n){ var p=String(n||'').trim().split(/\s+/).filter(Boolean); if(!p.length) return '?'; return (p[0][0]+(p.length>1?p[p.length-1][0]:'')).toUpperCase(); }
   function dayLbl(ms){ var t=new Date(); t.setHours(0,0,0,0); var x=new Date(ms); x.setHours(0,0,0,0); var n=Math.round((x-t)/864e5);
@@ -1757,31 +1776,58 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
     $('tile-resys').setAttribute('aria-label','Reservations: '+booked.length+' booked today, '+guests+' guests'+(pend?', '+pend+' waiting for approval':''));
   }
 
-  // ── CATERING: the next three orders from the square-orders feed (same feed as the calendar) ──
-  async function orders(){
-    var t0=new Date(); t0.setHours(0,0,0,0);
-    var data=null;
+  // ── CATERING LEADS: names need a manager sign-in on this device (catering_leads is admin-only);
+  //    everyone else gets counts from portal_catering_pulse (no names, no contact info) ──
+  var OPEN=['new','replied','quoted','contract_sent'], BOOKED=['signed','deposit_paid','paid'];
+  var STAGE={ new:'New', replied:'Replied', quoted:'Quoted', contract_sent:'Contract sent', signed:'Signed', deposit_paid:'Deposit paid', paid:'Paid' };
+  function evLbl(d){ if(!d) return { day:'TBD', date:'—' }; var x=new Date(d+'T12:00:00'); return { day:dayLbl(x.getTime()), date:(x.getMonth()+1)+'/'+x.getDate() }; }
+  async function leads(){
+    var rows=null;
     try{
-      var r=await fetch(ORDERS_URL, { method:'POST',
-        headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_KEY },
-        body:JSON.stringify({ action:'feed', from:fmt(t0), to:fmt(new Date(t0.getTime()+7*864e5)), loc:LOC }) });
-      if(r.ok) data=await r.json();
+      var ses=(await sb.auth.getSession()).data.session;
+      if(ses){
+        var adm=await sb.rpc('is_app_admin');
+        if(adm && adm.data===true){
+          var q=await sb.from('catering_leads').select('code,name,company,event_date,guests,stage,unread,last_message_at,created_at')
+            .ilike('location', LOC).neq('stage','lost').order('created_at',{ ascending:false }).limit(80);
+          if(!q.error) rows=q.data||[];
+        }
+      }
     }catch(e){}
-    if(!data){ fail('wgCatFoot'); return; }
-    var list=(data.orders||[]).filter(function(o){ return o.at && Date.parse(o.at)>=t0.getTime(); })
-      .sort(function(a,b){ return Date.parse(a.at)-Date.parse(b.at); });
-    var KIND={ catering:'Catering', delivery:'Delivery', pickup:'Pickup', order:'Order' };
-    $('wgCatList').innerHTML = list.slice(0,3).map(function(o){ var ms=Date.parse(o.at);
-      var due=o.total_cents && !o.paid;
-      var sub=[o.total_cents?money(o.total_cents):'', due?'<em>unpaid</em>':(KIND[o.kind]||'Pickup')].filter(Boolean).join(' · ');
-      return '<span class="wg-row"><span class="when">'+dayLbl(ms)+'<b>'+hm(new Date(ms))+'</b></span>'
-        +'<span class="nm"><b>'+esc(o.name||'Guest')+'</b><small>'+sub+'</small></span></span>';
-    }).join('') || '<span class="wg-empty"><i class="ti ti-mood-smile"></i>Nothing booked yet</span><i class="ti ti-tools-kitchen-2 wg-art" aria-hidden="true"></i>';
-    var tot=list.reduce(function(n,o){ return n+(o.total_cents||0); },0);
-    var unpaid=list.filter(function(o){ return o.total_cents && !o.paid; }).length;
-    $('wgCatFoot').innerHTML = list.length
-      ? '<b>'+list.length+'</b> order'+(list.length>1?'s':'')+' · '+money(tot)+(unpaid?' · <span class="wg-flag">'+unpaid+' unpaid</span>':'')
-      : 'Next 7 days';
+    if(rows){ drawLeads(rows); return; }
+    try{
+      var r=await sb.rpc('portal_catering_pulse',{ p_loc:LOC });
+      if(r.error || !r.data) throw new Error('pulse');
+      drawPulse(r.data);
+    }catch(e){ fail('wgLeadFoot'); }
+  }
+  function drawLeads(rows){
+    var today=fmt(new Date());
+    var act=rows.filter(function(r){ var up=!r.event_date || r.event_date>=today;
+      return (up && (OPEN.indexOf(r.stage)>=0 || BOOKED.indexOf(r.stage)>=0)) || r.unread; });
+    act.sort(function(a,b){ return ((b.unread?1:0)-(a.unread?1:0)) || ((OPEN.indexOf(b.stage)>=0?1:0)-(OPEN.indexOf(a.stage)>=0?1:0))
+      || String(a.event_date||'9999').localeCompare(String(b.event_date||'9999')); });
+    var open=act.filter(function(r){ return OPEN.indexOf(r.stage)>=0 && (!r.event_date || r.event_date>=today); }).length;
+    var booked=act.filter(function(r){ return BOOKED.indexOf(r.stage)>=0 && r.event_date && r.event_date>=today; }).length;
+    var unread=rows.filter(function(r){ return r.unread; }).length;
+    var chip=$('wgLeadChip'); chip.textContent=open+' open'; chip.hidden=!open;
+    $('wgLeadList').innerHTML = act.slice(0,3).map(function(r){ var e=evLbl(r.event_date);
+      var sub=r.unread ? ['<em>new message</em>', r.guests?r.guests+' guests':''].filter(Boolean).join(' · ')
+                       : [r.guests?r.guests+' guests':'', STAGE[r.stage]||esc(r.stage)].filter(Boolean).join(' · ');
+      return '<span class="wg-row"><span class="when">'+e.day+'<b>'+e.date+'</b></span>'
+        +'<span class="nm"><b>'+(r.unread?'<i class="dot"></i>':'')+esc(r.company||r.name||'Lead')+'</b><small>'+sub+'</small></span></span>';
+    }).join('') || '<span class="wg-empty"><i class="ti ti-mood-smile"></i>No open leads</span><i class="ti ti-briefcase wg-art" aria-hidden="true"></i>';
+    $('wgLeadFoot').innerHTML = unread ? '<span class="wg-pill"><i class="ti ti-mail"></i>'+unread+' unread</span>'
+      : (open||booked) ? [open?'<b>'+open+'</b> open':'', booked?'<b>'+booked+'</b> booked':''].filter(Boolean).join(' · ') : 'No open leads';
+  }
+  function drawPulse(p){
+    var open=Number(p.open)||0, booked=Number(p.booked)||0, unread=Number(p.unread)||0, next=p.next_event ? evLbl(p.next_event) : null;
+    $('wgLeadChip').hidden=true;
+    $('wgLeadList').innerHTML = '<span class="wg-big"><b>'+open+'</b><span>open lead'+(open===1?'':'s')+'</span></span>'
+      +'<span class="wg-sub">'+booked+' booked ahead'+(next ? ' · next '+next.day+' '+next.date : '')+'</span>'
+      +'<i class="ti ti-briefcase wg-art" aria-hidden="true"></i>';
+    $('wgLeadFoot').innerHTML = unread ? '<span class="wg-pill"><i class="ti ti-mail"></i>'+unread+' unread</span>'
+      : '<i class="ti ti-lock"></i> Manager sign-in shows names';
   }
 
   // ── SCHEDULE: who's on today (portal_shifts), my next shift, who's off ──
@@ -1813,7 +1859,8 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
     $('wgSchPpl').innerHTML = ppl.length
       ? ppl.slice(0,show).map(function(p){ return '<span class="av" style="background:'+PAL[(Number(p.e.id)||0)%PAL.length]+'" title="'+esc(p.e.name)+'">'+esc(inits(p.e.name))+'</span>'; }).join('')
         + (ppl.length>show ? '<span class="av more">+'+(ppl.length-show)+'</span>' : '')
-      : '<span class="av none"><i class="ti ti-users"></i></span><i class="ti ti-calendar-week wg-art" aria-hidden="true"></i>';
+      : '<span class="av none"><i class="ti ti-users"></i></span>';
+    $('tile-myshifts').classList.toggle('sch-empty', !ppl.length);
     setNum($('wgSchN'), ppl.length);
     $('wgSchN').parentNode.hidden = !SH.shifts.length;
     $('wgSchWho').innerHTML = ppl.length
@@ -1869,7 +1916,7 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
   if(_rsc) window.renderSchedCards=function(){ var r=_rsc.apply(this,arguments); try{ drawSched(); }catch(e){} return r; };
 
   var last=0;
-  function refresh(){ last=Date.now(); resys(); orders(); shifts(); }
+  function refresh(){ last=Date.now(); resys(); leads(); shifts(); }
   var _sv=window.showView;
   if(_sv) window.showView=function(name){ var r=_sv.apply(this,arguments); if(name==='home' && Date.now()-last>60e3){ refresh(); } return r; };
   function boot(){ refresh(); cheese(); }
