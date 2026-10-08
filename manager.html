@@ -757,7 +757,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
   <div id="panel-catering" class="panel">
     <div class="section-card">
       <h2>💼 Catering Leads</h2>
-      <div class="hint"><strong>Every inquiry lands here</strong> — catering, private events and experiences from the inquiry form (and any you add by hand). Experiences open their own conversation with the held time and booking link; catering and private events get the proposal and invoice. Reply here and it's emailed from info@greyscheese.com; their replies come back in automatically (Gmail sync). Build the <strong>Proposal</strong>, send it, and the customer signs online — that <strong>creates a Square invoice</strong> (deposit now, balance before the event) with the signed agreement attached. No proposal needed? <strong>🧾 Save &amp; send invoice</strong> skips the signature and emails the Square invoice right away. Payment status refreshes from Square every 15 minutes.</div>
+      <div class="hint"><strong>Every inquiry lands here</strong> — catering, private events, experiences and Nashville table requests from the inquiry form (and any you add by hand). Memphis tables booked on the form go straight into Reservations. Experiences open their own conversation with the held time and booking link; catering and private events get the proposal and invoice. Reply here and it's emailed from info@greyscheese.com; their replies come back in automatically (Gmail sync). Build the <strong>Proposal</strong>, send it, and the customer signs online — that <strong>creates a Square invoice</strong> (deposit now, balance before the event) with the signed agreement attached. No proposal needed? <strong>🧾 Save &amp; send invoice</strong> skips the signature and emails the Square invoice right away. Payment status refreshes from Square every 15 minutes.</div>
       <div class="toolbar" id="catKinds" style="margin-bottom:6px;"></div>
       <div class="toolbar" id="catChips"></div>
       <div class="rec-list" id="catList"><div class="rec-empty">Loading…</div></div>
@@ -1876,7 +1876,7 @@ const CAT_QSTAT = { draft:'Draft', sent:'Sent — waiting for signature', signed
 const catQStat = q => q.invoice_only && q.status==='signed' ? 'Invoice pending'
   : q.status==='invoiced' && !(q.deposit_pct>0 && q.deposit_pct<100) ? 'Invoiced — payment due' : (CAT_QSTAT[q.status]||q.status);
 const CAT_FUL = { pickup:'Pick-up', delivery:'Delivery', onsite:'On-site service' };
-let CAT_KIND = 'all'; // all | catering | event | experience
+let CAT_KIND = 'all'; // all | catering | event | experience | table
 let CAT_ROWS = [], CAT_FILTER = 'open', CAT_CUR = null, CAT_Q = null, CAT_QUOTES = [], CAT_ITEMS = [], CAT_MENU = null, CAT_TEMPLATE = '';
 const CAT_QUICK = [
   ['Thanks — on it', "Thanks so much for thinking of us! I'm pulling some ideas together and will send a proposal shortly."],
@@ -1910,11 +1910,11 @@ window.catOpenById = async function(id){
   catOpen(id);
 };
 // ONE LIST (Maverick 2026-10-08): catering leads, private events (a catering lead whose occasion
-// starts "Private event") and experience inquiries (INQ_ROWS, their own table and modal) together.
+// starts "Private event"), table requests (occasion starts "Table request") and experience inquiries (INQ_ROWS, their own table and modal) together.
 // Experience stages are shown under the nearest catering stage for the filter chips.
-const CAT_KINDS = { catering:['Catering','#06273a'], event:['Private event','#7c3aed'], experience:['Experience','#b45309'] };
+const CAT_KINDS = { catering:['Catering','#06273a'], event:['Private event','#7c3aed'], experience:['Experience','#b45309'], table:['Table request','#0f766e'] };
 const INQ_AS_CAT = { new:'new', replied:'replied', link_sent:'contract_sent', booked:'paid', lost:'lost' };
-function catKindOf(r){ return /^private event/i.test(r.occasion||'') ? 'event' : 'catering'; }
+function catKindOf(r){ const o = r.occasion||''; return /^private event/i.test(o) ? 'event' : /^table request/i.test(o) ? 'table' : 'catering'; }
 function catAll(){
   const a = CAT_ROWS.map(r=>({ kind:catKindOf(r), stage:r.stage, r }));
   const b = (typeof INQ_ROWS!=='undefined' ? INQ_ROWS : []).map(r=>({ kind: (r.details&&r.details.kind==='event') ? 'event' : 'experience', stage: INQ_AS_CAT[r.stage]||'new', inq:true, r }));
@@ -1925,10 +1925,10 @@ function catRender(){
   const unread = all.filter(x=>x.r.unread).length;
   const bd = document.getElementById('catBadge'); if(bd){ bd.textContent = unread; bd.style.display = unread ? '' : 'none'; }
   const isOpen = x => x.stage!=='paid' && x.stage!=='lost';
-  const kc = { all:0, catering:0, event:0, experience:0 };
+  const kc = { all:0, catering:0, event:0, experience:0, table:0 };
   all.filter(isOpen).forEach(x=>{ kc.all++; kc[x.kind]++; });
   const kd = document.getElementById('catKinds');
-  if(kd) kd.innerHTML = [['all','All inquiries'],['catering','Catering'],['event','Private events'],['experience','Experiences']].map(([k,l])=>
+  if(kd) kd.innerHTML = [['all','All inquiries'],['catering','Catering'],['event','Private events'],['experience','Experiences'],['table','Table requests']].map(([k,l])=>
     '<button class="chip'+(CAT_KIND===k?' on':'')+'" onclick="CAT_KIND=\''+k+'\';catRender()">'+l+' · '+kc[k]+'</button>').join('');
   const mine = all.filter(x=> CAT_KIND==='all' || x.kind===CAT_KIND);
   const counts = { open:0 }; Object.keys(CAT_STAGES).forEach(k=>counts[k]=0);
@@ -15384,35 +15384,30 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   var FORM_DEFAULTS = {
     "v": 1,
     "heading": "How can we help?",
-    "lede": "Tell us what you're planning and we'll get right back to you. Nothing is charged.",
+    "lede": "A table, an experience, catering or a private event. A few quick questions and you're done.",
     "ask": "What are you planning?",
     "types": [
+      {
+        "key": "table",
+        "on": true,
+        "label": "A table",
+        "sub": "Lunch, dinner or a glass of wine, for up to 5",
+        "title": "Reserve a table",
+        "lede": "Book a table in Memphis, or request one in Nashville.",
+        "msg_label": "Anything we should know?",
+        "msg_hint": "A birthday, a high chair, an allergy, where you'd like to sit",
+        "questions": []
+      },
       {
         "key": "experience",
         "on": true,
         "label": "A dinner experience",
-        "sub": "Fondue, raclette, tastings and more at our table or yours",
+        "sub": "Fondue, raclette, tastings and more",
         "title": "Ask about an experience",
-        "lede": "Pick an experience, a date and a time. We hold it for 48 hours while we answer you, and nothing is charged.",
+        "lede": "Pick an experience, then a date and a time. We hold it for 48 hours while we answer you.",
         "msg_label": "Your question",
         "msg_hint": "Extras, a surprise, timing — anything else we should know",
         "questions": [
-          {
-            "id": "occasion",
-            "label": "What's the occasion?",
-            "hint": "",
-            "kind": "one",
-            "required": false,
-            "on": true,
-            "options": [
-              "Birthday",
-              "Anniversary",
-              "Date night",
-              "Work / team",
-              "Celebration",
-              "Just because"
-            ]
-          },
           {
             "id": "dietary",
             "label": "Anything we should know?",
@@ -15435,28 +15430,12 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
         "key": "catering",
         "on": true,
         "label": "Catering",
-        "sub": "Boards, boxes and platters for your office, party or open house",
+        "sub": "Boards, boxes and platters for any gathering",
         "title": "Plan your catering",
         "lede": "Tell us about your event and we'll send ideas and a proposal. Nothing is charged.",
         "msg_label": "Tell us about your event",
         "msg_hint": "What you have in mind, favorite cheeses, anything we should know",
         "questions": [
-          {
-            "id": "occasion",
-            "label": "What's the occasion?",
-            "hint": "",
-            "kind": "one",
-            "required": false,
-            "on": true,
-            "options": [
-              "Office lunch",
-              "Open house",
-              "Wedding",
-              "Party",
-              "Holiday",
-              "Something else"
-            ]
-          },
           {
             "id": "budget",
             "label": "Do you have a budget in mind?",
@@ -15487,7 +15466,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
         "key": "event",
         "on": true,
         "label": "A private event or big party",
-        "sub": "Groups of 6 or more, buyouts and workshops at the shop",
+        "sub": "Groups of 6 or more, buyouts, workshops",
         "title": "Plan a private event",
         "lede": "Tell us the date, the size of your group and what you have in mind. We'll check it and get right back to you.",
         "msg_label": "Tell us about your event",
@@ -15505,22 +15484,6 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
               "Private event / buyout",
               "Workshop or class for my group",
               "Not sure yet"
-            ]
-          },
-          {
-            "id": "occasion",
-            "label": "What's the occasion?",
-            "hint": "",
-            "kind": "one",
-            "required": false,
-            "on": true,
-            "options": [
-              "Birthday",
-              "Shower",
-              "Rehearsal dinner",
-              "Work / team",
-              "Celebration",
-              "Something else"
             ]
           },
           {
@@ -15601,13 +15564,14 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   var KEY = 'inquiry_form';
   var KIND_NAMES = { one:'Buttons — pick one', many:'Buttons — pick any', text:'Short typed answer', long:'Long typed answer' };
   var BUILT_IN = {
-    experience: 'Built in, before these: which experience, option, shop, guests, date and time (held 48 h in Memphis), and the address for Raclette at Home. After these: name, phone, email, best way to reach them and the message box. Shows in 💼 Catering Leads tagged Experience.',
-    catering: 'Built in, before these: shop, pickup / delivery / served (plus the address), guests, date and time. After these: name, phone, email, best way to reach them and the message box. Goes to 💼 Catering Leads.',
-    event: 'Built in, before these: shop, guests, date and time (12–2, 4–7 or other). After these: name, phone, email, best way to reach them and the message box. Goes to 💼 Catering Leads tagged Private event, so it can get a proposal and an invoice.'
+    table: 'Built in: which shop, guests (1 to 5), date and time, then name, email, phone and a note. Memphis books the table on the spot (it lands in Wix reservations and they get a confirmation email). Nashville sends a request to 💼 Catering Leads tagged Table request. Questions you add here show on a "A few details" screen.',
+    experience: 'Built in: which experience (and tasting), shop, guests, date and time (held 48 h in Memphis), the address for Raclette at Home, then name, email, phone and a message. Shows in 💼 Catering Leads tagged Experience. The questions below share one "A few details" screen.',
+    catering: 'Built in: shop, pickup / delivery / served (plus the address), guests, date and time, then name, email, phone and a message. Goes to 💼 Catering Leads. The questions below share one "A few details" screen.',
+    event: 'Built in: shop, guests, date and time (12–2, 4–7 or other), then name, email, phone and a message. Goes to 💼 Catering Leads tagged Private event, so it can get a proposal and an invoice. The questions below share one "A few details" screen.'
   };
   var STAGING = /staging/i.test(location.hostname);
   var FORM_SITE = STAGING ? 'https://ticket-rennet.onrender.com/inquiry.html' : 'https://tickets.greyscheese.com/inquiry.html';
-  var st = { form: formOf(null), saved: null, type: 'experience', loaded: false, dirty: false, frameReady: false };
+  var st = { form: formOf(null), saved: null, type: 'table', loaded: false, dirty: false, frameReady: false };
 
   function h(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
   function $(id){ return document.getElementById(id); }
@@ -15625,7 +15589,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   function draw(){
     var root = $('iqfEdit'); if(!root) return;
     var f = st.form, t = cur(), ti = f.types.indexOf(t), o = [];
-    o.push('<div class="iqf-box"><h3>Opening question</h3><div class="hint">The first screen, before they pick a kind of inquiry. Skipped when only one kind is switched on. Each question after it is its own screen.</div><div class="iqf-grid">'
+    o.push('<div class="iqf-box"><h3>Opening question</h3><div class="hint">The first screen, over the photo, before they pick a kind of inquiry. Skipped when only one kind is switched on.</div><div class="iqf-grid">'
       + text('Page heading','heading',f.heading,{max:80})
       + text('The question','ask',f.ask,{max:80})
       + text('Intro line','lede',f.lede,{full:true,area:true,max:300}) + '</div></div>');
@@ -15639,9 +15603,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     o.push('<div class="iqf-grid">'
       + text('Button label','t.label',t.label,{max:60})
       + text('Small line under the button','t.sub',t.sub,{max:120})
-      + text('Small heading above each question','t.title',t.title,{max:80})
+      + text('Small heading on every screen','t.title',t.title,{max:80})
       + text('Message box label','t.msg_label',t.msg_label,{max:80})
-      + text('Intro line on its first question','t.lede',t.lede,{full:true,area:true,max:300})
+      + text('Intro line on its first screen','t.lede',t.lede,{full:true,area:true,max:300})
       + text('Message box hint (gray text inside it)','t.msg_hint',t.msg_hint,{full:true,max:160})
       + '</div></div>');
 
