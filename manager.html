@@ -619,6 +619,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab" onclick="tkTab(this,'experiences')">✨ Experiences</div>
     <div class="tab" onclick="tkTab(this,'expbookings')">📅 Bookings</div>
     <div class="tab" onclick="mtab('inquiries')">💬 Inquiries <span id="inqBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
+    <div class="tab" onclick="mtab('inqform')">📝 Inquiry Form</div>
     <div class="tab-head">Cheese Case</div>
     <div class="tab" onclick="mtab('plu')">🧀 New Case Entry</div>
     <div class="tab" onclick="mtab('jamlabels')">🏷️ Jam Labels</div>
@@ -682,6 +683,27 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       <div class="hint">Questions customers send from the <strong>Experiences</strong> page (Ask a question). Reply here and it's emailed to them from info@greyscheese.com; <strong>their replies go to brad@greyscheese.com</strong> and are copied in here automatically every 5 minutes (Gmail sync script). <em>Log their reply</em> is there for anything that comes in another way (text, phone). <strong>Booking link</strong> drops in a link that opens their experience already filled in.</div>
       <div class="toolbar" id="inqChips"></div>
       <div class="rec-list" id="inqList"><div class="rec-empty">Loading…</div></div>
+    </div>
+  </div>
+  <!-- Inquiry Form editor: the questions on the customer inquiry form (script: INQUIRY FORM EDITOR, near the end) -->
+  <div id="panel-inqform" class="panel">
+    <div class="section-card">
+      <h2>📝 Inquiry Form</h2>
+      <div class="hint">The one form customers use to ask about an <strong>experience</strong>, <strong>catering</strong> or a <strong>private event</strong>. Change the wording, switch a kind of inquiry on or off, and add, reorder or remove the questions under each. The preview on the right is the real form with your changes; customers see them once you press <strong>Save</strong>.</div>
+      <div class="iqf-bar">
+        <button class="btn btn-gold" id="iqfSave" type="button">Save</button>
+        <button class="btn btn-ghost" id="iqfUndo" type="button">Undo changes</button>
+        <button class="btn btn-ghost" id="iqfRevert" type="button">Back to built-in</button>
+        <a class="btn btn-ghost" id="iqfOpen" href="#" target="_blank" rel="noopener">Open the form ↗</a>
+        <span class="iqf-msg" id="iqfMsg" role="status"></span>
+      </div>
+      <div class="iqf">
+        <div id="iqfEdit"><div class="hint">Loading…</div></div>
+        <div class="iqf-side">
+          <div class="iqf-cap">Preview <span class="hint" style="margin:0;font-weight:400;">— nothing can be sent from here</span></div>
+          <iframe class="iqf-frame" id="iqfFrame" title="Inquiry form preview"></iframe>
+        </div>
+      </div>
     </div>
   </div>
   <div id="inqModal" class="rec-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:980;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 10px;" onclick="if(event.target===this)inqClose()">
@@ -15273,6 +15295,468 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     if(noteBtn && !$('ctplSaveReplyBtn')) noteBtn.insertAdjacentHTML('afterend', '<button class="btn btn-ghost btn-sm" id="ctplSaveReplyBtn" onclick="ctplSaveReply()" title="Save what is in the reply box as a template">💾 Save as template</button>');
   }
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>
+<!-- ═══ INQUIRY FORM EDITOR (2026-10-08) ═══════════════════════════════════════════
+     Experiences → 📝 Inquiry Form. Edits the one customer inquiry form (Greys-Sites
+     inquiry.html): which kinds of inquiry are offered, the wording for each, and the
+     extra questions asked under each. Saved to site_content 'inquiry_form' (public read,
+     admin write); the form falls back to its built-in wording for anything blank.
+     Shop, guests, date/time, the experience picker and the contact details are built
+     into the form (holds and availability depend on them) and are not editable here.
+     The preview is the real page in a frame (?preview=1) fed the unsaved form.
+     ═══════════════════════════════════════════════════════════════════════════════ -->
+<style id="iqf-css">
+  .iqf{display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,44%);gap:22px;align-items:start;}
+  .iqf-side{position:sticky;top:70px;}
+  .iqf-frame{display:block;width:100%;height:calc(100vh - 190px);min-height:480px;border:1px solid var(--line);border-radius:10px;background:#F5F7F2;}
+  .iqf-cap{display:flex;align-items:center;gap:10px;margin:0 0 8px;font-size:.8rem;font-weight:700;color:var(--sub);}
+  .iqf h3{margin:0 0 4px;font-size:1rem;}
+  .iqf-box{border:1px solid var(--line);border-radius:10px;padding:16px;margin:0 0 16px;background:#fff;}
+  .iqf-box > .hint{margin-bottom:12px;}
+  .iqf-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px;}
+  .iqf-full{grid-column:1 / -1;}
+  .iqf label.f{display:block;font-size:.76rem;font-weight:700;color:var(--sub);margin:0 0 4px;}
+  .iqf input[type=text],.iqf textarea,.iqf select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;
+    font:inherit;font-size:.9rem;background:#fff;color:var(--ink);}
+  .iqf textarea{min-height:64px;resize:vertical;line-height:1.4;}
+  .iqf input:focus,.iqf textarea:focus,.iqf select:focus{outline:2px solid #06273a;outline-offset:0;}
+  .iqf-check{display:inline-flex;align-items:center;gap:7px;font-size:.86rem;font-weight:700;cursor:pointer;}
+  .iqf-check input{width:17px;height:17px;}
+  .iqf-types{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px;}
+  .iqf-type{border:1px solid var(--line);background:#fff;border-radius:8px;padding:9px 14px;font:inherit;font-size:.86rem;font-weight:700;cursor:pointer;color:var(--ink);}
+  .iqf-type.on{background:#06273a;border-color:#06273a;color:#fff;}
+  .iqf-type.off{text-decoration:line-through;opacity:.7;}
+  .iqf-q{border:1px solid var(--line);border-left:4px solid #06273a;border-radius:8px;padding:12px 14px;margin:0 0 12px;background:#fafbfc;}
+  .iqf-q.hidden{border-left-color:#cbd5e1;opacity:.75;}
+  .iqf-qhead{display:flex;align-items:center;gap:8px;margin:0 0 10px;}
+  .iqf-qhead b{flex:1;min-width:0;font-size:.8rem;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;}
+  .iqf-ico{border:1px solid var(--line);background:#fff;border-radius:7px;min-width:34px;height:32px;cursor:pointer;font-size:.9rem;color:var(--ink);}
+  .iqf-ico:disabled{opacity:.35;cursor:default;}
+  .iqf-ico.del{color:#b91c1c;}
+  .iqf-row{display:flex;flex-wrap:wrap;gap:18px;margin-top:10px;}
+  .iqf-built{margin:0 0 14px;padding:10px 12px;background:#f1f5f9;border-radius:8px;font-size:.82rem;color:var(--sub);line-height:1.5;}
+  .iqf-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 16px;}
+  .iqf-msg{font-size:.84rem;font-weight:700;}
+  .iqf-msg.ok{color:#15803d;} .iqf-msg.bad{color:#b91c1c;} .iqf-msg.warn{color:#b45309;}
+  @media (max-width:1180px){ .iqf{grid-template-columns:minmax(0,1fr);} .iqf-side{position:static;} .iqf-frame{height:640px;} }
+  @media (max-width:640px){ .iqf-grid{grid-template-columns:minmax(0,1fr);} }
+</style>
+<script>
+(function(){
+  "use strict";
+  // ---------- the editable form (site_content 'inquiry_form') ----------
+  // The inquiry types, their wording and their extra questions are saved from the manager
+  // console (Experiences → Inquiry Form). FORM_DEFAULTS is what shows when nothing is saved,
+  // a field is blank, or the request fails. THIS BLOCK IS DUPLICATED, byte for byte, in
+  // Greys-Sites/inquiry.html and staff-portal/manager.html — change both or neither.
+  var FORM_DEFAULTS = {
+    "v": 1,
+    "heading": "How can we help?",
+    "lede": "Tell us what you're planning and we'll get right back to you. Nothing is charged.",
+    "ask": "What are you planning?",
+    "types": [
+      {
+        "key": "experience",
+        "on": true,
+        "label": "A dinner experience",
+        "sub": "Fondue, raclette, tastings and more at our table or yours",
+        "title": "Ask about an experience",
+        "lede": "Pick an experience, a date and a time. We hold it for 48 hours while we answer you, and nothing is charged.",
+        "msg_label": "Your question",
+        "msg_hint": "Extras, a surprise, timing — anything else we should know",
+        "questions": [
+          {
+            "id": "occasion",
+            "label": "What's the occasion?",
+            "hint": "",
+            "kind": "one",
+            "required": false,
+            "on": true,
+            "options": [
+              "Birthday",
+              "Anniversary",
+              "Date night",
+              "Work / team",
+              "Celebration",
+              "Just because"
+            ]
+          },
+          {
+            "id": "dietary",
+            "label": "Anything we should know?",
+            "hint": "",
+            "kind": "many",
+            "required": false,
+            "on": true,
+            "options": [
+              "Vegetarian",
+              "Gluten-free",
+              "Nut allergy",
+              "Pregnant guest",
+              "No pork",
+              "Something else"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "catering",
+        "on": true,
+        "label": "Catering",
+        "sub": "Boards, boxes and platters for your office, party or open house",
+        "title": "Plan your catering",
+        "lede": "Tell us about your event and we'll send ideas and a proposal. Nothing is charged.",
+        "msg_label": "Tell us about your event",
+        "msg_hint": "What you have in mind, favorite cheeses, anything we should know",
+        "questions": [
+          {
+            "id": "occasion",
+            "label": "What's the occasion?",
+            "hint": "",
+            "kind": "one",
+            "required": false,
+            "on": true,
+            "options": [
+              "Office lunch",
+              "Open house",
+              "Wedding",
+              "Party",
+              "Holiday",
+              "Something else"
+            ]
+          },
+          {
+            "id": "budget",
+            "label": "Do you have a budget in mind?",
+            "hint": "",
+            "kind": "one",
+            "required": false,
+            "on": true,
+            "options": [
+              "Under $250",
+              "$250 – $500",
+              "$500 – $1,000",
+              "Over $1,000",
+              "Not sure yet"
+            ]
+          },
+          {
+            "id": "company",
+            "label": "Company or organization",
+            "hint": "",
+            "kind": "text",
+            "required": false,
+            "on": true,
+            "options": []
+          }
+        ]
+      },
+      {
+        "key": "event",
+        "on": true,
+        "label": "A private event or big party",
+        "sub": "Groups of 6 or more, buyouts and workshops at the shop",
+        "title": "Plan a private event",
+        "lede": "Tell us the date, the size of your group and what you have in mind. We'll check it and get right back to you.",
+        "msg_label": "Tell us about your event",
+        "msg_hint": "What you have in mind, timing, anything else we should know",
+        "questions": [
+          {
+            "id": "event_kind",
+            "label": "What kind of event?",
+            "hint": "",
+            "kind": "one",
+            "required": true,
+            "on": true,
+            "options": [
+              "Big party (6 or more)",
+              "Private event / buyout",
+              "Workshop or class for my group",
+              "Not sure yet"
+            ]
+          },
+          {
+            "id": "occasion",
+            "label": "What's the occasion?",
+            "hint": "",
+            "kind": "one",
+            "required": false,
+            "on": true,
+            "options": [
+              "Birthday",
+              "Shower",
+              "Rehearsal dinner",
+              "Work / team",
+              "Celebration",
+              "Something else"
+            ]
+          },
+          {
+            "id": "food",
+            "label": "What would you like served?",
+            "hint": "",
+            "kind": "many",
+            "required": false,
+            "on": true,
+            "options": [
+              "Cheese & charcuterie",
+              "Wine",
+              "A full meal",
+              "Fondue or raclette",
+              "Not sure yet"
+            ]
+          },
+          {
+            "id": "dietary",
+            "label": "Any dietary needs?",
+            "hint": "",
+            "kind": "many",
+            "required": false,
+            "on": true,
+            "options": [
+              "Vegetarian",
+              "Gluten-free",
+              "Nut allergy",
+              "No pork",
+              "Something else"
+            ]
+          }
+        ]
+      }
+    ]
+  };
+  var FORM_KINDS = ["one", "many", "text", "long"];
+  function formTidyQ(q, i) {
+    if (!q || typeof q !== "object") return null;
+    var label = String(q.label || "").trim().slice(0, 120);
+    if (!label) return null;
+    var id = String(q.id || "").replace(/[^a-z0-9_]/gi, "").slice(0, 40) || "q" + (i + 1);
+    return {
+      id: id, label: label, hint: String(q.hint || "").trim().slice(0, 300),
+      kind: FORM_KINDS.indexOf(q.kind) !== -1 ? q.kind : "text",
+      options: (Array.isArray(q.options) ? q.options : []).map(function (o) { return String(o == null ? "" : o).trim().slice(0, 80); })
+        .filter(function (o, n, a) { return o && a.indexOf(o) === n; }).slice(0, 30),
+      required: !!q.required, on: q.on !== false,
+    };
+  }
+  // saved row → a complete form: every missing or blank piece falls back to the default
+  function formOf(saved) {
+    var out = JSON.parse(JSON.stringify(FORM_DEFAULTS));
+    if (!saved || typeof saved !== "object") return out;
+    ["heading", "lede", "ask"].forEach(function (k) { if (typeof saved[k] === "string" && saved[k].trim()) out[k] = saved[k].trim().slice(0, 400); });
+    var list = Array.isArray(saved.types) ? saved.types : [], by = {}, pos = {};
+    list.forEach(function (t, i) { if (t && typeof t.key === "string" && !(t.key in by)) { by[t.key] = t; pos[t.key] = i; } });
+    out.types.forEach(function (t) {
+      var s = by[t.key];
+      if (!s) return;
+      ["label", "sub", "title", "lede", "msg_label", "msg_hint"].forEach(function (k) {
+        if (typeof s[k] === "string" && s[k].trim()) t[k] = s[k].trim().slice(0, 400);
+      });
+      t.on = s.on !== false;
+      if (Array.isArray(s.questions)) {
+        var seen = {};
+        t.questions = s.questions.map(formTidyQ).filter(function (q) {
+          if (!q || seen[q.id]) return false;
+          seen[q.id] = 1; return true;
+        }).slice(0, 20);
+      }
+    });
+    out.types.sort(function (a, b) { return (a.key in pos ? pos[a.key] : 99) - (b.key in pos ? pos[b.key] : 99); });
+    if (!out.types.some(function (t) { return t.on; })) out.types.forEach(function (t) { t.on = true; });
+    return out;
+  }
+
+  var KEY = 'inquiry_form';
+  var KIND_NAMES = { one:'Buttons — pick one', many:'Buttons — pick any', text:'Short typed answer', long:'Long typed answer' };
+  var BUILT_IN = {
+    experience: 'Built in, before these: which experience, option, shop, guests, date and time (held 48 h in Memphis), and the address for Raclette at Home. After these: name, phone, email, best way to reach them and the message box.',
+    catering: 'Built in, before these: shop, pickup / delivery / served (plus the address), guests, date and time. After these: name, phone, email, best way to reach them and the message box. Goes to 💼 Catering Leads.',
+    event: 'Built in, before these: shop, guests, date and time (12–2, 4–7 or other). After these: name, phone, email, best way to reach them and the message box. Goes to 💬 Inquiries as “Private event”.'
+  };
+  var STAGING = /staging/i.test(location.hostname);
+  var FORM_SITE = STAGING ? 'https://ticket-rennet.onrender.com/inquiry.html' : 'https://tickets.greyscheese.com/inquiry.html';
+  var st = { form: formOf(null), saved: null, type: 'experience', loaded: false, dirty: false, frameReady: false };
+
+  function h(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  function $(id){ return document.getElementById(id); }
+  function cur(){ return st.form.types.filter(function(t){ return t.key===st.type; })[0] || st.form.types[0]; }
+  function msg(text, cls){ var el=$('iqfMsg'); if(el){ el.textContent=text||''; el.className='iqf-msg '+(cls||''); } }
+  function touch(){ st.dirty=true; msg('Not saved yet','warn'); postSoon(); }
+
+  function text(label, path, val, opts){
+    opts = opts || {};
+    return '<div class="'+(opts.full?'iqf-full':'')+'"><label class="f">'+h(label)+'</label>'
+      + (opts.area ? '<textarea data-p="'+path+'" maxlength="'+(opts.max||400)+'">'+h(val)+'</textarea>'
+                   : '<input type="text" data-p="'+path+'" maxlength="'+(opts.max||400)+'" value="'+h(val)+'">') + '</div>';
+  }
+
+  function draw(){
+    var root = $('iqfEdit'); if(!root) return;
+    var f = st.form, t = cur(), ti = f.types.indexOf(t), o = [];
+    o.push('<div class="iqf-box"><h3>Opening question</h3><div class="hint">What customers see first, before they pick a kind of inquiry. Skipped when only one kind is switched on.</div><div class="iqf-grid">'
+      + text('Page heading','heading',f.heading,{max:80})
+      + text('The question','ask',f.ask,{max:80})
+      + text('Intro line','lede',f.lede,{full:true,area:true,max:300}) + '</div></div>');
+
+    o.push('<div class="iqf-box"><h3>Kinds of inquiry</h3><div class="hint">Pick one to edit. Each kind has its own wording and its own questions.</div><div class="iqf-types">');
+    f.types.forEach(function(x){ o.push('<button type="button" class="iqf-type'+(x.key===t.key?' on':'')+(x.on?'':' off')+'" data-type="'+x.key+'">'+h(x.label)+'</button>'); });
+    o.push('</div>');
+    o.push('<div class="iqf-row" style="margin:0 0 14px;"><label class="iqf-check"><input type="checkbox" data-p="t.on"'+(t.on?' checked':'')+'> Show this kind on the form</label>'
+      + '<span><button type="button" class="iqf-ico" data-act="tup" title="Move earlier"'+(ti===0?' disabled':'')+'>←</button> '
+      + '<button type="button" class="iqf-ico" data-act="tdown" title="Move later"'+(ti===f.types.length-1?' disabled':'')+'>→</button> <span class="hint" style="margin:0;">order of the buttons</span></span></div>');
+    o.push('<div class="iqf-grid">'
+      + text('Button label','t.label',t.label,{max:60})
+      + text('Small line under the button','t.sub',t.sub,{max:120})
+      + text('Page heading once picked','t.title',t.title,{max:80})
+      + text('Message box label','t.msg_label',t.msg_label,{max:80})
+      + text('Intro line once picked','t.lede',t.lede,{full:true,area:true,max:300})
+      + text('Message box hint (gray text inside it)','t.msg_hint',t.msg_hint,{full:true,max:160})
+      + '</div></div>');
+
+    o.push('<div class="iqf-box"><h3>Questions for “'+h(t.label)+'”</h3><div class="iqf-built">'+h(BUILT_IN[t.key]||'')+'</div>');
+    if(!t.questions.length) o.push('<div class="hint">No extra questions yet.</div>');
+    t.questions.forEach(function(q,i){
+      var btn = q.kind==='one' || q.kind==='many';
+      o.push('<div class="iqf-q'+(q.on?'':' hidden')+'" data-q="'+i+'"><div class="iqf-qhead"><b>Question '+(i+1)+(q.on?'':' · hidden')+'</b>'
+        + '<button type="button" class="iqf-ico" data-act="qup" data-i="'+i+'" title="Move up"'+(i===0?' disabled':'')+'>↑</button>'
+        + '<button type="button" class="iqf-ico" data-act="qdown" data-i="'+i+'" title="Move down"'+(i===t.questions.length-1?' disabled':'')+'>↓</button>'
+        + '<button type="button" class="iqf-ico del" data-act="qdel" data-i="'+i+'" title="Delete this question">🗑</button></div>'
+        + '<div class="iqf-grid">'
+        + text('Question','q.'+i+'.label',q.label,{max:120})
+        + '<div><label class="f">Answer type</label><select data-p="q.'+i+'.kind">'
+        + FORM_KINDS.map(function(k){ return '<option value="'+k+'"'+(q.kind===k?' selected':'')+'>'+KIND_NAMES[k]+'</option>'; }).join('') + '</select></div>'
+        + (btn ? '<div class="iqf-full"><label class="f">Choices — one per line</label><textarea data-p="q.'+i+'.options" style="min-height:'+Math.max(64, 22*(q.options.length+1)+18)+'px">'+h(q.options.join('\n'))+'</textarea></div>' : '')
+        + text('Helper line under the question (optional)','q.'+i+'.hint',q.hint,{full:true,max:300})
+        + '</div><div class="iqf-row">'
+        + '<label class="iqf-check"><input type="checkbox" data-p="q.'+i+'.required"'+(q.required?' checked':'')+'> Required</label>'
+        + '<label class="iqf-check"><input type="checkbox" data-p="q.'+i+'.on"'+(q.on?' checked':'')+'> Show on the form</label>'
+        + '</div></div>');
+    });
+    o.push('<button type="button" class="btn btn-ghost" data-act="qadd">＋ Add a question</button></div>');
+    root.innerHTML = o.join('');
+  }
+
+  // write one field of the form from its data-p path
+  function setPath(p, v){
+    var t = cur(), parts = p.split('.');
+    if(parts[0]==='t'){ t[parts[1]] = v; return; }
+    if(parts[0]==='q'){
+      var q = t.questions[+parts[1]]; if(!q) return;
+      if(parts[2]==='options') q.options = String(v).split('\n').map(function(s){ return s.trim(); }).filter(Boolean);
+      else q[parts[2]] = v;
+      return;
+    }
+    st.form[p] = v;
+  }
+
+  function wire(){
+    var root = $('iqfEdit');
+    root.addEventListener('input', function(e){
+      var p = e.target.getAttribute('data-p'); if(!p || e.target.type==='checkbox' || e.target.tagName==='SELECT') return;
+      setPath(p, e.target.value); touch();
+    });
+    root.addEventListener('change', function(e){
+      var el = e.target, p = el.getAttribute('data-p'); if(!p) return;
+      if(el.type==='checkbox'){ setPath(p, el.checked); touch(); draw(); }
+      else if(el.tagName==='SELECT'){ setPath(p, el.value); touch(); draw(); }
+      else if(p==='t.label'){ draw(); }
+    });
+    root.addEventListener('click', function(e){
+      var b = e.target.closest('button'); if(!b) return;
+      var t = cur(), a = b.getAttribute('data-act'), i = +b.getAttribute('data-i'), ty = b.getAttribute('data-type');
+      if(ty){ st.type = ty; draw(); post(); return; }
+      if(!a) return;
+      var qs = t.questions, ts = st.form.types, ti = ts.indexOf(t);
+      if(a==='qadd'){
+        qs.push({ id:'q'+Date.now().toString(36), label:'New question', hint:'', kind:'one', options:['Choice 1','Choice 2'], required:false, on:true });
+      } else if(a==='qdel'){
+        if(!confirm('Delete “'+qs[i].label+'”?')) return;
+        qs.splice(i,1);
+      } else if(a==='qup' && i>0){ qs.splice(i-1,0,qs.splice(i,1)[0]); }
+      else if(a==='qdown' && i<qs.length-1){ qs.splice(i+1,0,qs.splice(i,1)[0]); }
+      else if(a==='tup' && ti>0){ ts.splice(ti-1,0,ts.splice(ti,1)[0]); }
+      else if(a==='tdown' && ti<ts.length-1){ ts.splice(ti+1,0,ts.splice(ti,1)[0]); }
+      else return;
+      touch(); draw();
+      if(a==='qadd'){ var last = root.querySelector('.iqf-q:last-of-type input[type=text]'); if(last){ last.focus(); last.select(); } }
+    });
+  }
+
+  // ---- live preview: the real form in a frame, fed the unsaved form ----
+  var postT = 0;
+  function postSoon(){ clearTimeout(postT); postT = setTimeout(post, 350); }
+  function post(){
+    var fr = $('iqfFrame'); if(!fr || !fr.contentWindow || !st.frameReady) return;
+    try{ fr.contentWindow.postMessage({ greysInquiryForm: st.form, type: st.type }, new URL(FORM_SITE).origin); }catch(_){}
+  }
+  window.addEventListener('message', function(e){
+    if(e.data && e.data.greysInquiryPreview === 'ready' && e.origin === new URL(FORM_SITE).origin){ st.frameReady = true; post(); }
+  });
+
+  // what stops a save: a blank question, or buttons with nothing to press
+  function problem(){
+    var bad = '';
+    st.form.types.forEach(function(t){
+      t.questions.forEach(function(q,i){
+        if(bad) return;
+        if(!String(q.label||'').trim()) bad = t.label+': question '+(i+1)+' has no wording.';
+        else if((q.kind==='one'||q.kind==='many') && !q.options.length) bad = t.label+': “'+q.label+'” needs at least one choice.';
+      });
+    });
+    if(!bad && !st.form.types.some(function(t){ return t.on; })) bad = 'Leave at least one kind of inquiry switched on.';
+    return bad;
+  }
+
+  async function load(){
+    try{
+      var r = await sb.from('site_content').select('data').eq('key', KEY).maybeSingle();
+      if(r.error) throw r.error;
+      st.saved = r.data ? r.data.data : null;
+    }catch(e){ st.saved = null; msg('Could not load the saved form — showing the built-in one.','bad'); }
+    st.form = formOf(st.saved); st.loaded = true; st.dirty = false;
+    if(!cur() || cur().key !== st.type) st.type = st.form.types[0].key;
+    draw(); post();
+  }
+  async function save(){
+    var bad = problem(); if(bad){ msg(bad,'bad'); return; }
+    var data = formOf(st.form), who = '';
+    try{ var s = await sb.auth.getSession(); who = (s.data && s.data.session && s.data.session.user && s.data.session.user.email) || ''; }catch(_){}
+    msg('Saving…','');
+    var r = await sb.from('site_content').upsert({ key: KEY, data: data, updated_at: new Date().toISOString(), updated_by: who || null });
+    if(r.error){ msg('Not saved: '+r.error.message,'bad'); return; }
+    st.saved = data; st.form = formOf(data); st.dirty = false;
+    draw(); post(); msg('Saved — the form is updated.','ok');
+  }
+  function revert(){
+    if(!confirm('Put the built-in questions and wording back? Nothing changes on the form until you press Save.')) return;
+    st.form = formOf(null); touch(); draw();
+  }
+  function undo(){
+    if(st.dirty && !confirm('Throw away the changes you haven\'t saved?')) return;
+    st.form = formOf(st.saved); st.dirty = false; draw(); post(); msg('','');
+  }
+
+  function init(){
+    if(!$('iqfEdit')) return;
+    wire();
+    $('iqfSave').addEventListener('click', save);
+    $('iqfUndo').addEventListener('click', undo);
+    $('iqfRevert').addEventListener('click', revert);
+    $('iqfOpen').href = FORM_SITE;
+    // load the form and the preview the first time the tab is opened
+    var _mtab = window.mtab;
+    window.mtab = function(name){
+      _mtab.apply(this, arguments);
+      if(name === 'inqform'){
+        if(!st.loaded) load();
+        var fr = $('iqfFrame'); if(fr && !fr.src) fr.src = FORM_SITE + '?preview=1';
+      }
+    };
+    window.addEventListener('beforeunload', function(e){ if(st.dirty){ e.preventDefault(); e.returnValue = ''; } });
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+  window.__iqf = { state: st, load: load, problem: problem };
 })();
 </script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
