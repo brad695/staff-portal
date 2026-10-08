@@ -618,7 +618,6 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab-head">Experiences</div>
     <div class="tab" onclick="tkTab(this,'experiences')">✨ Experiences</div>
     <div class="tab" onclick="tkTab(this,'expbookings')">📅 Bookings</div>
-    <div class="tab" onclick="mtab('inquiries')">💬 Inquiries <span id="inqBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
     <div class="tab" onclick="mtab('inqform')">📝 Inquiry Form</div>
     <div class="tab-head">Cheese Case</div>
     <div class="tab" onclick="mtab('plu')">🧀 New Case Entry</div>
@@ -758,7 +757,8 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
   <div id="panel-catering" class="panel">
     <div class="section-card">
       <h2>💼 Catering Leads</h2>
-      <div class="hint">Requests from <strong>tickets.greyscheese.com/catering.html</strong> (and any you add by hand). Reply here and it's emailed from info@greyscheese.com; their replies come back in automatically (Gmail sync). Build the <strong>Proposal</strong>, send it, and the customer signs online — that <strong>creates a Square invoice</strong> (deposit now, balance before the event) with the signed agreement attached. No proposal needed? <strong>🧾 Save &amp; send invoice</strong> skips the signature and emails the Square invoice right away. Payment status refreshes from Square every 15 minutes.</div>
+      <div class="hint"><strong>Every inquiry lands here</strong> — catering, private events and experiences from the inquiry form (and any you add by hand). Experiences open their own conversation with the held time and booking link; catering and private events get the proposal and invoice. Reply here and it's emailed from info@greyscheese.com; their replies come back in automatically (Gmail sync). Build the <strong>Proposal</strong>, send it, and the customer signs online — that <strong>creates a Square invoice</strong> (deposit now, balance before the event) with the signed agreement attached. No proposal needed? <strong>🧾 Save &amp; send invoice</strong> skips the signature and emails the Square invoice right away. Payment status refreshes from Square every 15 minutes.</div>
+      <div class="toolbar" id="catKinds" style="margin-bottom:6px;"></div>
       <div class="toolbar" id="catChips"></div>
       <div class="rec-list" id="catList"><div class="rec-empty">Loading…</div></div>
     </div>
@@ -1694,6 +1694,7 @@ function mtab(name){
 function openHashTab(){
   const want = (location.hash || '').replace('#','').trim();
   if (!want) return;
+  if (want === 'inquiries') { mtab('catering'); return; } // old links in staff emails
   if (document.getElementById('panel-' + want)) mtab(want);
 }
 window.addEventListener('hashchange', openHashTab);
@@ -1732,16 +1733,16 @@ async function inqLoad(){
   if(error){ el.innerHTML = '<div class="rec-empty">❌ Could not load inquiries.</div>'; return; }
   INQ_ROWS = data || [];
   const unread = INQ_ROWS.filter(r=>r.unread).length;
-  const b = document.getElementById('inqBadge'); if(b){ b.textContent = unread; b.style.display = unread ? '' : 'none'; }
   inqRender();
 }
 // Jump straight into one conversation (used by the Experiences bookings list).
 window.inqOpenById = async function(id){
-  const t = document.querySelector(".tab[onclick*=\"'inquiries'\"]"); if(t) t.click();
+  const t = document.querySelector(".tab[onclick*=\"'catering'\"]"); if(t) t.click();
   if(!INQ_ROWS.some(r=>r.id===id)) await inqLoad();
   inqOpen(id);
 };
 function inqRender(){
+  try{ if(document.getElementById('catList')) catRender(); }catch(_){} // inquiries list under Catering Leads now
   const counts = { open:0 }; Object.keys(INQ_STAGES).forEach(k=>counts[k]=0);
   INQ_ROWS.forEach(r=>{ counts[r.stage]=(counts[r.stage]||0)+1; if(r.stage!=='booked'&&r.stage!=='lost') counts.open++; });
   document.getElementById('inqChips').innerHTML = [['open','Open'],...Object.entries(INQ_STAGES),['all','All']].map(([k,l])=>
@@ -1875,6 +1876,7 @@ const CAT_QSTAT = { draft:'Draft', sent:'Sent — waiting for signature', signed
 const catQStat = q => q.invoice_only && q.status==='signed' ? 'Invoice pending'
   : q.status==='invoiced' && !(q.deposit_pct>0 && q.deposit_pct<100) ? 'Invoiced — payment due' : (CAT_QSTAT[q.status]||q.status);
 const CAT_FUL = { pickup:'Pick-up', delivery:'Delivery', onsite:'On-site service' };
+let CAT_KIND = 'all'; // all | catering | event | experience
 let CAT_ROWS = [], CAT_FILTER = 'open', CAT_CUR = null, CAT_Q = null, CAT_QUOTES = [], CAT_ITEMS = [], CAT_MENU = null, CAT_TEMPLATE = '';
 const CAT_QUICK = [
   ['Thanks — on it', "Thanks so much for thinking of us! I'm pulling some ideas together and will send a proposal shortly."],
@@ -1900,36 +1902,65 @@ async function catLoad(){
     .order('last_message_at',{ascending:false}).limit(300);
   if(error){ el.innerHTML = '<div class="rec-empty">❌ Could not load catering leads.</div>'; return; }
   CAT_ROWS = data || [];
-  const unread = CAT_ROWS.filter(r=>r.unread).length;
-  const b = document.getElementById('catBadge'); if(b){ b.textContent = unread; b.style.display = unread ? '' : 'none'; }
-  catRender();
+  catRender(); // sets the unread badge for the whole list
 }
 window.catOpenById = async function(id){
   const t = document.querySelector(".tab[onclick*=\"'catering'\"]"); if(t) t.click();
   if(!CAT_ROWS.some(r=>r.id===id)) await catLoad();
   catOpen(id);
 };
+// ONE LIST (Maverick 2026-10-08): catering leads, private events (a catering lead whose occasion
+// starts "Private event") and experience inquiries (INQ_ROWS, their own table and modal) together.
+// Experience stages are shown under the nearest catering stage for the filter chips.
+const CAT_KINDS = { catering:['Catering','#06273a'], event:['Private event','#7c3aed'], experience:['Experience','#b45309'] };
+const INQ_AS_CAT = { new:'new', replied:'replied', link_sent:'contract_sent', booked:'paid', lost:'lost' };
+function catKindOf(r){ return /^private event/i.test(r.occasion||'') ? 'event' : 'catering'; }
+function catAll(){
+  const a = CAT_ROWS.map(r=>({ kind:catKindOf(r), stage:r.stage, r }));
+  const b = (typeof INQ_ROWS!=='undefined' ? INQ_ROWS : []).map(r=>({ kind: (r.details&&r.details.kind==='event') ? 'event' : 'experience', stage: INQ_AS_CAT[r.stage]||'new', inq:true, r }));
+  return a.concat(b).sort((x,y)=>String(y.r.last_message_at||'').localeCompare(String(x.r.last_message_at||'')));
+}
 function catRender(){
+  const all = catAll();
+  const unread = all.filter(x=>x.r.unread).length;
+  const bd = document.getElementById('catBadge'); if(bd){ bd.textContent = unread; bd.style.display = unread ? '' : 'none'; }
+  const isOpen = x => x.stage!=='paid' && x.stage!=='lost';
+  const kc = { all:0, catering:0, event:0, experience:0 };
+  all.filter(isOpen).forEach(x=>{ kc.all++; kc[x.kind]++; });
+  const kd = document.getElementById('catKinds');
+  if(kd) kd.innerHTML = [['all','All inquiries'],['catering','Catering'],['event','Private events'],['experience','Experiences']].map(([k,l])=>
+    '<button class="chip'+(CAT_KIND===k?' on':'')+'" onclick="CAT_KIND=\''+k+'\';catRender()">'+l+' · '+kc[k]+'</button>').join('');
+  const mine = all.filter(x=> CAT_KIND==='all' || x.kind===CAT_KIND);
   const counts = { open:0 }; Object.keys(CAT_STAGES).forEach(k=>counts[k]=0);
-  CAT_ROWS.forEach(r=>{ counts[r.stage]=(counts[r.stage]||0)+1; if(r.stage!=='paid'&&r.stage!=='lost') counts.open++; });
+  mine.forEach(x=>{ counts[x.stage]=(counts[x.stage]||0)+1; if(isOpen(x)) counts.open++; });
   document.getElementById('catChips').innerHTML = [['open','Open'],...Object.entries(CAT_STAGES),['all','All']].map(([k,l])=>
     '<button class="chip'+(CAT_FILTER===k?' on':'')+'" onclick="CAT_FILTER=\''+k+'\';catRender()">'+l+(k==='all'?'':' · '+(counts[k]||0))+'</button>').join('')
-    +'<div class="spacer"></div><button class="btn btn-ghost btn-sm" onclick="catLoad()">↻ Refresh</button><button class="btn btn-gold btn-sm" onclick="catNew()">＋ New lead</button>';
-  const rows = CAT_ROWS.filter(r=> CAT_FILTER==='all' ? true : CAT_FILTER==='open' ? (r.stage!=='paid'&&r.stage!=='lost') : r.stage===CAT_FILTER);
+    +'<div class="spacer"></div><button class="btn btn-ghost btn-sm" onclick="catLoad();inqLoad()">↻ Refresh</button><button class="btn btn-gold btn-sm" onclick="catNew()">＋ New lead</button>';
+  const rows = mine.filter(x=> CAT_FILTER==='all' ? true : CAT_FILTER==='open' ? isOpen(x) : x.stage===CAT_FILTER);
   const el = document.getElementById('catList');
-  if(!rows.length){ el.innerHTML = '<div class="rec-empty">No catering leads here.</div>'; return; }
-  el.innerHTML = rows.map(r=>{
-    const msgs = (r.catering_messages||[]).filter(m=>m.direction!=='note').sort((a,b)=>a.created_at.localeCompare(b.created_at));
+  if(!rows.length){ el.innerHTML = '<div class="rec-empty">Nothing here.</div>'; return; }
+  el.innerHTML = rows.map(x=>{
+    const r = x.r, K = CAT_KINDS[x.kind];
+    const tag = '<span style="display:inline-block;font-size:.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:'+K[1]+';border:1px solid '+K[1]+';border-radius:5px;padding:1px 6px;margin-right:6px;vertical-align:1px;">'+K[0]+'</span>';
+    const list = x.inq ? r.inquiry_messages : r.catering_messages;
+    const msgs = (list||[]).filter(m=>m.direction!=='note').sort((a,b)=>a.created_at.localeCompare(b.created_at));
     const lastMsg = msgs[msgs.length-1];
-    const q = (r.catering_quotes||[]).filter(x=>x.status!=='canceled').sort((a,b)=>b.created_at.localeCompare(a.created_at))[0];
-    const bits = [r.occasion, r.event_date?fmtDisplay(r.event_date):'', r.guests?('👥 '+r.guests):'', r.location, q?catMoney(q.total_cents):''].filter(Boolean).join(' · ');
-    const pill = r.stage==='paid'?'pill-ok':r.stage==='lost'?'pill-bad':r.stage==='new'?'pill-req':'pill-mid';
-    return '<div class="rec-row" onclick="catOpen(\''+r.id+'\')">'
+    let bits, label, open;
+    if(x.inq){
+      bits = [r.experience_name||'Not sure yet', r.preferred_date?fmtDisplay(r.preferred_date):'', r.party_size?('👥 '+r.party_size):'', r.location].filter(Boolean).join(' · ');
+      label = INQ_STAGES[r.stage]||r.stage; open = "inqOpen('"+r.id+"')";
+    } else {
+      const q = (r.catering_quotes||[]).filter(z=>z.status!=='canceled').sort((a,b)=>b.created_at.localeCompare(a.created_at))[0];
+      bits = [r.occasion, r.event_date?fmtDisplay(r.event_date):'', r.guests?('👥 '+r.guests):'', r.location, q?catMoney(q.total_cents):''].filter(Boolean).join(' · ');
+      label = CAT_STAGES[r.stage]; open = "catOpen('"+r.id+"')";
+    }
+    const pill = x.stage==='paid'?'pill-ok':x.stage==='lost'?'pill-bad':x.stage==='new'?'pill-req':'pill-mid';
+    return '<div class="rec-row" data-kind="'+x.kind+'" onclick="'+open+'">'
       +'<span style="width:10px;height:10px;border-radius:50%;flex:0 0 10px;background:'+(r.unread?'#d97706':'transparent')+'"></span>'
-      +'<div style="flex:1;min-width:0;"><div class="res-r-name">'+esc(r.name)+(r.company?' <span style="font-weight:400;">('+esc(r.company)+')</span>':'')+' <span style="font-weight:400;color:#64748b;">· '+esc(bits)+'</span></div>'
+      +'<div style="flex:1;min-width:0;"><div class="res-r-name">'+tag+esc(r.name)+(r.company?' <span style="font-weight:400;">('+esc(r.company)+')</span>':'')+' <span style="font-weight:400;color:#64748b;">· '+esc(bits)+'</span></div>'
       +'<div class="res-r-meta" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(lastMsg?(lastMsg.direction==='out'?'You: ':'')+esc(lastMsg.body.slice(0,140)):'')+'</div></div>'
       +'<span class="res-r-time" style="min-width:auto;">'+esc(inqWhen(r.last_message_at))+'</span>'
-      +'<span class="pill '+pill+'">'+CAT_STAGES[r.stage]+'</span></div>';
+      +'<span class="pill '+pill+'">'+esc(label)+'</span></div>';
   }).join('');
 }
 async function catOpen(id){
@@ -15570,9 +15601,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   var KEY = 'inquiry_form';
   var KIND_NAMES = { one:'Buttons — pick one', many:'Buttons — pick any', text:'Short typed answer', long:'Long typed answer' };
   var BUILT_IN = {
-    experience: 'Built in, before these: which experience, option, shop, guests, date and time (held 48 h in Memphis), and the address for Raclette at Home. After these: name, phone, email, best way to reach them and the message box.',
+    experience: 'Built in, before these: which experience, option, shop, guests, date and time (held 48 h in Memphis), and the address for Raclette at Home. After these: name, phone, email, best way to reach them and the message box. Shows in 💼 Catering Leads tagged Experience.',
     catering: 'Built in, before these: shop, pickup / delivery / served (plus the address), guests, date and time. After these: name, phone, email, best way to reach them and the message box. Goes to 💼 Catering Leads.',
-    event: 'Built in, before these: shop, guests, date and time (12–2, 4–7 or other). After these: name, phone, email, best way to reach them and the message box. Goes to 💬 Inquiries as “Private event”.'
+    event: 'Built in, before these: shop, guests, date and time (12–2, 4–7 or other). After these: name, phone, email, best way to reach them and the message box. Goes to 💼 Catering Leads tagged Private event, so it can get a proposal and an invoice.'
   };
   var STAGING = /staging/i.test(location.hostname);
   var FORM_SITE = STAGING ? 'https://ticket-rennet.onrender.com/inquiry.html' : 'https://tickets.greyscheese.com/inquiry.html';
@@ -15594,7 +15625,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   function draw(){
     var root = $('iqfEdit'); if(!root) return;
     var f = st.form, t = cur(), ti = f.types.indexOf(t), o = [];
-    o.push('<div class="iqf-box"><h3>Opening question</h3><div class="hint">What customers see first, before they pick a kind of inquiry. Skipped when only one kind is switched on.</div><div class="iqf-grid">'
+    o.push('<div class="iqf-box"><h3>Opening question</h3><div class="hint">The first screen, before they pick a kind of inquiry. Skipped when only one kind is switched on. Each question after it is its own screen.</div><div class="iqf-grid">'
       + text('Page heading','heading',f.heading,{max:80})
       + text('The question','ask',f.ask,{max:80})
       + text('Intro line','lede',f.lede,{full:true,area:true,max:300}) + '</div></div>');
@@ -15608,9 +15639,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     o.push('<div class="iqf-grid">'
       + text('Button label','t.label',t.label,{max:60})
       + text('Small line under the button','t.sub',t.sub,{max:120})
-      + text('Page heading once picked','t.title',t.title,{max:80})
+      + text('Small heading above each question','t.title',t.title,{max:80})
       + text('Message box label','t.msg_label',t.msg_label,{max:80})
-      + text('Intro line once picked','t.lede',t.lede,{full:true,area:true,max:300})
+      + text('Intro line on its first question','t.lede',t.lede,{full:true,area:true,max:300})
       + text('Message box hint (gray text inside it)','t.msg_hint',t.msg_hint,{full:true,max:160})
       + '</div></div>');
 
