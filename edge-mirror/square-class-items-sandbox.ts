@@ -980,6 +980,102 @@ async function simulate(body: Record<string, any>) {
   return { order_id: order.id, total: order.total_money, tax: order.total_tax_money, payment: p.payment?.status };
 }
 
+// -------------------------------------------- sandbox: read-only inspect
+// Exists so a sandbox test run can be verified against what Square actually
+// holds — the catalog item behind an event, or the lines of an order it rang
+// up. Reads only: it never creates, updates or deletes anything. (2026-10-09)
+async function inspect(body: Record<string, any>) {
+  if (ENV !== "sandbox") throw new Error("inspect is sandbox-only");
+  const eventId = String(body.eventId ?? body.event_id ?? "").trim();
+  const orderId = String(body.orderId ?? body.order_id ?? "").trim();
+  if (!eventId && !orderId) throw new Error("inspect needs an eventId or an orderId");
+  const event = eventId ? await inspectEvent(eventId) : null;
+  const order = orderId ? await inspectOrder(orderId) : null;
+  // One id in, that id's shape straight back; both in, one key each.
+  if (event && order) return { event, order };
+  return event ?? order;
+}
+
+// The link row, the Square item it points at, and a name for every category id
+// that item mentions (ids alone say nothing about which report a sale lands in).
+async function inspectEvent(eventId: string) {
+  const { data: link } = await admin.from("class_square_links").select("*")
+    .eq("env", ENV).eq("event_id", eventId).maybeSingle();
+  if (!link) return { link: null, item: null, category_names: {}, reason: "no class_square_links row" };
+
+  const item = (await sq(`/v2/catalog/object/${link.square_item_id}`)).object ?? null;
+  const d = (item?.item_data ?? {}) as Record<string, any>;
+  const categories = (d.categories ?? []) as any[];
+  const catIds = [...new Set(
+    [...categories.map((c) => c?.id), d.reporting_category?.id].filter(Boolean).map(String),
+  )];
+  const category_names: Record<string, string> = {};
+  if (catIds.length) {
+    // POST is how Square reads a batch; nothing here changes an object.
+    const batch = await sq("/v2/catalog/batch-retrieve", {
+      method: "POST",
+      body: JSON.stringify({ object_ids: catIds, include_related_objects: false }),
+    });
+    for (const o of ((batch.objects ?? []) as any[])) {
+      category_names[String(o?.id)] = String(o?.category_data?.name ?? "");
+    }
+  }
+
+  return {
+    link,
+    item: item && {
+      id: item.id,
+      name: d.name ?? "",
+      reporting_category: d.reporting_category ?? null,
+      categories,
+      variations: ((d.variations ?? []) as any[]).map((v) => ({
+        id: v?.id,
+        name: v?.item_variation_data?.name ?? "",
+        price_money: v?.item_variation_data?.price_money ?? null,
+        sku: v?.item_variation_data?.sku ?? "",
+      })),
+      present_at_location_ids: item.present_at_location_ids ?? [],
+    },
+    category_names,
+  };
+}
+
+// What a register / checkout order really carries: lines and their catalog ids,
+// the upgrade modifiers on them, the fee service charge, the tax, the metadata.
+async function inspectOrder(orderId: string) {
+  const order = (await sq(`/v2/orders/${orderId}`)).order ?? null;
+  if (!order) return null;
+  return {
+    id: order.id,
+    state: order.state,
+    location_id: order.location_id,
+    line_items: ((order.line_items ?? []) as any[]).map((li) => ({
+      uid: li?.uid,
+      name: li?.name ?? "",
+      catalog_object_id: li?.catalog_object_id ?? null,
+      variation_name: li?.variation_name ?? "",
+      quantity: li?.quantity,
+      base_price_money: li?.base_price_money ?? null,
+      item_type: li?.item_type ?? null,
+      modifiers: ((li?.modifiers ?? []) as any[]).map((m) => ({
+        catalog_object_id: m?.catalog_object_id ?? null,
+        name: m?.name ?? "",
+      })),
+    })),
+    service_charges: ((order.service_charges ?? []) as any[]).map((s) => ({
+      name: s?.name ?? "",
+      amount_money: s?.amount_money ?? null,
+      applied_money: s?.applied_money ?? null,
+    })),
+    taxes: ((order.taxes ?? []) as any[]).map((t) => ({
+      name: t?.name ?? "",
+      percentage: t?.percentage ?? null,
+    })),
+    total_money: order.total_money ?? null,
+    metadata: order.metadata ?? {},
+  };
+}
+
 // ------------------------------------------------------------------- server
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok");
@@ -993,6 +1089,7 @@ Deno.serve(async (req) => {
     else if (action === "inventory") result = await syncInventory(!!body.force);
     else if (action === "pull") result = await pull(body.days ? Number(body.days) : undefined);
     else if (action === "simulate") result = await simulate(body);
+    else if (action === "inspect") result = await inspect(body);
     else if (action === "status") {
       const { data } = await admin.from("square_sync_state").select("*").eq("id", STATE_ID).maybeSingle();
       const { count } = await admin.from("class_square_links").select("event_id", { count: "exact", head: true }).eq("env", ENV);
