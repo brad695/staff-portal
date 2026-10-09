@@ -47,7 +47,7 @@ const KINDS: Record<string, { unit: "seat" | "table"; locPrefix: string; skuPref
   // or "Experiences" H5HEPNMRTWQ64C3OELYQXQF5. While it is null, tabled events
   // are NOT synced in production — a guessed reporting category would quietly
   // land Mahjong money in the wrong report.
-  event_tabled: { unit: "table", locPrefix: "Classes", skuPrefix: "TB", reportingProd: null, reportingSandboxName: "Experiences" /* sandbox stand-in */ },
+  event_tabled: { unit: "table", locPrefix: "Classes", skuPrefix: "TB", reportingProd: "CNZCPOPXO4MMMCUH2IJ4TKL2" /* top-level "Classes" — Brad chose 2026-10-09 */, reportingSandboxName: "Experiences" /* sandbox stand-in */ },
 };
 type KindCfg = (typeof KINDS)[string];
 const SYNCED_KINDS = Object.keys(KINDS);
