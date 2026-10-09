@@ -417,28 +417,62 @@ type Intent = {
   // never taxed or hit by the service fee.
   tipCents: number;
   tipPercent: number;
-  // Square catalog variation for this class date (square-class-items). When
-  // set, the ticket line references the real item so Square reports online and
-  // register sales together. Price stays the ticket price (fee is separate).
-  variationId: string | null;
+  // Square catalog variation for this date (square-class-items). Every ticket
+  // line references the real item, so Square reports online and register sales
+  // together. Price stays the ticket price (the fee is its own charge).
+  variationId: string;
   // add-on id -> Square CatalogModifier id on that item (upgrades as modifiers)
   modifierIds: Record<string, string>;
 };
 
-// Catalog-linked ticket lines are on for the staging site first; still off for
-// the live site until Brad sets the secret after register tests. CLASS_CATALOG_ONLINE
-// is either "all" (every origin) or a comma-separated list of exact origins to
-// allow alongside staging (2026-10-07). Unset keeps staging only. Events with no
-// class_square_links row for this env (e.g. Mahjong, which is kind 'event_tabled'
-// and not synced by square-class-items) fall back to the ad-hoc line as before.
-function catalogAllowed(req: Request) {
-  const setting = (Deno.env.get("CLASS_CATALOG_ONLINE") ?? "").trim().toLowerCase();
-  if (setting === "all") return true;
-  const origin = (req.headers.get("Origin") ?? "").trim().toLowerCase();
-  if (origin === "https://ticket-rennet.onrender.com") return true;
-  // filter(Boolean) means an empty Origin header can never match an empty entry.
-  return setting.split(",").map((s) => s.trim()).filter(Boolean).includes(origin);
+// Catalog lines are no longer optional and no longer gated: every ticket sale
+// reaches Square as a real catalog item line, so the CLASS_CATALOG_ONLINE
+// secret is NOT read any more and the ad-hoc fallback line is gone. Leaving the
+// secret set does nothing. (2026-10-09)
+
+// square-class-items owns the Square catalog; nothing in here writes it. When
+// an event has no usable item yet, that function is asked to build one.
+const CLASS_ITEMS_FUNCTION = env() === "production" ? "square-class-items" : "square-class-items-sandbox";
+
+async function readLink(eventId: string): Promise<Record<string, any> | null> {
+  const { data } = await admin.from("class_square_links")
+    .select("square_variation_id,location_id,modifier_ids")
+    .eq("env", env()).eq("event_id", eventId).maybeSingle();
+  return (data as Record<string, any> | null) ?? null;
 }
+
+// Make (or repair) this event's catalog item right now, from the one function
+// that owns the catalog — no duplicated catalog-writing code in here. Same
+// service-role call pattern sendConfirmation uses. A catalog function that
+// hangs must not hang checkout: 25 seconds, then the booking is refused with
+// nothing charged.
+async function ensureLink(eventId: string): Promise<unknown> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 25000);
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/${CLASS_ITEMS_FUNCTION}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!}`,
+      },
+      body: JSON.stringify({ action: "ensure", eventId }),
+      signal: ctrl.signal,
+    });
+    const data = await res.json().catch(() => null);
+    return { status: res.status, body: data };
+  } catch (e) {
+    return { error: String(e instanceof Error ? e.message : e).slice(0, 200) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Mahjong-style events: events.price is per SEAT and seats are sold only as
+// whole tables of party_size, so one catalog line is one table. Everything else
+// is one line quantity per seat.
+const tableSeats = (ev: Record<string, any>) =>
+  String(ev?.kind) === "event_tabled" ? Math.max(1, Math.floor(Number(ev?.party_size ?? 1) || 1)) : 1;
 
 // Tip presets the page offers. Anything else must come in as a flat amount.
 const TIP_PERCENTS = [15, 18, 20];
@@ -580,19 +614,37 @@ async function buildIntent(body: Record<string, unknown>): Promise<Intent> {
   const discountCents = promoDiscountCents(promo, addOnCounts, subtotal);
   const { tipCents, tipPercent } = tipFor(body, subtotal - discountCents);
 
-  let variationId: string | null = null;
-  let modifierIds: Record<string, string> = {};
-  if (body.__catalog === true) {
-    try {
-      const { data: link } = await admin.from("class_square_links")
-        .select("square_variation_id,location_id,modifier_ids")
-        .eq("env", env()).eq("event_id", event.id).maybeSingle();
-      if (link?.square_variation_id && link.location_id === locationForEvent(event)) {
-        variationId = link.square_variation_id;
-        modifierIds = (link.modifier_ids ?? {}) as Record<string, string>;
-      }
-    } catch (_) { /* no link: ad-hoc line, exactly as before */ }
+  // THE CATALOG LINK. A sale is only ever a real Square catalog line, so the
+  // link has to be there, point at the location this event's money belongs to,
+  // and carry a modifier for every upgrade on this booking. If it doesn't,
+  // square-class-items is asked to build it — all of this happens before a seat
+  // is claimed, an order is opened or a card is charged. (2026-10-09)
+  const chosen = addOnCounts.map((x) => x.addOn.id);
+  const usable = (l: Record<string, any> | null) =>
+    !!l?.square_variation_id &&
+    l.location_id === locationForEvent(event) &&
+    chosen.every((id) => ((l.modifier_ids ?? {}) as Record<string, string>)[id]);
+  let link = await readLink(event.id);
+  let ensured: unknown = null;
+  if (!usable(link)) {
+    ensured = await ensureLink(event.id);
+    link = await readLink(event.id);
   }
+  if (!usable(link)) {
+    console.error("no usable catalog link", JSON.stringify({
+      event_id: event.id,
+      kind: event.kind,
+      location: event.location,
+      wanted_location: locationForEvent(event),
+      link,
+      ensure: ensured,
+    }).slice(0, 1500));
+    throw new PublicError(
+      "This event can't be booked online right now. Nothing was charged — please call the shop.",
+    );
+  }
+  const variationId = String(link!.square_variation_id);
+  const modifierIds = (link!.modifier_ids ?? {}) as Record<string, string>;
 
   return {
     variationId,
@@ -616,30 +668,49 @@ async function buildIntent(body: Record<string, unknown>): Promise<Intent> {
 
 // The Square order body. quote and pay send the identical structure, so the
 // figures shown to the buyer are the figures charged.
+//
+// Every line is a CATALOG line (2026-10-09): the variation from
+// class_square_links, upgrades as that item's own modifiers, so Square reports
+// an online sale exactly like a register one. buildIntent has already proved
+// the link is usable, so there is nothing to fall back to. The money is
+// unchanged — base_price_money still overrides the register's fee-bearing
+// catalog price with the bare ticket price, and the tax, the service fee, the
+// promo and the metadata are all as they were.
 function orderBody(intent: Intent, referenceId?: string) {
   const ev = intent.event;
-  const when = new Date(`${ev.date}T12:00:00`).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  const party = tableSeats(ev);
+  let line_items: Record<string, unknown>[];
 
-  // Catalog path: one ticket line per upgrade combo, upgrades as the item's
-  // modifiers, so Square reports online sales exactly like the register.
-  // Needs every chosen upgrade to have a modifier; otherwise the old shape.
-  const allMods = intent.addOnCounts.every((x) => intent.modifierIds?.[x.addOn.id]);
-  let catalogLines: Record<string, unknown>[] | null = null;
-  if (intent.variationId && allMods && intent.guests.length) {
+  if (party > 1) {
+    // Tabled event: one line of whole tables, priced per table. A table of 4
+    // at $31.25 a seat is 1 x $125.00 — the same money as 4 x $31.25.
+    if (intent.qty % party !== 0) {
+      // claim_ticket_seats refuses this first; this is the backstop.
+      throw new PublicError(
+        "Tables for this event are sold whole. Please reload the page and try again. Nothing was charged.",
+      );
+    }
+    line_items = [{
+      uid: "tickets",
+      catalog_object_id: intent.variationId,
+      quantity: String(intent.qty / party),
+      base_price_money: money(cents(ev.price) * party),
+      note: clean(ev.location, 40),
+    }];
+  } else {
+    // One ticket line per upgrade combo, upgrades as modifiers on that line.
     const combos = new Map<string, number>();
     for (const g of intent.guests) {
       const k = [...new Set((g.optIds ?? []).map(String))].sort().join("|");
       combos.set(k, (combos.get(k) ?? 0) + 1);
     }
     const priceOf = new Map(intent.addOnCounts.map((x) => [x.addOn.id, x.addOn.price]));
-    const lines = [...combos.entries()].map(([k, n], i) => ({
+    line_items = [...combos.entries()].map(([k, n], i) => ({
       uid: i === 0 ? "tickets" : `tickets_${i}`,
       catalog_object_id: intent.variationId,
       quantity: String(n),
+      // Online price is the bare ticket; the service fee is its own charge below.
+      // (The catalog price carries the fee for register sales.)
       base_price_money: money(ev.price),
       note: clean(ev.location, 40),
       modifiers: k ? k.split("|").map((id) => ({
@@ -648,30 +719,12 @@ function orderBody(intent: Intent, referenceId?: string) {
         quantity: "1",
       })) : undefined,
     }));
-    // Sanity: the modifier path must price exactly like the ad-hoc path.
-    const seats = lines.reduce((s, l) => s + Number(l.quantity), 0);
-    if (seats === intent.qty) catalogLines = lines;
-  }
-
-  const line_items: Record<string, unknown>[] = catalogLines ?? [{
-    uid: "tickets",
-    ...(intent.variationId
-      ? { catalog_object_id: intent.variationId }
-      : { name: `${clean(ev.title, 400)} · ${when}` }),
-    quantity: String(intent.qty),
-    // Online price is the bare ticket; the service fee is its own charge below.
-    // (The catalog price carries the fee for register sales.)
-    base_price_money: money(ev.price),
-    note: clean(ev.location, 40),
-  }];
-
-  for (const { addOn, count } of catalogLines ? [] : intent.addOnCounts) {
-    line_items.push({
-      uid: `ao_${addOn.id}`.slice(0, 60),
-      name: clean(addOn.name, 400),
-      quantity: String(count),
-      base_price_money: money(addOn.price),
-    });
+    // The seats on the lines must add up to the seats being sold. Only our own
+    // bug can break this, so it is an internal error — never a cheaper order.
+    const seats = line_items.reduce((s, l) => s + Number(l.quantity), 0);
+    if (seats !== intent.qty) {
+      throw new Error(`catalog lines carry ${seats} seats, qty is ${intent.qty} (event ${ev.id})`);
+    }
   }
 
   const order: Record<string, unknown> = {
@@ -798,7 +851,7 @@ async function quote(req: Request, body: Record<string, unknown>) {
     `q:${callerIp(req)}`, QUOTE_LIMIT, QUOTE_WINDOW_SECS,
     "Too many price checks from this connection. Please wait a minute and try again.",
   );
-  const intent = await buildIntent({ ...body, __catalog: catalogAllowed(req), __resume: false });
+  const intent = await buildIntent({ ...body, __resume: false });
   const { order: _sq, ...totals } = await calculate(intent);
   const left = await seatsLeft(intent.event.id, intent.event.capacity);
   return {
@@ -1223,7 +1276,7 @@ async function pay(req: Request, body: Record<string, unknown>) {
     }
   }
 
-  const intent = await buildIntent({ ...body, __catalog: catalogAllowed(req), __resume: !!prior });
+  const intent = await buildIntent({ ...body, __resume: !!prior });
   await throttle(intent.buyer.email);
 
   // The ceiling. The client sends the total it actually displayed; if the
