@@ -14942,7 +14942,11 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
      PHOTOS (2026-10-09): catering_templates.image_url = cover photo, items[].image = per-line photo (HoneyBook's
      experience pictures, hosted in social-assets). Adding a package copies them onto the proposal (cq_image +
      CAT_ITEMS[].image); a catApi wrapper sends them with save_quote; catering.html shows them to the customer.
-     Photos can be swapped in the editor or the Templates manager: upload (social-assets/catering-templates/) or URL. -->
+     Photos can be swapped in the editor or the Templates manager: upload (social-assets/catering-templates/) or URL.
+     PREVIEW (2026-10-09): 👁 on every Templates-manager row and in the editor (unsaved edits included) opens #ctplPrev,
+     a mock of what the customer gets — packages as the catering.html proposal page (hero, photos, qty/pp, gratuity,
+     tax, deposit, note), emails in the send-mail shell, agreements filled like the catering fn fills them. Uses the
+     open lead's details when there is one, otherwise sample ones (Jane Smith, 8 guests, a Saturday 3 weeks out). -->
 <style id="cat-tpl-css">
   #ctplModal .rec-card{ max-height:none !important; display:block; }
   .ctpl-photo{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
@@ -14965,7 +14969,50 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   #ctplModal textarea{ width:100%; box-sizing:border-box; }
   .ctpl-hint{ font-size:.76rem; color:#64748b; margin-top:4px; line-height:1.4; }
   .ctpl-att{ margin-top:8px; padding:8px 10px; border-radius:8px; background:#fffbeb; color:#92400e; font-size:.8rem; }
+  #ctplModal .ctpl-row .pv-btn{ flex:0 0 auto; padding:2px 8px; }
   @media (max-width:640px){ #ctplModal .ctpl-pp{ display:none; } }
+  /* 👁 preview — a mock of the customer's page / email */
+  #ctplPrev{ position:fixed; inset:0; background:rgba(15,23,42,.62); z-index:990; display:none; align-items:flex-start; justify-content:center; overflow-y:auto; padding:24px 10px; }
+  #ctplPrev .pv-card{ background:#fff; width:100%; max-width:820px; border-radius:14px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.35); transition:max-width .2s; }
+  #ctplPrev.phone .pv-card{ max-width:400px; }
+  #ctplPrev .pv-bar{ position:sticky; top:0; z-index:2; display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:#fff; border-bottom:1px solid #e2e8f0; padding:8px 12px; }
+  #ctplPrev .pv-bar .pv-ttl{ flex:1; min-width:160px; font-weight:800; }
+  #ctplPrev .pv-bar .pv-with{ display:block; font-size:.74rem; font-weight:400; color:#64748b; }
+  #ctplPrev .pv-page{ background:#E9DFC7; color:#221E1B; font-family:Georgia,'Times New Roman',serif; font-size:15px; line-height:1.55; padding:22px 16px 36px; }
+  #ctplPrev .pv-top{ background:#211D19; color:#FBF7EB; padding:12px 18px; font-weight:900; font-size:20px; line-height:1; }
+  #ctplPrev .pv-top small{ display:block; font:400 10px Arial,sans-serif; letter-spacing:.2em; text-transform:uppercase; color:#E0A21C; margin-top:4px; }
+  #ctplPrev .pv-eyebrow{ font:600 11px Arial,sans-serif; text-transform:uppercase; letter-spacing:.22em; color:#A52B1E; margin:0 0 6px; }
+  #ctplPrev h1.pv-h1{ font:900 34px/1.05 Georgia,serif; margin:0 0 12px; color:#221E1B; }
+  #ctplPrev h2.pv-h2{ font:800 22px Georgia,serif; margin:0 0 10px; color:#221E1B; }
+  #ctplPrev .pv-lede{ color:#6E6353; font-size:16px; margin:0 0 20px; }
+  #ctplPrev .pv-hero{ aspect-ratio:5/2; max-height:300px; overflow:hidden; background:#EDE3CB; margin:0 0 18px; }
+  #ctplPrev .pv-hero img{ width:100%; height:100%; object-fit:cover; display:block; }
+  #ctplPrev .pv-cardp{ background:#FBF7EB; border:1px solid #EDE3CB; padding:20px; margin:0 0 16px; }
+  #ctplPrev dl.pv-facts{ display:grid; grid-template-columns:100px 1fr; gap:4px 12px; margin:0; font-size:14px; }
+  #ctplPrev dl.pv-facts dt{ font:600 11px Arial,sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#6E6353; padding-top:3px; }
+  #ctplPrev dl.pv-facts dd{ margin:0; }
+  #ctplPrev table.pv-items{ width:100%; border-collapse:collapse; font-size:14px; }
+  #ctplPrev table.pv-items th{ text-align:left; font:600 10px Arial,sans-serif; letter-spacing:.12em; text-transform:uppercase; color:#6E6353; border-bottom:1px solid #D6C8AB; padding:6px 4px; }
+  #ctplPrev table.pv-items td{ padding:9px 4px; border-bottom:1px solid #EDE3CB; vertical-align:top; }
+  #ctplPrev table.pv-items .n{ text-align:right; white-space:nowrap; }
+  #ctplPrev table.pv-items .note{ display:block; color:#9A8C76; font-size:12px; }
+  #ctplPrev table.pv-items .itm{ display:flex; gap:12px; align-items:flex-start; }
+  #ctplPrev table.pv-items .thumb{ width:72px; height:72px; object-fit:cover; flex:0 0 72px; background:#EDE3CB; display:block; }
+  #ctplPrev.phone table.pv-items .thumb{ width:56px; height:56px; flex-basis:56px; }
+  #ctplPrev table.pv-items tr.opt td{ opacity:.5; }
+  #ctplPrev .pv-tot{ margin:12px 0 0 auto; max-width:300px; font-size:14px; }
+  #ctplPrev .pv-tot div{ display:flex; justify-content:space-between; padding:3px 0; }
+  #ctplPrev .pv-tot .big{ font-weight:700; font-size:17px; border-top:1px solid #D6C8AB; padding-top:8px; margin-top:4px; }
+  #ctplPrev .pv-tot .dep{ color:#7C1F15; }
+  #ctplPrev .pv-muted{ color:#6E6353; font-size:13px; white-space:pre-wrap; margin:16px 0 0; }
+  #ctplPrev .pv-contract{ white-space:pre-wrap; font-size:13px; background:#fff; border:1px solid #D6C8AB; padding:16px; }
+  #ctplPrev .pv-sig{ font:italic 28px Georgia,serif; border-bottom:1px solid #221E1B; min-height:46px; padding:4px 2px; margin:6px 0 4px; color:#211D19; }
+  #ctplPrev .pv-mail{ background:#eef2f7; padding:22px 14px 30px; font-family:Arial,sans-serif; }
+  #ctplPrev .pv-mailhead{ font-size:13px; color:#475569; max-width:600px; margin:0 auto 12px; line-height:1.5; }
+  #ctplPrev .pv-mailbody{ background:#fff; padding:22px 20px; max-width:600px; margin:0 auto; font-family:Georgia,serif; color:#221E1B; line-height:1.55; font-size:15px; }
+  #ctplPrev .pv-mailbody a{ color:#7C1F15; }
+  #ctplPrev .pv-foot{ font:12px Arial,sans-serif; color:#64748b; padding:8px 12px 12px; }
+  @media (max-width:620px){ #ctplPrev{ padding:10px 4px; } #ctplPrev h1.pv-h1{ font-size:28px; } #ctplPrev .pv-cardp{ padding:16px 12px; } #ctplPrev table.pv-items .thumb{ width:56px; height:56px; flex-basis:56px; } }
 </style>
 <div id="ctplModal" class="rec-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:985;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 10px;" onclick="if(event.target===this)ctplClose()">
   <div class="rec-card" style="background:#fff;max-width:900px;width:100%;border-radius:14px;padding:22px;">
@@ -15264,7 +15311,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
         h += '<div class="ctpl-cat">'+esc(c || 'Other')+'</div>' + rs.map(t => '<div class="ctpl-row'+(t.active?'':' off')+'" onclick="ctplEdit(\''+t.id+'\')">'
           + (t.image_url ? '<img class="ctpl-rowpic" src="'+esc(t.image_url)+'" alt="">' : '')
           + '<div style="flex:1;min-width:0;"><div style="font-weight:700;">'+esc(t.title)+'</div><div class="ctpl-hint" style="margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(preview(t))+'</div></div>'
-          + (t.location ? '<span class="ctpl-tag">'+esc(t.location)+'</span>' : '') + (t.active ? '' : '<span class="ctpl-tag" style="background:#f1f5f9;color:#64748b;">hidden</span>') + '</div>').join(''); });
+          + (t.location ? '<span class="ctpl-tag">'+esc(t.location)+'</span>' : '') + (t.active ? '' : '<span class="ctpl-tag" style="background:#f1f5f9;color:#64748b;">hidden</span>')
+          + '<button class="btn btn-ghost btn-sm pv-btn" type="button" title="Preview — what the customer sees" onclick="event.stopPropagation();ctplPreview(\''+t.id+'\')">👁</button></div>').join(''); });
       if(!rows.length) h += '<div class="rec-empty">Nothing here yet.</div>';
       h += '</div>';
     }
@@ -15295,6 +15343,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       + (t.source_ref ? '<div class="ctpl-hint">From '+esc(t.source_ref)+'</div>' : '')
       + '<div class="cat-actions"><span class="save-msg" id="ctE_msg"></span>'
       +   (t.id ? '<button class="btn btn-ghost btn-sm" onclick="ctplDelete()">🗑 Delete</button><button class="btn btn-ghost btn-sm" onclick="ctplDup()">⧉ Duplicate</button>' : '')
+      +   '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplPreview()" title="What the customer sees — includes what you have typed but not saved yet">👁 Preview</button>'
       +   '<button class="btn btn-gold" onclick="ctplSave()">💾 Save</button></div>';
     $('ctplBody').innerHTML = h;
     if(k === 'package'){ linesRender(); photoBind('ctE_cover', u => { MG.edit.image_url = u || null; mgEditKeep(); }); }
@@ -15384,6 +15433,99 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     const b = first && first.length > 1 ? body.replace(new RegExp('\\b' + first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'g'), '{{first_name}}') : body;
     ctplOpen('email', { body: b });
   };
+
+  /* ---------- 👁 preview: what the customer gets ---------- */
+  const SAMPLE = { first_name: 'Jane', name: 'Jane Smith', company: '', event_time: '6:30 PM', guests: '8', occasion: 'birthday',
+    client_email: 'jane@example.com', client_phone: '(901) 555-0123', client_address: '', code: 'AB12CD' };
+  const ymdOf = d => d.toLocaleDateString('en-CA');
+  const addDays = (ymd, n) => { const d = new Date(String(ymd).slice(0, 10) + 'T12:00:00'); d.setDate(d.getDate() + n); return ymdOf(d); };
+  // the open lead's details (as ctx() sees them), sample values for whatever is blank
+  function sampleCtx(){
+    const c = ctx(), r = cur();
+    let ymd = ((formOk() && $('cq_date')) ? $('cq_date').value : (r || {}).event_date) || '';
+    if(!ymd){ const d = new Date(); d.setDate(d.getDate() + (((6 - d.getDay()) + 7) % 7 || 7) + 14); ymd = ymdOf(d); }   // a Saturday ~3 weeks out
+    const today = ymdOf(new Date()); let bal = addDays(ymd, -3); if(bal < today) bal = today;
+    const out = Object.assign({}, c, { event_date: c.event_date || longDate(ymd), balance_due_date: longDate(bal), _ymd: ymd, _bal: bal });
+    Object.keys(SAMPLE).forEach(k => { if(!out[k]) out[k] = SAMPLE[k]; });
+    if(!out.schedule_link) out.schedule_link = '[scheduling link — set it under ⚙️ Links & shop info]';
+    out._real = !!r;
+    return out;
+  }
+  // every fill-in the portal or the catering fn knows; blanks show as [bracketed] so they stand out
+  function pfill(text, c){ return String(text || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => (k in c && k[0] !== '_') ? (c[k] || '[' + k.replace(/_/g, ' ') + ']') : m); }
+  const para = s => esc(s).replace(/\r?\n/g, '<br>').replace(/(https:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  const pvTop = () => '<div class="pv-top">GREYS<small>Fine Cheeses · Charcuterie · Wine</small></div>';
+  // the editor's current state, typed-but-unsaved values included
+  function editState(){
+    const t = JSON.parse(JSON.stringify(MG.edit || {})), v = id => ($(id) ? $(id).value : undefined);
+    if($('ctE_title')) t.title = v('ctE_title').trim();
+    if($('ctE_body')) t.body = v('ctE_body');
+    if($('ctE_subj')) t.subject = v('ctE_subj').trim();
+    if($('ctE_loc')) t.location = v('ctE_loc') || null;
+    if($('ctE_dep')){ const d = v('ctE_dep').trim(); t.deposit_pct = d === '' ? null : Math.min(100, Math.max(0, Math.round(Number(d) || 0))); }
+    if($('ctE_grat')){ const g = v('ctE_grat').trim(); t.gratuity_pct = (g === '' || !(Number(g) > 0)) ? null : Math.min(50, Number(g)); }
+    return t;
+  }
+  function pvPackage(t, c){
+    const guests = Number(c.guests) || 0;
+    const rate = (formOk() && Number(($('cq_tax') || {}).value)) || 9.75;
+    const depPct = t.deposit_pct != null ? Number(t.deposit_pct) : ((formOk() && Number(($('cq_dep') || {}).value)) || 50);
+    const L = (t.items || []).filter(it => String(it.name || '').trim()).map(it => { const qty = it.pp ? guests : (Number(it.qty) || 0);
+      return { name: it.name, qty, price_cents: Math.max(0, Math.round(Number(it.price_cents) || 0)), note: String(it.note || '').slice(0, 300), image: okUrl(it.image), opt: !(qty > 0) }; });
+    const sum = () => L.reduce((s, l) => s + (l.opt ? 0 : Math.round(l.qty * l.price_cents)), 0);
+    const base = sum();
+    if(Number(t.gratuity_pct) > 0){ const g = Number(t.gratuity_pct); L.push({ name: 'Gratuity (' + g + '%)', qty: 1, price_cents: Math.round(base * g / 100), note: g + '% of ' + catMoney(base), image: '', opt: false }); }
+    const sub = sum(), tax = Math.round(sub * rate / 100), tot = sub + tax, split = depPct > 0 && depPct < 100, dep = Math.round(tot * depPct / 100);
+    const rows = L.map(l => '<tr' + (l.opt ? ' class="opt"' : '') + '><td><div class="itm">' + (l.image ? '<img class="thumb" src="' + esc(l.image) + '" alt="" loading="lazy">' : '')
+      + '<div>' + esc(l.name) + (l.note ? '<span class="note">' + esc(l.note) + '</span>' : '') + (l.opt ? '<span class="note">optional — only on the proposal once a qty is set</span>' : '') + '</div></div></td>'
+      + '<td class="n">' + (l.opt ? '—' : esc(l.qty)) + '</td><td class="n">' + catMoney(l.price_cents) + '</td><td class="n">' + (l.opt ? '—' : catMoney(Math.round(l.qty * l.price_cents))) + '</td></tr>').join('');
+    const balShort = new Date(c._bal + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const note = pfill(t.body, c);
+    return pvTop() + '<div class="pv-page">'
+      + (okUrl(t.image_url) ? '<div class="pv-hero"><img src="' + esc(okUrl(t.image_url)) + '" alt=""></div>' : '')
+      + '<p class="pv-eyebrow">Catering proposal · #' + esc(c.code) + '</p><h1 class="pv-h1">' + esc(c.event_date) + '</h1>'
+      + '<p class="pv-lede">Hi ' + esc(c.first_name) + ' — here’s everything we talked about. Look it over, then sign at the bottom to book your date.</p>'
+      + '<div class="pv-cardp"><h2 class="pv-h2">Your event</h2><dl class="pv-facts"><dt>For</dt><dd>' + esc(c.name) + (c.company ? ' · ' + esc(c.company) : '') + '</dd>'
+      +   '<dt>When</dt><dd>' + esc(c.event_date) + (c.event_time ? ' at ' + esc(c.event_time) : '') + '</dd><dt>Guests</dt><dd>' + esc(c.guests || 'TBD') + '</dd><dt>Shop</dt><dd>' + esc(c.location) + '</dd></dl></div>'
+      + '<div class="pv-cardp"><h2 class="pv-h2">Proposal</h2><div style="overflow-x:auto"><table class="pv-items"><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th></tr></thead><tbody>'
+      +   (rows || '<tr><td colspan="4"><span class="note">No lines yet.</span></td></tr>') + '</tbody></table></div>'
+      +   '<div class="pv-tot"><div><span>Subtotal</span><span>' + catMoney(sub) + '</span></div><div><span>Sales tax (' + rate + '%)</span><span>' + catMoney(tax) + '</span></div><div class="big"><span>Total</span><span>' + catMoney(tot) + '</span></div>'
+      +   (split ? '<div class="dep"><span>Deposit to book (' + depPct + '%)</span><span>' + catMoney(dep) + '</span></div><div><span>Balance due ' + esc(balShort) + '</span><span>' + catMoney(tot - dep) + '</span></div>' : '') + '</div>'
+      +   (note.trim() ? '<p class="pv-muted">' + esc(note) + '</p>' : '') + '</div>'
+      + '<p class="pv-muted" style="margin:0;text-align:center;">— then the agreement and the signature box —</p></div>';
+  }
+  function pvEmail(t, c){
+    return '<div class="pv-mail"><div class="pv-mailhead"><div><b>To:</b> ' + esc(c.name) + ' &lt;' + esc(c.client_email) + '&gt;</div><div><b>Subject:</b> Re: Your GREYS catering question [#' + esc(c.code) + ']</div>'
+      + (t.subject ? '<div style="color:#94a3b8;">HoneyBook’s subject was “' + esc(t.subject) + '” — portal emails keep the thread’s subject so replies land back on the lead.</div>' : '') + '</div>'
+      + '<div class="pv-mailbody"><div style="font:700 22px Georgia,serif;letter-spacing:.04em;border-bottom:2px solid #E0A21C;padding-bottom:8px;margin-bottom:18px;">GREYS <span style="font:400 12px Arial,sans-serif;">Fine Cheeses · Charcuterie · Wine</span></div>'
+      +   '<p style="margin:0;">' + para(pfill(t.body, c)) + '</p><p style="font:12px Arial,sans-serif;color:#6E6353;margin:28px 0 0;">Just reply to this email to keep the conversation going.</p></div>'
+      + ((t.attachments || []).length ? '<p class="pv-mailhead" style="margin-top:12px;">📎 In HoneyBook this email attached ' + esc(t.attachments.join(', ')) + ' — nothing is attached here.</p>' : '') + '</div>';
+  }
+  function pvContract(t, c){
+    const d = Object.assign({ total: '$1,250.00', deposit_pct: '50', deposit: '$625.00' }, c);
+    return pvTop() + '<div class="pv-page"><p class="pv-eyebrow">Catering proposal · #' + esc(c.code) + '</p>'
+      + '<div class="pv-cardp"><h2 class="pv-h2">Agreement</h2><div class="pv-contract">' + esc(pfill(t.body, d)) + '</div>'
+      + '<div style="margin-top:18px;"><div style="font:600 11px Arial,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#6E6353;">Type your full name to sign</div>'
+      +   '<div style="background:#fff;border:1px solid #D6C8AB;padding:11px 12px;color:#9A8C76;margin-top:5px;">' + esc(c.name) + '</div><div class="pv-sig"></div><div style="color:#6E6353;font-size:13px;">Your typed name is your electronic signature.</div></div></div>'
+      + '<p class="pv-muted" style="margin:0;text-align:center;">Amounts and dates are filled in from the proposal when it is sent.</p></div>';
+  }
+  window.ctplPreview = function(id){
+    const t = id ? byId(id) : (MG.edit ? editState() : null); if(!t) return;
+    const c = sampleCtx();
+    const inner = t.kind === 'package' ? pvPackage(t, c) : t.kind === 'email' ? pvEmail(t, c) : pvContract(t, c);
+    if(!$('ctplPrev')) document.body.insertAdjacentHTML('beforeend', '<div id="ctplPrev" onclick="if(event.target===this)ctplPrevClose()"><div class="pv-card"><div class="pv-bar"><div class="pv-ttl">👁 <span id="pvTitle"></span><span class="pv-with" id="pvWith"></span></div>'
+      + '<button class="btn btn-ghost btn-sm" type="button" id="pvPhoneBtn" onclick="ctplPrevPhone()">📱 Phone</button><button class="btn btn-ghost btn-sm" type="button" onclick="ctplPrevClose()">✕ Close</button></div><div id="pvBody"></div><div class="pv-foot" id="pvFoot"></div></div></div>');
+    const what = t.kind === 'package' ? 'proposal page' : t.kind === 'email' ? 'email' : 'agreement';
+    $('pvTitle').textContent = (t.title || 'Untitled') + ' — the customer’s ' + what;
+    $('pvWith').textContent = c._real ? 'Filled in with ' + c.name + '’s details' + (!id ? ', including what you have typed but not saved' : '') + '.'
+      : 'Filled in with sample details (Jane Smith, 8 guests, ' + c.event_date + ')' + (!id ? ', including what you have typed but not saved' : '') + '.';
+    $('pvBody').innerHTML = inner;
+    $('pvFoot').textContent = t.kind === 'package' ? 'Lines marked “pp” use the guest count. Photos, prices and the note can still be changed on each proposal before it is sent.' : '[Bracketed] parts are fill-ins with nothing to fill them yet.';
+    const m = $('ctplPrev'); m.style.display = 'flex'; m.scrollTop = 0;
+  };
+  window.ctplPrevClose = function(){ const m = $('ctplPrev'); if(m) m.style.display = 'none'; };
+  window.ctplPrevPhone = function(){ const m = $('ctplPrev'); if(!m) return; m.classList.toggle('phone'); $('pvPhoneBtn').textContent = m.classList.contains('phone') ? '🖥 Desktop' : '📱 Phone'; };
+  document.addEventListener('keydown', e => { const m = $('ctplPrev'); if(e.key === 'Escape' && m && m.style.display !== 'none') ctplPrevClose(); });
 
   /* ---------- wire into the existing catering code ---------- */
   function wrap(name, make){ const o = window[name]; if(typeof o === 'function' && !o.__ctpl){ const f = make(o); f.__ctpl = true; window[name] = f; } }
