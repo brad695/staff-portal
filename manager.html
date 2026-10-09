@@ -14938,9 +14938,22 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
      (scheduling link + shop address/phone per store). Reply box: email templates. Proposal: 📦 packages (+ a live
      "Gratuity (N%)" line), 📜 agreement templates, ✉️ templates for the email message. 📚 Templates manager next to
      ↻ Refresh. Agreement fill-ins the catering fn doesn't know ({{today}} {{venue}} {{client_*}} {{shop_*}}
-     {{occasion}}) are filled into the saved contract_text when the proposal is saved. -->
+     {{occasion}}) are filled into the saved contract_text when the proposal is saved.
+     PHOTOS (2026-10-09): catering_templates.image_url = cover photo, items[].image = per-line photo (HoneyBook's
+     experience pictures, hosted in social-assets). Adding a package copies them onto the proposal (cq_image +
+     CAT_ITEMS[].image); a catApi wrapper sends them with save_quote; catering.html shows them to the customer.
+     Photos can be swapped in the editor or the Templates manager: upload (social-assets/catering-templates/) or URL. -->
 <style id="cat-tpl-css">
   #ctplModal .rec-card{ max-height:none !important; display:block; }
+  .ctpl-photo{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .ctpl-photo img{ width:64px; height:64px; object-fit:cover; border-radius:8px; background:#f1f5f9; border:1px solid #e2e8f0; }
+  .ctpl-photo.cover img{ width:140px; height:56px; }
+  .ctpl-photo .ph-none{ width:64px; height:64px; border-radius:8px; background:#f1f5f9; border:1px dashed #cbd5e1; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:1.2rem; }
+  .ctpl-photo.cover .ph-none{ width:140px; height:56px; }
+  .cat-item .ci-img{ grid-column:1/-1; display:flex; align-items:center; gap:8px; font-size:.78rem; color:#64748b; }
+  .cat-item .ci-img img{ width:40px; height:40px; object-fit:cover; border-radius:6px; border:1px solid #e2e8f0; }
+  .cat-tbl .ci-thumb{ width:44px; height:44px; object-fit:cover; border-radius:6px; margin-right:8px; vertical-align:middle; }
+  #ctplModal .ctpl-row img.ctpl-rowpic{ width:48px; height:36px; object-fit:cover; border-radius:6px; flex:0 0 48px; }
   #ctplModal .ctpl-tabs{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:12px 0; }
   #ctplModal .ctpl-list{ display:flex; flex-direction:column; gap:6px; }
   #ctplModal .ctpl-row{ display:flex; align-items:center; gap:10px; padding:9px 12px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; cursor:pointer; }
@@ -15026,6 +15039,43 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   }
   const autoGrow = ta => { if(ta) ta.rows = Math.min(18, Math.max(ta.rows || 3, String(ta.value).split('\n').length + 1)); };
 
+  /* ---------- photos ---------- */
+  const okUrl = u => /^https:\/\/[^\s"'<>]+$/i.test(String(u || '').trim()) ? String(u).trim() : '';
+  // upload to the public social-assets bucket (same bucket as the experience + social photos); returns the public URL
+  async function uploadPhoto(file){
+    if(!file || !/^image\//.test(file.type)) throw new Error('Pick an image file (jpg, png, webp).');
+    if(file.size > 12 * 1024 * 1024) throw new Error('That photo is over 12 MB — please shrink it first.');
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const path = 'catering-templates/' + new Date().toISOString().slice(0, 10) + '-' + Math.random().toString(36).slice(2, 8) + '-' + file.name.toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]+/g, '-').slice(0, 40) + '.' + ext;
+    const { error } = await sb.storage.from('social-assets').upload(path, file, { contentType: file.type, upsert: false });
+    if(error) throw new Error(error.message);
+    return sb.storage.from('social-assets').getPublicUrl(path).data.publicUrl;
+  }
+  // one hidden file input; pickPhoto() resolves with the public URL (or null when canceled)
+  function pickPhoto(){
+    return new Promise(resolve => {
+      let inp = $('ctplFile');
+      if(!inp){ inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.id = 'ctplFile'; inp.style.display = 'none'; document.body.appendChild(inp); }
+      inp.value = '';
+      inp.onchange = async () => { const f = inp.files && inp.files[0]; if(!f) return resolve(null); try { resolve(await uploadPhoto(f)); } catch(e) { alert(e.message); resolve(null); } };
+      inp.click();
+    });
+  }
+  // photo control: thumbnail + 📷 Upload + 🔗 URL + ✕ ; `on(url)` is called with the new value ('' = removed)
+  const PH = {};
+  function photoCtl(id, url, label, cover){
+    PH[id] = { on: null };
+    return '<div class="ctpl-photo' + (cover ? ' cover' : '') + '" id="' + id + '">' + (url ? '<img src="' + esc(url) + '" alt="">' : '<span class="ph-none">📷</span>')
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + (label ? '<span class="ctpl-hint" style="margin:0;width:100%;">' + esc(label) + '</span>' : '')
+      + '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplPhotoPick(\'' + id + '\')">📷 ' + (url ? 'Replace' : 'Upload') + '</button>'
+      + '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplPhotoUrl(\'' + id + '\')">🔗 URL</button>'
+      + (url ? '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplPhotoSet(\'' + id + '\',\'\')">✕ Remove</button>' : '') + '</div></div>';
+  }
+  window.ctplPhotoSet = function(id, url){ const h = PH[id]; if(h && h.on) h.on(url || ''); };
+  window.ctplPhotoPick = async function(id){ const u = await pickPhoto(); if(u) ctplPhotoSet(id, u); };
+  window.ctplPhotoUrl = function(id){ const u = prompt('Paste the photo URL (https://…)'); if(u === null) return; const ok = okUrl(u); if(u.trim() && !ok) return alert('That needs to be an https:// link to an image.'); ctplPhotoSet(id, ok); };
+  function photoBind(id, on){ if(PH[id]) PH[id].on = on; }
+
   /* ---------- pickers ---------- */
   function groups(kind, loc){
     const rows = rowsOf(kind).filter(t => t.active);
@@ -15071,11 +15121,35 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   }
 
   // proposal editor
+  let COVER = '';                                     // cover photo of the proposal being edited
+  function coverHtml(){
+    return '<div class="rf" id="cq_cover" style="margin-top:14px;"><label>Cover photo (top of the customer’s proposal)</label>' + photoCtl('cq_coverctl', COVER, '', true) + '</div>';
+  }
+  function coverRender(){
+    const host = $('cq_cover'); if(!host) return;
+    host.outerHTML = coverHtml();
+    photoBind('cq_coverctl', u => { COVER = u; coverRender(); });
+  }
+  function lockedThumbs(){
+    const q = (typeof CAT_Q !== 'undefined' && CAT_Q) || null; const rows = document.querySelectorAll('#catQuote .cat-tbl tbody tr');
+    if(!q || !rows.length) return;
+    (q.items || []).forEach((it, i) => { const td = rows[i] && rows[i].querySelector('td'); if(td && it.image && !td.querySelector('.ci-thumb')) td.insertAdjacentHTML('afterbegin', '<img class="ci-thumb" src="' + esc(it.image) + '" alt="">'); });
+    if(q.image_url && !$('cq_lockedcover')) $('catQuote').insertAdjacentHTML('afterbegin', '<img id="cq_lockedcover" src="' + esc(q.image_url) + '" alt="" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px;margin:10px 0 4px;">');
+  }
   async function decorate(){
     const box = $('catQuote'), r = cur(); if(!box) return;
     box.dataset.lead = r ? r.id : '';
-    if(!$('catItems')) return;                       // signed / invoiced view — nothing to add
+    if(!$('catItems')){ lockedThumbs(); return; }    // signed / invoiced view — photos only
     await load();
+    // cover photo: starts from the saved quote (or the copied one), lives above the items
+    if(!$('cq_cover')){
+      const q = (typeof CAT_Q !== 'undefined' && CAT_Q) || null;
+      COVER = okUrl(q && q.image_url ? q.image_url : (box.__coverFrom || ''));
+      box.__coverFrom = '';
+      const itemsEl = $('catItems'); if(itemsEl && itemsEl.previousElementSibling) itemsEl.previousElementSibling.insertAdjacentHTML('beforebegin', coverHtml());
+      photoBind('cq_coverctl', u => { COVER = u; coverRender(); });
+    }
+    itemPhotos();
     const menu = $('catMenu');
     if(menu && !$('catPkg')){
       menu.insertAdjacentHTML('beforebegin', '<select id="catPkg" class="loc-sel" style="max-width:340px;" onchange="ctplPkg(this)"></select>');
@@ -15093,6 +15167,20 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     if(ls && !ls.__ctpl){ ls.__ctpl = true; ls.addEventListener('change', () => { pkgOptions(); msgOptions(); }); }
     pkgOptions(); ctrOptions(); msgOptions();
   }
+  // per-line photo row under each item in the proposal editor
+  function itemPhotos(){
+    document.querySelectorAll('#catItems .cat-item').forEach((row, i) => {
+      const it = CAT_ITEMS[i]; if(!it || row.querySelector('.ci-img') || GRAT_RE.test(it.name || '')) return;
+      row.insertAdjacentHTML('beforeend', '<div class="ci-img">' + (it.image ? '<img src="' + esc(it.image) + '" alt="">' : '')
+        + '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplItemPhoto(' + i + ')">📷 ' + (it.image ? 'Replace photo' : 'Add photo') + '</button>'
+        + (it.image ? '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplItemPhoto(' + i + ',\'\')">✕ Remove</button>' : '') + '</div>');
+    });
+  }
+  window.ctplItemPhoto = async function(i, v){
+    const it = CAT_ITEMS[i]; if(!it) return;
+    if(v === '') delete it.image; else { const u = await pickPhoto(); if(!u) return; it.image = u; }
+    catItemsRender();
+  };
   function setGrat(pct){
     pct = Number(pct) || 0; if(!(pct > 0)) return;
     const line = { name: 'Gratuity (' + pct + '%)', qty: 1, price_cents: 0, note: '' };
@@ -15110,8 +15198,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     if(val === 'manage') return ctplOpen('package');
     const t = byId(val.slice(2)); if(!t) return;
     const guests = Number(($('cq_guests') || {}).value) || 0;
-    (t.items || []).forEach(it => CAT_ITEMS.push({ name: it.name || '', qty: it.pp ? guests : (Number(it.qty) || 0),
-      price_cents: Math.max(0, Math.round(Number(it.price_cents) || 0)), note: String(it.note || '').slice(0, 300) }));
+    (t.items || []).forEach(it => CAT_ITEMS.push(Object.assign({ name: it.name || '', qty: it.pp ? guests : (Number(it.qty) || 0),
+      price_cents: Math.max(0, Math.round(Number(it.price_cents) || 0)), note: String(it.note || '').slice(0, 300) }, okUrl(it.image) ? { image: okUrl(it.image) } : {})));
+    if(!COVER && okUrl(t.image_url)){ COVER = okUrl(t.image_url); coverRender(); }
     if(t.gratuity_pct) setGrat(t.gratuity_pct);
     if(t.deposit_pct != null && $('cq_dep')) $('cq_dep').value = t.deposit_pct;
     const note = $('cq_note');
@@ -15173,6 +15262,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       h += '<div class="ctpl-list">';
       cats.forEach(c => { const rs = rows.filter(t => (t.category || '') === c); if(!rs.length) return;
         h += '<div class="ctpl-cat">'+esc(c || 'Other')+'</div>' + rs.map(t => '<div class="ctpl-row'+(t.active?'':' off')+'" onclick="ctplEdit(\''+t.id+'\')">'
+          + (t.image_url ? '<img class="ctpl-rowpic" src="'+esc(t.image_url)+'" alt="">' : '')
           + '<div style="flex:1;min-width:0;"><div style="font-weight:700;">'+esc(t.title)+'</div><div class="ctpl-hint" style="margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(preview(t))+'</div></div>'
           + (t.location ? '<span class="ctpl-tag">'+esc(t.location)+'</span>' : '') + (t.active ? '' : '<span class="ctpl-tag" style="background:#f1f5f9;color:#64748b;">hidden</span>') + '</div>').join(''); });
       if(!rows.length) h += '<div class="rec-empty">Nothing here yet.</div>';
@@ -15193,7 +15283,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
           + '<div class="rf"><label>Gratuity %</label><input id="ctE_grat" type="number" min="0" max="50" step="any" value="'+(t.gratuity_pct==null?'':Number(t.gratuity_pct))+'" placeholder="none"></div>' : '')
       + '</div>'
       + (k === 'email' ? '<div class="rf" style="margin-top:10px;"><label>HoneyBook subject (for reference)</label><input id="ctE_subj" value="'+esc(t.subject || '')+'"><div class="ctpl-hint">Portal emails keep the “Your GREYS catering question [#code]” subject so customer replies land back in the thread.</div></div>' : '')
-      + (k === 'package' ? '<h4 style="margin:16px 0 6px;">Lines</h4><div id="ctE_items"></div><button class="btn btn-ghost btn-sm" style="margin-top:8px;" onclick="ctplAddLine()">＋ Line</button>'
+      + (k === 'package' ? '<div class="rf" style="margin-top:12px;"><label>Cover photo (top of the customer\u2019s proposal)</label>' + photoCtl('ctE_cover', t.image_url, '', true) + '</div>'
+          + '<h4 style="margin:16px 0 6px;">Lines</h4><div id="ctE_items"></div><button class="btn btn-ghost btn-sm" style="margin-top:8px;" onclick="ctplAddLine()">＋ Line</button>'
           + '<div class="ctpl-hint">Qty 0 = optional — the line is dropped when the proposal is saved unless someone sets a qty. “pp” fills the qty with the guest count. Notes over 300 characters get cut on the proposal.</div>' : '')
       + '<div class="rf" style="margin-top:14px;"><label>'+(k === 'email' ? 'Email text' : k === 'package' ? 'Note for the customer (added to the proposal’s customer note)' : 'Agreement text')+'</label>'
       +   '<textarea id="ctE_body" rows="'+(k === 'contract' ? 18 : k === 'email' ? 12 : 6)+'">'+esc(t.body || '')+'</textarea>'
@@ -15206,7 +15297,15 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       +   (t.id ? '<button class="btn btn-ghost btn-sm" onclick="ctplDelete()">🗑 Delete</button><button class="btn btn-ghost btn-sm" onclick="ctplDup()">⧉ Duplicate</button>' : '')
       +   '<button class="btn btn-gold" onclick="ctplSave()">💾 Save</button></div>';
     $('ctplBody').innerHTML = h;
-    if(k === 'package') linesRender();
+    if(k === 'package'){ linesRender(); photoBind('ctE_cover', u => { MG.edit.image_url = u || null; mgEditKeep(); }); }
+  }
+  // re-draw the editor without losing typed values
+  function mgEditKeep(){
+    const keep = {}; ['ctE_title','ctE_cat','ctE_loc','ctE_dep','ctE_grat','ctE_subj','ctE_body'].forEach(id => { const e = $(id); if(e) keep[id] = e.value; });
+    const act = $('ctE_active') ? $('ctE_active').checked : null;
+    mgEdit();
+    Object.entries(keep).forEach(([id, v]) => { const e = $(id); if(e) e.value = v; });
+    if(act !== null && $('ctE_active')) $('ctE_active').checked = act;
   }
   function linesRender(){
     const el = $('ctE_items'), L = MG.edit.items || (MG.edit.items = []);
@@ -15217,8 +15316,19 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       + '<label class="ctpl-pp" title="Fill the qty with the guest count"><input type="checkbox"'+(it.pp ? ' checked' : '')+' onchange="ctplLine('+i+',\'pp\',this.checked)">pp</label>'
       + '<button class="btn btn-ghost btn-sm" onclick="ctplDelLine('+i+')" title="Remove">✕</button>'
       + '<input class="ci-note" maxlength="300" value="'+esc(it.note || '')+'" placeholder="Note (optional)" oninput="ctplLine('+i+',\'note\',this.value)">'
+      + '<div class="ci-img">' + (it.image ? '<img src="'+esc(it.image)+'" alt="">' : '')
+      +   '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplLinePhoto('+i+')">📷 ' + (it.image ? 'Replace photo' : 'Add photo') + '</button>'
+      +   '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplLinePhoto('+i+',\'url\')">🔗 URL</button>'
+      +   (it.image ? '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplLinePhoto('+i+',\'\')">✕ Remove</button>' : '') + '</div>'
       + '</div>').join('') + '</div>' : '<div class="rec-empty" style="padding:12px;">No lines yet.</div>';
   }
+  window.ctplLinePhoto = async function(i, v){
+    const it = MG.edit.items[i]; if(!it) return;
+    if(v === '') delete it.image;
+    else if(v === 'url'){ const u = prompt('Paste the photo URL (https://…)'); if(u === null) return; const ok = okUrl(u); if(u.trim() && !ok) return alert('That needs to be an https:// link to an image.'); if(ok) it.image = ok; else delete it.image; }
+    else { const u = await pickPhoto(); if(!u) return; it.image = u; }
+    linesRender();
+  };
   window.ctplLine = function(i, k, v){ const it = MG.edit.items[i]; if(!it) return; if(k === 'pp' && !v) delete it.pp; else it[k] = v; };
   window.ctplAddLine = function(){ (MG.edit.items = MG.edit.items || []).push({ name: '', qty: 1, price_cents: 0, note: '' }); linesRender(); };
   window.ctplDelLine = function(i){ MG.edit.items.splice(i, 1); linesRender(); };
@@ -15232,8 +15342,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       const d = $('ctE_dep').value.trim(), g = $('ctE_grat').value.trim();
       row.deposit_pct = d === '' ? null : Math.min(100, Math.max(0, Math.round(Number(d) || 0)));
       row.gratuity_pct = (g === '' || !(Number(g) > 0)) ? null : Math.min(50, Number(g));
+      row.image_url = okUrl(t.image_url) || null;
       row.items = (t.items || []).map(it => Object.assign({ name: String(it.name || '').trim(), qty: Number(it.qty) || 0,
-        price_cents: Math.max(0, Math.round(it.price_cents || 0)), note: String(it.note || '').trim().slice(0, 300) }, it.pp ? { pp: true } : {})).filter(it => it.name);
+        price_cents: Math.max(0, Math.round(it.price_cents || 0)), note: String(it.note || '').trim().slice(0, 300) }, it.pp ? { pp: true } : {}, okUrl(it.image) ? { image: okUrl(it.image) } : {})).filter(it => it.name);
     }
     msg.textContent = 'Saving…';
     const res = t.id
@@ -15280,6 +15391,20 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     wrap('catOpen', o => function(){ const p = o.apply(this, arguments); fillQuick(); return p; });
     wrap('catQuickPick', o => function(sel){ const v = sel.value; if(v === 'manage' || v.indexOf('t:') === 0) return pickReply(sel); return o.apply(this, arguments); });
     wrap('catQuoteRender', o => function(){ const r = o.apply(this, arguments); decorate().catch(e => console.warn('catering templates', e)); return r; });
+    wrap('catItemsRender', o => function(){ const r = o.apply(this, arguments); try{ itemPhotos(); }catch(e){} return r; });
+    // photos ride along with save_quote: items[].image (same filter as catSaveQuote) + the cover
+    wrap('catApi', o => function(action, payload){
+      if(action === 'save_quote' && payload && Array.isArray(payload.items)){
+        try{
+          const src = CAT_ITEMS.filter(it => String(it.name || '').trim() && (Number(it.qty) || 0) > 0);
+          if(src.length === payload.items.length) payload.items.forEach((p, i) => { const u = okUrl(src[i].image); if(u) p.image = u; });
+          payload.image_url = COVER || '';
+        }catch(e){}
+      }
+      return o.apply(this, arguments);
+    });
+    // "New proposal (copy this one)" keeps the cover photo too
+    wrap('catNewProposal', o => function(){ try{ const from = (typeof CAT_Q !== 'undefined' && CAT_Q) || null; const box = $('catQuote'); if(box) box.__coverFrom = (from && from.image_url) || ''; }catch(e){} return o.apply(this, arguments); });
     // live gratuity line: "Gratuity (N%)" = N% of every other line
     wrap('catTotals', o => function(){
       try{
