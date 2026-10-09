@@ -1,16 +1,28 @@
 // ============================================================================
-// square-class-items — classes as Square catalog items, sold on the register,
-// landing back in the class roster. (2026-09-26)
+// square-class-items — ticket-site events as Square catalog items, sold on the
+// register, landing back in the class roster. (2026-10-09)
 //
-//   catalog   one Square ITEM per class title per shop ("Class – <title> (<shop>)"),
-//             one VARIATION per date, category "Classes", TN 9.75% additive tax.
-//             Register price = ticket x (1 + fee) so the register total matches
-//             online (ticket + tax + service fee).
-//   inventory each date's Square stock = seats left (capacity - seats taken).
+//   kinds     'class' (sold per seat) and 'event_tabled' (Mahjong: sold as
+//             whole tables of party_size seats). KINDS below is the whole
+//             per-kind config; a kind that is not listed is never synced.
+//   catalog   one Square ITEM per title per shop ("<title> - Oct 28"), one
+//             VARIATION per date — one seat for a class, one whole table for a
+//             tabled event — TN 9.75% additive tax. Register price = ticket x
+//             (1 + fee) so the register total matches online (ticket + tax +
+//             service fee).
+//   category  the per-shop category ("Classes – Memphis") stays on the item for
+//             the register menu; the REPORTING category — what Square's
+//             item-sales report groups by — is the kind's own top-level one.
+//   inventory each date's Square stock = seats left (tables left for a tabled
+//             event).
 //   pull      completed register orders with a class line -> a registration on
 //             that class. Returns reduce / refund the registration.
 //   refunds   a refund made in Square on a ticket-site order (return order) ->
 //             ticket_payments + registration (2026-10-07)
+//   ensure    {"action":"ensure","eventId":"..."} syncs just that event's group
+//             and hands back its class_square_links row. square-ticket-pay
+//             calls it at checkout so every online sale is a real catalog line
+//             and never an ad-hoc one. (2026-10-09)
 //
 // ENV below decides sandbox vs production. The sandbox copy writes register
 // sales as canceled + refunded test rows: it shares the LIVE database, so a
@@ -25,7 +37,22 @@ const admin = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY
 const SQUARE_VERSION = "2025-01-23";
 const TZ = "America/Chicago";
 const FEE_RATE = Number(Deno.env.get("TICKET_FEE_RATE") ?? "0.04"); // register price = ticket x 1.04 (was 1.06 until 2026-09-29)
-const CATEGORY_NAME = "Classes";
+// Per-kind config (2026-10-09). unit says whether one variation is a seat
+// (classes) or a whole table of party_size seats (Mahjong); locPrefix builds
+// the per-shop register category; reporting* is the top-level category Square's
+// item-sales report groups the kind under.
+const KINDS: Record<string, { unit: "seat" | "table"; locPrefix: string; skuPrefix: string; reportingProd: string | null; reportingSandboxName: string }> = {
+  class:        { unit: "seat",  locPrefix: "Classes", skuPrefix: "CL", reportingProd: "CNZCPOPXO4MMMCUH2IJ4TKL2" /* top-level "Classes" */, reportingSandboxName: "Classes" },
+  // reportingProd is PENDING Brad's choice: "Classes" CNZCPOPXO4MMMCUH2IJ4TKL2
+  // or "Experiences" H5HEPNMRTWQ64C3OELYQXQF5. While it is null, tabled events
+  // are NOT synced in production — a guessed reporting category would quietly
+  // land Mahjong money in the wrong report.
+  event_tabled: { unit: "table", locPrefix: "Classes", skuPrefix: "TB", reportingProd: null, reportingSandboxName: "Experiences" /* sandbox stand-in */ },
+};
+type KindCfg = (typeof KINDS)[string];
+const SYNCED_KINDS = Object.keys(KINDS);
+const kindCfg = (kind: unknown): KindCfg | null => KINDS[String(kind ?? "")] ?? null;
+const partySizeOf = (ev: Record<string, any>) => Math.max(1, Math.round(Number(ev?.party_size ?? 1) || 1));
 const PROD_TAX_ID = "2K7XWRVWVXBTAJQIHHQOLFCN"; // TN Standard 9.75% ADDITIVE
 const SANDBOX_TAX_NAME = "TN Sales Tax 9.75% (classes)";
 const PROD_LOCATIONS: Record<string, string> = {
@@ -61,6 +88,25 @@ async function sq(path: string, init: RequestInit = {}) {
     return data as Record<string, any>;
   }
   throw new Error("unreachable");
+}
+
+// Square answers a reused batch-upsert idempotency key with this code: the
+// other runner (the 5-minute cron vs a checkout "ensure") already wrote that
+// object, so its stored row is the one to keep. (2026-10-09)
+function isIdemReuse(e: unknown): boolean {
+  if (!(e instanceof SqErr)) return false;
+  return (((e.data as any)?.errors ?? []) as any[]).some((x) => String(x?.code) === "IDEMPOTENCY_KEY_REUSED");
+}
+// The other run writes class_square_items right after its upsert, so give it a
+// couple of seconds before giving up on finding the item it made.
+async function itemRowFor(itemKey: string, tries = 6): Promise<Record<string, any> | null> {
+  for (let i = 0; i < tries; i++) {
+    const { data } = await admin.from("class_square_items").select("*")
+      .eq("env", ENV).eq("item_key", itemKey).maybeSingle();
+    if (data) return data;
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  return null;
 }
 
 const money = (c: number) => ({ amount: Math.round(c), currency: "USD" });
@@ -127,10 +173,17 @@ function upgradeName(n: string) {
 // the list on a rewrite dropped the class off the register menu whenever its
 // price, date or upgrades changed. Only the per-shop category is ours: swap it
 // if it changed, leave everything else alone. (2026-09-28)
-function keepCategories(cur: Record<string, any> | null, categoryId: string, prevCategoryId: string | null) {
+// The reporting category is never dropped either — Square puts it in this list
+// itself, and dropping it would fight that every rewrite. (2026-10-09)
+function keepCategories(
+  cur: Record<string, any> | null, categoryId: string, prevCategoryId: string | null, reportingId: string,
+) {
   const had = ((cur?.item_data?.categories ?? []) as any[])
-    .filter((c) => c?.id && (c.id === categoryId || c.id !== prevCategoryId));
-  return had.some((c) => c.id === categoryId) ? had : [{ id: categoryId }, ...had];
+    .filter((c) => c?.id && (c.id === categoryId || c.id === reportingId || c.id !== prevCategoryId));
+  const keep = had.some((c) => c.id === categoryId) ? had : [{ id: categoryId }, ...had];
+  // Never list the same category twice: Square rejects duplicates.
+  const seen = new Set<string>();
+  return keep.filter((c) => !seen.has(c.id) && seen.add(c.id));
 }
 
 // ---------------------------------------------------------------- locations
@@ -162,26 +215,48 @@ async function findByName(type: string, name: string): Promise<Record<string, an
   return (d.objects ?? []).find((o: any) => !o.is_deleted) ?? null;
 }
 // One category per shop ("Classes – Memphis"), so each location's menu and
-// reports only carry its own classes.
+// reports only carry its own events.
 const catCache = new Map<string, string>();
-async function ensureCategory(location = ""): Promise<string> {
-  const name = location ? `${CATEGORY_NAME} – ${location}` : CATEGORY_NAME;
+async function ensureCategory(prefix: string, location = ""): Promise<string> {
+  const name = location ? `${prefix} – ${location}` : prefix;
   if (catCache.has(name)) return catCache.get(name)!;
   const id = await ensureCategoryNamed(name);
   catCache.set(name, id);
   return id;
 }
-async function ensureCategoryNamed(CATEGORY_NAME: string): Promise<string> {
-  const hit = await findByName("CATEGORY", CATEGORY_NAME);
+async function ensureCategoryNamed(name: string): Promise<string> {
+  const hit = await findByName("CATEGORY", name);
   if (hit) return hit.id;
-  const d = await sq("/v2/catalog/object", {
-    method: "POST",
-    body: JSON.stringify({
-      idempotency_key: crypto.randomUUID(),
-      object: { type: "CATEGORY", id: "#classes", category_data: { name: CATEGORY_NAME, is_top_level: true } },
-    }),
-  });
-  return d.catalog_object.id;
+  try {
+    const d = await sq("/v2/catalog/object", {
+      method: "POST",
+      body: JSON.stringify({
+        // Deterministic on the name, so the cron and a checkout "ensure" running
+        // at the same second cannot create two categories called the same thing.
+        idempotency_key: `cat-${ENV}-${name}`.slice(0, 128),
+        object: { type: "CATEGORY", id: "#classes", category_data: { name, is_top_level: true } },
+      }),
+    });
+    return d.catalog_object.id;
+  } catch (e) {
+    if (!isIdemReuse(e)) throw e;
+    const again = await findByName("CATEGORY", name);
+    if (again) return again.id;
+    throw e;
+  }
+}
+// The kind's reporting category. Production names it by its fixed id (like
+// PROD_TAX_ID); sandbox ids differ per test account, so there it is resolved —
+// or created — by name. null means "not chosen yet": do not sync that kind.
+const reportCache = new Map<string, string>();
+async function reportingCategory(kind: string): Promise<string | null> {
+  const cfg = kindCfg(kind);
+  if (!cfg) return null;
+  if (ENV === "production") return cfg.reportingProd;
+  if (reportCache.has(kind)) return reportCache.get(kind)!;
+  const id = await ensureCategoryNamed(cfg.reportingSandboxName);
+  reportCache.set(kind, id);
+  return id;
 }
 async function ensureTax(): Promise<string> {
   if (ENV === "production") return PROD_TAX_ID;
@@ -204,17 +279,33 @@ async function ensureTax(): Promise<string> {
 }
 
 // ------------------------------------------------------------------ catalog
-async function upcomingClasses() {
+// Everything the catalog is built from: upcoming, on-sale, priced events of a
+// kind KINDS covers. party_size comes along for tabled events, where one
+// variation is one whole table (2026-10-09).
+async function upcomingEvents() {
   const { data, error } = await admin.from("events")
-    .select("id,title,date,time,price,capacity,location,kind,archived,add_ons")
-    .eq("kind", "class").gte("date", todayCentral()).gt("price", 0)
+    .select("id,title,date,time,price,capacity,location,kind,party_size,archived,add_ons")
+    .in("kind", SYNCED_KINDS).gte("date", todayCentral()).gt("price", 0)
     .order("date").order("time");
   if (error) throw new Error(error.message);
   return (data ?? []).filter((e) => !e.archived && salesOpen(e));
 }
 
-async function syncCatalog() {
-  const events = await upcomingClasses();
+// Upcoming priced events of a kind KINDS knows nothing about. Never synced,
+// only reported, so a new kind in the DB shows up instead of silently missing.
+async function unsupportedKindEvents(): Promise<string[]> {
+  const { data } = await admin.from("events").select("id,kind,archived")
+    .not("kind", "in", `(${SYNCED_KINDS.join(",")})`)
+    .gte("date", todayCentral()).gt("price", 0);
+  return (data ?? []).filter((e) => !e.archived).map((e) => e.id);
+}
+
+// The one catalog-writing path (2026-10-09): the 5-minute "sync" runs it over
+// everything, "ensure" runs it over a single event's group — same items, no
+// deletions, no stale-link cleanup.
+async function syncCatalog(opts: { onlyEventId?: string } = {}) {
+  const scoped = !!opts.onlyEventId;
+  const events = await upcomingEvents();
   const taxId = await ensureTax();
 
   const { data: itemRows } = await admin.from("class_square_items").select("*").eq("env", ENV);
@@ -222,27 +313,81 @@ async function syncCatalog() {
   const items = new Map((itemRows ?? []).map((r) => [r.item_key, r]));
   const links = new Map((linkRows ?? []).map((r) => [r.event_id, r]));
 
-  // group
-  const groups = new Map<string, { title: string; location: string; loc: string; events: any[] }>();
+  // group. Classes keep EXACTLY the historic key: changing it would delete and
+  // recreate every live item. Other kinds are namespaced by kind, so a Mahjong
+  // night and a class of the same name in the same shop stay separate items.
+  type Group = {
+    kind: string; cfg: KindCfg; title: string; location: string; loc: string;
+    report: string; events: Record<string, any>[];
+  };
+  const groups = new Map<string, Group>();
+  const pending: string[] = [];
+  const noLoc: string[] = [];
   for (const ev of events) {
-    const key = `${String(ev.location).toLowerCase()}|${String(ev.title).trim().toLowerCase()}`;
+    const cfg = kindCfg(ev.kind)!;
+    const report = await reportingCategory(String(ev.kind));
+    // No production reporting category chosen for this kind yet: never guess.
+    if (!report) { pending.push(ev.id); continue; }
+    // An event whose shop has no Square location (a typo, a closed Franklin
+    // date) is skipped and reported. It used to throw, which took the whole
+    // sync — and now checkout's "ensure" — down with it. (2026-10-09)
+    let loc: string;
+    try {
+      loc = await locationFor(ev);
+    } catch (_) {
+      noLoc.push(ev.id);
+      continue;
+    }
+    const base = `${String(ev.location).toLowerCase()}|${String(ev.title).trim().toLowerCase()}`;
+    const key = ev.kind === "class" ? base : `${ev.kind}:${base}`;
     if (!groups.has(key)) {
-      groups.set(key, { title: String(ev.title).trim(), location: ev.location, loc: await locationFor(ev), events: [] });
+      groups.set(key, {
+        kind: String(ev.kind), cfg, title: String(ev.title).trim(), location: ev.location,
+        loc, report, events: [],
+      });
     }
     groups.get(key)!.events.push(ev);
   }
 
-  const out = { groups: groups.size, written: 0, deleted: 0, unchanged: 0 };
+  // "ensure" works on the one group that holds the asked-for event.
+  const work = new Map(groups);
+  const out: Record<string, any> = { groups: 0, written: 0, deleted: 0, unchanged: 0, adopted: 0, raced: 0 };
+  if (scoped) {
+    const want = String(opts.onlyEventId);
+    const hit = [...groups.entries()].find(([, g]) => g.events.some((e) => e.id === want));
+    work.clear();
+    if (hit) work.set(hit[0], hit[1]);
+    out.event_ids = hit ? hit[1].events.map((e) => e.id) : [];
+  }
+  out.groups = work.size;
+  const mine = (ids: string[]) => (scoped ? ids.filter((id) => id === String(opts.onlyEventId)) : ids);
+  const pendingOut = mine(pending);
+  if (pendingOut.length) out.pending_reporting_category = pendingOut;
+  const noLocOut = mine(noLoc);
+  if (noLocOut.length) out.no_location = noLocOut;
+  if (!scoped) {
+    const other = await unsupportedKindEvents();
+    if (other.length) out.unsupported_kind = other;
+  }
 
-  for (const [key, g] of groups) {
-    const categoryId = await ensureCategory(String(g.location ?? "").trim());
-    const priceOf = (ev: any) => Math.round(Number(ev.price) * (1 + FEE_RATE));
+  for (const [key, g] of work) {
+    const categoryId = await ensureCategory(g.cfg.locPrefix, String(g.location ?? "").trim());
+    // A tabled event (Mahjong) is sold as whole tables: one variation is
+    // party_size seats, and the register price is the whole table.
+    const table = g.cfg.unit === "table";
+    const partyOf = (ev: Record<string, any>) => (table ? partySizeOf(ev) : 1);
+    const priceOf = (ev: Record<string, any>) => Math.round(Number(ev.price) * partyOf(ev) * (1 + FEE_RATE));
     // Classes normally run once: then the item carries the date in its name
     // and has a single plain "Regular" variation, so the register never asks
     // for a date. Only a title with several dates gets one variation per date.
     const single = g.events.length === 1;
     const desired = g.events.map((ev, i) => ({
-      id: ev.id, name: single ? "Regular" : niceWhen(ev.date, ev.time), price: priceOf(ev), ord: i,
+      id: ev.id,
+      name: table
+        ? (single ? `Table of ${partyOf(ev)}` : `${niceWhen(ev.date, ev.time)} · table of ${partyOf(ev)}`)
+        : (single ? "Regular" : niceWhen(ev.date, ev.time)),
+      price: priceOf(ev),
+      ord: i,
     }));
     // Staff-only names (Maverick): "A Nightmare on Cheese Street - Oct 28".
     // The shop is already the category (Classes – Memphis / – Nashville).
@@ -251,20 +396,26 @@ async function syncCatalog() {
     const itemName = single ? `${g.title} - ${shortDate(g.events[0].date)}` : g.title;
     // Upgrades (charcuterie, wine...) -> one modifier list per item, union of
     // the group's add-ons keyed by display name. Register price carries the fee.
+    // Tabled events never get one: the site sends no upgrades for them.
     const mods: { key: string; name: string; price: number; addonIds: Record<string, string[]> }[] = [];
-    for (const ev of g.events) {
-      for (const a of (Array.isArray(ev.add_ons) ? ev.add_ons : []) as any[]) {
-        const name = upgradeName(a.name);
-        const price = Math.round(Number(a.price ?? 0) * (1 + FEE_RATE));
-        const key = `${name.toLowerCase()}|${price}`;
-        let m = mods.find((x) => x.key === key);
-        if (!m) mods.push(m = { key, name, price, addonIds: {} });
-        (m.addonIds[ev.id] ??= []).push(String(a.id));
+    if (!table) {
+      for (const ev of g.events) {
+        for (const a of (Array.isArray(ev.add_ons) ? ev.add_ons : []) as any[]) {
+          const name = upgradeName(a.name);
+          const price = Math.round(Number(a.price ?? 0) * (1 + FEE_RATE));
+          const key = `${name.toLowerCase()}|${price}`;
+          let m = mods.find((x) => x.key === key);
+          if (!m) mods.push(m = { key, name, price, addonIds: {} });
+          (m.addonIds[ev.id] ??= []).push(String(a.id));
+        }
       }
     }
+    // v:3 adds the reporting category, the kind and the party size, so every
+    // existing item is rewritten once with its new reporting category.
     const sig = await sha(JSON.stringify({
-      n: itemName, loc: g.loc, c: categoryId, t: taxId, d: desired,
-      m: mods.map((m) => [m.name, m.price]), v: 2,
+      n: itemName, loc: g.loc, c: categoryId, rc: g.report, t: taxId, d: desired,
+      m: mods.map((m) => [m.name, m.price]),
+      k: g.kind, u: g.cfg.unit, p: g.events.map((ev) => partyOf(ev)), v: 3,
     }));
     const have = items.get(key);
     if (have && have.sig === sig && g.events.every((ev) => links.get(ev.id)?.square_item_id === have.square_item_id)) {
@@ -299,7 +450,7 @@ async function syncCatalog() {
       Object.assign(v.item_variation_data, {
         item_id: itemId,
         name: desired[i].name,
-        sku: `CL-${String(ev.id).slice(0, 8).toUpperCase()}`,
+        sku: `${g.cfg.skuPrefix}-${String(ev.id).slice(0, 8).toUpperCase()}`,
         ordinal: i,
         pricing_type: "FIXED_PRICING",
         price_money: money(desired[i].price),
@@ -354,8 +505,11 @@ async function syncCatalog() {
       name: itemName.slice(0, 255),
       description: "",
       product_type: "REGULAR",
-      categories: keepCategories(cur, categoryId, have?.category_id ?? null),
-      reporting_category: { id: categoryId },
+      categories: keepCategories(cur, categoryId, have?.category_id ?? null, g.report),
+      // Square's item-sales report groups by the REPORTING category, so that one
+      // is the kind's top-level category ("Classes" / "Experiences"), not the
+      // per-shop one. Square adds it to categories[] by itself; that is fine.
+      reporting_category: { id: g.report },
       tax_ids: [taxId],
       variations,
       modifier_list_info: mlObj
@@ -366,13 +520,44 @@ async function syncCatalog() {
     delete obj.item_data.description_html;
     delete obj.item_data.description_plaintext;
 
-    const res = await sq("/v2/catalog/batch-upsert", {
-      method: "POST",
-      body: JSON.stringify({
-        idempotency_key: crypto.randomUUID(),
-        batches: [{ objects: mlObj ? [mlObj, obj] : [obj] }],
-      }),
-    });
+    // The 5-minute cron and a checkout "ensure" can run at the same time, so
+    // CREATING an item is keyed deterministically on (env, item key, sig): two
+    // runs can never make two items for one class. An update keeps a random key
+    // (its object id is already the thing being written). (2026-10-09)
+    const batches = [{ objects: mlObj ? [mlObj, obj] : [obj] }];
+    const creating = !cur;
+    let res: Record<string, any>;
+    try {
+      res = await sq("/v2/catalog/batch-upsert", {
+        method: "POST",
+        body: JSON.stringify({
+          idempotency_key: creating
+            ? `ci-${ENV}-${await sha(key)}-${sig}`.slice(0, 128)
+            : crypto.randomUUID(),
+          batches,
+        }),
+      });
+    } catch (e) {
+      if (!creating || !isIdemReuse(e)) throw e;
+      const row = await itemRowFor(key);
+      if (row && row.square_item_id !== (have?.square_item_id ?? null)) {
+        // The other run created it. Its links were written with it: nothing to do.
+        out.adopted++;
+        continue;
+      }
+      if (!row) {
+        // The other run has not written its rows yet. The next sync picks it up.
+        out.raced++;
+        console.error("catalog idempotency race", key);
+        continue;
+      }
+      // Our own earlier run burned this key and the item has since been deleted
+      // in Square: create a fresh one.
+      res = await sq("/v2/catalog/batch-upsert", {
+        method: "POST",
+        body: JSON.stringify({ idempotency_key: crypto.randomUUID(), batches }),
+      });
+    }
     const map = new Map<string, string>(
       (res.id_mappings ?? []).map((m: any) => [m.client_object_id, m.object_id]),
     );
@@ -411,39 +596,49 @@ async function syncCatalog() {
     out.written++;
   }
 
-  // Items whose classes have all passed / been archived: delete from Square.
-  for (const [key, row] of items) {
-    if (groups.has(key)) continue;
-    try { await sq(`/v2/catalog/object/${row.square_item_id}`, { method: "DELETE" }); }
-    catch (e) { if (!(e instanceof SqErr && e.status === 404)) throw e; }
-    await admin.from("class_square_items").delete().eq("env", ENV).eq("item_key", key);
-    out.deleted++;
-  }
-  // Links for events no longer upcoming (their variation went with the item
-  // rewrite). Keep links for past classes a week so late returns still map.
-  const live = new Set(events.map((e) => e.id));
-  const stale = (linkRows ?? []).filter((l) => !live.has(l.event_id)).map((l) => l.event_id);
-  if (stale.length) {
-    const { data: old } = await admin.from("events").select("id,date").in("id", stale);
-    const cutoff = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
-    const drop = (old ?? []).filter((e) => !e.date || e.date < cutoff).map((e) => e.id);
-    if (drop.length) await admin.from("class_square_links").delete().eq("env", ENV).in("event_id", drop);
+  // "ensure" touches one group only: it must never delete another item or drop
+  // another event's link.
+  if (!scoped) {
+    // Items whose events have all passed / been archived: delete from Square.
+    for (const [key, row] of items) {
+      if (groups.has(key)) continue;
+      try { await sq(`/v2/catalog/object/${row.square_item_id}`, { method: "DELETE" }); }
+      catch (e) { if (!(e instanceof SqErr && e.status === 404)) throw e; }
+      await admin.from("class_square_items").delete().eq("env", ENV).eq("item_key", key);
+      out.deleted++;
+    }
+    // Links for events no longer upcoming (their variation went with the item
+    // rewrite). Keep links for past classes a week so late returns still map.
+    const live = new Set(events.map((e) => e.id));
+    const stale = (linkRows ?? []).filter((l) => !live.has(l.event_id)).map((l) => l.event_id);
+    if (stale.length) {
+      const { data: old } = await admin.from("events").select("id,date").in("id", stale);
+      const cutoff = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+      const drop = (old ?? []).filter((e) => !e.date || e.date < cutoff).map((e) => e.id);
+      if (drop.length) await admin.from("class_square_links").delete().eq("env", ENV).in("event_id", drop);
+    }
   }
   return out;
 }
 
 // ---------------------------------------------------------------- inventory
-async function syncInventory(force = false) {
-  const events = await upcomingClasses();
+// onlyEventIds limits the push to one group's links ("ensure"); the 5-minute
+// sync passes nothing and pushes every linked event.
+async function syncInventory(force = false, onlyEventIds?: Set<string>) {
+  const events = await upcomingEvents();
   const byId = new Map(events.map((e) => [e.id, e]));
   const { data: links } = await admin.from("class_square_links").select("*").eq("env", ENV);
   const changes: any[] = [];
   const updates: { event_id: string; left: number }[] = [];
   for (const l of links ?? []) {
+    if (onlyEventIds && !onlyEventIds.has(l.event_id)) continue;
     const ev = byId.get(l.event_id);
     if (!ev) continue;
     const { data: taken } = await admin.rpc("ticket_seats_taken", { p_event_id: ev.id });
-    const left = Math.max(0, Number(ev.capacity ?? 0) - Number(taken ?? 0));
+    const seats = Math.max(0, Number(ev.capacity ?? 0) - Number(taken ?? 0));
+    // A tabled event's stock is TABLES, not seats: a 24-seat Mahjong night with
+    // party_size 4 and one table sold has 5 tables left. (2026-10-09)
+    const left = kindCfg(ev.kind)?.unit === "table" ? Math.floor(seats / partySizeOf(ev)) : seats;
     const fresh = l.stock_at && Date.now() - new Date(l.stock_at).getTime() < 6 * 3600e3;
     if (!force && l.stock_set === left && fresh) continue;
     changes.push({
@@ -467,6 +662,48 @@ async function syncInventory(force = false) {
       .eq("env", ENV).eq("event_id", u.event_id);
   }
   return { pushed: changes.length };
+}
+
+// ------------------------------------------------------------------- ensure
+// Called by square-ticket-pay at checkout when an event has no usable
+// class_square_links row, so every online sale reaches Square as a real
+// catalog line instead of an ad-hoc one (2026-10-09). It syncs only the group
+// that holds this event (the whole group, so the item stays complete), deletes
+// nothing, then pushes that group's stock and hands back the link row.
+async function ensure(eventId: string) {
+  const id = String(eventId ?? "").trim();
+  if (!id) return { link: null, reason: "no event id" };
+  const { data: ev } = await admin.from("events")
+    .select("id,title,date,time,price,capacity,location,kind,party_size,archived,add_ons")
+    .eq("id", id).maybeSingle();
+  if (!ev) return { link: null, reason: "not found" };
+  if (ev.archived) return { link: null, reason: "archived" };
+  if (!(Number(ev.price) > 0)) return { link: null, reason: "price 0" };
+  if (!salesOpen(ev)) return { link: null, reason: "sales closed" };
+  if (!kindCfg(ev.kind)) return { link: null, reason: `unsupported kind ${String(ev.kind)}` };
+  if (!(await reportingCategory(String(ev.kind)))) {
+    return { link: null, reason: "pending reporting category" };
+  }
+  try {
+    await locationFor(ev);
+  } catch (e) {
+    return { link: null, reason: `no location: ${String(e instanceof Error ? e.message : e).slice(0, 120)}` };
+  }
+
+  const catalog = await syncCatalog({ onlyEventId: id });
+  const ids: string[] = (catalog.event_ids as string[] | undefined) ?? [id];
+  let inventory: unknown;
+  try {
+    inventory = await syncInventory(false, new Set(ids));
+  } catch (e) {
+    // The item is what checkout needs; a stock push that failed is not fatal.
+    inventory = `error: ${String(e instanceof Error ? e.message : e).slice(0, 200)}`;
+  }
+  const { data: link } = await admin.from("class_square_links").select("*")
+    .eq("env", ENV).eq("event_id", id).maybeSingle();
+  return link
+    ? { link, catalog, inventory }
+    : { link: null, reason: "catalog sync produced no link", catalog, inventory };
 }
 
 // --------------------------------------------------------------------- pull
@@ -556,6 +793,18 @@ async function pull(days?: number) {
 
   const { data: links } = await admin.from("class_square_links").select("event_id,square_variation_id").eq("env", ENV);
   const varToEvent = new Map((links ?? []).map((l) => [l.square_variation_id, l.event_id]));
+  // A tabled event's variation IS one table, so a register line of quantity 2
+  // is 2 tables = 2 x party_size seats. Classes keep party 1. (2026-10-09)
+  const kindOf = new Map<string, { kind: string; party: number }>();
+  if (varToEvent.size) {
+    const { data: evs } = await admin.from("events").select("id,kind,party_size")
+      .in("id", [...new Set(varToEvent.values())]);
+    for (const e of evs ?? []) kindOf.set(e.id, { kind: String(e.kind), party: partySizeOf(e) });
+  }
+  const seatsPerUnit = (eventId: string) => {
+    const inf = kindOf.get(eventId);
+    return kindCfg(inf?.kind)?.unit === "table" ? (inf?.party ?? 1) : 1;
+  };
   const out = { scanned: 0, added: 0, returns: 0, ticket_refunds: 0, skipped_online: 0 };
   // No class links for this env used to return early here. The scan has to run
   // either way now: a refund made in Square on a ticket-site order only reaches
@@ -598,8 +847,24 @@ async function pull(days?: number) {
           .eq("env", ENV).eq("square_order_id", o.id).eq("line_uid", li.uid).maybeSingle();
         if (seen) continue;
 
-        const qty = Math.max(1, Math.round(Number(li.quantity ?? 1)));
+        const units = Math.max(1, Math.round(Number(li.quantity ?? 1)));
+        const perUnit = seatsPerUnit(eventId);
+        // Seats: the line quantity for a class, tables x party_size for a
+        // tabled event.
+        const qty = units * perUnit;
         const who = await customerOf(o);
+        const total = Number(li.total_money?.amount ?? 0);
+        // Upgrades rung as modifiers apply to every seat on the line. A tabled
+        // event has no modifier list, so there is nothing to read.
+        const addOns = perUnit > 1 ? [] : ((li.modifiers ?? []) as any[]).map((m) => ({
+          name: cleanLine(m.name, 120),
+          qty: qty * Math.max(1, Math.round(Number(m.quantity ?? 1))),
+          price: Math.round(Number(m.base_price_money?.amount ?? 0) / (1 + FEE_RATE)),
+        }));
+        // optText feeds the guest roster below, so it has to exist before the
+        // notes are built — it used to be read in guests.map() one statement
+        // before its own const, which threw on any line with a note.
+        const optText = addOns.map((a) => a.name).join(", ");
         const guests = String(li.note ?? "").split(/[,;\n]+/).map((s) => cleanLine(s, 80)).filter(Boolean);
         const notes = [
           `Sold at the register${ENV === "sandbox" ? " [SANDBOX TEST]" : ""} · Square order ${o.id}`,
@@ -607,14 +872,6 @@ async function pull(days?: number) {
             ? `Guests: ${guests.map((gn) => optText ? `${gn} (${optText})` : gn).join("; ")}`
             : "",
         ].filter(Boolean).join("\n");
-        const total = Number(li.total_money?.amount ?? 0);
-        // Upgrades rung as modifiers apply to every seat on the line.
-        const addOns = ((li.modifiers ?? []) as any[]).map((m) => ({
-          name: cleanLine(m.name, 120),
-          qty: qty * Math.max(1, Math.round(Number(m.quantity ?? 1))),
-          price: Math.round(Number(m.base_price_money?.amount ?? 0) / (1 + FEE_RATE)),
-        }));
-        const optText = addOns.map((a) => a.name).join(", ");
         const { data: reg, error } = await admin.from("registrations").insert({
           event_id: eventId,
           code: bookingCode(),
@@ -655,7 +912,8 @@ async function pull(days?: number) {
           const { data: done } = await admin.from("class_register_sales").select("line_uid")
             .eq("env", ENV).eq("square_order_id", sale.square_order_id).eq("line_uid", key).maybeSingle();
           if (done) continue;
-          const n = Math.max(1, Math.round(Number(rl.quantity ?? 1)));
+          // Returned units are tables for a tabled event: n is always seats.
+          const n = Math.max(1, Math.round(Number(rl.quantity ?? 1))) * seatsPerUnit(sale.event_id);
           const returned = Math.min(sale.qty, sale.returned_qty + n);
           await admin.from("class_register_sales").insert({
             env: ENV, square_order_id: sale.square_order_id, line_uid: key, event_id: sale.event_id,
@@ -730,6 +988,7 @@ Deno.serve(async (req) => {
   try {
     let result: unknown;
     if (action === "catalog") result = await syncCatalog();
+    else if (action === "ensure") result = await ensure(String(body.eventId ?? body.event_id ?? ""));
     else if (action === "inventory") result = await syncInventory(!!body.force);
     else if (action === "pull") result = await pull(body.days ? Number(body.days) : undefined);
     else if (action === "simulate") result = await simulate(body);
