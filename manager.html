@@ -707,27 +707,29 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
   </div>
   <div id="inqModal" class="rec-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:980;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 10px;" onclick="if(event.target===this)inqClose()">
     <div class="rec-card" style="background:#fff;max-width:720px;width:100%;border-radius:14px;padding:22px;">
-      <div style="display:flex;align-items:flex-start;gap:10px;">
-        <div style="flex:1;min-width:0;"><h3 id="inqTitle" style="margin:0 0 4px;"></h3><div id="inqMeta" class="hint" style="margin:0;"></div></div>
-        <select id="inqStage" class="loc-sel" onchange="inqSetStage(this.value)">
+      <div class="cat-mhead" style="padding-bottom:0;">
+        <div style="flex:1;min-width:0;"><h3 id="inqTitle"></h3><div id="inqMeta" class="hint"></div></div>
+        <div class="cat-mhead-r"><span class="cat-stagelbl">Stage</span><select id="inqStage" class="loc-sel" onchange="inqSetStage(this.value)">
           <option value="new">New</option><option value="replied">Replied</option><option value="link_sent">Booking link sent</option><option value="booked">Booked</option><option value="lost">Lost</option>
         </select>
-        <button class="btn btn-ghost btn-sm" onclick="inqClose()">✕</button>
+        <button class="btn btn-ghost btn-sm" onclick="inqClose()">✕</button></div>
       </div>
       <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;margin:10px 0 0;cursor:pointer;">
         <input type="checkbox" id="inqHideCal" onchange="inqSetHideCal(this.checked)">
         🔒 Hide this conversation from the staff calendar <span class="hint" style="margin:0;">(for anything sensitive — it stays here)</span>
       </label>
-      <div id="inqThread" style="margin:16px 0;max-height:46vh;overflow-y:auto;"></div>
-      <div class="rf full"><label>Reply</label>
-        <select id="inqQuick" class="loc-sel" style="margin-bottom:6px;" onchange="inqQuickPick(this)"><option value="">Quick replies…</option></select>
-        <textarea id="inqBody" rows="5" placeholder="Write your reply…"></textarea></div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center;">
-        <button class="btn btn-ghost btn-sm" onclick="inqInsertLink()">🔗 Booking link</button>
-        <button class="btn btn-ghost btn-sm" onclick="inqLog(false)">📥 Log their reply</button>
-        <button class="btn btn-ghost btn-sm" onclick="inqLog(true)">📝 Add note</button>
-        <span class="save-msg" id="inqMsg" style="flex:1;"></span>
-        <button class="btn btn-gold" id="inqSend" onclick="inqSend()">Send reply ✉️</button>
+      <div class="cat-sec soft"><h4>Conversation</h4><div id="inqThread"></div></div>
+      <div class="cat-sec"><h4>Reply</h4>
+        <div class="rf full">
+          <select id="inqQuick" class="loc-sel" style="margin-bottom:6px;" onchange="inqQuickPick(this)"><option value="">Quick replies…</option></select>
+          <textarea id="inqBody" rows="5" placeholder="Write your reply…"></textarea></div>
+        <div class="cat-sec-actions">
+          <button class="btn btn-ghost btn-sm" onclick="inqInsertLink()">🔗 Booking link</button>
+          <button class="btn btn-ghost btn-sm" onclick="inqLog(false)">📥 Log their reply</button>
+          <button class="btn btn-ghost btn-sm" onclick="inqLog(true)">📝 Add note</button>
+          <span class="save-msg" id="inqMsg" style="flex:1;"></span>
+          <button class="btn btn-gold" id="inqSend" onclick="inqSend()">Send reply ✉️</button>
+        </div>
       </div>
     </div>
   </div>
@@ -752,43 +754,117 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     .cat-item .ci-note{ grid-column:1/-1; font-size:.8rem; }
     .cat-item .ci-amt{ text-align:right; font-weight:700; font-size:.88rem; }
     @media (max-width:640px){ .cat-item{ grid-template-columns:1fr 60px 84px 32px; } .cat-item .ci-amt{ display:none; } }
+    /* CAT-LOOK (2026-10-09): separation + clear tabs. List page: title + tools row, kind tabs (underline), stage
+       filter pills, then the list. Lead modal: header facts as pills, a full-width tab strip, and every pane split
+       into boxed sections (.cat-sec) with small uppercase headings — the BEO tab already worked that way. */
+    .cat-pagehead{ display:flex; align-items:flex-start; gap:14px; flex-wrap:wrap; }
+    .cat-pagehead > .cat-pagetitle{ flex:1 1 320px; min-width:0; }
+    .cat-pagehead .hint{ margin-bottom:0; }
+    .cat-tools{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding-top:2px; }
+    .cat-how{ display:inline; }
+    .cat-how summary{ display:inline; cursor:pointer; color:#06273a; font-weight:700; list-style:none; }
+    .cat-how summary::-webkit-details-marker{ display:none; }
+    .cat-how summary::after{ content:' ▾'; font-size:.8em; }
+    .cat-how[open] summary::after{ content:' ▴'; }
+    .cat-how > div{ margin-top:10px; padding:12px 14px; background:#f6f8fa; border:1px solid var(--line); border-radius:10px; line-height:1.55; }
+    .cat-kinds{ display:flex; gap:2px; border-bottom:2px solid var(--line); margin:16px 0 0; overflow-x:auto; scrollbar-width:none; }
+    .cat-kinds::-webkit-scrollbar{ display:none; }
+    .cat-kinds .ctab{ appearance:none; background:none; border:0; border-bottom:3px solid transparent; margin-bottom:-2px; padding:11px 14px; font:inherit; font-size:.86rem; font-weight:700; color:var(--sub); cursor:pointer; white-space:nowrap; display:inline-flex; align-items:center; gap:7px; border-radius:8px 8px 0 0; }
+    .cat-kinds .ctab:hover{ color:var(--ink); background:#f4f6f8; }
+    .cat-kinds .ctab.on{ color:#06273a; border-bottom-color:#06273a; }
+    .cat-kinds .ctab .cnt{ font-size:.68rem; font-weight:800; background:#eef0f3; color:#4a5462; border-radius:999px; padding:1px 7px; min-width:22px; text-align:center; line-height:1.5; }
+    .cat-kinds .ctab.on .cnt{ background:#06273a; color:#fff; }
+    .cat-stages{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:12px 0 14px; }
+    .cat-stages .lbl{ font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--sub); margin-right:4px; }
+    .cat-stages .chip{ padding:5px 12px; font-size:.76rem; border-radius:999px; }
+    .cat-stages .chip b{ font-weight:800; opacity:.65; margin-left:4px; }
+    .cat-stages .chip.on b{ opacity:.9; }
+    .cat-stages .sep{ width:1px; height:18px; background:var(--line); margin:0 4px; }
+    #catList .rec-row{ padding:14px 16px; }
+    #catList .res-r-meta{ margin-top:3px; }
+    /* lead modal */
+    #catModal .cat-mhead, #inqModal .cat-mhead{ display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; padding-bottom:16px; }
+    #catModal .cat-mhead h3, #inqModal .cat-mhead h3{ margin:0; font-size:1.18rem; }
+    #catModal .cat-mhead-r, #inqModal .cat-mhead-r{ display:flex; align-items:center; gap:8px; }
+    .cat-stagelbl{ font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.4px; color:var(--sub); }
+    #catMeta, #inqMeta{ display:flex; flex-wrap:wrap; gap:6px 6px; margin:8px 0 0 !important; }
+    .cat-fact{ display:inline-flex; align-items:center; gap:4px; background:#f3f5f7; border:1px solid var(--line); border-radius:999px; padding:3px 10px; font-size:.78rem; line-height:1.4; color:#3f4854; max-width:100%; }
+    .cat-fact a{ color:#06273a; }
+    #catModal .cat-tabbar{ display:flex; gap:2px; align-items:flex-end; border-bottom:2px solid var(--line); margin:0 -22px; padding:0 22px; overflow-x:auto; scrollbar-width:none; background:#f3f5f7; }
+    #catModal .cat-tabbar::-webkit-scrollbar{ display:none; }
+    #catModal .cat-tabbar .chip{ background:none; border:0; border-bottom:3px solid transparent; border-radius:8px 8px 0 0; margin-bottom:-2px; padding:12px 16px; font-size:.88rem; font-weight:700; color:var(--sub); white-space:nowrap; }
+    #catModal .cat-tabbar .chip:hover{ color:var(--ink); background:#e9edf1; border-color:transparent; border-bottom-color:transparent; }
+    #catModal .cat-tabbar .chip.on{ background:#fff; color:#06273a; border-bottom-color:#06273a; }
+    #catModal .cat-pane{ padding-top:4px; }
+    .cat-sec{ border:1px solid var(--line); border-radius:12px; padding:14px 16px 16px; margin-top:14px; background:#fff; }
+    .cat-sec > h4{ margin:0 0 10px; font-size:.72rem; letter-spacing:.8px; text-transform:uppercase; color:#475569; font-weight:800; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .cat-sec > h4 .r{ margin-left:auto; display:flex; gap:6px; align-items:center; font-weight:400; text-transform:none; letter-spacing:0; font-size:.78rem; color:var(--sub); }
+    .cat-sec > h4 .pill{ letter-spacing:.4px; }
+    .cat-sec.soft{ background:#f8fafc; }
+    .cat-sec .cat-grid{ margin:0; }
+    .cat-sec .ctpl-hint, .cat-sec .hint{ margin-bottom:0; }
+    .cat-sec details > summary{ cursor:pointer; font-size:.72rem; letter-spacing:.8px; text-transform:uppercase; color:#475569; font-weight:800; }
+    .cat-sec details[open] > summary{ margin-bottom:10px; }
+    #catThread, #inqThread{ max-height:46vh; overflow-y:auto; margin:0 !important; }
+    .cat-addrow{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; align-items:center; }
+    .cat-statusbar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:14px; }
+    .cat-sec-actions{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; align-items:center; }
+    #catBeo .beo-sec{ border:1px solid var(--line); border-radius:12px; padding:14px 16px 16px; margin-top:14px; background:#fff; }
+    #catBeo .beo-sec > h4{ font-size:.72rem; font-weight:800; margin-bottom:10px; }
+    #catBeo .beo-head{ margin-top:14px; }
+    @media (max-width:640px){
+      #catModal .cat-tabbar .chip{ padding:11px 12px; font-size:.82rem; } .cat-sec{ padding:12px 12px 14px; } .cat-kinds .ctab{ padding:10px 11px; font-size:.82rem; }
+      /* list rows: name + details on the first line, time + stage on their own line underneath */
+      #catList .rec-row{ flex-wrap:wrap; gap:6px 10px; padding:12px 14px; }
+      #catList .rec-row > div{ flex:1 1 calc(100% - 24px) !important; min-width:0; }   /* beats the inline flex:1 */
+      #catList .res-r-time{ margin-left:20px; font-size:.78rem; }
+      #catList .rec-row > .pill{ margin-left:auto; }
+    }
   </style>
   <!-- Catering leads: HoneyBook-style pipeline — conversation → proposal → e-signed contract → Square invoice -->
   <div id="panel-catering" class="panel">
     <div class="section-card">
-      <h2>💼 Catering Leads</h2>
-      <div class="hint"><strong>Every inquiry lands here</strong> — catering, private events, experiences and Nashville table requests from the inquiry form (and any you add by hand). Memphis tables booked on the form go straight into Reservations. Experiences open their own conversation with the held time and booking link; catering and private events get the proposal and invoice. Reply here and it's emailed from info@greyscheese.com; their replies come back in automatically (Gmail sync). Build the <strong>Proposal</strong>, send it, and the customer signs online — that <strong>creates a Square invoice</strong> (deposit now, balance before the event) with the signed agreement attached. No proposal needed? <strong>🧾 Save &amp; send invoice</strong> skips the signature and emails the Square invoice right away. Payment status refreshes from Square every 15 minutes.</div>
-      <div class="toolbar" id="catKinds" style="margin-bottom:6px;"></div>
-      <div class="toolbar" id="catChips"></div>
+      <div class="cat-pagehead">
+        <div class="cat-pagetitle">
+          <h2>💼 Catering Leads</h2>
+          <div class="hint"><strong>Every inquiry lands here</strong> — catering, private events, experiences and Nashville table requests from the inquiry form, plus any you add by hand.
+            <details class="cat-how"><summary>How it works</summary><div>Memphis tables booked on the form go straight into Reservations. Experiences open their own conversation with the held time and booking link; catering and private events get the proposal and invoice. Reply here and it's emailed from info@greyscheese.com; their replies come back in automatically (Gmail sync). Build the <strong>Proposal</strong>, send it, and the customer signs online — that <strong>creates a Square invoice</strong> (deposit now, balance before the event) with the signed agreement attached. No proposal needed? <strong>🧾 Save &amp; send invoice</strong> skips the signature and emails the Square invoice right away. Payment status refreshes from Square every 15 minutes.</div></details></div>
+        </div>
+        <div class="cat-tools" id="catTools"></div>
+      </div>
+      <div class="cat-kinds" id="catKinds"></div>
+      <div class="cat-stages" id="catChips"></div>
       <div class="rec-list" id="catList"><div class="rec-empty">Loading…</div></div>
     </div>
   </div>
   <div id="catModal" class="rec-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:980;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 10px;" onclick="if(event.target===this)catClose()">
     <div class="rec-card" style="background:#fff;max-width:900px;width:100%;border-radius:14px;padding:22px;">
-      <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:220px;"><h3 id="catTitle" style="margin:0 0 4px;"></h3><div id="catMeta" class="hint" style="margin:0;"></div></div>
-        <select id="catStage" class="loc-sel" onchange="catSetStage(this.value)"></select>
-        <button class="btn btn-ghost btn-sm" onclick="catClose()">✕</button>
+      <div class="cat-mhead">
+        <div style="flex:1;min-width:220px;"><h3 id="catTitle"></h3><div id="catMeta" class="hint"></div></div>
+        <div class="cat-mhead-r"><span class="cat-stagelbl">Stage</span><select id="catStage" class="loc-sel" onchange="catSetStage(this.value)"></select>
+        <button class="btn btn-ghost btn-sm" onclick="catClose()">✕</button></div>
       </div>
-      <div class="toolbar" style="margin:14px 0 0;">
+      <div class="cat-tabbar" id="catTabs">
         <button class="chip on" id="catTabConvo" onclick="catView('convo')">💬 Conversation</button>
         <button class="chip" id="catTabQuote" onclick="catView('quote')">📄 Proposal &amp; Invoice</button>
       </div>
 
-      <div id="catConvo">
-        <div id="catThread" style="margin:16px 0;max-height:46vh;overflow-y:auto;"></div>
-        <div class="rf full"><label>Reply</label>
-          <select id="catQuick" class="loc-sel" style="margin-bottom:6px;" onchange="catQuickPick(this)"><option value="">Quick replies…</option></select>
-          <textarea id="catBody" rows="5" placeholder="Write your reply…"></textarea></div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center;">
-          <button class="btn btn-ghost btn-sm" onclick="catLog(false)">📥 Log their reply</button>
-          <button class="btn btn-ghost btn-sm" onclick="catLog(true)">📝 Add note</button>
-          <span class="save-msg" id="catMsg" style="flex:1;"></span>
-          <button class="btn btn-gold" id="catSend" onclick="catSend()">Send reply ✉️</button>
+      <div id="catConvo" class="cat-pane">
+        <div class="cat-sec soft"><h4>Conversation</h4><div id="catThread"></div></div>
+        <div class="cat-sec"><h4>Reply</h4>
+          <div class="rf full">
+            <select id="catQuick" class="loc-sel" style="margin-bottom:6px;" onchange="catQuickPick(this)"><option value="">Quick replies…</option></select>
+            <textarea id="catBody" rows="5" placeholder="Write your reply…"></textarea></div>
+          <div class="cat-sec-actions">
+            <button class="btn btn-ghost btn-sm" onclick="catLog(false)">📥 Log their reply</button>
+            <button class="btn btn-ghost btn-sm" onclick="catLog(true)">📝 Add note</button>
+            <span class="save-msg" id="catMsg" style="flex:1;"></span>
+            <button class="btn btn-gold" id="catSend" onclick="catSend()">Send reply ✉️</button>
+          </div>
         </div>
       </div>
 
-      <div id="catQuote" style="display:none;margin-top:16px;"></div>
+      <div id="catQuote" class="cat-pane" style="display:none;"></div>
     </div>
   </div>
   <div id="catNewModal" class="rec-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:990;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 10px;" onclick="if(event.target===this)this.style.display='none'">
@@ -1929,13 +2005,14 @@ function catRender(){
   all.filter(isOpen).forEach(x=>{ kc.all++; kc[x.kind]++; });
   const kd = document.getElementById('catKinds');
   if(kd) kd.innerHTML = [['all','All inquiries'],['catering','Catering'],['event','Private events'],['experience','Experiences'],['table','Table requests']].map(([k,l])=>
-    '<button class="chip'+(CAT_KIND===k?' on':'')+'" onclick="CAT_KIND=\''+k+'\';catRender()">'+l+' · '+kc[k]+'</button>').join('');
+    '<button class="ctab'+(CAT_KIND===k?' on':'')+'" onclick="CAT_KIND=\''+k+'\';catRender()">'+l+'<span class="cnt">'+kc[k]+'</span></button>').join('');
+  const tools = document.getElementById('catTools');
+  if(tools && !tools.querySelector('button')) tools.innerHTML = '<button class="btn btn-ghost btn-sm" onclick="catLoad();inqLoad()">↻ Refresh</button><button class="btn btn-gold btn-sm" onclick="catNew()">＋ New lead</button>';
   const mine = all.filter(x=> CAT_KIND==='all' || x.kind===CAT_KIND);
   const counts = { open:0 }; Object.keys(CAT_STAGES).forEach(k=>counts[k]=0);
   mine.forEach(x=>{ counts[x.stage]=(counts[x.stage]||0)+1; if(isOpen(x)) counts.open++; });
-  document.getElementById('catChips').innerHTML = [['open','Open'],...Object.entries(CAT_STAGES),['all','All']].map(([k,l])=>
-    '<button class="chip'+(CAT_FILTER===k?' on':'')+'" onclick="CAT_FILTER=\''+k+'\';catRender()">'+l+(k==='all'?'':' · '+(counts[k]||0))+'</button>').join('')
-    +'<div class="spacer"></div><button class="btn btn-ghost btn-sm" onclick="catLoad();inqLoad()">↻ Refresh</button><button class="btn btn-gold btn-sm" onclick="catNew()">＋ New lead</button>';
+  document.getElementById('catChips').innerHTML = '<span class="lbl">Stage</span>' + [['open','Open'],['sep'],...Object.entries(CAT_STAGES),['sep'],['all','All']].map(([k,l])=>
+    k==='sep' ? '<span class="sep"></span>' : '<button class="chip'+(CAT_FILTER===k?' on':'')+'" onclick="CAT_FILTER=\''+k+'\';catRender()">'+l+(k==='all'?'':'<b>'+(counts[k]||0)+'</b>')+'</button>').join('');
   const rows = mine.filter(x=> CAT_FILTER==='all' ? true : CAT_FILTER==='open' ? isOpen(x) : x.stage===CAT_FILTER);
   const el = document.getElementById('catList');
   if(!rows.length){ el.innerHTML = '<div class="rec-empty">Nothing here.</div>'; return; }
@@ -1979,10 +2056,10 @@ async function catOpen(id){
 function catHead(){
   const r = CAT_CUR;
   document.getElementById('catTitle').textContent = r.name + (r.company ? ' — ' + r.company : '');
-  document.getElementById('catMeta').innerHTML = [ '<a href="mailto:'+esc(r.email)+'">'+esc(r.email)+'</a>', r.phone?esc(r.phone):'',
-    r.event_date?'📅 '+fmtDisplay(r.event_date)+(r.event_time?' '+catTime(r.event_time):''):'', r.guests?'👥 '+r.guests:'',
-    r.fulfillment?CAT_FUL[r.fulfillment]:'', r.location||'', '#'+esc(r.code) ].filter(Boolean).join(' · ')
-    + (r.address?'<div style="margin-top:3px;">📍 '+esc(r.address)+'</div>':'') + (r.budget?'<div style="margin-top:3px;">Budget: '+esc(r.budget)+'</div>':'');
+  const fact = x => x ? '<span class="cat-fact">'+x+'</span>' : '';
+  document.getElementById('catMeta').innerHTML = fact('<a href="mailto:'+esc(r.email)+'">'+esc(r.email)+'</a>') + fact(r.phone?esc(r.phone):'')
+    + fact(r.event_date?'📅 '+fmtDisplay(r.event_date)+(r.event_time?' · '+catTime(r.event_time):''):'') + fact(r.guests?'👥 '+r.guests:'')
+    + fact(r.fulfillment?CAT_FUL[r.fulfillment]:'') + fact(r.location||'') + fact(r.address?'📍 '+esc(r.address):'') + fact(r.budget?'Budget: '+esc(r.budget):'') + fact('#'+esc(r.code));
 }
 function catView(which){
   document.getElementById('catConvo').style.display = which==='convo' ? '' : 'none';
@@ -2084,35 +2161,36 @@ function catQuoteRender(copyFrom){
   const status = q ? '<span class="pill '+(q.status==='sent'?'pill-req':'pill-mid')+'">'+esc(CAT_QSTAT[q.status])+'</span>'
     + (q.sent_at?' <span class="hint" style="margin:0;">sent '+esc(inqWhen(q.sent_at))+'</span>':'') + (q.viewed_at?' <span class="hint" style="margin:0;">· 👀 opened '+esc(inqWhen(q.viewed_at))+'</span>':'') : '<span class="pill pill-mid">New proposal</span>';
   box.innerHTML =
-    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+status+'<div class="spacer" style="flex:1"></div>'
+    '<div class="cat-statusbar">'+status+'<div class="spacer" style="flex:1"></div>'
     + (q && q.status==='sent' ? '<button class="btn btn-ghost btn-sm" onclick="catCopyLink()">🔗 Copy link</button><a class="btn btn-ghost btn-sm" target="_blank" href="'+CAT_SITE+'?q='+esc(q.sign_token)+'">👁 Preview</a>' : '')
     + '</div>'
-    + '<h4 style="margin:16px 0 6px;">Event</h4><div class="cat-grid">'
+    + '<div class="cat-sec"><h4>Event</h4><div class="cat-grid">'
     +   catField('Name','cq_name',r.name) + catField('Email','cq_email',r.email,'email') + catField('Phone','cq_phone',r.phone||'','tel') + catField('Company','cq_company',r.company||'')
     +   catField('Event date','cq_date',r.event_date||'','date') + catField('Time','cq_time',r.event_time||'','time') + catField('Guests','cq_guests',r.guests||'','number')
     +   '<div class="rf"><label>Store</label><select id="cq_loc" class="loc-sel">'+['Memphis','Nashville'].map(l=>'<option'+(l===(r.location||'Memphis')?' selected':'')+'>'+l+'</option>').join('')+'</select></div>'
     +   '<div class="rf"><label>Service</label><select id="cq_ful" class="loc-sel"><option value="">—</option>'+Object.entries(CAT_FUL).map(([k,l])=>'<option value="'+k+'"'+(r.fulfillment===k?' selected':'')+'>'+l+'</option>').join('')+'</select></div>'
     +   catField('Occasion','cq_occ',r.occasion||'')
     +   '<div class="rf" style="grid-column:1/-1;"><label>Address</label><input id="cq_addr" value="'+esc(r.address||'')+'"></div>'
-    + '</div>'
-    + '<h4 style="margin:18px 0 6px;">Items</h4>'
+    + '</div></div>'
+    + '<div id="cq_coverSlot"></div>'
+    + '<div class="cat-sec"><h4>Items</h4>'
     + '<div id="catItems"></div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center;">'
+    + '<div class="cat-addrow">'
     +   '<button class="btn btn-ghost btn-sm" onclick="catAddItem()">＋ Custom line</button>'
     +   '<select id="catMenu" class="loc-sel" style="max-width:340px;" onchange="catMenuPick(this)"><option value="">＋ From the Square catering menu…</option></select>'
     +   '<button class="btn btn-ghost btn-sm" onclick="catAddItem(\'Delivery & set-up\',1,0)">＋ Delivery fee</button>'
-    + '</div>'
-    + '<div class="cat-grid" style="margin-top:14px;">'
+    + '</div></div>'
+    + '<div class="cat-sec"><h4>Pricing</h4><div class="cat-grid">'
     +   catField('Sales tax %','cq_tax', q?q.tax_rate:9.75,'number') + catField('Deposit %','cq_dep', q?q.deposit_pct:50,'number')
     +   '<div class="rf"><label>Balance due</label><input id="cq_bal" type="date" value="'+esc((q&&q.balance_due_date)||'')+'"><span style="font-size:.72rem;color:#64748b;">Blank = 3 days before the event</span></div>'
     + '</div>'
-    + '<div id="catTotals" class="cat-tot"></div>'
-    + '<div class="rf" style="margin-top:14px;"><label>Note for the customer (shows on the proposal or invoice)</label><textarea id="cq_note" rows="2">'+esc((src&&src.customer_note)||'')+'</textarea></div>'
-    + '<details style="margin-top:14px;"><summary style="cursor:pointer;font-weight:700;">📜 Agreement text</summary>'
+    + '<div id="catTotals" class="cat-tot"></div></div>'
+    + '<div class="cat-sec"><h4>Note for the customer <span class="r">shows on the proposal or invoice</span></h4><div class="rf"><textarea id="cq_note" rows="2">'+esc((src&&src.customer_note)||'')+'</textarea></div></div>'
+    + '<div class="cat-sec"><details><summary>📜 Agreement text</summary>'
     +   '<div class="hint" style="margin:8px 0;">Placeholders fill in automatically: {{name}} {{event_date}} {{guests}} {{total}} {{deposit_pct}} {{deposit}} {{balance_due_date}}. Changes here apply to this proposal only.</div>'
     +   '<textarea id="cq_contract" rows="14" style="width:100%;font-family:inherit;font-size:.85rem;">'+esc((src&&src.contract_text)||CAT_TEMPLATE)+'</textarea>'
-    +   '<div style="margin-top:6px;"><button class="btn btn-ghost btn-sm" onclick="catSaveTemplate()">Save as the default for new proposals</button></div></details>'
-    + '<div class="rf" style="margin-top:14px;"><label>Message with the email (optional)</label><textarea id="cq_msg" rows="3" placeholder="Leave blank for the standard note"></textarea></div>'
+    +   '<div style="margin-top:6px;"><button class="btn btn-ghost btn-sm" onclick="catSaveTemplate()">Save as the default for new proposals</button></div></details></div>'
+    + '<div class="cat-sec"><h4>Email to the customer <span class="r">goes out with the proposal — blank = the standard note</span></h4><div class="rf"><textarea id="cq_msg" rows="3" placeholder="Leave blank for the standard note"></textarea></div></div>'
     + '<div class="cat-actions">'
     +   '<span class="save-msg" id="cqMsg"></span>'
     +   '<button class="btn btn-ghost" onclick="catSaveQuote(false)">💾 Save draft</button>'
@@ -2240,7 +2318,7 @@ function catLockedHtml(q){
   const split = q.deposit_pct>0 && q.deposit_pct<100, dep = Math.round(q.total_cents*q.deposit_pct/100);
   const items = (q.items||[]).map(it=>'<tr><td>'+esc(it.name)+(it.note?'<div style="font-size:.78rem;color:#64748b;">'+esc(it.note)+'</div>':'')+'</td><td class="n">'+esc(it.qty)+'</td><td class="n">'+catMoney(it.price_cents)+'</td><td class="n">'+catMoney(Math.round(it.qty*it.price_cents))+'</td></tr>').join('');
   const pill = q.status==='paid'?'pill-ok':q.status==='canceled'?'pill-bad':q.status==='deposit_paid'?'pill-ok':'pill-req';
-  return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="pill '+pill+'">'+esc(catQStat(q))+'</span>'
+  return '<div class="cat-statusbar"><span class="pill '+pill+'">'+esc(catQStat(q))+'</span>'
     + (q.square_env==='sandbox'?'<span class="pill pill-bad">Square SANDBOX</span>':'') + '<div style="flex:1"></div>'
     + (q.pdf_path?'<button class="btn btn-ghost btn-sm" onclick="catPdf(\''+q.id+'\')">📄 Signed PDF</button>':'')
     + (q.invoice_url?'<a class="btn btn-ghost btn-sm" target="_blank" href="'+esc(q.invoice_url)+'">🧾 Invoice'+(q.invoice_number?' #'+esc(q.invoice_number):'')+'</a>':'')
@@ -2249,7 +2327,7 @@ function catLockedHtml(q){
     + (q.signed_at?'<div style="margin:12px 0 0;font-size:.88rem;">✍️ Signed by <b>'+esc(q.signed_name)+'</b> · '+esc(inqWhen(q.signed_at))+(q.signed_ip?' <span style="color:#64748b;">· IP '+esc(q.signed_ip)+'</span>':'')+'</div>':'')
     + (q.invoice_only?'<div style="margin:12px 0 0;font-size:.88rem;">🧾 Invoiced straight from the portal — no proposal or signature.</div>':'')
     + (q.invoice_error && !q.square_invoice_id ? '<div style="margin:12px 0;padding:10px 12px;background:#fef2f2;color:#991b1b;border-radius:8px;">Square invoice failed: '+esc(q.invoice_error)+'<div style="margin-top:8px;"><button class="btn btn-gold btn-sm" onclick="catRetryInvoice(\''+q.id+'\')">Retry invoice</button></div></div>' : '')
-    + '<table class="cat-tbl"><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th></tr></thead><tbody>'+items+'</tbody></table>'
+    + '<div class="cat-sec"><h4>Proposal</h4><table class="cat-tbl" style="margin-top:0;"><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th></tr></thead><tbody>'+items+'</tbody></table>'
     + '<div class="cat-tot">'
     +   '<div><span>Subtotal</span><span>'+catMoney(q.subtotal_cents)+'</span></div>'
     +   '<div><span>Tax ('+Number(q.tax_rate)+'%)</span><span>'+catMoney(q.tax_cents)+'</span></div>'
@@ -2257,7 +2335,7 @@ function catLockedHtml(q){
     +   (split?'<div><span>Deposit ('+q.deposit_pct+'%)</span><span>'+catMoney(dep)+'</span></div>':'')
     +   '<div class="paid"><span>Paid so far</span><span>'+catMoney(q.amount_paid_cents)+'</span></div>'
     +   '<div><span>Still owed</span><span>'+catMoney(Math.max(0,q.total_cents-q.amount_paid_cents))+'</span></div>'
-    + '</div>'
+    + '</div></div>'
     + '<div class="cat-actions">'
     +   '<span class="save-msg" id="cqMsg"></span>'
     +   (['signed','invoiced'].includes(q.status)?'<button class="btn btn-ghost btn-sm" onclick="catCancelInvoice(\''+q.id+'\')">Cancel '+(q.square_invoice_id||q.invoice_only?'invoice':'proposal')+'</button>':'')
@@ -14658,7 +14736,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   function mount(){
     const tq = $('catTabQuote'); if(!tq || $('catTabBeo')) return;
     tq.insertAdjacentHTML('afterend', '<button class="chip" id="catTabBeo" onclick="catView(\'beo\')">📋 BEO</button>');
-    $('catQuote').insertAdjacentHTML('afterend', '<div id="catBeo" style="display:none;margin-top:16px;"></div>');
+    $('catQuote').insertAdjacentHTML('afterend', '<div id="catBeo" class="cat-pane" style="display:none;"></div>');
     const orig = window.catView;
     window.catView = function(which){
       if(which !== 'beo'){ $('catBeo').style.display='none'; $('catTabBeo').classList.remove('on'); return orig(which); }
@@ -14946,7 +15024,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
      PREVIEW (2026-10-09): 👁 on every Templates-manager row and in the editor (unsaved edits included) opens #ctplPrev,
      a mock of what the customer gets — packages as the catering.html proposal page (hero, photos, qty/pp, gratuity,
      tax, deposit, note), emails in the send-mail shell, agreements filled like the catering fn fills them. Uses the
-     open lead's details when there is one, otherwise sample ones (Jane Smith, 8 guests, a Saturday 3 weeks out). -->
+     open lead's details when there is one, otherwise sample ones (Jane Smith, 8 guests, a Saturday 3 weeks out).
+     CAT-LOOK (2026-10-09): the core's proposal editor is split into .cat-sec boxes; the cover photo fills #cq_coverSlot
+     as its own section, and the 📚 Templates button goes into #catTools (falls back to the old spots on main). -->
 <style id="cat-tpl-css">
   #ctplModal .rec-card{ max-height:none !important; display:block; }
   .ctpl-photo{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
@@ -15169,12 +15249,12 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 
   // proposal editor
   let COVER = '';                                     // cover photo of the proposal being edited
-  function coverHtml(){
-    return '<div class="rf" id="cq_cover" style="margin-top:14px;"><label>Cover photo (top of the customer’s proposal)</label>' + photoCtl('cq_coverctl', COVER, '', true) + '</div>';
+  function coverHtml(bare){                            // bare = inside the CAT-LOOK "Cover photo" section (heading is there)
+    return '<div class="rf" id="cq_cover"' + (bare ? '' : ' style="margin-top:14px;"') + '>' + (bare ? '' : '<label>Cover photo (top of the customer’s proposal)</label>') + photoCtl('cq_coverctl', COVER, '', true) + '</div>';
   }
   function coverRender(){
     const host = $('cq_cover'); if(!host) return;
-    host.outerHTML = coverHtml();
+    host.outerHTML = coverHtml(!!$('cq_coverSec'));
     photoBind('cq_coverctl', u => { COVER = u; coverRender(); });
   }
   function lockedThumbs(){
@@ -15193,7 +15273,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       const q = (typeof CAT_Q !== 'undefined' && CAT_Q) || null;
       COVER = okUrl(q && q.image_url ? q.image_url : (box.__coverFrom || ''));
       box.__coverFrom = '';
-      const itemsEl = $('catItems'); if(itemsEl && itemsEl.previousElementSibling) itemsEl.previousElementSibling.insertAdjacentHTML('beforebegin', coverHtml());
+      const slot = $('cq_coverSlot'), itemsEl = $('catItems');
+      if(slot) slot.outerHTML = '<div class="cat-sec" id="cq_coverSec"><h4>Cover photo <span class="r">top of the customer’s proposal</span></h4>' + coverHtml(true) + '</div>';   // CAT-LOOK sections
+      else if(itemsEl && itemsEl.previousElementSibling) itemsEl.previousElementSibling.insertAdjacentHTML('beforebegin', coverHtml());
       photoBind('cq_coverctl', u => { COVER = u; coverRender(); });
     }
     itemPhotos();
@@ -15581,7 +15663,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     });
     wrap('catRender', o => function(){
       const r = o.apply(this, arguments);
-      try{ const chips = $('catChips');
+      try{ const chips = $('catTools') || $('catChips');   // CAT-LOOK moved the buttons to #catTools
         if(chips && !chips.querySelector('.ctpl-btn')){
           const ref = [...chips.querySelectorAll('button')].find(b => /Refresh/.test(b.textContent));
           const html = '<button class="btn btn-ghost btn-sm ctpl-btn" onclick="ctplOpen()">📚 Templates</button>';
