@@ -873,6 +873,113 @@ body > div[style*="text-align:center"]{ background:#fff; }
 .dash .wg-stf{ box-shadow:inset 0 0 0 1px #f1dfb0, 0 12px 24px -18px rgba(15,23,42,.35); }
 }
 </style>
+<!-- HOME-V8 LAYOUT: "Edit tiles" (move / hide / add back) and the folding calendar card. Delete this block and the HOME-V8 script to drop it. -->
+<style id="home-v8-layout">
+@media screen{
+.dash{ grid-auto-flow:row dense; }
+.dash .wg[hidden]{ display:none !important; }
+.dash-tools{ display:flex; justify-content:flex-end; padding:2px 12px 0; }
+.dash-edit{ display:inline-flex; align-items:center; gap:5px; min-height:32px; padding:0 10px; border:0; background:none; color:#6b7280; font:inherit; font-size:.78rem; font-weight:700; cursor:pointer; }
+.dash-edit i{ font-size:15px; }
+.dash-edit:hover{ background:#f3f4f6; color:#161a1f; }
+.dash-edit:focus-visible{ outline:3px solid #e0a21c; outline-offset:1px; }
+body.home-editing .dash-tools{ display:none; }
+
+/* edit mode: dark bar on top, dashed tiles, a handle to drag and a minus to hide */
+.home-editbar{ position:sticky; top:8px; z-index:30; display:flex; align-items:center; gap:8px; margin:12px 16px 2px; padding:9px 9px 9px 14px;
+  background:rgba(22,26,31,.95); color:#fff; border-radius:14px; box-shadow:0 12px 26px -14px rgba(15,23,42,.7); }
+.heb-t{ flex:1 1 auto; min-width:0; line-height:1.2; }
+.heb-t b{ display:block; font-size:.92rem; font-weight:800; letter-spacing:-.2px; }
+.heb-t small{ display:block; margin-top:2px; font-size:.72rem; font-weight:600; color:rgba(255,255,255,.72); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.heb-t small i{ font-size:13px; vertical-align:-2px; }
+.heb-btn{ flex:none; min-height:36px; padding:0 12px; border:1px solid rgba(255,255,255,.25); background:transparent; color:#fff; font:inherit; font-size:.82rem; font-weight:800; cursor:pointer; }
+.heb-btn:hover{ background:rgba(255,255,255,.1); }
+.heb-done{ background:#e0a21c; border-color:#e0a21c; color:#161a1f; }
+.heb-done:hover{ background:#f0b532; }
+.heb-btn:focus-visible{ outline:3px solid #fde68a; outline-offset:2px; }
+.dash.editing .wg{ animation:none; }
+.dash.editing .wg[data-tile]{ outline:2px dashed rgba(22,26,31,.3); outline-offset:3px; cursor:grab; -webkit-touch-callout:none; }
+.dash.editing .wg[data-tile] > *:not(.wg-ctl){ pointer-events:none; }
+.dash.editing .wg:hover, .dash.editing .wg:active{ transform:none; }
+.dash.editing .wg-head .wg-chip{ visibility:hidden; }   /* the minus sits where the chip was */
+.wg-ctl{ position:absolute; inset:0; z-index:6; pointer-events:none; }
+.wg-grip{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:58px; height:46px; display:flex; align-items:center; justify-content:center; padding:0; border:0;
+  background:rgba(255,255,255,.96); color:#161a1f; box-shadow:0 8px 18px -8px rgba(15,23,42,.6); cursor:grab; touch-action:none; pointer-events:auto; }
+.wg-grip i{ font-size:26px; }
+.wg-hide{ position:absolute; top:8px; right:8px; width:34px; height:34px; display:flex; align-items:center; justify-content:center; padding:0; border:0;
+  background:#fff; color:#b91c1c; box-shadow:0 4px 12px -4px rgba(15,23,42,.55); cursor:pointer; pointer-events:auto; }
+.wg-hide i{ font-size:20px; }
+.wg-grip:focus-visible, .wg-hide:focus-visible{ outline:3px solid #e0a21c; outline-offset:2px; }
+.dash .wg.wg-lifted{ opacity:.3; }
+.dash .wg.wg-lifted .wg-ctl{ visibility:hidden; }
+.dash .wg-add{ grid-column:1 / -1; min-height:62px !important; flex-direction:row; align-items:center; justify-content:center; gap:8px; padding:0 16px;
+  background:transparent; color:#4b5563; border:2px dashed #cbd5e1; box-shadow:none !important; font-size:.92rem; font-weight:800; }
+.dash .wg-add i{ font-size:20px; }
+.dash .wg-add:hover{ background:#f8fafc; color:#161a1f; border-color:#94a3b8; transform:none; }
+.v8-ghostwrap{ position:fixed !important; left:0; top:0; width:0; height:0; margin:0; padding:0 !important; display:block !important; z-index:90; pointer-events:none; }
+.v8-ghostwrap .wg{ position:absolute; left:0; top:0; margin:0; animation:none !important; transition:none; cursor:grabbing;
+  box-shadow:0 28px 46px -18px rgba(15,23,42,.6), 0 0 0 2px rgba(224,162,28,.9) !important; }
+.v8-ghostwrap .wg-hide{ display:none; }
+.v8-ghostwrap, .v8-ghostwrap *{ pointer-events:none !important; }
+body.home-dragging, body.home-dragging *{ cursor:grabbing !important; -webkit-user-select:none; user-select:none; }
+body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer-events:none; }
+.dash .wg.wg-new{ animation:v8Pop .9s ease; }
+@keyframes v8Pop{ 0%{ box-shadow:0 0 0 0 rgba(224,162,28,0); } 25%{ box-shadow:0 0 0 5px #e0a21c; } 100%{ box-shadow:0 0 0 0 rgba(224,162,28,0); } }
+
+/* calendar card folds: chevron top right (the title works too); folded = just the dates */
+.today-card{ position:relative; }
+.today-fold{ position:absolute; top:14px; right:14px; z-index:2; width:36px; height:36px; display:flex; align-items:center; justify-content:center; padding:0;
+  border:1px solid #e3e3e0; background:#f3f3f1; color:#161a1f; cursor:pointer; }
+.today-fold:hover{ background:#e9e9e6; }
+.today-fold i{ font-size:18px; transition:transform .2s ease; }
+.today-fold:focus-visible{ outline:3px solid #e0a21c; outline-offset:2px; }
+.today-card .today-title{ padding-right:46px; cursor:pointer; }
+.today-card.folded{ padding-bottom:16px; }
+.today-card.folded .today-fold i{ transform:rotate(180deg); }
+.today-card.folded .today-head{ border-bottom:0; padding-bottom:0; margin-bottom:0; }
+.today-card.folded .today-title{ margin-bottom:0; }
+.today-card.folded .today-head .cal-nav, .today-card.folded .today-head .cal-today, .today-card.folded #todayList, .today-card.folded .today-all{ display:none !important; }
+@media(min-width:1000px){ .dash-tools{ padding:4px 24px 0; } .home-editbar{ margin:14px 28px 2px; } .today-fold{ top:20px; right:22px; } }
+
+/* sheets (Add a tile, sign in) + toast */
+.v8-sheet{ position:fixed; inset:0; z-index:100; display:flex; align-items:flex-end; justify-content:center; }
+.v8-scrim{ position:absolute; inset:0; background:rgba(15,23,42,.42); animation:v8Fade .18s ease both; }
+.v8-card{ position:relative; box-sizing:border-box; width:calc(100% - 16px); max-width:520px; max-height:82vh; overflow:auto; margin:0 0 8px;
+  padding:16px 16px calc(16px + env(safe-area-inset-bottom)); background:#fff; color:#161a1f; border-radius:18px; box-shadow:0 -10px 40px rgba(15,23,42,.25);
+  animation:v8Up .22s cubic-bezier(.2,.8,.25,1) both; }
+@media(min-width:640px){ .v8-sheet{ align-items:center; } .v8-card{ margin:0; } }
+@keyframes v8Fade{ from{ opacity:0; } to{ opacity:1; } }
+@keyframes v8Up{ from{ opacity:0; transform:translateY(24px); } to{ opacity:1; transform:none; } }
+.v8-h{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.v8-h b{ flex:1; font-size:1.05rem; font-weight:800; letter-spacing:-.2px; }
+.v8-x{ flex:none; width:36px; height:36px; display:flex; align-items:center; justify-content:center; padding:0; border:1px solid #e7e9ee; background:#f7f8fa; color:#4b5563; cursor:pointer; }
+.v8-x i{ font-size:18px; }
+.v8-p{ margin:0 0 12px; font-size:.86rem; line-height:1.45; color:#6b7280; }
+.v8-list{ display:flex; flex-direction:column; gap:8px; }
+.v8-row{ display:flex; align-items:center; gap:12px; width:100%; min-height:58px; padding:8px 12px 8px 9px; border:1px solid #e7e9ee; background:#fff; color:#161a1f; font:inherit; text-align:left; cursor:pointer; }
+.v8-row:hover{ background:#f7f8fa; }
+.v8-sw{ flex:none; width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; box-shadow:inset 0 0 0 1px rgba(15,23,42,.08); }
+.v8-sw i{ font-size:21px; }
+.v8-nm{ flex:1; min-width:0; font-weight:800; font-size:.95rem; }
+.v8-add{ flex:none; display:inline-flex; align-items:center; gap:4px; font-size:.82rem; font-weight:800; color:#a16207; }
+.v8-in{ display:block; width:100%; box-sizing:border-box; height:46px; padding:0 12px; border:1px solid #d9dce3; border-radius:10px; font:inherit; font-size:1rem; color:#161a1f; background:#fff; }
+.v8-in:focus{ outline:3px solid rgba(224,162,28,.45); border-color:#e0a21c; }
+.v8-err{ min-height:1.25em; margin:6px 0 2px; font-size:.82rem; font-weight:700; color:#b91c1c; }
+.v8-acts{ display:flex; justify-content:flex-end; gap:8px; margin-top:4px; }
+.v8-btn{ min-height:42px; padding:0 16px; border:1px solid #d9dce3; background:#fff; color:#161a1f; font:inherit; font-size:.9rem; font-weight:800; cursor:pointer; }
+.v8-btn.pri{ background:#e0a21c; border-color:#e0a21c; }
+.v8-btn:disabled{ opacity:.6; cursor:default; }
+.v8-row:focus-visible, .v8-btn:focus-visible, .v8-x:focus-visible{ outline:3px solid #e0a21c; outline-offset:2px; }
+.v8-toast{ position:fixed; left:50%; bottom:calc(92px + env(safe-area-inset-bottom)); z-index:110; box-sizing:border-box; max-width:calc(100% - 32px); padding:10px 14px;
+  border-radius:12px; background:#161a1f; color:#fff; font-size:.85rem; font-weight:700; box-shadow:0 10px 26px -10px rgba(15,23,42,.6);
+  transform:translateX(-50%); animation:v8Toast .2s ease both; transition:opacity .3s; }
+.v8-toast.out{ opacity:0; }
+@keyframes v8Toast{ from{ opacity:0; transform:translate(-50%,10px); } to{ opacity:1; transform:translate(-50%,0); } }
+.v8-sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+@media (prefers-reduced-motion:reduce){ .v8-scrim, .v8-card, .v8-toast, .dash .wg.wg-new{ animation:none; } .today-fold i{ transition:none; } }
+}
+@media print{ .dash-tools, .home-editbar, .today-fold, .v8-sheet, .v8-toast{ display:none !important; } }
+</style>
 </head>
 <body>
 <div class="app">
@@ -890,7 +997,7 @@ body > div[style*="text-align:center"]{ background:#fff; }
   <div id="view-home" class="view active">
     <!-- HOME-V6 WIDGETS: each tile is a live mini-dashboard. Numbers are filled by the HOME-V6 script at the bottom of the page. -->
     <div class="dash" id="dash">
-      <button class="wg wg-res" id="tile-resys" style="--i:0" onclick="showView('resys')" aria-label="Reservations">
+      <button class="wg wg-res" id="tile-resys" style="--i:0" onclick="showView('resys')" aria-label="Reservations" data-tile="resys" data-name="Resys" data-icon="ti-armchair" data-swatch="#1d4ed8" data-ink="#ffffff">
         <i class="ti ti-armchair wg-art" id="wgResArt" aria-hidden="true" hidden></i>
         <span class="wg-head"><span class="wg-t">Resys</span><span class="wg-chip opt">Today</span></span>
         <span class="wg-stats">
@@ -901,7 +1008,7 @@ body > div[style*="text-align:center"]{ background:#fff; }
         <span class="wg-hrs" id="wgResHrs"></span>
         <span class="wg-foot" id="wgResFoot">Loading&hellip;</span>
       </button>
-      <div class="wg wg-sch" id="tile-myshifts" style="--i:1">
+      <div class="wg wg-sch" id="tile-myshifts" style="--i:1" data-tile="schedule" data-name="Schedule" data-icon="ti-calendar-week" data-swatch="#e7eeff" data-ink="#3730a3">
         <a class="wg-cover" href="schedule.html" aria-label="Schedule"></a>
         <span class="wg-head"><span class="wg-t">Schedule</span><span class="wg-chip opt">Today</span></span>
         <span class="wg-ppl" id="wgSchPpl"></span>
@@ -913,7 +1020,7 @@ body > div[style*="text-align:center"]{ background:#fff; }
           <a class="wg-btn" href="schedule.html#swap"><i class="ti ti-switch-horizontal"></i>Shift swap</a>
         </span>
       </div>
-      <button class="wg wg-chz" id="tile-cheese-entry" style="--i:2" onclick="location.href='manager.html#plu'" aria-label="Cheese Entry">
+      <button class="wg wg-chz" id="tile-cheese-entry" style="--i:2" onclick="location.href='manager.html#plu'" aria-label="Cheese Entry" data-tile="cheese" data-name="Cheese Entry" data-icon="ti-cheese" data-swatch="#ff7f52" data-ink="#ffffff">
         <img class="wg-greysie" src="greysie-cheesemonger-sticker.svg" alt="" width="132" height="132">
         <svg class="wg-wave" viewBox="0 0 200 100" preserveAspectRatio="none" aria-hidden="true"><path d="M0 24 C 28 6, 60 30, 98 17 S 162 0, 200 14 L 200 100 L 0 100 Z"/></svg>
         <span class="wg-t">Cheese<br>Entry</span>
@@ -921,23 +1028,25 @@ body > div[style*="text-align:center"]{ background:#fff; }
         <span class="wg-chz-n"><b id="wgChzN">&ndash;</b><span>cheeses</span></span>
         <span class="wg-foot" id="wgChzFoot">Loading&hellip;</span>
       </button>
-      <button class="wg wg-cat" id="tile-catering" style="--i:3" onclick="location.href='manager.html#catering'" aria-label="Catering leads">
+      <button class="wg wg-cat" id="tile-catering" style="--i:3" onclick="location.href='manager.html#catering'" aria-label="Catering leads" data-tile="leads" data-name="Catering Leads" data-icon="ti-briefcase" data-swatch="#0a6e4c" data-ink="#ffffff">
         <span class="wg-head"><span class="wg-t">Catering Leads</span><span class="wg-chip opt" id="wgLeadChip" hidden></span></span>
         <span class="wg-list" id="wgLeadList"></span>
         <span class="wg-foot" id="wgLeadFoot">Loading&hellip;</span>
       </button>
-      <button class="wg wg-stf" id="tile-stuff" style="--i:4" onclick="showView('stuff')" aria-label="Stuff to Know">
+      <button class="wg wg-stf" id="tile-stuff" style="--i:4" onclick="showView('stuff')" aria-label="Stuff to Know" data-tile="stuff" data-name="Stuff to Know" data-icon="ti-info-circle" data-swatch="#fff3d4" data-ink="#a16207">
         <span class="wg-head"><span class="wg-t">Stuff to Know</span><span class="wg-chip" id="wgStfN" hidden></span></span>
         <span class="wg-list" id="wgStfList"></span>
         <span class="wg-foot" id="wgStfFoot">Loading&hellip;</span>
       </button>
     </div>
+    <div class="dash-tools" id="dashTools"><button type="button" class="dash-edit" id="dashEdit"><i class="ti ti-pencil" aria-hidden="true"></i>Edit tiles</button></div>
     <div id="homePreview" class="home-preview" style="display:none;"></div>
 
     <div class="notes-banner" id="notesGrid"></div>
 
-    <!-- TODAY: the calendar for one day, stepped with ‹ › -->
-    <div class="today-card">
+    <!-- TODAY: the next 7 days, a week per ‹ › step; the chevron folds it (HOME-V8 remembers open/closed per person) -->
+    <div class="today-card" id="todayCard">
+      <button type="button" class="today-fold" id="todayFold" aria-expanded="true" aria-controls="todayList" aria-label="Hide calendar" title="Hide calendar"><i class="ti ti-chevron-up" aria-hidden="true"></i></button>
       <div class="today-head">
         <div class="today-title"><span id="todayLabel">Today</span><small id="todayDate"></small></div>
         <button class="cal-nav" onclick="todayStep(-1)" aria-label="Previous week">‹</button>
@@ -948,6 +1057,347 @@ body > div[style*="text-align:center"]{ background:#fff; }
       <button class="today-all" onclick="showView('calendar')">Full calendar →</button>
     </div>
   </div>
+<!-- HOME-V8 LAYOUT: each person's own home. Tile order, hidden tiles and calendar open/closed save to their employee ID
+     (RPCs portal_home_layout_get / portal_home_layout_save -> table portal_home_layouts) and are cached on the device.
+     Edit tiles: drag the handle to move a tile (with a mouse, drag the tile itself), the minus hides it, "+ Add tile" brings it back.
+     New tile later: put a .wg in #dash with data-tile (key), data-name, data-icon, data-swatch, data-ink, plus
+     data-def="0" hidden  -> starts hidden and is offered under "+ Add tile"   (no data-def -> shows for everyone). -->
+<script>
+(function(){
+  var dash=document.getElementById('dash'), card=document.getElementById('todayCard');
+  if(!dash) return;
+  var PFX='greys_home_layout:', reduce=!!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var calOpen=true, calStale=false, todayOrig=null, saveT=0;
+  var editing=false, addEl=null, bar=null, sr=null, sheetEl=null, drag=null, ghostWrap=null, scrollRaf=0;
+
+  function $q(s,r){ return (r||document).querySelector(s); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); }
+  function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+  function lsSet(k,v){ try{ if(v==null) localStorage.removeItem(k); else localStorage.setItem(k,v); }catch(e){} }
+  function emp(){ return (lsGet('greys_emp_id')||'').trim(); }
+  function ck(){ return PFX+emp().toLowerCase(); }
+  function pendKey(){ return PFX+'unsaved:'+emp().toLowerCase(); }
+  function isObj(o){ return !!o && typeof o==='object' && !Array.isArray(o); }
+  function readCache(){ try{ var o=JSON.parse(lsGet(ck())||'null'); return isObj(o)?o:null; }catch(e){ return null; } }
+  function writeCache(L){ lsSet(ck(), JSON.stringify(L)); }
+
+  function tiles(){ return [].slice.call(dash.children).filter(function(el){ return el.hasAttribute('data-tile'); }); }
+  function key(el){ return el.getAttribute('data-tile'); }
+  function nm(el){ return el.getAttribute('data-name')||'Tile'; }
+  function isDef(el){ return el.getAttribute('data-def')!=='0'; }
+  function byKey(k){ var r=null; tiles().forEach(function(el){ if(key(el)===k) r=el; }); return r; }
+  function shown(){ return tiles().filter(function(el){ return !el.hidden; }); }
+  var DEF=tiles().map(key);     // the order in the markup = the standard home
+
+  // ── the layout on screen ↔ a saved layout ──
+  function current(){
+    return { v:1, order:shown().map(key), hidden:tiles().filter(function(el){ return el.hidden; }).map(key), cal:calOpen?'open':'closed' };
+  }
+  function standard(){ return { v:1, order:DEF.filter(function(k){ var el=byKey(k); return el && isDef(el); }), hidden:[], cal:'open' }; }
+  // tiles the layout doesn't mention: standard ones show at the end, optional ones stay hidden
+  function apply(L){
+    if(!isObj(L)) return;
+    var all=tiles(), keys=all.map(key);
+    var order=(Array.isArray(L.order)?L.order:[]).filter(function(k,i,a){ return typeof k==='string' && keys.indexOf(k)>=0 && a.indexOf(k)===i; });
+    var hid=(Array.isArray(L.hidden)?L.hidden:[]).filter(function(k){ return typeof k==='string'; });
+    var vis=all.filter(function(el){ var k=key(el); return order.indexOf(k)>=0 || (hid.indexOf(k)<0 && isDef(el)); });
+    function rank(el){ var i=order.indexOf(key(el)); return i>=0 ? i : 1000+DEF.indexOf(key(el)); }
+    vis.sort(function(a,b){ return rank(a)-rank(b); });
+    var want=vis.concat(all.filter(function(el){ return vis.indexOf(el)<0; }));
+    var moved=want.some(function(el,i){ return all[i]!==el; }) || all.some(function(el){ return el.hidden!==(vis.indexOf(el)<0); });
+    if(moved){
+      var anchor=(addEl && addEl.parentNode===dash) ? addEl : null;
+      want.forEach(function(el){ el.hidden=vis.indexOf(el)<0; el.style.setProperty('--i', Math.max(0, vis.indexOf(el))); dash.insertBefore(el, anchor); });
+      if(editing) vis.forEach(decorate);
+    }
+    if(L.cal==='open' || L.cal==='closed') setCal(L.cal==='open');
+  }
+
+  // ── saved to the employee ID (the device keeps a copy; an edit that never reached the server goes up next time) ──
+  function save(L){
+    var id=emp(); if(!id || typeof sb==='undefined') return Promise.resolve(false);
+    lsSet(pendKey(), '1');
+    return sb.rpc('portal_home_layout_save', { p_login:id, p_layout:L })
+      .then(function(r){ if(r.error || r.data!==true) return false; lsSet(pendKey(), null); return true; })
+      .catch(function(){ return false; });
+  }
+  function load(){
+    var id=emp(); if(!id || typeof sb==='undefined') return Promise.resolve(null);
+    return sb.rpc('portal_home_layout_get', { p_login:id })
+      .then(function(r){ return (!r.error && isObj(r.data)) ? r.data : null; })
+      .catch(function(){ return null; });
+  }
+  function persist(){
+    var L=current(); writeCache(L);
+    if(!emp()) return;
+    lsSet(pendKey(), '1');
+    clearTimeout(saveT); saveT=setTimeout(function(){ save(current()); }, 400);
+  }
+
+  // ── calendar card: open by default; the chevron (or the title) folds it. Folded = no loading until it opens again ──
+  function setCal(open){
+    calOpen=!!open;
+    if(card){
+      card.classList.toggle('folded', !calOpen);
+      var b=document.getElementById('todayFold');
+      if(b){ var t=calOpen?'Hide calendar':'Show calendar'; b.setAttribute('aria-expanded', String(calOpen)); b.setAttribute('aria-label', t); b.title=t; }
+    }
+    if(calOpen && calStale && todayOrig){ calStale=false; todayOrig(); }
+  }
+  function foldHead(){   // folded: keep the title right without loading the week
+    try{
+      var w=_todayOff, s=new Date(); s.setHours(12,0,0,0); s.setDate(s.getDate()+w*7);
+      var e=new Date(s); e.setDate(s.getDate()+6);
+      document.getElementById('todayLabel').textContent = w===0?'Next 7 days':w===1?'Next week':w===-1?'Last week':(w>0?'In '+w+' weeks':(-w)+' weeks ago');
+      document.getElementById('todayDate').textContent = wkRange(s,e);
+    }catch(err){}
+  }
+  function hookToday(){
+    if(todayOrig || typeof window.renderToday!=='function') return;
+    todayOrig=window.renderToday;
+    window.renderToday=function(){ if(!calOpen){ calStale=true; foldHead(); return Promise.resolve(); } return todayOrig.apply(this, arguments); };
+  }
+  function fold(){ setCal(!calOpen); persist(); }
+  if(card){
+    var fb=document.getElementById('todayFold'); if(fb) fb.addEventListener('click', fold);
+    var tt=$q('.today-title', card); if(tt) tt.addEventListener('click', fold);
+  }
+
+  // ── edit mode ──
+  function say(t){
+    if(!sr){ sr=document.createElement('div'); sr.className='v8-sr'; sr.setAttribute('aria-live','polite'); document.body.appendChild(sr); }
+    sr.textContent=''; setTimeout(function(){ sr.textContent=t; }, 40);
+  }
+  function decorate(el){
+    if($q(':scope > .wg-ctl', el)) return;
+    var c=document.createElement('span'); c.className='wg-ctl';
+    c.innerHTML='<button type="button" class="wg-grip" aria-label="Move '+esc(nm(el))+' (arrow keys move it)"><i class="ti ti-grip-horizontal" aria-hidden="true"></i></button>'
+      +'<button type="button" class="wg-hide" aria-label="Hide '+esc(nm(el))+'" title="Hide"><i class="ti ti-minus" aria-hidden="true"></i></button>';
+    el.appendChild(c);
+  }
+  function undecorate(el){ var c=$q(':scope > .wg-ctl', el); if(c) c.remove(); }
+
+  function edit(){ if(editing) return; if(!emp()){ signIn(start); return; } start(); }
+  function start(){
+    if(editing) return;
+    editing=true;
+    var home=document.getElementById('view-home');
+    if(home && !home.classList.contains('active') && window.showView) showView('home');
+    document.body.classList.add('home-editing'); dash.classList.add('editing');
+    bar=document.createElement('div'); bar.className='home-editbar';
+    bar.innerHTML='<div class="heb-t"><b>Edit your home</b><small>Drag <i class="ti ti-grip-horizontal" aria-hidden="true"></i> to move · <i class="ti ti-minus" aria-hidden="true"></i> to hide</small></div>'
+      +'<button type="button" class="heb-btn" data-act="reset">Reset</button><button type="button" class="heb-btn heb-done" data-act="done">Done</button>';
+    bar.addEventListener('click', function(e){ var b=e.target.closest('[data-act]'); if(!b) return; if(b.getAttribute('data-act')==='done') done(); else reset(); });
+    dash.parentNode.insertBefore(bar, dash);
+    shown().forEach(decorate);
+    addEl=document.createElement('button'); addEl.type='button'; addEl.className='wg wg-add';
+    addEl.innerHTML='<i class="ti ti-plus" aria-hidden="true"></i><span>Add tile</span>';
+    dash.appendChild(addEl);
+    var r=bar.getBoundingClientRect();
+    if(r.top<0 || r.top>innerHeight*0.5) window.scrollTo({ top:Math.max(0, scrollY+r.top-10), behavior:reduce?'auto':'smooth' });
+    var d=$q('.heb-done', bar); if(d) d.focus({ preventScroll:true });
+    say('Editing your home. Drag a tile by its handle to move it.');
+  }
+  function done(){
+    if(!editing) return;
+    endDrag(true); closeSheet();
+    editing=false;
+    tiles().forEach(undecorate);
+    if(addEl){ addEl.remove(); addEl=null; }
+    if(bar){ bar.remove(); bar=null; }
+    dash.classList.remove('editing'); document.body.classList.remove('home-editing');
+    shown().forEach(function(el,i){ el.style.setProperty('--i', i); });
+    var L=current(); writeCache(L);
+    save(L).then(function(ok){ toast(ok ? 'Saved to your employee ID' : 'Saved on this device — it syncs to your ID next time'); });
+    var eb=document.getElementById('dashEdit'); if(eb) eb.focus({ preventScroll:true });
+  }
+  function reset(){ flip(function(){ apply(standard()); }); say('Back to the standard tiles.'); }
+  function hide(el){ flip(function(){ el.hidden=true; }); say(nm(el)+' hidden. Add tile brings it back.'); }
+  function move(el, d){
+    var vis=shown(), i=vis.indexOf(el), j=i+d;
+    if(i<0 || j<0 || j>=vis.length) return;
+    flip(function(){ dash.insertBefore(el, d<0 ? vis[j] : vis[j].nextSibling); });
+    var g=$q('.wg-grip', el); if(g) g.focus({ preventScroll:true });
+    say(nm(el)+', '+(j+1)+' of '+vis.length);
+  }
+
+  // smooth reflow: every tile slides from where it was to where it lands
+  function flip(mutate){
+    var els=[].slice.call(dash.children).filter(function(el){ return !el.hidden && !(drag && el===drag.el); });
+    var first=els.map(function(el){ return el.getBoundingClientRect(); });
+    mutate();
+    if(reduce) return;
+    var moving=[];
+    els.forEach(function(el,i){
+      if(el.hidden) return;
+      var a=first[i], b=el.getBoundingClientRect(), dx=a.left-b.left, dy=a.top-b.top;
+      if(Math.abs(dx)<1 && Math.abs(dy)<1) return;
+      el.style.transition='none'; el.style.transform='translate('+dx+'px,'+dy+'px)'; moving.push(el);
+    });
+    if(!moving.length) return;
+    void dash.offsetWidth;
+    moving.forEach(function(el){ el.style.transition='transform .2s ease'; el.style.transform=''; });
+    setTimeout(function(){ moving.forEach(function(el){ el.style.transition=''; }); }, 260);
+  }
+
+  // clicks inside the grid while editing: nothing opens; the minus hides; "+ Add tile" opens the sheet
+  dash.addEventListener('click', function(e){
+    if(!editing) return;
+    if(addEl && addEl.contains(e.target)){ openAdd(); return; }
+    e.preventDefault(); e.stopPropagation();
+    var h=e.target.closest('.wg-hide'); if(h) hide(h.closest('.wg'));
+  }, true);
+  dash.addEventListener('keydown', function(e){
+    if(!editing || !e.target.closest) return;
+    var g=e.target.closest('.wg-grip'); if(!g) return;
+    var d={ ArrowLeft:-1, ArrowUp:-1, ArrowRight:1, ArrowDown:1 }[e.key];
+    if(d){ e.preventDefault(); move(g.closest('.wg'), d); }
+  });
+  document.addEventListener('keydown', function(e){ if(editing && !sheetEl && e.key==='Escape') done(); });
+
+  // ── drag: a finger drags from the handle (the rest of the tile still scrolls the page); a mouse drags the whole tile ──
+  dash.addEventListener('pointerdown', function(e){
+    if(!editing || drag || (e.pointerType==='mouse' && e.button!==0)) return;
+    var t=e.target, el=t.closest('.wg');
+    if(!el || el.parentNode!==dash || !el.hasAttribute('data-tile') || t.closest('.wg-hide')) return;
+    if(!t.closest('.wg-grip') && e.pointerType!=='mouse') return;
+    e.preventDefault();
+    drag={ el:el, id:e.pointerId, x0:e.clientX, y0:e.clientY, x:e.clientX, y:e.clientY, on:false, lock:0 };
+  });
+  window.addEventListener('pointermove', function(e){
+    if(!drag || e.pointerId!==drag.id) return;
+    drag.x=e.clientX; drag.y=e.clientY;
+    if(!drag.on){ if(Math.abs(drag.x-drag.x0)+Math.abs(drag.y-drag.y0)<6) return; lift(); }
+    e.preventDefault();
+    place(); hit(); edgeScroll();
+  }, { passive:false });
+  window.addEventListener('pointerup', function(e){ if(drag && e.pointerId===drag.id) endDrag(); });
+  window.addEventListener('pointercancel', function(e){ if(drag && e.pointerId===drag.id) endDrag(); });
+
+  function lift(){
+    drag.on=true;
+    var r=drag.el.getBoundingClientRect();
+    drag.ox=drag.x0-r.left; drag.oy=drag.y0-r.top;
+    ghostWrap=document.createElement('div'); ghostWrap.className='dash v8-ghostwrap'; ghostWrap.setAttribute('aria-hidden','true');
+    var g=drag.el.cloneNode(true);
+    g.removeAttribute('id'); [].forEach.call(g.querySelectorAll('[id]'), function(n){ n.removeAttribute('id'); });
+    g.classList.add('wg-ghost'); g.style.width=r.width+'px'; g.style.height=r.height+'px';
+    ghostWrap.appendChild(g); document.body.appendChild(ghostWrap); drag.ghost=g;
+    drag.el.classList.add('wg-lifted'); document.body.classList.add('home-dragging');
+    place();
+  }
+  function place(){ if(drag && drag.ghost) drag.ghost.style.transform='translate('+(drag.x-drag.ox)+'px,'+(drag.y-drag.oy)+'px) rotate(1.2deg) scale(1.03)'; }
+  function hit(){
+    if(!drag || !drag.on || performance.now()<drag.lock) return;
+    var o=document.elementFromPoint(drag.x, drag.y), t=(o && o.closest) ? o.closest('.wg') : null;
+    if(!t || t.parentNode!==dash || t===drag.el) return;
+    var el=drag.el;
+    if(t===addEl){ if(el.nextElementSibling===addEl) return; flip(function(){ dash.insertBefore(el, addEl); }); }
+    else {
+      var kids=[].slice.call(dash.children), a=kids.indexOf(el), b=kids.indexOf(t);
+      flip(function(){ dash.insertBefore(el, a<b ? t.nextSibling : t); });
+    }
+    drag.lock=performance.now()+220;
+  }
+  function edgeScroll(){
+    cancelAnimationFrame(scrollRaf);
+    if(!drag || !drag.on) return;
+    var top=(bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0)+40, bot=innerHeight-80, v=0;
+    if(drag.y<top) v=-Math.min(16, (top-drag.y)/3+3); else if(drag.y>bot) v=Math.min(16, (drag.y-bot)/3+3);
+    if(!v) return;
+    (function step(){ if(!drag || !drag.on) return; window.scrollBy(0, v); hit(); scrollRaf=requestAnimationFrame(step); })();
+  }
+  function endDrag(quick){
+    cancelAnimationFrame(scrollRaf);
+    var d=drag; drag=null;
+    if(!d || !d.on) return;
+    var g=d.ghost, wrap=ghostWrap; ghostWrap=null;
+    function clean(){ if(wrap) wrap.remove(); d.el.classList.remove('wg-lifted'); document.body.classList.remove('home-dragging'); }
+    if(quick || reduce || !g) clean();
+    else { var r=d.el.getBoundingClientRect(); g.style.transition='transform .16s ease'; g.style.transform='translate('+r.left+'px,'+r.top+'px)'; setTimeout(clean, 170); }
+    var vis=shown(); say(nm(d.el)+', '+(vis.indexOf(d.el)+1)+' of '+vis.length);
+  }
+
+  // ── sheets: "Add a tile" and the employee-ID sign-in ──
+  function closeSheet(){ if(sheetEl){ sheetEl.remove(); sheetEl=null; } }
+  function sheet(html){
+    closeSheet();
+    var prev=document.activeElement, me=document.createElement('div');
+    me.className='v8-sheet';
+    me.innerHTML='<div class="v8-scrim" data-x></div><div class="v8-card" role="dialog" aria-modal="true">'+html+'</div>';
+    document.body.appendChild(me); sheetEl=me;
+    function shut(){ if(sheetEl===me) closeSheet(); if(prev && prev.focus && document.contains(prev)) prev.focus({ preventScroll:true }); }
+    me.addEventListener('click', function(e){ if(e.target.closest('[data-x]')) shut(); });
+    me.addEventListener('keydown', function(e){ if(e.key==='Escape'){ e.stopPropagation(); shut(); } });
+    var f=$q('.v8-in', me) || $q('.v8-row', me) || $q('.v8-x', me); if(f) f.focus({ preventScroll:true });
+    return me;
+  }
+  function openAdd(){
+    var off=tiles().filter(function(el){ return el.hidden; });
+    var rows=off.map(function(el){
+      return '<button type="button" class="v8-row" data-k="'+esc(key(el))+'">'
+        +'<span class="v8-sw" style="background:'+esc(el.getAttribute('data-swatch')||'#eef0f3')+';color:'+esc(el.getAttribute('data-ink')||'#161a1f')+'"><i class="ti '+esc(el.getAttribute('data-icon')||'ti-square')+'" aria-hidden="true"></i></span>'
+        +'<span class="v8-nm">'+esc(nm(el))+'</span><span class="v8-add"><i class="ti ti-plus" aria-hidden="true"></i>Add</span></button>';
+    }).join('');
+    var s=sheet('<div class="v8-h"><b>Add a tile</b><button type="button" class="v8-x" data-x aria-label="Close"><i class="ti ti-x" aria-hidden="true"></i></button></div>'
+      +(rows ? '<div class="v8-list">'+rows+'</div>' : '<p class="v8-p">Every tile is already on your home. New tiles will show up here as they’re added.</p>'));
+    s.addEventListener('click', function(e){
+      var b=e.target.closest('.v8-row'); if(!b) return;
+      var el=byKey(b.getAttribute('data-k')); closeSheet();
+      if(!el || !editing) return;
+      flip(function(){ el.hidden=false; decorate(el); dash.insertBefore(el, addEl); });
+      el.scrollIntoView({ block:'nearest', behavior:reduce?'auto':'smooth' });
+      el.classList.remove('wg-new'); void el.offsetWidth; el.classList.add('wg-new');
+      var g=$q('.wg-grip', el); if(g) g.focus({ preventScroll:true });
+      say(nm(el)+' added at the end.');
+    });
+  }
+  function likeLit(s){ return String(s).replace(/([\\%_])/g, '\\$1'); }   // literal match for ilike (same as schedule.html)
+  function signIn(next){
+    var s=sheet('<div class="v8-h"><b>Sign in to edit your tiles</b><button type="button" class="v8-x" data-x aria-label="Close"><i class="ti ti-x" aria-hidden="true"></i></button></div>'
+      +'<p class="v8-p">Your tiles save to your employee ID, so they follow you to any phone or iPad.</p>'
+      +'<input class="v8-in" type="text" placeholder="Your employee ID" aria-label="Your employee ID" autocomplete="off" autocapitalize="off" spellcheck="false">'
+      +'<div class="v8-err" role="alert"></div>'
+      +'<div class="v8-acts"><button type="button" class="v8-btn" data-x>Cancel</button><button type="button" class="v8-btn pri" data-go>Sign in</button></div>');
+    var inp=$q('.v8-in', s), err=$q('.v8-err', s), go=$q('[data-go]', s);
+    function run(){
+      var v=inp.value.trim(); err.textContent='';
+      if(!v){ err.textContent='Enter your employee ID.'; inp.focus(); return; }
+      go.disabled=true;
+      Promise.resolve().then(function(){ return sb.from('portal_employees').select('id,login_id').ilike('login_id', likeLit(v)).eq('active', true); })
+        .catch(function(e){ return { error:e }; })
+        .then(function(r){
+          go.disabled=false;
+          if(r.error){ err.textContent='Could not check right now — try again.'; return; }
+          if(!r.data || !r.data.length){ err.textContent='No employee found with that ID. Ask your manager to add you.'; inp.select(); return; }
+          lsSet('greys_emp_id', v);
+          closeSheet();
+          window.dispatchEvent(new Event('resize'));          // the Schedule tile redraws with "You: …"
+          return load().then(function(L){ if(L) apply(L); writeCache(current()); next(); });   // tiles saved on another device win
+        });
+    }
+    go.addEventListener('click', run);
+    inp.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); run(); } });
+  }
+  function toast(t){
+    var el=document.createElement('div'); el.className='v8-toast'; el.setAttribute('role','status'); el.textContent=t;
+    document.body.appendChild(el);
+    setTimeout(function(){ el.classList.add('out'); }, 2400); setTimeout(function(){ el.remove(); }, 2800);
+  }
+  var eb=document.getElementById('dashEdit'); if(eb) eb.addEventListener('click', edit);
+  window.addEventListener('pagehide', function(){ if(editing){ writeCache(current()); if(emp()) lsSet(pendKey(), '1'); } });
+
+  // ── boot: this device's copy right away (before the first paint), then the copy saved to the employee ID ──
+  apply(readCache());
+  document.addEventListener('DOMContentLoaded', function(){
+    hookToday();
+    if(!emp()) return;
+    if(lsGet(pendKey())){ var c=readCache(); if(c) save(c); return; }
+    load().then(function(L){ if(L && !editing){ apply(L); writeCache(current()); } });
+  });
+  window.homeLayout={ edit:edit, done:done, current:current, apply:apply };
+})();
+</script>
 
   <!-- ══ SPECIALS ══ -->
   <div id="view-specials" class="view">
