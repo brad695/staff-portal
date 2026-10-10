@@ -15026,7 +15026,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
      tax, deposit, note), emails in the send-mail shell, agreements filled like the catering fn fills them. Uses the
      open lead's details when there is one, otherwise sample ones (Jane Smith, 8 guests, a Saturday 3 weeks out).
      CAT-LOOK (2026-10-09): the core's proposal editor is split into .cat-sec boxes; the cover photo fills #cq_coverSlot
-     as its own section, and the 📚 Templates button goes into #catTools (falls back to the old spots on main). -->
+     as its own section, and the 📚 Templates button goes into #catTools (falls back to the old spots on main).
+     PROPOSAL PREVIEW (2026-10-09): 👁 Preview in the proposal's action bar (editor: what is on the form now, unsaved
+     included; locked: the saved proposal) renders the customer's page in the same #ctplPrev overlay. -->
 <style id="cat-tpl-css">
   #ctplModal .rec-card{ max-height:none !important; display:block; }
   .ctpl-photo{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
@@ -15266,7 +15268,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   async function decorate(){
     const box = $('catQuote'), r = cur(); if(!box) return;
     box.dataset.lead = r ? r.id : '';
-    if(!$('catItems')){ lockedThumbs(); return; }    // signed / invoiced view — photos only
+    if(!$('catItems')){ lockedThumbs(); proposalPreviewBtn(); return; }    // signed / invoiced view — photos + 👁 Preview only
+    proposalPreviewBtn();
     await load();
     // cover photo: starts from the saved quote (or the copied one), lives above the items
     if(!$('cq_cover')){
@@ -15591,20 +15594,70 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       +   '<div style="background:#fff;border:1px solid #D6C8AB;padding:11px 12px;color:#9A8C76;margin-top:5px;">' + esc(c.name) + '</div><div class="pv-sig"></div><div style="color:#6E6353;font-size:13px;">Your typed name is your electronic signature.</div></div></div>'
       + '<p class="pv-muted" style="margin:0;text-align:center;">Amounts and dates are filled in from the proposal when it is sent.</p></div>';
   }
+  function pvShow(title, withText, inner, foot){
+    if(!$('ctplPrev')) document.body.insertAdjacentHTML('beforeend', '<div id="ctplPrev" onclick="if(event.target===this)ctplPrevClose()"><div class="pv-card"><div class="pv-bar"><div class="pv-ttl">👁 <span id="pvTitle"></span><span class="pv-with" id="pvWith"></span></div>'
+      + '<button class="btn btn-ghost btn-sm" type="button" id="pvPhoneBtn" onclick="ctplPrevPhone()">📱 Phone</button><button class="btn btn-ghost btn-sm" type="button" onclick="ctplPrevClose()">✕ Close</button></div><div id="pvBody"></div><div class="pv-foot" id="pvFoot"></div></div></div>');
+    $('pvTitle').textContent = title; $('pvWith').textContent = withText; $('pvBody').innerHTML = inner; $('pvFoot').textContent = foot || '';
+    const m = $('ctplPrev'); m.style.display = 'flex'; m.scrollTop = 0;
+  }
   window.ctplPreview = function(id){
     const t = id ? byId(id) : (MG.edit ? editState() : null); if(!t) return;
     const c = sampleCtx();
     const inner = t.kind === 'package' ? pvPackage(t, c) : t.kind === 'email' ? pvEmail(t, c) : pvContract(t, c);
-    if(!$('ctplPrev')) document.body.insertAdjacentHTML('beforeend', '<div id="ctplPrev" onclick="if(event.target===this)ctplPrevClose()"><div class="pv-card"><div class="pv-bar"><div class="pv-ttl">👁 <span id="pvTitle"></span><span class="pv-with" id="pvWith"></span></div>'
-      + '<button class="btn btn-ghost btn-sm" type="button" id="pvPhoneBtn" onclick="ctplPrevPhone()">📱 Phone</button><button class="btn btn-ghost btn-sm" type="button" onclick="ctplPrevClose()">✕ Close</button></div><div id="pvBody"></div><div class="pv-foot" id="pvFoot"></div></div></div>');
     const what = t.kind === 'package' ? 'proposal page' : t.kind === 'email' ? 'email' : 'agreement';
-    $('pvTitle').textContent = (t.title || 'Untitled') + ' — the customer’s ' + what;
-    $('pvWith').textContent = c._real ? 'Filled in with ' + c.name + '’s details' + (!id ? ', including what you have typed but not saved' : '') + '.'
-      : 'Filled in with sample details (Jane Smith, 8 guests, ' + c.event_date + ')' + (!id ? ', including what you have typed but not saved' : '') + '.';
-    $('pvBody').innerHTML = inner;
-    $('pvFoot').textContent = t.kind === 'package' ? 'Lines marked “pp” use the guest count. Photos, prices and the note can still be changed on each proposal before it is sent.' : '[Bracketed] parts are fill-ins with nothing to fill them yet.';
-    const m = $('ctplPrev'); m.style.display = 'flex'; m.scrollTop = 0;
+    pvShow((t.title || 'Untitled') + ' — the customer’s ' + what,
+      c._real ? 'Filled in with ' + c.name + '’s details' + (!id ? ', including what you have typed but not saved' : '') + '.'
+              : 'Filled in with sample details (Jane Smith, 8 guests, ' + c.event_date + ')' + (!id ? ', including what you have typed but not saved' : '') + '.',
+      inner, t.kind === 'package' ? 'Lines marked “pp” use the guest count. Photos, prices and the note can still be changed on each proposal before it is sent.' : '[Bracketed] parts are fill-ins with nothing to fill them yet.');
   };
+  /* 👁 Preview on the proposal itself: the page the customer gets, from what is on the form right now
+     (draft, unsaved edits included) or from the saved proposal when it is locked (sent / signed / invoiced). */
+  function proposalState(){
+    const q = (typeof CAT_Q !== 'undefined' && CAT_Q) || null, editing = !!$('catItems');
+    if(!editing && q) return { saved: true, items: q.items || [], image_url: okUrl(q.image_url), note: q.customer_note || '', contract: q.contract_text || '', tax: Number(q.tax_rate) || 0, dep: Number(q.deposit_pct) || 0, bal: q.balance_due_date || '' };
+    const v = id => ($(id) ? String($(id).value || '') : '');
+    return { saved: false, items: (typeof CAT_ITEMS !== 'undefined' ? CAT_ITEMS : []).filter(it => String(it.name || '').trim()), image_url: COVER, note: v('cq_note'), contract: v('cq_contract'),
+      tax: Number(v('cq_tax')) || 0, dep: Math.min(100, Math.max(0, Math.round(Number(v('cq_dep')) || 0))), bal: v('cq_bal') };
+  }
+  function pvProposal(st, c){
+    // same arithmetic as catTotals / the catering fn: lines with qty 0 are dropped when the proposal is saved
+    const L = st.items.map(it => ({ name: it.name, qty: Number(it.qty) || 0, price_cents: Math.max(0, Math.round(Number(it.price_cents) || 0)), note: String(it.note || '').slice(0, 300), image: okUrl(it.image) })).filter(l => l.qty > 0);
+    const sub = L.reduce((s, l) => s + Math.round(l.qty * l.price_cents), 0), tax = Math.round(sub * st.tax / 100), tot = sub + tax;
+    const split = st.dep > 0 && st.dep < 100, dep = Math.round(tot * st.dep / 100);
+    const today = ymdOf(new Date()); let bal = st.bal || (c._ymd ? addDays(c._ymd, -3) : addDays(today, 14)); if(bal < today) bal = today;
+    const balShort = new Date(bal + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const rows = L.map(l => '<tr><td><div class="itm">' + (l.image ? '<img class="thumb" src="' + esc(l.image) + '" alt="" loading="lazy">' : '') + '<div>' + esc(l.name) + (l.note ? '<span class="note">' + esc(l.note) + '</span>' : '') + '</div></div></td>'
+      + '<td class="n">' + esc(l.qty) + '</td><td class="n">' + catMoney(l.price_cents) + '</td><td class="n">' + catMoney(Math.round(l.qty * l.price_cents)) + '</td></tr>').join('');
+    const d = Object.assign({}, c, { total: catMoney(tot), deposit_pct: String(st.dep), deposit: catMoney(dep), balance_due_date: longDate(bal) });
+    const contract = String(st.contract || '').trim();
+    return pvTop() + '<div class="pv-page">'
+      + (st.image_url ? '<div class="pv-hero"><img src="' + esc(st.image_url) + '" alt=""></div>' : '')
+      + '<p class="pv-eyebrow">Catering proposal · #' + esc(c.code) + '</p><h1 class="pv-h1">' + esc(c.event_date) + '</h1>'
+      + '<p class="pv-lede">Hi ' + esc(c.first_name) + ' — here’s everything we talked about. Look it over, then sign at the bottom to book your date.</p>'
+      + '<div class="pv-cardp"><h2 class="pv-h2">Your event</h2><dl class="pv-facts"><dt>For</dt><dd>' + esc(c.name) + (c.company ? ' · ' + esc(c.company) : '') + '</dd>'
+      +   '<dt>When</dt><dd>' + esc(c.event_date) + (c.event_time ? ' at ' + esc(c.event_time) : '') + '</dd><dt>Guests</dt><dd>' + esc(c.guests || 'TBD') + '</dd><dt>Shop</dt><dd>' + esc(c.location) + '</dd></dl></div>'
+      + '<div class="pv-cardp"><h2 class="pv-h2">Proposal</h2><div style="overflow-x:auto"><table class="pv-items"><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th></tr></thead><tbody>'
+      +   (rows || '<tr><td colspan="4"><span class="note">No priced lines yet — lines left at qty 0 are dropped when you save.</span></td></tr>') + '</tbody></table></div>'
+      +   '<div class="pv-tot"><div><span>Subtotal</span><span>' + catMoney(sub) + '</span></div><div><span>Sales tax (' + st.tax + '%)</span><span>' + catMoney(tax) + '</span></div><div class="big"><span>Total</span><span>' + catMoney(tot) + '</span></div>'
+      +   (split ? '<div class="dep"><span>Deposit to book (' + st.dep + '%)</span><span>' + catMoney(dep) + '</span></div><div><span>Balance due ' + esc(balShort) + '</span><span>' + catMoney(tot - dep) + '</span></div>' : '') + '</div>'
+      +   (st.note.trim() ? '<p class="pv-muted">' + esc(st.note) + '</p>' : '') + '</div>'
+      + '<div class="pv-cardp"><h2 class="pv-h2">Agreement</h2><div class="pv-contract">' + (contract ? esc(pfill(contract, d)) : '<span style="color:#9A8C76;">(no agreement text — the default agreement is used)</span>') + '</div>'
+      +   '<div style="margin-top:18px;"><div style="font:600 11px Arial,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#6E6353;">Type your full name to sign</div>'
+      +   '<div style="background:#fff;border:1px solid #D6C8AB;padding:11px 12px;color:#9A8C76;margin-top:5px;">' + esc(c.name) + '</div><div class="pv-sig"></div><div style="color:#6E6353;font-size:13px;">Your typed name is your electronic signature.</div></div>'
+      +   '<div style="margin-top:14px;background:#A52B1E;color:#fff;text-align:center;padding:14px;font-weight:600;">Sign &amp; continue to payment</div></div></div>';
+  }
+  window.ctplProposalPreview = function(){
+    const st = proposalState(), c = sampleCtx(), r = cur() || {};
+    pvShow((r.name || 'Proposal') + ' — the customer’s proposal page',
+      st.saved ? 'From the saved proposal.' : 'From what is on the form right now — unsaved changes included.',
+      pvProposal(st, c), st.saved ? '' : 'Lines left at qty 0 are dropped when you save. Fill-ins in the agreement are completed when the proposal is sent.');
+  };
+  function proposalPreviewBtn(){
+    const act = document.querySelector('#catQuote .cat-actions:not(.beo-pdfbar)'); if(!act || $('cqPreviewBtn')) return;
+    const sm = act.querySelector('.save-msg');
+    const html = '<button class="btn btn-ghost" id="cqPreviewBtn" type="button" onclick="ctplProposalPreview()" title="What the customer sees — what is on the form right now">👁 Preview</button>';
+    if(sm) sm.insertAdjacentHTML('afterend', html); else act.insertAdjacentHTML('afterbegin', html);
+  }
   window.ctplPrevClose = function(){ const m = $('ctplPrev'); if(m) m.style.display = 'none'; };
   window.ctplPrevPhone = function(){ const m = $('ctplPrev'); if(!m) return; m.classList.toggle('phone'); $('pvPhoneBtn').textContent = m.classList.contains('phone') ? '🖥 Desktop' : '📱 Phone'; };
   document.addEventListener('keydown', e => { const m = $('ctplPrev'); if(e.key === 'Escape' && m && m.style.display !== 'none') ctplPrevClose(); });
