@@ -628,6 +628,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab-head">Catering</div>
     <div class="tab" onclick="mtab('catering')">💼 Catering Leads <span id="catBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
     <div class="tab" onclick="mtab('preorders')">📅 Pre-Orders</div>
+    <div class="tab" onclick="mtab('ordering')">🛒 Online Ordering <span id="ooTabPill" class="oo-tabpill">OFF</span></div>
     <div class="tab-head">Cheese Club</div>
     <div class="tab" onclick="ccTab(this,'members')">Members</div>
     <div class="tab" onclick="ccTab(this,'boxes')">Boxes</div>
@@ -676,6 +677,14 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
 
   <!-- RESERVATIONS -->
   <!-- Experience inquiries: HoneyBook-style conversations with customers before they book -->
+  <!-- Online Ordering on/off (script: ONLINE-ORDERING SWITCH, near the end) -->
+  <div id="panel-ordering" class="panel">
+    <div class="section-card">
+      <h2>🛒 Online Ordering</h2>
+      <div class="hint">Turn ordering on <strong>orderonline.greyscheese.com</strong> off or on for each shop. Off takes effect within about 10 seconds: the menu stays up, a notice says ordering is paused, and nobody can check out. Orders already paid are not affected. It stays off until someone turns it back on. (Uber Eats, DoorDash and Square Online are separate and not changed here.)</div>
+      <div class="oo-grid" id="ooGrid"><div class="rec-empty">Loading…</div></div>
+    </div>
+  </div>
   <div id="panel-inquiries" class="panel">
     <div class="section-card">
       <h2>💬 Experience Inquiries</h2>
@@ -16154,6 +16163,87 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   }
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
   window.__iqf = { state: st, load: load, problem: problem };
+})();
+</script>
+<!-- ONLINE-ORDERING SWITCH (2026-10-10): the 🛒 Online Ordering tab (Catering section). One switch per shop for
+     orderonline.greyscheese.com. State lives in site_content 'online_ordering' = { memphis:{paused,at,by}, nashville:{…} },
+     written only by the set_online_ordering RPC (is_app_admin) and read by the square-online-order edge function
+     (re-read every ~10 s). The same switch is on the staff portal home page (index.html). -->
+<style id="oo-switch">
+.oo-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+.oo-card{ display:flex; align-items:center; gap:16px; padding:20px; border-radius:14px; border:1px solid var(--line,#e5e7eb); background:#f6fbf7; }
+.oo-card.off{ background:#fef2f2; border-color:#fca5a5; }
+.oo-card .oo-tx{ flex:1; min-width:0; }
+.oo-card .oo-name{ font-size:1.15rem; font-weight:700; color:#111827; }
+.oo-card .oo-st{ font-size:.95rem; font-weight:700; color:#15803d; margin-top:2px; }
+.oo-card.off .oo-st{ color:#b91c1c; }
+.oo-card .oo-by{ font-size:.8rem; color:#6b7280; margin-top:4px; }
+.oo-card .oo-link{ font-size:.8rem; margin-top:6px; display:inline-block; }
+.oo-sw{ flex:none; position:relative; width:72px; height:40px; border-radius:999px; border:0; padding:0; cursor:pointer; background:#16a34a; transition:background .18s; }
+.oo-sw::after{ content:""; position:absolute; top:4px; left:36px; width:32px; height:32px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3); transition:left .18s; }
+.oo-sw[aria-checked="false"]{ background:#b91c1c; }
+.oo-sw[aria-checked="false"]::after{ left:4px; }
+.oo-sw:disabled{ opacity:.55; cursor:default; }
+.oo-sw:focus-visible{ outline:3px solid #2563eb; outline-offset:2px; }
+.oo-err{ color:#b91c1c; font-size:.85rem; margin-top:12px; }
+.oo-tabpill{ display:none; margin-left:6px; padding:1px 7px; border-radius:999px; background:#b91c1c; color:#fff; font-size:.68rem; font-weight:700; letter-spacing:.03em; vertical-align:middle; }
+.oo-tabpill.show{ display:inline-block; }
+@media (prefers-reduced-motion:reduce){ .oo-sw, .oo-sw::after{ transition:none; } }
+</style>
+<script>
+(function(){
+  var grid = document.getElementById('ooGrid'), panel = document.getElementById('panel-ordering');
+  if (!grid || !panel || typeof sb === 'undefined') return;
+  var SHOPS = [['memphis','Memphis'], ['nashville','Nashville']];
+  var state = null, busy = {}, err = '';
+  function h(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); }
+  function when(iso){
+    if (!iso) return '';
+    var d = new Date(iso); if (isNaN(d)) return '';
+    var t = d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+    return d.toDateString() === new Date().toDateString() ? 'today at ' + t : d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) + ' at ' + t;
+  }
+  function draw(){
+    if (!state){ grid.innerHTML = '<div class="rec-empty">' + (err ? h(err) : 'Loading…') + '</div>'; return; }
+    var anyOff = false;
+    grid.innerHTML = SHOPS.map(function(s){
+      var v = state[s[0]] || {}, off = v.paused === true; if (off) anyOff = true;
+      var by = v.at ? 'Turned ' + (off ? 'off ' : 'on ') + when(v.at) + (v.by ? ' by ' + h(v.by) : '') : '';
+      return '<div class="oo-card' + (off ? ' off' : '') + '">'
+        + '<div class="oo-tx"><div class="oo-name">' + s[1] + '</div>'
+        + '<div class="oo-st">' + (off ? 'OFF — customers can’t order' : 'On — taking orders') + '</div>'
+        + (by ? '<div class="oo-by">' + by + '</div>' : '')
+        + '<a class="oo-link" href="https://orderonline.greyscheese.com/?shop=' + s[0] + '" target="_blank" rel="noopener">See the order site →</a></div>'
+        + '<button type="button" class="oo-sw" role="switch" data-shop="' + s[0] + '" aria-checked="' + (off ? 'false' : 'true') + '"'
+        + ' aria-label="Online ordering for ' + s[1] + '"' + (busy[s[0]] ? ' disabled' : '') + '></button></div>';
+    }).join('') + (err ? '<div class="oo-err" style="grid-column:1/-1">' + h(err) + '</div>' : '');
+    var pill = document.getElementById('ooTabPill'); if (pill) pill.classList.toggle('show', anyOff);
+  }
+  async function load(){
+    try{
+      var r = await sb.from('site_content').select('data').eq('key','online_ordering').maybeSingle();
+      if (r.error) throw r.error;
+      state = (r.data && r.data.data) || {};
+    }catch(e){ if (!state) err = 'Couldn’t load the switch. Check your connection and reload.'; }
+    draw();
+  }
+  grid.addEventListener('click', async function(ev){
+    var b = ev.target.closest && ev.target.closest('.oo-sw'); if (!b || b.disabled) return;
+    var shop = b.getAttribute('data-shop'), turnOn = b.getAttribute('aria-checked') === 'false';
+    busy[shop] = true; err = ''; draw();
+    var who = '';
+    try{ who = ((await sb.auth.getSession()).data.session.user.email) || ''; }catch(e){}
+    try{
+      var r = await sb.rpc('set_online_ordering', { p_shop: shop, p_on: turnOn, p_by: who });
+      if (r.error) throw r.error;
+      state = r.data || state;
+    }catch(e){ err = 'That didn’t save' + (e && e.message ? ' (' + e.message + ')' : '') + '. Ordering is unchanged.'; }
+    busy[shop] = false; draw();
+  });
+  load();
+  // fresh whenever the tab is opened, and every minute while it is showing (someone may flip it from the portal)
+  new MutationObserver(function(){ if (panel.classList.contains('active')) load(); }).observe(panel, { attributes:true, attributeFilter:['class'] });
+  setInterval(function(){ if (!document.hidden) load(); }, 60000);
 })();
 </script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->

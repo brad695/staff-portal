@@ -2463,6 +2463,100 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
 </script>
+<!-- ONLINE-ORDERING SWITCH (2026-10-10): the bar under the home tiles shows whether orderonline.greyscheese.com is
+     taking orders for this shop. A manager signed in on this device can flip it here; everyone else is sent to the
+     manager console (manager.html#ordering). State: site_content 'online_ordering' { memphis:{paused}, nashville:{paused} },
+     written by the set_online_ordering RPC (managers only) and read by the square-online-order function within ~10 s. -->
+<style id="oo-switch">
+.oo-bar{ display:flex; align-items:center; gap:12px; margin:10px 16px 0; padding:12px 14px; border-radius:14px; background:#fff; border:1px solid #e5e7eb; box-shadow:0 1px 2px rgba(16,24,40,.05); color:#111827; }
+.oo-bar[hidden]{ display:none; }
+.oo-bar .oo-ic{ width:38px; height:38px; flex:none; border-radius:11px; display:grid; place-items:center; font-size:1.25rem; background:#e7f6ec; color:#15803d; }
+.oo-bar .oo-tx{ flex:1; min-width:0; display:flex; flex-direction:column; line-height:1.25; }
+.oo-bar .oo-tx b{ font-size:.95rem; font-weight:700; }
+.oo-bar .oo-tx small{ font-size:.8rem; color:#6b7280; }
+.oo-bar.off{ background:#fef2f2; border-color:#fca5a5; }
+.oo-bar.off .oo-ic{ background:#fee2e2; color:#b91c1c; }
+.oo-bar.off .oo-tx small{ color:#b91c1c; font-weight:600; }
+.oo-sw{ flex:none; position:relative; width:58px; height:34px; border-radius:999px; border:0; padding:0; cursor:pointer; background:#16a34a; transition:background .18s; -webkit-tap-highlight-color:transparent; }
+.oo-sw::after{ content:""; position:absolute; top:3px; left:27px; width:28px; height:28px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3); transition:left .18s; }
+.oo-sw[aria-checked="false"]{ background:#b91c1c; }
+.oo-sw[aria-checked="false"]::after{ left:3px; }
+.oo-sw:disabled{ opacity:.55; cursor:default; }
+.oo-sw:focus-visible{ outline:3px solid #2563eb; outline-offset:2px; }
+@media (min-width:1024px){ .oo-bar{ margin:14px 28px 0; } }
+@media (prefers-reduced-motion:reduce){ .oo-sw, .oo-sw::after{ transition:none; } }
+@media print{ .oo-bar{ display:none !important; } }
+</style>
+<script>
+(function(){
+  var dash = document.getElementById('dash');
+  if (!dash || typeof sb === 'undefined' || typeof LOC === 'undefined') return;
+  var NAME = LOC === 'nashville' ? 'Nashville' : 'Memphis';
+  var bar = document.createElement('div');
+  bar.className = 'oo-bar'; bar.id = 'ooBar'; bar.hidden = true;
+  bar.innerHTML = '<span class="oo-ic"><i class="ti ti-shopping-bag"></i></span>'
+    + '<span class="oo-tx"><b>Online ordering &middot; ' + NAME + '</b><small id="ooSub">Checking&hellip;</small></span>'
+    + '<button type="button" class="oo-sw" id="ooSw" role="switch" aria-checked="true" aria-label="Online ordering for ' + NAME + '"></button>';
+  dash.insertAdjacentElement('afterend', bar);
+  var sw = document.getElementById('ooSw'), sub = document.getElementById('ooSub');
+  var state = null, busy = false, admin = null;
+
+  function when(iso){
+    if (!iso) return '';
+    var d = new Date(iso); if (isNaN(d)) return '';
+    var t = d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+    return d.toDateString() === new Date().toDateString() ? t : d.toLocaleDateString('en-US', { month:'short', day:'numeric' }) + ', ' + t;
+  }
+  function draw(){
+    var s = (state && state[LOC]) || {}, off = s.paused === true;
+    bar.hidden = false;
+    bar.classList.toggle('off', off);
+    sw.setAttribute('aria-checked', off ? 'false' : 'true');
+    sw.disabled = busy;
+    sub.textContent = off ? ('OFF' + (s.at ? ' since ' + when(s.at) : '') + ' — customers can’t order') : 'On — taking orders';
+  }
+  async function load(){
+    try{
+      var r = await sb.from('site_content').select('data').eq('key','online_ordering').maybeSingle();
+      if (r.error) throw r.error;
+      state = (r.data && r.data.data) || {};
+      if (!busy) draw();
+    }catch(e){ if (!state){ bar.hidden = false; sub.textContent = 'Couldn’t check — tap to open the manager console'; } }
+  }
+  async function isAdmin(){
+    if (admin === true) return true;
+    try{
+      var ses = (await sb.auth.getSession()).data.session;
+      if (!ses) return false;
+      var a = await sb.rpc('is_app_admin');
+      admin = a.data === true;
+      return admin ? ses : false;
+    }catch(e){ return false; }
+  }
+  sw.addEventListener('click', async function(){
+    if (busy) return;
+    busy = true; draw();
+    var ses = await isAdmin();
+    if (!ses){ location.href = 'manager.html#ordering'; return; }
+    var cur = (state && state[LOC] && state[LOC].paused === true), turnOn = cur;   // paused now → turn it on
+    var who = '';
+    try{ who = ((await sb.auth.getSession()).data.session.user.email) || ''; }catch(e){}
+    try{
+      var r = await sb.rpc('set_online_ordering', { p_shop: LOC, p_on: turnOn, p_by: who });
+      if (r.error) throw r.error;
+      state = r.data || state;
+    }catch(e){
+      busy = false; draw();
+      sub.textContent = 'Couldn’t change it — try the manager console';
+      return;
+    }
+    busy = false; draw();
+  });
+  load();
+  setInterval(function(){ if (!document.hidden) load(); }, 60000);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) load(); });
+})();
+</script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
 <script>(function(){if(location.hostname.indexOf("staging")<0)return;document.title="[STAGING] "+document.title;var m=document.createElement("meta");m.name="robots";m.content="noindex";document.head.appendChild(m);var b=document.createElement("div");b.textContent="STAGING \u2014 test copy. Same live database: data changes, emails and Square actions are REAL.";b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#c62828;color:#fff;font:600 12px/1.2 system-ui,sans-serif;text-align:center;padding:5px 8px;pointer-events:none;opacity:.92";document.body.appendChild(b);})();</script>
 </body>
