@@ -15920,6 +15920,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   };
   var STAGING = /staging/i.test(location.hostname);
   var FORM_SITE = STAGING ? 'https://ticket-rennet.onrender.com/inquiry.html' : 'https://tickets.greyscheese.com/inquiry.html';
+  // Until the new inquiry form is live on tickets.greyscheese.com, the editor shows on the test portal only — drop these two lines once Greys-Sites main has the new inquiry.html.
+  if(!STAGING){ var tabEl = document.querySelector(".tab[onclick=\"mtab('inqform')\"]"); if(tabEl) tabEl.style.display = 'none'; }
   var st = { form: formOf(null), saved: null, type: 'table', loaded: false, dirty: false, frameReady: false };
 
   function h(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
