@@ -624,7 +624,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab-head">Experiences</div>
     <div class="tab" onclick="tkTab(this,'experiences')">✨ Experiences</div>
     <div class="tab" onclick="tkTab(this,'expbookings')">📅 Bookings</div>
-    <div class="tab" onclick="mtab('inquiries')">💬 Inquiries <span id="inqBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
+    <div class="tab" onclick="mtab('inqform')">📝 Inquiry Form</div>
     <div class="tab-head">Cheese Case</div>
     <div class="tab" onclick="mtab('plu')">🧀 New Case Entry</div>
     <div class="tab" onclick="mtab('jamlabels')">🏷️ Jam Labels</div>
@@ -690,29 +690,52 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       <div class="rec-list" id="inqList"><div class="rec-empty">Loading…</div></div>
     </div>
   </div>
+  <!-- Inquiry Form editor: the questions on the customer inquiry form (script: INQUIRY FORM EDITOR, near the end) -->
+  <div id="panel-inqform" class="panel">
+    <div class="section-card">
+      <h2>📝 Inquiry Form</h2>
+      <div class="hint">The one form customers use to ask about an <strong>experience</strong>, <strong>catering</strong> or a <strong>private event</strong>. Change the wording, switch a kind of inquiry on or off, and add, reorder or remove the questions under each. The preview on the right is the real form with your changes; customers see them once you press <strong>Save</strong>.</div>
+      <div class="iqf-bar">
+        <button class="btn btn-gold" id="iqfSave" type="button">Save</button>
+        <button class="btn btn-ghost" id="iqfUndo" type="button">Undo changes</button>
+        <button class="btn btn-ghost" id="iqfRevert" type="button">Back to built-in</button>
+        <a class="btn btn-ghost" id="iqfOpen" href="#" target="_blank" rel="noopener">Open the form ↗</a>
+        <span class="iqf-msg" id="iqfMsg" role="status"></span>
+      </div>
+      <div class="iqf">
+        <div id="iqfEdit"><div class="hint">Loading…</div></div>
+        <div class="iqf-side">
+          <div class="iqf-cap">Preview <span class="hint" style="margin:0;font-weight:400;">— nothing can be sent from here</span></div>
+          <iframe class="iqf-frame" id="iqfFrame" title="Inquiry form preview"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="inqModal" class="rec-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:980;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 10px;" onclick="if(event.target===this)inqClose()">
     <div class="rec-card" style="background:#fff;max-width:720px;width:100%;border-radius:14px;padding:22px;">
-      <div style="display:flex;align-items:flex-start;gap:10px;">
-        <div style="flex:1;min-width:0;"><h3 id="inqTitle" style="margin:0 0 4px;"></h3><div id="inqMeta" class="hint" style="margin:0;"></div></div>
-        <select id="inqStage" class="loc-sel" onchange="inqSetStage(this.value)">
+      <div class="cat-mhead" style="padding-bottom:0;">
+        <div style="flex:1;min-width:0;"><h3 id="inqTitle"></h3><div id="inqMeta" class="hint"></div></div>
+        <div class="cat-mhead-r"><span class="cat-stagelbl">Stage</span><select id="inqStage" class="loc-sel" onchange="inqSetStage(this.value)">
           <option value="new">New</option><option value="replied">Replied</option><option value="link_sent">Booking link sent</option><option value="booked">Booked</option><option value="lost">Lost</option>
         </select>
-        <button class="btn btn-ghost btn-sm" onclick="inqClose()">✕</button>
+        <button class="btn btn-ghost btn-sm" onclick="inqClose()">✕</button></div>
       </div>
       <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;margin:10px 0 0;cursor:pointer;">
         <input type="checkbox" id="inqHideCal" onchange="inqSetHideCal(this.checked)">
         🔒 Hide this conversation from the staff calendar <span class="hint" style="margin:0;">(for anything sensitive — it stays here)</span>
       </label>
-      <div id="inqThread" style="margin:16px 0;max-height:46vh;overflow-y:auto;"></div>
-      <div class="rf full"><label>Reply</label>
-        <select id="inqQuick" class="loc-sel" style="margin-bottom:6px;" onchange="inqQuickPick(this)"><option value="">Quick replies…</option></select>
-        <textarea id="inqBody" rows="5" placeholder="Write your reply…"></textarea></div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center;">
-        <button class="btn btn-ghost btn-sm" onclick="inqInsertLink()">🔗 Booking link</button>
-        <button class="btn btn-ghost btn-sm" onclick="inqLog(false)">📥 Log their reply</button>
-        <button class="btn btn-ghost btn-sm" onclick="inqLog(true)">📝 Add note</button>
-        <span class="save-msg" id="inqMsg" style="flex:1;"></span>
-        <button class="btn btn-gold" id="inqSend" onclick="inqSend()">Send reply ✉️</button>
+      <div class="cat-sec soft"><h4>Conversation</h4><div id="inqThread"></div></div>
+      <div class="cat-sec"><h4>Reply</h4>
+        <div class="rf full">
+          <select id="inqQuick" class="loc-sel" style="margin-bottom:6px;" onchange="inqQuickPick(this)"><option value="">Quick replies…</option></select>
+          <textarea id="inqBody" rows="5" placeholder="Write your reply…"></textarea></div>
+        <div class="cat-sec-actions">
+          <button class="btn btn-ghost btn-sm" onclick="inqInsertLink()">🔗 Booking link</button>
+          <button class="btn btn-ghost btn-sm" onclick="inqLog(false)">📥 Log their reply</button>
+          <button class="btn btn-ghost btn-sm" onclick="inqLog(true)">📝 Add note</button>
+          <span class="save-msg" id="inqMsg" style="flex:1;"></span>
+          <button class="btn btn-gold" id="inqSend" onclick="inqSend()">Send reply ✉️</button>
+        </div>
       </div>
     </div>
   </div>
@@ -737,42 +760,117 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     .cat-item .ci-note{ grid-column:1/-1; font-size:.8rem; }
     .cat-item .ci-amt{ text-align:right; font-weight:700; font-size:.88rem; }
     @media (max-width:640px){ .cat-item{ grid-template-columns:1fr 60px 84px 32px; } .cat-item .ci-amt{ display:none; } }
+    /* CAT-LOOK (2026-10-09): separation + clear tabs. List page: title + tools row, kind tabs (underline), stage
+       filter pills, then the list. Lead modal: header facts as pills, a full-width tab strip, and every pane split
+       into boxed sections (.cat-sec) with small uppercase headings — the BEO tab already worked that way. */
+    .cat-pagehead{ display:flex; align-items:flex-start; gap:14px; flex-wrap:wrap; }
+    .cat-pagehead > .cat-pagetitle{ flex:1 1 320px; min-width:0; }
+    .cat-pagehead .hint{ margin-bottom:0; }
+    .cat-tools{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding-top:2px; }
+    .cat-how{ display:inline; }
+    .cat-how summary{ display:inline; cursor:pointer; color:#06273a; font-weight:700; list-style:none; }
+    .cat-how summary::-webkit-details-marker{ display:none; }
+    .cat-how summary::after{ content:' ▾'; font-size:.8em; }
+    .cat-how[open] summary::after{ content:' ▴'; }
+    .cat-how > div{ margin-top:10px; padding:12px 14px; background:#f6f8fa; border:1px solid var(--line); border-radius:10px; line-height:1.55; }
+    .cat-kinds{ display:flex; gap:2px; border-bottom:2px solid var(--line); margin:16px 0 0; overflow-x:auto; scrollbar-width:none; }
+    .cat-kinds::-webkit-scrollbar{ display:none; }
+    .cat-kinds .ctab{ appearance:none; background:none; border:0; border-bottom:3px solid transparent; margin-bottom:-2px; padding:11px 14px; font:inherit; font-size:.86rem; font-weight:700; color:var(--sub); cursor:pointer; white-space:nowrap; display:inline-flex; align-items:center; gap:7px; border-radius:8px 8px 0 0; }
+    .cat-kinds .ctab:hover{ color:var(--ink); background:#f4f6f8; }
+    .cat-kinds .ctab.on{ color:#06273a; border-bottom-color:#06273a; }
+    .cat-kinds .ctab .cnt{ font-size:.68rem; font-weight:800; background:#eef0f3; color:#4a5462; border-radius:999px; padding:1px 7px; min-width:22px; text-align:center; line-height:1.5; }
+    .cat-kinds .ctab.on .cnt{ background:#06273a; color:#fff; }
+    .cat-stages{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:12px 0 14px; }
+    .cat-stages .lbl{ font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--sub); margin-right:4px; }
+    .cat-stages .chip{ padding:5px 12px; font-size:.76rem; border-radius:999px; }
+    .cat-stages .chip b{ font-weight:800; opacity:.65; margin-left:4px; }
+    .cat-stages .chip.on b{ opacity:.9; }
+    .cat-stages .sep{ width:1px; height:18px; background:var(--line); margin:0 4px; }
+    #catList .rec-row{ padding:14px 16px; }
+    #catList .res-r-meta{ margin-top:3px; }
+    /* lead modal */
+    #catModal .cat-mhead, #inqModal .cat-mhead{ display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; padding-bottom:16px; }
+    #catModal .cat-mhead h3, #inqModal .cat-mhead h3{ margin:0; font-size:1.18rem; }
+    #catModal .cat-mhead-r, #inqModal .cat-mhead-r{ display:flex; align-items:center; gap:8px; }
+    .cat-stagelbl{ font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.4px; color:var(--sub); }
+    #catMeta, #inqMeta{ display:flex; flex-wrap:wrap; gap:6px 6px; margin:8px 0 0 !important; }
+    .cat-fact{ display:inline-flex; align-items:center; gap:4px; background:#f3f5f7; border:1px solid var(--line); border-radius:999px; padding:3px 10px; font-size:.78rem; line-height:1.4; color:#3f4854; max-width:100%; }
+    .cat-fact a{ color:#06273a; }
+    #catModal .cat-tabbar{ display:flex; gap:2px; align-items:flex-end; border-bottom:2px solid var(--line); margin:0 -22px; padding:0 22px; overflow-x:auto; scrollbar-width:none; background:#f3f5f7; }
+    #catModal .cat-tabbar::-webkit-scrollbar{ display:none; }
+    #catModal .cat-tabbar .chip{ background:none; border:0; border-bottom:3px solid transparent; border-radius:8px 8px 0 0; margin-bottom:-2px; padding:12px 16px; font-size:.88rem; font-weight:700; color:var(--sub); white-space:nowrap; }
+    #catModal .cat-tabbar .chip:hover{ color:var(--ink); background:#e9edf1; border-color:transparent; border-bottom-color:transparent; }
+    #catModal .cat-tabbar .chip.on{ background:#fff; color:#06273a; border-bottom-color:#06273a; }
+    #catModal .cat-pane{ padding-top:4px; }
+    .cat-sec{ border:1px solid var(--line); border-radius:12px; padding:14px 16px 16px; margin-top:14px; background:#fff; }
+    .cat-sec > h4{ margin:0 0 10px; font-size:.72rem; letter-spacing:.8px; text-transform:uppercase; color:#475569; font-weight:800; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .cat-sec > h4 .r{ margin-left:auto; display:flex; gap:6px; align-items:center; font-weight:400; text-transform:none; letter-spacing:0; font-size:.78rem; color:var(--sub); }
+    .cat-sec > h4 .pill{ letter-spacing:.4px; }
+    .cat-sec.soft{ background:#f8fafc; }
+    .cat-sec .cat-grid{ margin:0; }
+    .cat-sec .ctpl-hint, .cat-sec .hint{ margin-bottom:0; }
+    .cat-sec details > summary{ cursor:pointer; font-size:.72rem; letter-spacing:.8px; text-transform:uppercase; color:#475569; font-weight:800; }
+    .cat-sec details[open] > summary{ margin-bottom:10px; }
+    #catThread, #inqThread{ max-height:46vh; overflow-y:auto; margin:0 !important; }
+    .cat-addrow{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; align-items:center; }
+    .cat-statusbar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:14px; }
+    .cat-sec-actions{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; align-items:center; }
+    #catBeo .beo-sec{ border:1px solid var(--line); border-radius:12px; padding:14px 16px 16px; margin-top:14px; background:#fff; }
+    #catBeo .beo-sec > h4{ font-size:.72rem; font-weight:800; margin-bottom:10px; }
+    #catBeo .beo-head{ margin-top:14px; }
+    @media (max-width:640px){
+      #catModal .cat-tabbar .chip{ padding:11px 12px; font-size:.82rem; } .cat-sec{ padding:12px 12px 14px; } .cat-kinds .ctab{ padding:10px 11px; font-size:.82rem; }
+      /* list rows: name + details on the first line, time + stage on their own line underneath */
+      #catList .rec-row{ flex-wrap:wrap; gap:6px 10px; padding:12px 14px; }
+      #catList .rec-row > div{ flex:1 1 calc(100% - 24px) !important; min-width:0; }   /* beats the inline flex:1 */
+      #catList .res-r-time{ margin-left:20px; font-size:.78rem; }
+      #catList .rec-row > .pill{ margin-left:auto; }
+    }
   </style>
   <!-- Catering leads: HoneyBook-style pipeline — conversation → proposal → e-signed contract → Square invoice -->
   <div id="panel-catering" class="panel">
     <div class="section-card">
-      <h2>💼 Catering Leads</h2>
-      <div class="hint">Requests from <strong>tickets.greyscheese.com/catering.html</strong> (and any you add by hand). Reply here and it's emailed from info@greyscheese.com; their replies come back in automatically (Gmail sync). Build the <strong>Proposal</strong>, send it, and the customer signs online — that <strong>creates a Square invoice</strong> (deposit now, balance before the event) with the signed agreement attached. No proposal needed? <strong>🧾 Save &amp; send invoice</strong> skips the signature and emails the Square invoice right away. Payment status refreshes from Square every 15 minutes.</div>
-      <div class="toolbar" id="catChips"></div>
+      <div class="cat-pagehead">
+        <div class="cat-pagetitle">
+          <h2>💼 Catering Leads</h2>
+          <div class="hint"><strong>Every inquiry lands here</strong> — catering, private events, experiences and Nashville table requests from the inquiry form, plus any you add by hand.
+            <details class="cat-how"><summary>How it works</summary><div>Memphis tables booked on the form go straight into Reservations. Experiences open their own conversation with the held time and booking link; catering and private events get the proposal and invoice. Reply here and it's emailed from info@greyscheese.com; their replies come back in automatically (Gmail sync). Build the <strong>Proposal</strong>, send it, and the customer signs online — that <strong>creates a Square invoice</strong> (deposit now, balance before the event) with the signed agreement attached. No proposal needed? <strong>🧾 Save &amp; send invoice</strong> skips the signature and emails the Square invoice right away. Payment status refreshes from Square every 15 minutes.</div></details></div>
+        </div>
+        <div class="cat-tools" id="catTools"></div>
+      </div>
+      <div class="cat-kinds" id="catKinds"></div>
+      <div class="cat-stages" id="catChips"></div>
       <div class="rec-list" id="catList"><div class="rec-empty">Loading…</div></div>
     </div>
   </div>
   <div id="catModal" class="rec-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:980;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 10px;" onclick="if(event.target===this)catClose()">
     <div class="rec-card" style="background:#fff;max-width:900px;width:100%;border-radius:14px;padding:22px;">
-      <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:220px;"><h3 id="catTitle" style="margin:0 0 4px;"></h3><div id="catMeta" class="hint" style="margin:0;"></div></div>
-        <select id="catStage" class="loc-sel" onchange="catSetStage(this.value)"></select>
-        <button class="btn btn-ghost btn-sm" onclick="catClose()">✕</button>
+      <div class="cat-mhead">
+        <div style="flex:1;min-width:220px;"><h3 id="catTitle"></h3><div id="catMeta" class="hint"></div></div>
+        <div class="cat-mhead-r"><span class="cat-stagelbl">Stage</span><select id="catStage" class="loc-sel" onchange="catSetStage(this.value)"></select>
+        <button class="btn btn-ghost btn-sm" onclick="catClose()">✕</button></div>
       </div>
-      <div class="toolbar" style="margin:14px 0 0;">
+      <div class="cat-tabbar" id="catTabs">
         <button class="chip on" id="catTabConvo" onclick="catView('convo')">💬 Conversation</button>
         <button class="chip" id="catTabQuote" onclick="catView('quote')">📄 Proposal &amp; Invoice</button>
       </div>
 
-      <div id="catConvo">
-        <div id="catThread" style="margin:16px 0;max-height:46vh;overflow-y:auto;"></div>
-        <div class="rf full"><label>Reply</label>
-          <select id="catQuick" class="loc-sel" style="margin-bottom:6px;" onchange="catQuickPick(this)"><option value="">Quick replies…</option></select>
-          <textarea id="catBody" rows="5" placeholder="Write your reply…"></textarea></div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center;">
-          <button class="btn btn-ghost btn-sm" onclick="catLog(false)">📥 Log their reply</button>
-          <button class="btn btn-ghost btn-sm" onclick="catLog(true)">📝 Add note</button>
-          <span class="save-msg" id="catMsg" style="flex:1;"></span>
-          <button class="btn btn-gold" id="catSend" onclick="catSend()">Send reply ✉️</button>
+      <div id="catConvo" class="cat-pane">
+        <div class="cat-sec soft"><h4>Conversation</h4><div id="catThread"></div></div>
+        <div class="cat-sec"><h4>Reply</h4>
+          <div class="rf full">
+            <select id="catQuick" class="loc-sel" style="margin-bottom:6px;" onchange="catQuickPick(this)"><option value="">Quick replies…</option></select>
+            <textarea id="catBody" rows="5" placeholder="Write your reply…"></textarea></div>
+          <div class="cat-sec-actions">
+            <button class="btn btn-ghost btn-sm" onclick="catLog(false)">📥 Log their reply</button>
+            <button class="btn btn-ghost btn-sm" onclick="catLog(true)">📝 Add note</button>
+            <span class="save-msg" id="catMsg" style="flex:1;"></span>
+            <button class="btn btn-gold" id="catSend" onclick="catSend()">Send reply ✉️</button>
+          </div>
         </div>
       </div>
 
-      <div id="catQuote" style="display:none;margin-top:16px;"></div>
+      <div id="catQuote" class="cat-pane" style="display:none;"></div>
     </div>
   </div>
   <div id="catNewModal" class="rec-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:990;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 10px;" onclick="if(event.target===this)this.style.display='none'">
@@ -1678,6 +1776,7 @@ function mtab(name){
 function openHashTab(){
   const want = (location.hash || '').replace('#','').trim();
   if (!want) return;
+  if (want === 'inquiries') { mtab('catering'); return; } // old links in staff emails
   if (document.getElementById('panel-' + want)) mtab(want);
 }
 window.addEventListener('hashchange', openHashTab);
@@ -1716,16 +1815,16 @@ async function inqLoad(){
   if(error){ el.innerHTML = '<div class="rec-empty">❌ Could not load inquiries.</div>'; return; }
   INQ_ROWS = data || [];
   const unread = INQ_ROWS.filter(r=>r.unread).length;
-  const b = document.getElementById('inqBadge'); if(b){ b.textContent = unread; b.style.display = unread ? '' : 'none'; }
   inqRender();
 }
 // Jump straight into one conversation (used by the Experiences bookings list).
 window.inqOpenById = async function(id){
-  const t = document.querySelector(".tab[onclick*=\"'inquiries'\"]"); if(t) t.click();
+  const t = document.querySelector(".tab[onclick*=\"'catering'\"]"); if(t) t.click();
   if(!INQ_ROWS.some(r=>r.id===id)) await inqLoad();
   inqOpen(id);
 };
 function inqRender(){
+  try{ if(document.getElementById('catList')) catRender(); }catch(_){} // inquiries list under Catering Leads now
   const counts = { open:0 }; Object.keys(INQ_STAGES).forEach(k=>counts[k]=0);
   INQ_ROWS.forEach(r=>{ counts[r.stage]=(counts[r.stage]||0)+1; if(r.stage!=='booked'&&r.stage!=='lost') counts.open++; });
   document.getElementById('inqChips').innerHTML = [['open','Open'],...Object.entries(INQ_STAGES),['all','All']].map(([k,l])=>
@@ -1859,6 +1958,7 @@ const CAT_QSTAT = { draft:'Draft', sent:'Sent — waiting for signature', signed
 const catQStat = q => q.invoice_only && q.status==='signed' ? 'Invoice pending'
   : q.status==='invoiced' && !(q.deposit_pct>0 && q.deposit_pct<100) ? 'Invoiced — payment due' : (CAT_QSTAT[q.status]||q.status);
 const CAT_FUL = { pickup:'Pick-up', delivery:'Delivery', onsite:'On-site service' };
+let CAT_KIND = 'all'; // all | catering | event | experience | table
 let CAT_ROWS = [], CAT_FILTER = 'open', CAT_CUR = null, CAT_Q = null, CAT_QUOTES = [], CAT_ITEMS = [], CAT_MENU = null, CAT_TEMPLATE = '';
 const CAT_QUICK = [
   ['Thanks — on it', "Thanks so much for thinking of us! I'm pulling some ideas together and will send a proposal shortly."],
@@ -1884,36 +1984,66 @@ async function catLoad(){
     .order('last_message_at',{ascending:false}).limit(300);
   if(error){ el.innerHTML = '<div class="rec-empty">❌ Could not load catering leads.</div>'; return; }
   CAT_ROWS = data || [];
-  const unread = CAT_ROWS.filter(r=>r.unread).length;
-  const b = document.getElementById('catBadge'); if(b){ b.textContent = unread; b.style.display = unread ? '' : 'none'; }
-  catRender();
+  catRender(); // sets the unread badge for the whole list
 }
 window.catOpenById = async function(id){
   const t = document.querySelector(".tab[onclick*=\"'catering'\"]"); if(t) t.click();
   if(!CAT_ROWS.some(r=>r.id===id)) await catLoad();
   catOpen(id);
 };
+// ONE LIST (Maverick 2026-10-08): catering leads, private events (a catering lead whose occasion
+// starts "Private event"), table requests (occasion starts "Table request") and experience inquiries (INQ_ROWS, their own table and modal) together.
+// Experience stages are shown under the nearest catering stage for the filter chips.
+const CAT_KINDS = { catering:['Catering','#06273a'], event:['Private event','#7c3aed'], experience:['Experience','#b45309'], table:['Table request','#0f766e'] };
+const INQ_AS_CAT = { new:'new', replied:'replied', link_sent:'contract_sent', booked:'paid', lost:'lost' };
+function catKindOf(r){ const o = r.occasion||''; return /^private event/i.test(o) ? 'event' : /^table request/i.test(o) ? 'table' : 'catering'; }
+function catAll(){
+  const a = CAT_ROWS.map(r=>({ kind:catKindOf(r), stage:r.stage, r }));
+  const b = (typeof INQ_ROWS!=='undefined' ? INQ_ROWS : []).map(r=>({ kind: (r.details&&r.details.kind==='event') ? 'event' : 'experience', stage: INQ_AS_CAT[r.stage]||'new', inq:true, r }));
+  return a.concat(b).sort((x,y)=>String(y.r.last_message_at||'').localeCompare(String(x.r.last_message_at||'')));
+}
 function catRender(){
+  const all = catAll();
+  const unread = all.filter(x=>x.r.unread).length;
+  const bd = document.getElementById('catBadge'); if(bd){ bd.textContent = unread; bd.style.display = unread ? '' : 'none'; }
+  const isOpen = x => x.stage!=='paid' && x.stage!=='lost';
+  const kc = { all:0, catering:0, event:0, experience:0, table:0 };
+  all.filter(isOpen).forEach(x=>{ kc.all++; kc[x.kind]++; });
+  const kd = document.getElementById('catKinds');
+  if(kd) kd.innerHTML = [['all','All inquiries'],['catering','Catering'],['event','Private events'],['experience','Experiences'],['table','Table requests']].map(([k,l])=>
+    '<button class="ctab'+(CAT_KIND===k?' on':'')+'" onclick="CAT_KIND=\''+k+'\';catRender()">'+l+'<span class="cnt">'+kc[k]+'</span></button>').join('');
+  const tools = document.getElementById('catTools');
+  if(tools && !tools.querySelector('button')) tools.innerHTML = '<button class="btn btn-ghost btn-sm" onclick="catLoad();inqLoad()">↻ Refresh</button><button class="btn btn-gold btn-sm" onclick="catNew()">＋ New lead</button>';
+  const mine = all.filter(x=> CAT_KIND==='all' || x.kind===CAT_KIND);
   const counts = { open:0 }; Object.keys(CAT_STAGES).forEach(k=>counts[k]=0);
-  CAT_ROWS.forEach(r=>{ counts[r.stage]=(counts[r.stage]||0)+1; if(r.stage!=='paid'&&r.stage!=='lost') counts.open++; });
-  document.getElementById('catChips').innerHTML = [['open','Open'],...Object.entries(CAT_STAGES),['all','All']].map(([k,l])=>
-    '<button class="chip'+(CAT_FILTER===k?' on':'')+'" onclick="CAT_FILTER=\''+k+'\';catRender()">'+l+(k==='all'?'':' · '+(counts[k]||0))+'</button>').join('')
-    +'<div class="spacer"></div><button class="btn btn-ghost btn-sm" onclick="catLoad()">↻ Refresh</button><button class="btn btn-gold btn-sm" onclick="catNew()">＋ New lead</button>';
-  const rows = CAT_ROWS.filter(r=> CAT_FILTER==='all' ? true : CAT_FILTER==='open' ? (r.stage!=='paid'&&r.stage!=='lost') : r.stage===CAT_FILTER);
+  mine.forEach(x=>{ counts[x.stage]=(counts[x.stage]||0)+1; if(isOpen(x)) counts.open++; });
+  document.getElementById('catChips').innerHTML = '<span class="lbl">Stage</span>' + [['open','Open'],['sep'],...Object.entries(CAT_STAGES),['sep'],['all','All']].map(([k,l])=>
+    k==='sep' ? '<span class="sep"></span>' : '<button class="chip'+(CAT_FILTER===k?' on':'')+'" onclick="CAT_FILTER=\''+k+'\';catRender()">'+l+(k==='all'?'':'<b>'+(counts[k]||0)+'</b>')+'</button>').join('');
+  const rows = mine.filter(x=> CAT_FILTER==='all' ? true : CAT_FILTER==='open' ? isOpen(x) : x.stage===CAT_FILTER);
   const el = document.getElementById('catList');
-  if(!rows.length){ el.innerHTML = '<div class="rec-empty">No catering leads here.</div>'; return; }
-  el.innerHTML = rows.map(r=>{
-    const msgs = (r.catering_messages||[]).filter(m=>m.direction!=='note').sort((a,b)=>a.created_at.localeCompare(b.created_at));
+  if(!rows.length){ el.innerHTML = '<div class="rec-empty">Nothing here.</div>'; return; }
+  el.innerHTML = rows.map(x=>{
+    const r = x.r, K = CAT_KINDS[x.kind];
+    const tag = '<span style="display:inline-block;font-size:.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:'+K[1]+';border:1px solid '+K[1]+';border-radius:5px;padding:1px 6px;margin-right:6px;vertical-align:1px;">'+K[0]+'</span>';
+    const list = x.inq ? r.inquiry_messages : r.catering_messages;
+    const msgs = (list||[]).filter(m=>m.direction!=='note').sort((a,b)=>a.created_at.localeCompare(b.created_at));
     const lastMsg = msgs[msgs.length-1];
-    const q = (r.catering_quotes||[]).filter(x=>x.status!=='canceled').sort((a,b)=>b.created_at.localeCompare(a.created_at))[0];
-    const bits = [r.occasion, r.event_date?fmtDisplay(r.event_date):'', r.guests?('👥 '+r.guests):'', r.location, q?catMoney(q.total_cents):''].filter(Boolean).join(' · ');
-    const pill = r.stage==='paid'?'pill-ok':r.stage==='lost'?'pill-bad':r.stage==='new'?'pill-req':'pill-mid';
-    return '<div class="rec-row" onclick="catOpen(\''+r.id+'\')">'
+    let bits, label, open;
+    if(x.inq){
+      bits = [r.experience_name||'Not sure yet', r.preferred_date?fmtDisplay(r.preferred_date):'', r.party_size?('👥 '+r.party_size):'', r.location].filter(Boolean).join(' · ');
+      label = INQ_STAGES[r.stage]||r.stage; open = "inqOpen('"+r.id+"')";
+    } else {
+      const q = (r.catering_quotes||[]).filter(z=>z.status!=='canceled').sort((a,b)=>b.created_at.localeCompare(a.created_at))[0];
+      bits = [r.occasion, r.event_date?fmtDisplay(r.event_date):'', r.guests?('👥 '+r.guests):'', r.location, q?catMoney(q.total_cents):''].filter(Boolean).join(' · ');
+      label = CAT_STAGES[r.stage]; open = "catOpen('"+r.id+"')";
+    }
+    const pill = x.stage==='paid'?'pill-ok':x.stage==='lost'?'pill-bad':x.stage==='new'?'pill-req':'pill-mid';
+    return '<div class="rec-row" data-kind="'+x.kind+'" onclick="'+open+'">'
       +'<span style="width:10px;height:10px;border-radius:50%;flex:0 0 10px;background:'+(r.unread?'#d97706':'transparent')+'"></span>'
-      +'<div style="flex:1;min-width:0;"><div class="res-r-name">'+esc(r.name)+(r.company?' <span style="font-weight:400;">('+esc(r.company)+')</span>':'')+' <span style="font-weight:400;color:#64748b;">· '+esc(bits)+'</span></div>'
+      +'<div style="flex:1;min-width:0;"><div class="res-r-name">'+tag+esc(r.name)+(r.company?' <span style="font-weight:400;">('+esc(r.company)+')</span>':'')+' <span style="font-weight:400;color:#64748b;">· '+esc(bits)+'</span></div>'
       +'<div class="res-r-meta" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(lastMsg?(lastMsg.direction==='out'?'You: ':'')+esc(lastMsg.body.slice(0,140)):'')+'</div></div>'
       +'<span class="res-r-time" style="min-width:auto;">'+esc(inqWhen(r.last_message_at))+'</span>'
-      +'<span class="pill '+pill+'">'+CAT_STAGES[r.stage]+'</span></div>';
+      +'<span class="pill '+pill+'">'+esc(label)+'</span></div>';
   }).join('');
 }
 async function catOpen(id){
@@ -1932,10 +2062,10 @@ async function catOpen(id){
 function catHead(){
   const r = CAT_CUR;
   document.getElementById('catTitle').textContent = r.name + (r.company ? ' — ' + r.company : '');
-  document.getElementById('catMeta').innerHTML = [ '<a href="mailto:'+esc(r.email)+'">'+esc(r.email)+'</a>', r.phone?esc(r.phone):'',
-    r.event_date?'📅 '+fmtDisplay(r.event_date)+(r.event_time?' '+catTime(r.event_time):''):'', r.guests?'👥 '+r.guests:'',
-    r.fulfillment?CAT_FUL[r.fulfillment]:'', r.location||'', '#'+esc(r.code) ].filter(Boolean).join(' · ')
-    + (r.address?'<div style="margin-top:3px;">📍 '+esc(r.address)+'</div>':'') + (r.budget?'<div style="margin-top:3px;">Budget: '+esc(r.budget)+'</div>':'');
+  const fact = x => x ? '<span class="cat-fact">'+x+'</span>' : '';
+  document.getElementById('catMeta').innerHTML = fact('<a href="mailto:'+esc(r.email)+'">'+esc(r.email)+'</a>') + fact(r.phone?esc(r.phone):'')
+    + fact(r.event_date?'📅 '+fmtDisplay(r.event_date)+(r.event_time?' · '+catTime(r.event_time):''):'') + fact(r.guests?'👥 '+r.guests:'')
+    + fact(r.fulfillment?CAT_FUL[r.fulfillment]:'') + fact(r.location||'') + fact(r.address?'📍 '+esc(r.address):'') + fact(r.budget?'Budget: '+esc(r.budget):'') + fact('#'+esc(r.code));
 }
 function catView(which){
   document.getElementById('catConvo').style.display = which==='convo' ? '' : 'none';
@@ -2037,35 +2167,36 @@ function catQuoteRender(copyFrom){
   const status = q ? '<span class="pill '+(q.status==='sent'?'pill-req':'pill-mid')+'">'+esc(CAT_QSTAT[q.status])+'</span>'
     + (q.sent_at?' <span class="hint" style="margin:0;">sent '+esc(inqWhen(q.sent_at))+'</span>':'') + (q.viewed_at?' <span class="hint" style="margin:0;">· 👀 opened '+esc(inqWhen(q.viewed_at))+'</span>':'') : '<span class="pill pill-mid">New proposal</span>';
   box.innerHTML =
-    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+status+'<div class="spacer" style="flex:1"></div>'
+    '<div class="cat-statusbar">'+status+'<div class="spacer" style="flex:1"></div>'
     + (q && q.status==='sent' ? '<button class="btn btn-ghost btn-sm" onclick="catCopyLink()">🔗 Copy link</button><a class="btn btn-ghost btn-sm" target="_blank" href="'+CAT_SITE+'?q='+esc(q.sign_token)+'">👁 Preview</a>' : '')
     + '</div>'
-    + '<h4 style="margin:16px 0 6px;">Event</h4><div class="cat-grid">'
+    + '<div class="cat-sec"><h4>Event</h4><div class="cat-grid">'
     +   catField('Name','cq_name',r.name) + catField('Email','cq_email',r.email,'email') + catField('Phone','cq_phone',r.phone||'','tel') + catField('Company','cq_company',r.company||'')
     +   catField('Event date','cq_date',r.event_date||'','date') + catField('Time','cq_time',r.event_time||'','time') + catField('Guests','cq_guests',r.guests||'','number')
     +   '<div class="rf"><label>Store</label><select id="cq_loc" class="loc-sel">'+['Memphis','Nashville'].map(l=>'<option'+(l===(r.location||'Memphis')?' selected':'')+'>'+l+'</option>').join('')+'</select></div>'
     +   '<div class="rf"><label>Service</label><select id="cq_ful" class="loc-sel"><option value="">—</option>'+Object.entries(CAT_FUL).map(([k,l])=>'<option value="'+k+'"'+(r.fulfillment===k?' selected':'')+'>'+l+'</option>').join('')+'</select></div>'
     +   catField('Occasion','cq_occ',r.occasion||'')
     +   '<div class="rf" style="grid-column:1/-1;"><label>Address</label><input id="cq_addr" value="'+esc(r.address||'')+'"></div>'
-    + '</div>'
-    + '<h4 style="margin:18px 0 6px;">Items</h4>'
+    + '</div></div>'
+    + '<div id="cq_coverSlot"></div>'
+    + '<div class="cat-sec"><h4>Items</h4>'
     + '<div id="catItems"></div>'
-    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center;">'
+    + '<div class="cat-addrow">'
     +   '<button class="btn btn-ghost btn-sm" onclick="catAddItem()">＋ Custom line</button>'
     +   '<select id="catMenu" class="loc-sel" style="max-width:340px;" onchange="catMenuPick(this)"><option value="">＋ From the Square catering menu…</option></select>'
     +   '<button class="btn btn-ghost btn-sm" onclick="catAddItem(\'Delivery & set-up\',1,0)">＋ Delivery fee</button>'
-    + '</div>'
-    + '<div class="cat-grid" style="margin-top:14px;">'
+    + '</div></div>'
+    + '<div class="cat-sec"><h4>Pricing</h4><div class="cat-grid">'
     +   catField('Sales tax %','cq_tax', q?q.tax_rate:9.75,'number') + catField('Deposit %','cq_dep', q?q.deposit_pct:50,'number')
     +   '<div class="rf"><label>Balance due</label><input id="cq_bal" type="date" value="'+esc((q&&q.balance_due_date)||'')+'"><span style="font-size:.72rem;color:#64748b;">Blank = 3 days before the event</span></div>'
     + '</div>'
-    + '<div id="catTotals" class="cat-tot"></div>'
-    + '<div class="rf" style="margin-top:14px;"><label>Note for the customer (shows on the proposal or invoice)</label><textarea id="cq_note" rows="2">'+esc((src&&src.customer_note)||'')+'</textarea></div>'
-    + '<details style="margin-top:14px;"><summary style="cursor:pointer;font-weight:700;">📜 Agreement text</summary>'
+    + '<div id="catTotals" class="cat-tot"></div></div>'
+    + '<div class="cat-sec"><h4>Note for the customer <span class="r">shows on the proposal or invoice</span></h4><div class="rf"><textarea id="cq_note" rows="2">'+esc((src&&src.customer_note)||'')+'</textarea></div></div>'
+    + '<div class="cat-sec"><details><summary>📜 Agreement text</summary>'
     +   '<div class="hint" style="margin:8px 0;">Placeholders fill in automatically: {{name}} {{event_date}} {{guests}} {{total}} {{deposit_pct}} {{deposit}} {{balance_due_date}}. Changes here apply to this proposal only.</div>'
     +   '<textarea id="cq_contract" rows="14" style="width:100%;font-family:inherit;font-size:.85rem;">'+esc((src&&src.contract_text)||CAT_TEMPLATE)+'</textarea>'
-    +   '<div style="margin-top:6px;"><button class="btn btn-ghost btn-sm" onclick="catSaveTemplate()">Save as the default for new proposals</button></div></details>'
-    + '<div class="rf" style="margin-top:14px;"><label>Message with the email (optional)</label><textarea id="cq_msg" rows="3" placeholder="Leave blank for the standard note"></textarea></div>'
+    +   '<div style="margin-top:6px;"><button class="btn btn-ghost btn-sm" onclick="catSaveTemplate()">Save as the default for new proposals</button></div></details></div>'
+    + '<div class="cat-sec"><h4>Email to the customer <span class="r">goes out with the proposal — blank = the standard note</span></h4><div class="rf"><textarea id="cq_msg" rows="3" placeholder="Leave blank for the standard note"></textarea></div></div>'
     + '<div class="cat-actions">'
     +   '<span class="save-msg" id="cqMsg"></span>'
     +   '<button class="btn btn-ghost" onclick="catSaveQuote(false)">💾 Save draft</button>'
@@ -2193,7 +2324,7 @@ function catLockedHtml(q){
   const split = q.deposit_pct>0 && q.deposit_pct<100, dep = Math.round(q.total_cents*q.deposit_pct/100);
   const items = (q.items||[]).map(it=>'<tr><td>'+esc(it.name)+(it.note?'<div style="font-size:.78rem;color:#64748b;">'+esc(it.note)+'</div>':'')+'</td><td class="n">'+esc(it.qty)+'</td><td class="n">'+catMoney(it.price_cents)+'</td><td class="n">'+catMoney(Math.round(it.qty*it.price_cents))+'</td></tr>').join('');
   const pill = q.status==='paid'?'pill-ok':q.status==='canceled'?'pill-bad':q.status==='deposit_paid'?'pill-ok':'pill-req';
-  return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="pill '+pill+'">'+esc(catQStat(q))+'</span>'
+  return '<div class="cat-statusbar"><span class="pill '+pill+'">'+esc(catQStat(q))+'</span>'
     + (q.square_env==='sandbox'?'<span class="pill pill-bad">Square SANDBOX</span>':'') + '<div style="flex:1"></div>'
     + (q.pdf_path?'<button class="btn btn-ghost btn-sm" onclick="catPdf(\''+q.id+'\')">📄 Signed PDF</button>':'')
     + (q.invoice_url?'<a class="btn btn-ghost btn-sm" target="_blank" href="'+esc(q.invoice_url)+'">🧾 Invoice'+(q.invoice_number?' #'+esc(q.invoice_number):'')+'</a>':'')
@@ -2202,7 +2333,7 @@ function catLockedHtml(q){
     + (q.signed_at?'<div style="margin:12px 0 0;font-size:.88rem;">✍️ Signed by <b>'+esc(q.signed_name)+'</b> · '+esc(inqWhen(q.signed_at))+(q.signed_ip?' <span style="color:#64748b;">· IP '+esc(q.signed_ip)+'</span>':'')+'</div>':'')
     + (q.invoice_only?'<div style="margin:12px 0 0;font-size:.88rem;">🧾 Invoiced straight from the portal — no proposal or signature.</div>':'')
     + (q.invoice_error && !q.square_invoice_id ? '<div style="margin:12px 0;padding:10px 12px;background:#fef2f2;color:#991b1b;border-radius:8px;">Square invoice failed: '+esc(q.invoice_error)+'<div style="margin-top:8px;"><button class="btn btn-gold btn-sm" onclick="catRetryInvoice(\''+q.id+'\')">Retry invoice</button></div></div>' : '')
-    + '<table class="cat-tbl"><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th></tr></thead><tbody>'+items+'</tbody></table>'
+    + '<div class="cat-sec"><h4>Proposal</h4><table class="cat-tbl" style="margin-top:0;"><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th></tr></thead><tbody>'+items+'</tbody></table>'
     + '<div class="cat-tot">'
     +   '<div><span>Subtotal</span><span>'+catMoney(q.subtotal_cents)+'</span></div>'
     +   '<div><span>Tax ('+Number(q.tax_rate)+'%)</span><span>'+catMoney(q.tax_cents)+'</span></div>'
@@ -2210,7 +2341,7 @@ function catLockedHtml(q){
     +   (split?'<div><span>Deposit ('+q.deposit_pct+'%)</span><span>'+catMoney(dep)+'</span></div>':'')
     +   '<div class="paid"><span>Paid so far</span><span>'+catMoney(q.amount_paid_cents)+'</span></div>'
     +   '<div><span>Still owed</span><span>'+catMoney(Math.max(0,q.total_cents-q.amount_paid_cents))+'</span></div>'
-    + '</div>'
+    + '</div></div>'
     + '<div class="cat-actions">'
     +   '<span class="save-msg" id="cqMsg"></span>'
     +   (['signed','invoiced'].includes(q.status)?'<button class="btn btn-ghost btn-sm" onclick="catCancelInvoice(\''+q.id+'\')">Cancel '+(q.square_invoice_id||q.invoice_only?'invoice':'proposal')+'</button>':'')
@@ -14970,7 +15101,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   function mount(){
     const tq = $('catTabQuote'); if(!tq || $('catTabBeo')) return;
     tq.insertAdjacentHTML('afterend', '<button class="chip" id="catTabBeo" onclick="catView(\'beo\')">📋 BEO</button>');
-    $('catQuote').insertAdjacentHTML('afterend', '<div id="catBeo" style="display:none;margin-top:16px;"></div>');
+    $('catQuote').insertAdjacentHTML('afterend', '<div id="catBeo" class="cat-pane" style="display:none;"></div>');
     const orig = window.catView;
     window.catView = function(which){
       if(which !== 'beo'){ $('catBeo').style.display='none'; $('catTabBeo').classList.remove('on'); return orig(which); }
@@ -15297,6 +15428,1100 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     window.addEventListener('hashchange', route);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>
+<!-- CAT-TEMPLATES (2026-10-07): HoneyBook templates inside Catering Leads.
+     Data: catering_templates (admin-only RLS: email / package / contract) + site_content 'catering_template_vars'
+     (scheduling link + shop address/phone per store). Reply box: email templates. Proposal: 📦 packages (+ a live
+     "Gratuity (N%)" line), 📜 agreement templates, ✉️ templates for the email message. 📚 Templates manager next to
+     ↻ Refresh. Agreement fill-ins the catering fn doesn't know ({{today}} {{venue}} {{client_*}} {{shop_*}}
+     {{occasion}}) are filled into the saved contract_text when the proposal is saved.
+     PHOTOS (2026-10-09): catering_templates.image_url = cover photo, items[].image = per-line photo (HoneyBook's
+     experience pictures, hosted in social-assets). Adding a package copies them onto the proposal (cq_image +
+     CAT_ITEMS[].image); a catApi wrapper sends them with save_quote; catering.html shows them to the customer.
+     Photos can be swapped in the editor or the Templates manager: upload (social-assets/catering-templates/) or URL.
+     PREVIEW (2026-10-09): 👁 on every Templates-manager row and in the editor (unsaved edits included) opens #ctplPrev,
+     a mock of what the customer gets — packages as the catering.html proposal page (hero, photos, qty/pp, gratuity,
+     tax, deposit, note), emails in the send-mail shell, agreements filled like the catering fn fills them. Uses the
+     open lead's details when there is one, otherwise sample ones (Jane Smith, 8 guests, a Saturday 3 weeks out).
+     CAT-LOOK (2026-10-09): the core's proposal editor is split into .cat-sec boxes; the cover photo fills #cq_coverSlot
+     as its own section, and the 📚 Templates button goes into #catTools (falls back to the old spots on main). -->
+<style id="cat-tpl-css">
+  #ctplModal .rec-card{ max-height:none !important; display:block; }
+  .ctpl-photo{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .ctpl-photo img{ width:64px; height:64px; object-fit:cover; border-radius:8px; background:#f1f5f9; border:1px solid #e2e8f0; }
+  .ctpl-photo.cover img{ width:140px; height:56px; }
+  .ctpl-photo .ph-none{ width:64px; height:64px; border-radius:8px; background:#f1f5f9; border:1px dashed #cbd5e1; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:1.2rem; }
+  .ctpl-photo.cover .ph-none{ width:140px; height:56px; }
+  .cat-item .ci-img{ grid-column:1/-1; display:flex; align-items:center; gap:8px; font-size:.78rem; color:#64748b; }
+  .cat-item .ci-img img{ width:40px; height:40px; object-fit:cover; border-radius:6px; border:1px solid #e2e8f0; }
+  .cat-tbl .ci-thumb{ width:44px; height:44px; object-fit:cover; border-radius:6px; margin-right:8px; vertical-align:middle; }
+  #ctplModal .ctpl-row img.ctpl-rowpic{ width:48px; height:36px; object-fit:cover; border-radius:6px; flex:0 0 48px; }
+  #ctplModal .ctpl-tabs{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:12px 0; }
+  #ctplModal .ctpl-list{ display:flex; flex-direction:column; gap:6px; }
+  #ctplModal .ctpl-row{ display:flex; align-items:center; gap:10px; padding:9px 12px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; cursor:pointer; }
+  #ctplModal .ctpl-row:hover{ border-color:#06273a; }
+  #ctplModal .ctpl-row.off{ opacity:.55; }
+  #ctplModal .ctpl-cat{ font-size:.72rem; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:#64748b; margin:12px 0 2px; }
+  #ctplModal .ctpl-tag{ font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:999px; background:#e3edf2; color:#06273a; white-space:nowrap; }
+  #ctplModal .ctpl-pp{ font-size:.72rem; display:flex; gap:4px; align-items:center; justify-content:center; }
+  #ctplModal textarea{ width:100%; box-sizing:border-box; }
+  .ctpl-hint{ font-size:.76rem; color:#64748b; margin-top:4px; line-height:1.4; }
+  .ctpl-att{ margin-top:8px; padding:8px 10px; border-radius:8px; background:#fffbeb; color:#92400e; font-size:.8rem; }
+  #ctplModal .ctpl-row .pv-btn{ flex:0 0 auto; padding:2px 8px; }
+  @media (max-width:640px){ #ctplModal .ctpl-pp{ display:none; } }
+  /* 👁 preview — a mock of the customer's page / email */
+  #ctplPrev{ position:fixed; inset:0; background:rgba(15,23,42,.62); z-index:990; display:none; align-items:flex-start; justify-content:center; overflow-y:auto; padding:24px 10px; }
+  #ctplPrev .pv-card{ background:#fff; width:100%; max-width:820px; border-radius:14px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.35); transition:max-width .2s; }
+  #ctplPrev.phone .pv-card{ max-width:400px; }
+  #ctplPrev .pv-bar{ position:sticky; top:0; z-index:2; display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:#fff; border-bottom:1px solid #e2e8f0; padding:8px 12px; }
+  #ctplPrev .pv-bar .pv-ttl{ flex:1; min-width:160px; font-weight:800; }
+  #ctplPrev .pv-bar .pv-with{ display:block; font-size:.74rem; font-weight:400; color:#64748b; }
+  #ctplPrev .pv-page{ background:#E9DFC7; color:#221E1B; font-family:Georgia,'Times New Roman',serif; font-size:15px; line-height:1.55; padding:22px 16px 36px; }
+  #ctplPrev .pv-top{ background:#211D19; color:#FBF7EB; padding:12px 18px; font-weight:900; font-size:20px; line-height:1; }
+  #ctplPrev .pv-top small{ display:block; font:400 10px Arial,sans-serif; letter-spacing:.2em; text-transform:uppercase; color:#E0A21C; margin-top:4px; }
+  #ctplPrev .pv-eyebrow{ font:600 11px Arial,sans-serif; text-transform:uppercase; letter-spacing:.22em; color:#A52B1E; margin:0 0 6px; }
+  #ctplPrev h1.pv-h1{ font:900 34px/1.05 Georgia,serif; margin:0 0 12px; color:#221E1B; }
+  #ctplPrev h2.pv-h2{ font:800 22px Georgia,serif; margin:0 0 10px; color:#221E1B; }
+  #ctplPrev .pv-lede{ color:#6E6353; font-size:16px; margin:0 0 20px; }
+  #ctplPrev .pv-hero{ aspect-ratio:5/2; max-height:300px; overflow:hidden; background:#EDE3CB; margin:0 0 18px; }
+  #ctplPrev .pv-hero img{ width:100%; height:100%; object-fit:cover; display:block; }
+  #ctplPrev .pv-cardp{ background:#FBF7EB; border:1px solid #EDE3CB; padding:20px; margin:0 0 16px; }
+  #ctplPrev dl.pv-facts{ display:grid; grid-template-columns:100px 1fr; gap:4px 12px; margin:0; font-size:14px; }
+  #ctplPrev dl.pv-facts dt{ font:600 11px Arial,sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#6E6353; padding-top:3px; }
+  #ctplPrev dl.pv-facts dd{ margin:0; }
+  #ctplPrev table.pv-items{ width:100%; border-collapse:collapse; font-size:14px; }
+  #ctplPrev table.pv-items th{ text-align:left; font:600 10px Arial,sans-serif; letter-spacing:.12em; text-transform:uppercase; color:#6E6353; border-bottom:1px solid #D6C8AB; padding:6px 4px; }
+  #ctplPrev table.pv-items td{ padding:9px 4px; border-bottom:1px solid #EDE3CB; vertical-align:top; }
+  #ctplPrev table.pv-items .n{ text-align:right; white-space:nowrap; }
+  #ctplPrev table.pv-items .note{ display:block; color:#9A8C76; font-size:12px; }
+  #ctplPrev table.pv-items .itm{ display:flex; gap:12px; align-items:flex-start; }
+  #ctplPrev table.pv-items .thumb{ width:72px; height:72px; object-fit:cover; flex:0 0 72px; background:#EDE3CB; display:block; }
+  #ctplPrev.phone table.pv-items .thumb{ width:56px; height:56px; flex-basis:56px; }
+  #ctplPrev table.pv-items tr.opt td{ opacity:.5; }
+  #ctplPrev .pv-tot{ margin:12px 0 0 auto; max-width:300px; font-size:14px; }
+  #ctplPrev .pv-tot div{ display:flex; justify-content:space-between; padding:3px 0; }
+  #ctplPrev .pv-tot .big{ font-weight:700; font-size:17px; border-top:1px solid #D6C8AB; padding-top:8px; margin-top:4px; }
+  #ctplPrev .pv-tot .dep{ color:#7C1F15; }
+  #ctplPrev .pv-muted{ color:#6E6353; font-size:13px; white-space:pre-wrap; margin:16px 0 0; }
+  #ctplPrev .pv-contract{ white-space:pre-wrap; font-size:13px; background:#fff; border:1px solid #D6C8AB; padding:16px; }
+  #ctplPrev .pv-sig{ font:italic 28px Georgia,serif; border-bottom:1px solid #221E1B; min-height:46px; padding:4px 2px; margin:6px 0 4px; color:#211D19; }
+  #ctplPrev .pv-mail{ background:#eef2f7; padding:22px 14px 30px; font-family:Arial,sans-serif; }
+  #ctplPrev .pv-mailhead{ font-size:13px; color:#475569; max-width:600px; margin:0 auto 12px; line-height:1.5; }
+  #ctplPrev .pv-mailbody{ background:#fff; padding:22px 20px; max-width:600px; margin:0 auto; font-family:Georgia,serif; color:#221E1B; line-height:1.55; font-size:15px; }
+  #ctplPrev .pv-mailbody a{ color:#7C1F15; }
+  #ctplPrev .pv-foot{ font:12px Arial,sans-serif; color:#64748b; padding:8px 12px 12px; }
+  @media (max-width:620px){ #ctplPrev{ padding:10px 4px; } #ctplPrev h1.pv-h1{ font-size:28px; } #ctplPrev .pv-cardp{ padding:16px 12px; } #ctplPrev table.pv-items .thumb{ width:56px; height:56px; flex-basis:56px; } }
+</style>
+<div id="ctplModal" class="rec-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:985;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 10px;" onclick="if(event.target===this)ctplClose()">
+  <div class="rec-card" style="background:#fff;max-width:900px;width:100%;border-radius:14px;padding:22px;">
+    <div style="display:flex;align-items:center;gap:10px;"><h3 style="margin:0;flex:1;">📚 Catering templates</h3><button class="btn btn-ghost btn-sm" onclick="ctplClose()">✕</button></div>
+    <div id="ctplBody"></div>
+  </div>
+</div>
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const CATS = {
+    email: ['Inquiry replies','Experiences','Proposals & deposits','Follow-ups & reminders'],
+    package: ['Catering','Private events & off-site','Classes','Experiences','Older (HoneyBook 2021)'],
+    contract: ['Agreements']
+  };
+  const LATE_KEYS = ['today','venue','client_email','client_phone','client_address','shop_address','shop_phone','occasion'];
+  const GRAT_RE = /^gratuity\s*\((\d+(?:\.\d+)?)\s*%\)/i;
+  let ALL = null, VARS = {}, LOADING = null;
+
+  async function load(force){
+    if(ALL && !force) return ALL;
+    if(LOADING) return LOADING;
+    LOADING = (async () => {
+      const [t, v] = await Promise.all([
+        sb.from('catering_templates').select('*').order('sort').order('title'),
+        sb.from('site_content').select('data').eq('key','catering_template_vars').maybeSingle()
+      ]);
+      const rows = (!t.error && t.data) ? t.data : [];
+      ALL = rows.length ? rows : null;            // empty = not signed in yet → try again next time
+      VARS = (v && v.data && v.data.data) || VARS || {};
+      return rows;
+    })();
+    try { return await LOADING; } finally { LOADING = null; }
+  }
+  const rowsOf = kind => (ALL || []).filter(t => t.kind === kind);
+  const byId = id => (ALL || []).find(t => t.id === id);
+
+  /* ---------- fill-ins ---------- */
+  function longDate(ymd){ if(!ymd) return ''; const d = new Date(String(ymd).slice(0,10)+'T12:00:00'); return isNaN(d) ? String(ymd) : d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
+  const cur = () => (typeof CAT_CUR !== 'undefined' && CAT_CUR) || null;
+  // the proposal form only counts if it was drawn for the lead that is open now
+  const formOk = () => { const b = $('catQuote'), r = cur(); return !!(b && r && b.dataset.lead === r.id && $('cq_name')); };
+  function ctx(){
+    const r = cur() || {}, ok = formOk();
+    const val = (id, k) => { if(ok){ const e = $(id); if(e) return String(e.value||'').trim(); } return r[k] == null ? '' : String(r[k]).trim(); };
+    const loc = val('cq_loc','location') || 'Memphis';
+    const name = val('cq_name','name'), addr = val('cq_addr','address');
+    const shop = (VARS.shops || {})[loc] || {};
+    const time = val('cq_time','event_time');
+    return {
+      first_name: name.split(/\s+/)[0] || '', name, company: val('cq_company','company'),
+      event_date: longDate(val('cq_date','event_date')), event_time: time ? catTime(time) : '',
+      guests: val('cq_guests','guests'), occasion: val('cq_occ','occasion'), location: loc, code: r.code || '',
+      venue: addr || ('GREYS ' + loc + (shop.address ? ', ' + shop.address : '')),
+      schedule_link: (VARS.schedule_link || {})[loc] || '',
+      client_email: val('cq_email','email'), client_phone: val('cq_phone','phone'), client_address: addr,
+      shop_address: shop.address || '', shop_phone: shop.phone || '',
+      today: longDate(new Date().toLocaleDateString('en-CA'))
+    };
+  }
+  // emails: blanks show as [event date] so they stand out; agreements: blanks stay blank
+  function fill(text, opt){
+    opt = opt || {}; const c = ctx();
+    return String(text || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => {
+      if(opt.only && opt.only.indexOf(k) < 0) return m;
+      if(!(k in c)) return m;
+      if(c[k]) return c[k];
+      if(opt.contract) return k === 'occasion' ? 'event' : '';
+      return '[' + k.replace(/_/g,' ') + ']';
+    });
+  }
+  const autoGrow = ta => { if(ta) ta.rows = Math.min(18, Math.max(ta.rows || 3, String(ta.value).split('\n').length + 1)); };
+
+  /* ---------- photos ---------- */
+  const okUrl = u => /^https:\/\/[^\s"'<>]+$/i.test(String(u || '').trim()) ? String(u).trim() : '';
+  // upload to the public social-assets bucket (same bucket as the experience + social photos); returns the public URL
+  async function uploadPhoto(file){
+    if(!file || !/^image\//.test(file.type)) throw new Error('Pick an image file (jpg, png, webp).');
+    if(file.size > 12 * 1024 * 1024) throw new Error('That photo is over 12 MB — please shrink it first.');
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const path = 'catering-templates/' + new Date().toISOString().slice(0, 10) + '-' + Math.random().toString(36).slice(2, 8) + '-' + file.name.toLowerCase().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]+/g, '-').slice(0, 40) + '.' + ext;
+    const { error } = await sb.storage.from('social-assets').upload(path, file, { contentType: file.type, upsert: false });
+    if(error) throw new Error(error.message);
+    return sb.storage.from('social-assets').getPublicUrl(path).data.publicUrl;
+  }
+  // one hidden file input; pickPhoto() resolves with the public URL (or null when canceled)
+  function pickPhoto(){
+    return new Promise(resolve => {
+      let inp = $('ctplFile');
+      if(!inp){ inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.id = 'ctplFile'; inp.style.display = 'none'; document.body.appendChild(inp); }
+      inp.value = '';
+      inp.onchange = async () => { const f = inp.files && inp.files[0]; if(!f) return resolve(null); try { resolve(await uploadPhoto(f)); } catch(e) { alert(e.message); resolve(null); } };
+      inp.click();
+    });
+  }
+  // photo control: thumbnail + 📷 Upload + 🔗 URL + ✕ ; `on(url)` is called with the new value ('' = removed)
+  const PH = {};
+  function photoCtl(id, url, label, cover){
+    PH[id] = { on: null };
+    return '<div class="ctpl-photo' + (cover ? ' cover' : '') + '" id="' + id + '">' + (url ? '<img src="' + esc(url) + '" alt="">' : '<span class="ph-none">📷</span>')
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + (label ? '<span class="ctpl-hint" style="margin:0;width:100%;">' + esc(label) + '</span>' : '')
+      + '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplPhotoPick(\'' + id + '\')">📷 ' + (url ? 'Replace' : 'Upload') + '</button>'
+      + '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplPhotoUrl(\'' + id + '\')">🔗 URL</button>'
+      + (url ? '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplPhotoSet(\'' + id + '\',\'\')">✕ Remove</button>' : '') + '</div></div>';
+  }
+  window.ctplPhotoSet = function(id, url){ const h = PH[id]; if(h && h.on) h.on(url || ''); };
+  window.ctplPhotoPick = async function(id){ const u = await pickPhoto(); if(u) ctplPhotoSet(id, u); };
+  window.ctplPhotoUrl = function(id){ const u = prompt('Paste the photo URL (https://…)'); if(u === null) return; const ok = okUrl(u); if(u.trim() && !ok) return alert('That needs to be an https:// link to an image.'); ctplPhotoSet(id, ok); };
+  function photoBind(id, on){ if(PH[id]) PH[id].on = on; }
+
+  /* ---------- pickers ---------- */
+  function groups(kind, loc){
+    const rows = rowsOf(kind).filter(t => t.active);
+    const mine = rows.filter(t => !t.location || t.location === loc), other = rows.filter(t => t.location && t.location !== loc);
+    const cats = [...new Set([...(CATS[kind] || []), ...mine.map(t => t.category || '')])];
+    let h = '';
+    cats.forEach(c => { const rs = mine.filter(t => (t.category || '') === c); if(rs.length) h += '<optgroup label="'+esc(c || 'Other')+'">' + rs.map(t => '<option value="t:'+t.id+'">'+esc(t.title)+'</option>').join('') + '</optgroup>'; });
+    if(other.length) h += '<optgroup label="Other store">' + other.map(t => '<option value="t:'+t.id+'">'+esc(t.title)+' · '+esc(t.location)+'</option>').join('') + '</optgroup>';
+    return h;
+  }
+  const locOf = () => { const s = $('cq_loc'); return (s && s.value) || ((cur() || {}).location) || 'Memphis'; };
+  const MANAGE = '<option value="manage">✏️ Edit templates…</option>';
+
+  async function fillQuick(){
+    const sel = $('catQuick'); if(!sel) return;
+    await load();
+    if(!cur()) return;
+    const quick = (typeof CAT_QUICK !== 'undefined' ? CAT_QUICK : []).map((x,i) => '<option value="'+i+'">'+esc(x[0])+'</option>').join('');
+    sel.innerHTML = '<option value="">Templates &amp; quick replies…</option>' + (quick ? '<optgroup label="Quick replies">'+quick+'</optgroup>' : '')
+      + groups('email', (cur() || {}).location || 'Memphis') + MANAGE;
+  }
+  function pkgOptions(){ const s = $('catPkg'); if(s) s.innerHTML = '<option value="">📦 Add a package…</option>' + groups('package', locOf()) + MANAGE; }
+  function msgOptions(){ const s = $('catMsgTpl'); if(s) s.innerHTML = '<option value="">✉️ Use an email template…</option>' + groups('email', locOf()); }
+  function ctrOptions(){
+    const s = $('catCtrTpl'); if(!s) return;
+    s.innerHTML = '<option value="">📜 Agreement templates…</option><option value="default">The current default agreement</option>'
+      + rowsOf('contract').filter(t => t.active).map(t => '<option value="t:'+t.id+'">'+esc(t.title)+'</option>').join('') + MANAGE;
+  }
+  function refreshPickers(){ const m = $('catModal'); if(m && m.style.display !== 'none' && cur()){ fillQuick(); pkgOptions(); msgOptions(); ctrOptions(); } }
+
+  // reply box
+  function pickReply(sel){
+    const val = sel.value; sel.value = '';
+    if(val === 'manage') return ctplOpen('email');
+    const t = byId(val.slice(2)); if(!t) return;
+    const ta = $('catBody'), body = fill(t.body);
+    ta.value = ta.value.trim() ? ta.value.replace(/\s+$/,'') + '\n\n' + body : body;
+    autoGrow(ta); ta.focus();
+    const notes = [];
+    if((t.attachments || []).length) notes.push('📎 In HoneyBook this email attached ' + t.attachments.join(', ') + ' — nothing is attached here.');
+    if(/\[[a-z ]+\]/.test(body)) notes.push('Fill in the [bracketed] parts before sending.');
+    $('catMsg').textContent = notes.join(' ');
+  }
+
+  // proposal editor
+  let COVER = '';                                     // cover photo of the proposal being edited
+  function coverHtml(bare){                            // bare = inside the CAT-LOOK "Cover photo" section (heading is there)
+    return '<div class="rf" id="cq_cover"' + (bare ? '' : ' style="margin-top:14px;"') + '>' + (bare ? '' : '<label>Cover photo (top of the customer’s proposal)</label>') + photoCtl('cq_coverctl', COVER, '', true) + '</div>';
+  }
+  function coverRender(){
+    const host = $('cq_cover'); if(!host) return;
+    host.outerHTML = coverHtml(!!$('cq_coverSec'));
+    photoBind('cq_coverctl', u => { COVER = u; coverRender(); });
+  }
+  function lockedThumbs(){
+    const q = (typeof CAT_Q !== 'undefined' && CAT_Q) || null; const rows = document.querySelectorAll('#catQuote .cat-tbl tbody tr');
+    if(!q || !rows.length) return;
+    (q.items || []).forEach((it, i) => { const td = rows[i] && rows[i].querySelector('td'); if(td && it.image && !td.querySelector('.ci-thumb')) td.insertAdjacentHTML('afterbegin', '<img class="ci-thumb" src="' + esc(it.image) + '" alt="">'); });
+    if(q.image_url && !$('cq_lockedcover')) $('catQuote').insertAdjacentHTML('afterbegin', '<img id="cq_lockedcover" src="' + esc(q.image_url) + '" alt="" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px;margin:10px 0 4px;">');
+  }
+  async function decorate(){
+    const box = $('catQuote'), r = cur(); if(!box) return;
+    box.dataset.lead = r ? r.id : '';
+    if(!$('catItems')){ lockedThumbs(); return; }    // signed / invoiced view — photos only
+    await load();
+    // cover photo: starts from the saved quote (or the copied one), lives above the items
+    if(!$('cq_cover')){
+      const q = (typeof CAT_Q !== 'undefined' && CAT_Q) || null;
+      COVER = okUrl(q && q.image_url ? q.image_url : (box.__coverFrom || ''));
+      box.__coverFrom = '';
+      const slot = $('cq_coverSlot'), itemsEl = $('catItems');
+      if(slot) slot.outerHTML = '<div class="cat-sec" id="cq_coverSec"><h4>Cover photo <span class="r">top of the customer’s proposal</span></h4>' + coverHtml(true) + '</div>';   // CAT-LOOK sections
+      else if(itemsEl && itemsEl.previousElementSibling) itemsEl.previousElementSibling.insertAdjacentHTML('beforebegin', coverHtml());
+      photoBind('cq_coverctl', u => { COVER = u; coverRender(); });
+    }
+    itemPhotos();
+    const menu = $('catMenu');
+    if(menu && !$('catPkg')){
+      menu.insertAdjacentHTML('beforebegin', '<select id="catPkg" class="loc-sel" style="max-width:340px;" onchange="ctplPkg(this)"></select>');
+      menu.parentNode.insertAdjacentHTML('beforeend', '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplGrat()" title="Adds a Gratuity (20%) line that recalculates as items change — rename it to change the %">＋ Gratuity</button>');
+    }
+    const ctr = $('cq_contract');
+    if(ctr && !$('catCtrTpl')){
+      ctr.insertAdjacentHTML('beforebegin', '<select id="catCtrTpl" class="loc-sel" style="margin-bottom:6px;max-width:100%;" onchange="ctplCtr(this)"></select>');
+      const hint = ctr.parentNode.querySelector('.hint');
+      if(hint) hint.insertAdjacentHTML('beforeend', ' Agreement templates also fill {{venue}} {{occasion}} {{client_email}} {{client_phone}} {{client_address}} {{shop_address}} {{shop_phone}} {{today}} when you save.');
+    }
+    const m = $('cq_msg');
+    if(m && !$('catMsgTpl')) m.insertAdjacentHTML('beforebegin', '<select id="catMsgTpl" class="loc-sel" style="margin-bottom:6px;max-width:100%;" onchange="ctplMsg(this)"></select>');
+    const ls = $('cq_loc');
+    if(ls && !ls.__ctpl){ ls.__ctpl = true; ls.addEventListener('change', () => { pkgOptions(); msgOptions(); }); }
+    pkgOptions(); ctrOptions(); msgOptions();
+  }
+  // per-line photo row under each item in the proposal editor
+  function itemPhotos(){
+    document.querySelectorAll('#catItems .cat-item').forEach((row, i) => {
+      const it = CAT_ITEMS[i]; if(!it || row.querySelector('.ci-img') || GRAT_RE.test(it.name || '')) return;
+      row.insertAdjacentHTML('beforeend', '<div class="ci-img">' + (it.image ? '<img src="' + esc(it.image) + '" alt="">' : '')
+        + '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplItemPhoto(' + i + ')">📷 ' + (it.image ? 'Replace photo' : 'Add photo') + '</button>'
+        + (it.image ? '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplItemPhoto(' + i + ',\'\')">✕ Remove</button>' : '') + '</div>');
+    });
+  }
+  window.ctplItemPhoto = async function(i, v){
+    const it = CAT_ITEMS[i]; if(!it) return;
+    if(v === '') delete it.image; else { const u = await pickPhoto(); if(!u) return; it.image = u; }
+    catItemsRender();
+  };
+  function setGrat(pct){
+    pct = Number(pct) || 0; if(!(pct > 0)) return;
+    const line = { name: 'Gratuity (' + pct + '%)', qty: 1, price_cents: 0, note: '' };
+    const i = CAT_ITEMS.findIndex(it => GRAT_RE.test(it.name || ''));
+    if(i >= 0) CAT_ITEMS.splice(i, 1);
+    CAT_ITEMS.push(line);                             // keep it last so it reads like a total line
+  }
+  window.ctplGrat = function(){
+    const g = CAT_ITEMS.find(it => GRAT_RE.test(it.name || ''));
+    setGrat(g ? GRAT_RE.exec(g.name)[1] : 20);
+    catItemsRender();
+  };
+  window.ctplPkg = function(sel){
+    const val = sel.value; sel.value = ''; if(!val) return;
+    if(val === 'manage') return ctplOpen('package');
+    const t = byId(val.slice(2)); if(!t) return;
+    const guests = Number(($('cq_guests') || {}).value) || 0;
+    (t.items || []).forEach(it => CAT_ITEMS.push(Object.assign({ name: it.name || '', qty: it.pp ? guests : (Number(it.qty) || 0),
+      price_cents: Math.max(0, Math.round(Number(it.price_cents) || 0)), note: String(it.note || '').slice(0, 300) }, okUrl(it.image) ? { image: okUrl(it.image) } : {})));
+    if(!COVER && okUrl(t.image_url)){ COVER = okUrl(t.image_url); coverRender(); }
+    if(t.gratuity_pct) setGrat(t.gratuity_pct);
+    if(t.deposit_pct != null && $('cq_dep')) $('cq_dep').value = t.deposit_pct;
+    const note = $('cq_note');
+    if(note && t.body){ const b = fill(t.body); if(note.value.indexOf(b.slice(0, 80)) < 0) note.value = note.value.trim() ? note.value.trim() + '\n\n' + b : b; autoGrow(note); }
+    catItemsRender();
+    const zero = CAT_ITEMS.some(it => !(Number(it.qty) > 0));
+    $('cqMsg').textContent = '✓ Added “' + t.title + '”' + (zero ? ' — set the quantities you need; lines left at 0 are dropped when you save.' : '.');
+  };
+  window.ctplMsg = function(sel){
+    const val = sel.value; sel.value = ''; const t = byId(val.slice(2)); if(!t) return;
+    const ta = $('cq_msg'), body = fill(t.body);
+    ta.value = ta.value.trim() ? ta.value.trim() + '\n\n' + body : body; autoGrow(ta);
+    if(/\[[a-z ]+\]/.test(body)) $('cqMsg').textContent = 'Fill in the [bracketed] parts of the message before sending.';
+  };
+  window.ctplCtr = async function(sel){
+    const val = sel.value; sel.value = ''; if(!val) return;
+    if(val === 'manage') return ctplOpen('contract');
+    const ta = $('cq_contract'); if(!ta) return;
+    const text = val === 'default' ? await catTemplate() : ((byId(val.slice(2)) || {}).body || '');
+    if(ta.value.trim() && ta.value !== text && !confirm('Replace the agreement text on this proposal?')) return;
+    ta.value = text;
+    $('cqMsg').textContent = '✓ Agreement swapped — its fill-ins are completed when you save.';
+  };
+
+  /* ---------- 📚 manager ---------- */
+  const MG = { kind: 'email', edit: null };
+  const BLANK = k => ({ kind: k, title: '', category: (CATS[k] || [''])[0], subject: '', body: '', items: [], deposit_pct: null, gratuity_pct: null, location: null, attachments: [], active: true, sort: 999 });
+  window.ctplOpen = async function(kind, preset){
+    if(typeof kind === 'string') MG.kind = kind;
+    MG.edit = null;
+    $('ctplModal').style.display = 'flex';
+    $('ctplBody').innerHTML = '<div class="rec-empty">Loading…</div>';
+    await load(true);
+    if(preset) MG.edit = Object.assign(BLANK(MG.kind), preset);
+    mgRender();
+  };
+  window.ctplClose = function(){ $('ctplModal').style.display = 'none'; refreshPickers(); };
+  window.ctplTab = function(k){ MG.kind = k; MG.edit = null; mgRender(); };
+  window.ctplBack = function(){ MG.edit = null; mgRender(); };
+  window.ctplNew = function(){ MG.edit = BLANK(MG.kind); mgRender(); };
+  window.ctplEdit = function(id){ const t = byId(id); if(!t) return; MG.edit = JSON.parse(JSON.stringify(t)); mgRender(); };
+  window.ctplDup = function(){ const t = JSON.parse(JSON.stringify(MG.edit)); delete t.id; t.title = t.title + ' (copy)'; t.source = 'portal'; t.source_ref = null; MG.edit = t; mgRender(); };
+  function preview(t){
+    if(t.kind === 'package'){
+      const n = (t.items || []).length, tot = (t.items || []).reduce((s, it) => s + Math.round((Number(it.qty) || 0) * (it.price_cents || 0)), 0);
+      return n + ' line' + (n === 1 ? '' : 's') + (tot ? ' · ' + catMoney(tot) + ' as set' : '') + (t.gratuity_pct ? ' · ' + Number(t.gratuity_pct) + '% gratuity' : '') + (t.deposit_pct != null ? ' · ' + t.deposit_pct + '% deposit' : '');
+    }
+    return String(t.body || '').replace(/\s+/g, ' ').slice(0, 150);
+  }
+  function mgRender(){
+    if(MG.edit) return mgEdit();
+    const n = k => rowsOf(k).length;
+    const tabs = [['email','✉️ Emails'],['package','📦 Packages'],['contract','📜 Agreements'],['settings','⚙️ Links & shop info']];
+    let h = '<div class="ctpl-tabs">' + tabs.map(([k,l]) => '<button class="chip'+(MG.kind===k?' on':'')+'" onclick="ctplTab(\''+k+'\')">'+l+(k!=='settings'?' · '+n(k):'')+'</button>').join('')
+      + '<div style="flex:1"></div>' + (MG.kind !== 'settings' ? '<button class="btn btn-gold btn-sm" onclick="ctplNew()">＋ New</button>' : '') + '</div>';
+    if(MG.kind === 'settings') h += settingsHtml();
+    else {
+      const rows = rowsOf(MG.kind), cats = [...new Set([...(CATS[MG.kind] || []), ...rows.map(t => t.category || '')])];
+      h += '<div class="ctpl-list">';
+      cats.forEach(c => { const rs = rows.filter(t => (t.category || '') === c); if(!rs.length) return;
+        h += '<div class="ctpl-cat">'+esc(c || 'Other')+'</div>' + rs.map(t => '<div class="ctpl-row'+(t.active?'':' off')+'" onclick="ctplEdit(\''+t.id+'\')">'
+          + (t.image_url ? '<img class="ctpl-rowpic" src="'+esc(t.image_url)+'" alt="">' : '')
+          + '<div style="flex:1;min-width:0;"><div style="font-weight:700;">'+esc(t.title)+'</div><div class="ctpl-hint" style="margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(preview(t))+'</div></div>'
+          + (t.location ? '<span class="ctpl-tag">'+esc(t.location)+'</span>' : '') + (t.active ? '' : '<span class="ctpl-tag" style="background:#f1f5f9;color:#64748b;">hidden</span>')
+          + '<button class="btn btn-ghost btn-sm pv-btn" type="button" title="Preview — what the customer sees" onclick="event.stopPropagation();ctplPreview(\''+t.id+'\')">👁</button></div>').join(''); });
+      if(!rows.length) h += '<div class="rec-empty">Nothing here yet.</div>';
+      h += '</div>';
+    }
+    $('ctplBody').innerHTML = h;
+  }
+  function mgEdit(){
+    const t = MG.edit, k = t.kind;
+    const cats = [...new Set([...(CATS[k] || []), ...rowsOf(k).map(x => x.category || '')])].filter(Boolean);
+    const what = k === 'email' ? 'emails' : k === 'package' ? 'packages' : 'agreements';
+    let h = '<div style="margin-top:12px;"><button class="btn btn-ghost btn-sm" onclick="ctplBack()">← All '+what+'</button></div>'
+      + '<div class="cat-grid" style="margin-top:12px;">'
+      +   '<div class="rf" style="grid-column:1/-1;"><label>Name</label><input id="ctE_title" value="'+esc(t.title)+'"></div>'
+      +   '<div class="rf"><label>Group</label><input id="ctE_cat" list="ctE_cats" value="'+esc(t.category || '')+'"><datalist id="ctE_cats">'+cats.map(c => '<option value="'+esc(c)+'">').join('')+'</datalist></div>'
+      +   '<div class="rf"><label>Store</label><select id="ctE_loc" data-loc-btns="off"><option value="">Both stores</option>'+['Memphis','Nashville'].map(l => '<option'+(t.location===l?' selected':'')+'>'+l+'</option>').join('')+'</select></div>'
+      +   (k === 'package' ? '<div class="rf"><label>Deposit %</label><input id="ctE_dep" type="number" min="0" max="100" value="'+(t.deposit_pct==null?'':esc(t.deposit_pct))+'" placeholder="leave as is"></div>'
+          + '<div class="rf"><label>Gratuity %</label><input id="ctE_grat" type="number" min="0" max="50" step="any" value="'+(t.gratuity_pct==null?'':Number(t.gratuity_pct))+'" placeholder="none"></div>' : '')
+      + '</div>'
+      + (k === 'email' ? '<div class="rf" style="margin-top:10px;"><label>HoneyBook subject (for reference)</label><input id="ctE_subj" value="'+esc(t.subject || '')+'"><div class="ctpl-hint">Portal emails keep the “Your GREYS catering question [#code]” subject so customer replies land back in the thread.</div></div>' : '')
+      + (k === 'package' ? '<div class="rf" style="margin-top:12px;"><label>Cover photo (top of the customer\u2019s proposal)</label>' + photoCtl('ctE_cover', t.image_url, '', true) + '</div>'
+          + '<h4 style="margin:16px 0 6px;">Lines</h4><div id="ctE_items"></div><button class="btn btn-ghost btn-sm" style="margin-top:8px;" onclick="ctplAddLine()">＋ Line</button>'
+          + '<div class="ctpl-hint">Qty 0 = optional — the line is dropped when the proposal is saved unless someone sets a qty. “pp” fills the qty with the guest count. Notes over 300 characters get cut on the proposal.</div>' : '')
+      + '<div class="rf" style="margin-top:14px;"><label>'+(k === 'email' ? 'Email text' : k === 'package' ? 'Note for the customer (added to the proposal’s customer note)' : 'Agreement text')+'</label>'
+      +   '<textarea id="ctE_body" rows="'+(k === 'contract' ? 18 : k === 'email' ? 12 : 6)+'">'+esc(t.body || '')+'</textarea>'
+      +   '<div class="ctpl-hint">Fill-ins: {{first_name}} {{name}} {{company}} {{event_date}} {{event_time}} {{guests}} {{occasion}} {{venue}} {{location}} {{schedule_link}}'
+      +   (k === 'contract' ? '<br>Filled by the proposal: {{total}} {{deposit}} {{deposit_pct}} {{balance_due_date}} {{code}} · filled when saved: {{today}} {{client_email}} {{client_phone}} {{client_address}} {{shop_address}} {{shop_phone}}' : '') + '</div></div>'
+      + ((t.attachments || []).length ? '<div class="ctpl-att">📎 HoneyBook attached: '+esc(t.attachments.join(', '))+' — portal emails can’t attach files.</div>' : '')
+      + '<label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:.9rem;"><input type="checkbox" id="ctE_active"'+(t.active !== false ? ' checked' : '')+'> Show in the pickers</label>'
+      + (t.source_ref ? '<div class="ctpl-hint">From '+esc(t.source_ref)+'</div>' : '')
+      + '<div class="cat-actions"><span class="save-msg" id="ctE_msg"></span>'
+      +   (t.id ? '<button class="btn btn-ghost btn-sm" onclick="ctplDelete()">🗑 Delete</button><button class="btn btn-ghost btn-sm" onclick="ctplDup()">⧉ Duplicate</button>' : '')
+      +   '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplPreview()" title="What the customer sees — includes what you have typed but not saved yet">👁 Preview</button>'
+      +   '<button class="btn btn-gold" onclick="ctplSave()">💾 Save</button></div>';
+    $('ctplBody').innerHTML = h;
+    if(k === 'package'){ linesRender(); photoBind('ctE_cover', u => { MG.edit.image_url = u || null; mgEditKeep(); }); }
+  }
+  // re-draw the editor without losing typed values
+  function mgEditKeep(){
+    const keep = {}; ['ctE_title','ctE_cat','ctE_loc','ctE_dep','ctE_grat','ctE_subj','ctE_body'].forEach(id => { const e = $(id); if(e) keep[id] = e.value; });
+    const act = $('ctE_active') ? $('ctE_active').checked : null;
+    mgEdit();
+    Object.entries(keep).forEach(([id, v]) => { const e = $(id); if(e) e.value = v; });
+    if(act !== null && $('ctE_active')) $('ctE_active').checked = act;
+  }
+  function linesRender(){
+    const el = $('ctE_items'), L = MG.edit.items || (MG.edit.items = []);
+    el.innerHTML = L.length ? '<div class="cat-items">' + L.map((it, i) => '<div class="cat-item">'
+      + '<input class="ci-name" value="'+esc(it.name || '')+'" placeholder="Item" oninput="ctplLine('+i+',\'name\',this.value)">'
+      + '<input class="ci-qty" type="number" step="any" min="0" value="'+esc(it.qty == null ? 0 : it.qty)+'" title="Qty" oninput="ctplLine('+i+',\'qty\',Number(this.value)||0)">'
+      + '<input class="ci-price" type="number" step="0.01" min="0" value="'+((it.price_cents || 0) / 100).toFixed(2)+'" title="Price each" oninput="ctplLine('+i+',\'price_cents\',Math.round(Number(this.value)*100)||0)">'
+      + '<label class="ctpl-pp" title="Fill the qty with the guest count"><input type="checkbox"'+(it.pp ? ' checked' : '')+' onchange="ctplLine('+i+',\'pp\',this.checked)">pp</label>'
+      + '<button class="btn btn-ghost btn-sm" onclick="ctplDelLine('+i+')" title="Remove">✕</button>'
+      + '<input class="ci-note" maxlength="300" value="'+esc(it.note || '')+'" placeholder="Note (optional)" oninput="ctplLine('+i+',\'note\',this.value)">'
+      + '<div class="ci-img">' + (it.image ? '<img src="'+esc(it.image)+'" alt="">' : '')
+      +   '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplLinePhoto('+i+')">📷 ' + (it.image ? 'Replace photo' : 'Add photo') + '</button>'
+      +   '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplLinePhoto('+i+',\'url\')">🔗 URL</button>'
+      +   (it.image ? '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplLinePhoto('+i+',\'\')">✕ Remove</button>' : '') + '</div>'
+      + '</div>').join('') + '</div>' : '<div class="rec-empty" style="padding:12px;">No lines yet.</div>';
+  }
+  window.ctplLinePhoto = async function(i, v){
+    const it = MG.edit.items[i]; if(!it) return;
+    if(v === '') delete it.image;
+    else if(v === 'url'){ const u = prompt('Paste the photo URL (https://…)'); if(u === null) return; const ok = okUrl(u); if(u.trim() && !ok) return alert('That needs to be an https:// link to an image.'); if(ok) it.image = ok; else delete it.image; }
+    else { const u = await pickPhoto(); if(!u) return; it.image = u; }
+    linesRender();
+  };
+  window.ctplLine = function(i, k, v){ const it = MG.edit.items[i]; if(!it) return; if(k === 'pp' && !v) delete it.pp; else it[k] = v; };
+  window.ctplAddLine = function(){ (MG.edit.items = MG.edit.items || []).push({ name: '', qty: 1, price_cents: 0, note: '' }); linesRender(); };
+  window.ctplDelLine = function(i){ MG.edit.items.splice(i, 1); linesRender(); };
+  window.ctplSave = async function(){
+    const t = MG.edit, msg = $('ctE_msg');
+    const row = { kind: t.kind, title: $('ctE_title').value.trim(), category: $('ctE_cat').value.trim(), location: $('ctE_loc').value || null,
+      body: $('ctE_body').value, active: $('ctE_active').checked, updated_at: new Date().toISOString() };
+    if(!row.title){ msg.textContent = 'Give it a name first.'; return; }
+    if(t.kind === 'email') row.subject = $('ctE_subj').value.trim() || null;
+    if(t.kind === 'package'){
+      const d = $('ctE_dep').value.trim(), g = $('ctE_grat').value.trim();
+      row.deposit_pct = d === '' ? null : Math.min(100, Math.max(0, Math.round(Number(d) || 0)));
+      row.gratuity_pct = (g === '' || !(Number(g) > 0)) ? null : Math.min(50, Number(g));
+      row.image_url = okUrl(t.image_url) || null;
+      row.items = (t.items || []).map(it => Object.assign({ name: String(it.name || '').trim(), qty: Number(it.qty) || 0,
+        price_cents: Math.max(0, Math.round(it.price_cents || 0)), note: String(it.note || '').trim().slice(0, 300) }, it.pp ? { pp: true } : {}, okUrl(it.image) ? { image: okUrl(it.image) } : {})).filter(it => it.name);
+    }
+    msg.textContent = 'Saving…';
+    const res = t.id
+      ? await sb.from('catering_templates').update(row).eq('id', t.id).select().single()
+      : await sb.from('catering_templates').insert(Object.assign({ source: 'portal', sort: t.sort || 999, attachments: t.attachments || [] }, row)).select().single();
+    if(res.error){ msg.textContent = '❌ ' + res.error.message; return; }
+    MG.edit = res.data; await load(true); mgEdit();
+    $('ctE_msg').textContent = '✓ Saved';
+  };
+  window.ctplDelete = async function(){
+    const t = MG.edit; if(!t.id) return;
+    if(!confirm('Delete “' + t.title + '”?\n\n(Unticking “Show in the pickers” hides it instead.)')) return;
+    const { error } = await sb.from('catering_templates').delete().eq('id', t.id);
+    if(error){ $('ctE_msg').textContent = '❌ ' + error.message; return; }
+    MG.edit = null; await load(true); mgRender();
+  };
+  function settingsHtml(){
+    const s = VARS.schedule_link || {}, sh = VARS.shops || {};
+    return '<div class="ctpl-hint" style="margin:4px 0 6px;">Used by {{schedule_link}}, {{venue}}, {{shop_address}} and {{shop_phone}} — picked by the lead’s store.</div>'
+      + ['Memphis','Nashville'].map(l => '<h4 style="margin:14px 0 6px;">'+l+'</h4><div class="cat-grid">'
+        + '<div class="rf" style="grid-column:1/-1;"><label>Scheduling link (book-a-call page)</label><input id="ctS_link_'+l+'" value="'+esc(s[l] || '')+'" placeholder="https://…"></div>'
+        + '<div class="rf" style="grid-column:1/-1;"><label>Shop address</label><input id="ctS_addr_'+l+'" value="'+esc((sh[l] || {}).address || '')+'"></div>'
+        + '<div class="rf"><label>Shop phone</label><input id="ctS_phone_'+l+'" value="'+esc((sh[l] || {}).phone || '')+'"></div></div>').join('')
+      + '<div class="cat-actions"><span class="save-msg" id="ctS_msg"></span><button class="btn btn-gold" onclick="ctplSaveVars()">💾 Save</button></div>';
+  }
+  window.ctplSaveVars = async function(){
+    const data = Object.assign({}, VARS, { schedule_link: {}, shops: {} });
+    ['Memphis','Nashville'].forEach(l => { data.schedule_link[l] = $('ctS_link_'+l).value.trim(); data.shops[l] = { address: $('ctS_addr_'+l).value.trim(), phone: $('ctS_phone_'+l).value.trim() }; });
+    const { error } = await sb.from('site_content').upsert({ key: 'catering_template_vars', data, updated_at: new Date().toISOString() });
+    $('ctS_msg').textContent = error ? '❌ ' + error.message : '✓ Saved';
+    if(!error) VARS = data;
+  };
+  window.ctplSaveReply = function(){
+    const body = ($('catBody').value || '').trim();
+    if(!body){ $('catMsg').textContent = 'Write the reply first, then save it as a template.'; return; }
+    const first = ((cur() || {}).name || '').split(/\s+/)[0];
+    const b = first && first.length > 1 ? body.replace(new RegExp('\\b' + first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'g'), '{{first_name}}') : body;
+    ctplOpen('email', { body: b });
+  };
+
+  /* ---------- 👁 preview: what the customer gets ---------- */
+  const SAMPLE = { first_name: 'Jane', name: 'Jane Smith', company: '', event_time: '6:30 PM', guests: '8', occasion: 'birthday',
+    client_email: 'jane@example.com', client_phone: '(901) 555-0123', client_address: '', code: 'AB12CD' };
+  const ymdOf = d => d.toLocaleDateString('en-CA');
+  const addDays = (ymd, n) => { const d = new Date(String(ymd).slice(0, 10) + 'T12:00:00'); d.setDate(d.getDate() + n); return ymdOf(d); };
+  // the open lead's details (as ctx() sees them), sample values for whatever is blank
+  function sampleCtx(){
+    const c = ctx(), r = cur();
+    let ymd = ((formOk() && $('cq_date')) ? $('cq_date').value : (r || {}).event_date) || '';
+    if(!ymd){ const d = new Date(); d.setDate(d.getDate() + (((6 - d.getDay()) + 7) % 7 || 7) + 14); ymd = ymdOf(d); }   // a Saturday ~3 weeks out
+    const today = ymdOf(new Date()); let bal = addDays(ymd, -3); if(bal < today) bal = today;
+    const out = Object.assign({}, c, { event_date: c.event_date || longDate(ymd), balance_due_date: longDate(bal), _ymd: ymd, _bal: bal });
+    Object.keys(SAMPLE).forEach(k => { if(!out[k]) out[k] = SAMPLE[k]; });
+    if(!out.schedule_link) out.schedule_link = '[scheduling link — set it under ⚙️ Links & shop info]';
+    out._real = !!r;
+    return out;
+  }
+  // every fill-in the portal or the catering fn knows; blanks show as [bracketed] so they stand out
+  function pfill(text, c){ return String(text || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => (k in c && k[0] !== '_') ? (c[k] || '[' + k.replace(/_/g, ' ') + ']') : m); }
+  const para = s => esc(s).replace(/\r?\n/g, '<br>').replace(/(https:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  const pvTop = () => '<div class="pv-top">GREYS<small>Fine Cheeses · Charcuterie · Wine</small></div>';
+  // the editor's current state, typed-but-unsaved values included
+  function editState(){
+    const t = JSON.parse(JSON.stringify(MG.edit || {})), v = id => ($(id) ? $(id).value : undefined);
+    if($('ctE_title')) t.title = v('ctE_title').trim();
+    if($('ctE_body')) t.body = v('ctE_body');
+    if($('ctE_subj')) t.subject = v('ctE_subj').trim();
+    if($('ctE_loc')) t.location = v('ctE_loc') || null;
+    if($('ctE_dep')){ const d = v('ctE_dep').trim(); t.deposit_pct = d === '' ? null : Math.min(100, Math.max(0, Math.round(Number(d) || 0))); }
+    if($('ctE_grat')){ const g = v('ctE_grat').trim(); t.gratuity_pct = (g === '' || !(Number(g) > 0)) ? null : Math.min(50, Number(g)); }
+    return t;
+  }
+  function pvPackage(t, c){
+    const guests = Number(c.guests) || 0;
+    const rate = (formOk() && Number(($('cq_tax') || {}).value)) || 9.75;
+    const depPct = t.deposit_pct != null ? Number(t.deposit_pct) : ((formOk() && Number(($('cq_dep') || {}).value)) || 50);
+    const L = (t.items || []).filter(it => String(it.name || '').trim()).map(it => { const qty = it.pp ? guests : (Number(it.qty) || 0);
+      return { name: it.name, qty, price_cents: Math.max(0, Math.round(Number(it.price_cents) || 0)), note: String(it.note || '').slice(0, 300), image: okUrl(it.image), opt: !(qty > 0) }; });
+    const sum = () => L.reduce((s, l) => s + (l.opt ? 0 : Math.round(l.qty * l.price_cents)), 0);
+    const base = sum();
+    if(Number(t.gratuity_pct) > 0){ const g = Number(t.gratuity_pct); L.push({ name: 'Gratuity (' + g + '%)', qty: 1, price_cents: Math.round(base * g / 100), note: g + '% of ' + catMoney(base), image: '', opt: false }); }
+    const sub = sum(), tax = Math.round(sub * rate / 100), tot = sub + tax, split = depPct > 0 && depPct < 100, dep = Math.round(tot * depPct / 100);
+    const rows = L.map(l => '<tr' + (l.opt ? ' class="opt"' : '') + '><td><div class="itm">' + (l.image ? '<img class="thumb" src="' + esc(l.image) + '" alt="" loading="lazy">' : '')
+      + '<div>' + esc(l.name) + (l.note ? '<span class="note">' + esc(l.note) + '</span>' : '') + (l.opt ? '<span class="note">optional — only on the proposal once a qty is set</span>' : '') + '</div></div></td>'
+      + '<td class="n">' + (l.opt ? '—' : esc(l.qty)) + '</td><td class="n">' + catMoney(l.price_cents) + '</td><td class="n">' + (l.opt ? '—' : catMoney(Math.round(l.qty * l.price_cents))) + '</td></tr>').join('');
+    const balShort = new Date(c._bal + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const note = pfill(t.body, c);
+    return pvTop() + '<div class="pv-page">'
+      + (okUrl(t.image_url) ? '<div class="pv-hero"><img src="' + esc(okUrl(t.image_url)) + '" alt=""></div>' : '')
+      + '<p class="pv-eyebrow">Catering proposal · #' + esc(c.code) + '</p><h1 class="pv-h1">' + esc(c.event_date) + '</h1>'
+      + '<p class="pv-lede">Hi ' + esc(c.first_name) + ' — here’s everything we talked about. Look it over, then sign at the bottom to book your date.</p>'
+      + '<div class="pv-cardp"><h2 class="pv-h2">Your event</h2><dl class="pv-facts"><dt>For</dt><dd>' + esc(c.name) + (c.company ? ' · ' + esc(c.company) : '') + '</dd>'
+      +   '<dt>When</dt><dd>' + esc(c.event_date) + (c.event_time ? ' at ' + esc(c.event_time) : '') + '</dd><dt>Guests</dt><dd>' + esc(c.guests || 'TBD') + '</dd><dt>Shop</dt><dd>' + esc(c.location) + '</dd></dl></div>'
+      + '<div class="pv-cardp"><h2 class="pv-h2">Proposal</h2><div style="overflow-x:auto"><table class="pv-items"><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th></tr></thead><tbody>'
+      +   (rows || '<tr><td colspan="4"><span class="note">No lines yet.</span></td></tr>') + '</tbody></table></div>'
+      +   '<div class="pv-tot"><div><span>Subtotal</span><span>' + catMoney(sub) + '</span></div><div><span>Sales tax (' + rate + '%)</span><span>' + catMoney(tax) + '</span></div><div class="big"><span>Total</span><span>' + catMoney(tot) + '</span></div>'
+      +   (split ? '<div class="dep"><span>Deposit to book (' + depPct + '%)</span><span>' + catMoney(dep) + '</span></div><div><span>Balance due ' + esc(balShort) + '</span><span>' + catMoney(tot - dep) + '</span></div>' : '') + '</div>'
+      +   (note.trim() ? '<p class="pv-muted">' + esc(note) + '</p>' : '') + '</div>'
+      + '<p class="pv-muted" style="margin:0;text-align:center;">— then the agreement and the signature box —</p></div>';
+  }
+  function pvEmail(t, c){
+    return '<div class="pv-mail"><div class="pv-mailhead"><div><b>To:</b> ' + esc(c.name) + ' &lt;' + esc(c.client_email) + '&gt;</div><div><b>Subject:</b> Re: Your GREYS catering question [#' + esc(c.code) + ']</div>'
+      + (t.subject ? '<div style="color:#94a3b8;">HoneyBook’s subject was “' + esc(t.subject) + '” — portal emails keep the thread’s subject so replies land back on the lead.</div>' : '') + '</div>'
+      + '<div class="pv-mailbody"><div style="font:700 22px Georgia,serif;letter-spacing:.04em;border-bottom:2px solid #E0A21C;padding-bottom:8px;margin-bottom:18px;">GREYS <span style="font:400 12px Arial,sans-serif;">Fine Cheeses · Charcuterie · Wine</span></div>'
+      +   '<p style="margin:0;">' + para(pfill(t.body, c)) + '</p><p style="font:12px Arial,sans-serif;color:#6E6353;margin:28px 0 0;">Just reply to this email to keep the conversation going.</p></div>'
+      + ((t.attachments || []).length ? '<p class="pv-mailhead" style="margin-top:12px;">📎 In HoneyBook this email attached ' + esc(t.attachments.join(', ')) + ' — nothing is attached here.</p>' : '') + '</div>';
+  }
+  function pvContract(t, c){
+    const d = Object.assign({ total: '$1,250.00', deposit_pct: '50', deposit: '$625.00' }, c);
+    return pvTop() + '<div class="pv-page"><p class="pv-eyebrow">Catering proposal · #' + esc(c.code) + '</p>'
+      + '<div class="pv-cardp"><h2 class="pv-h2">Agreement</h2><div class="pv-contract">' + esc(pfill(t.body, d)) + '</div>'
+      + '<div style="margin-top:18px;"><div style="font:600 11px Arial,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#6E6353;">Type your full name to sign</div>'
+      +   '<div style="background:#fff;border:1px solid #D6C8AB;padding:11px 12px;color:#9A8C76;margin-top:5px;">' + esc(c.name) + '</div><div class="pv-sig"></div><div style="color:#6E6353;font-size:13px;">Your typed name is your electronic signature.</div></div></div>'
+      + '<p class="pv-muted" style="margin:0;text-align:center;">Amounts and dates are filled in from the proposal when it is sent.</p></div>';
+  }
+  window.ctplPreview = function(id){
+    const t = id ? byId(id) : (MG.edit ? editState() : null); if(!t) return;
+    const c = sampleCtx();
+    const inner = t.kind === 'package' ? pvPackage(t, c) : t.kind === 'email' ? pvEmail(t, c) : pvContract(t, c);
+    if(!$('ctplPrev')) document.body.insertAdjacentHTML('beforeend', '<div id="ctplPrev" onclick="if(event.target===this)ctplPrevClose()"><div class="pv-card"><div class="pv-bar"><div class="pv-ttl">👁 <span id="pvTitle"></span><span class="pv-with" id="pvWith"></span></div>'
+      + '<button class="btn btn-ghost btn-sm" type="button" id="pvPhoneBtn" onclick="ctplPrevPhone()">📱 Phone</button><button class="btn btn-ghost btn-sm" type="button" onclick="ctplPrevClose()">✕ Close</button></div><div id="pvBody"></div><div class="pv-foot" id="pvFoot"></div></div></div>');
+    const what = t.kind === 'package' ? 'proposal page' : t.kind === 'email' ? 'email' : 'agreement';
+    $('pvTitle').textContent = (t.title || 'Untitled') + ' — the customer’s ' + what;
+    $('pvWith').textContent = c._real ? 'Filled in with ' + c.name + '’s details' + (!id ? ', including what you have typed but not saved' : '') + '.'
+      : 'Filled in with sample details (Jane Smith, 8 guests, ' + c.event_date + ')' + (!id ? ', including what you have typed but not saved' : '') + '.';
+    $('pvBody').innerHTML = inner;
+    $('pvFoot').textContent = t.kind === 'package' ? 'Lines marked “pp” use the guest count. Photos, prices and the note can still be changed on each proposal before it is sent.' : '[Bracketed] parts are fill-ins with nothing to fill them yet.';
+    const m = $('ctplPrev'); m.style.display = 'flex'; m.scrollTop = 0;
+  };
+  window.ctplPrevClose = function(){ const m = $('ctplPrev'); if(m) m.style.display = 'none'; };
+  window.ctplPrevPhone = function(){ const m = $('ctplPrev'); if(!m) return; m.classList.toggle('phone'); $('pvPhoneBtn').textContent = m.classList.contains('phone') ? '🖥 Desktop' : '📱 Phone'; };
+  document.addEventListener('keydown', e => { const m = $('ctplPrev'); if(e.key === 'Escape' && m && m.style.display !== 'none') ctplPrevClose(); });
+
+  /* ---------- wire into the existing catering code ---------- */
+  function wrap(name, make){ const o = window[name]; if(typeof o === 'function' && !o.__ctpl){ const f = make(o); f.__ctpl = true; window[name] = f; } }
+  function boot(){
+    wrap('catOpen', o => function(){ const p = o.apply(this, arguments); fillQuick(); return p; });
+    wrap('catQuickPick', o => function(sel){ const v = sel.value; if(v === 'manage' || v.indexOf('t:') === 0) return pickReply(sel); return o.apply(this, arguments); });
+    wrap('catQuoteRender', o => function(){ const r = o.apply(this, arguments); decorate().catch(e => console.warn('catering templates', e)); return r; });
+    wrap('catItemsRender', o => function(){ const r = o.apply(this, arguments); try{ itemPhotos(); }catch(e){} return r; });
+    // photos ride along with save_quote: items[].image (same filter as catSaveQuote) + the cover
+    wrap('catApi', o => function(action, payload){
+      if(action === 'save_quote' && payload && Array.isArray(payload.items)){
+        try{
+          const src = CAT_ITEMS.filter(it => String(it.name || '').trim() && (Number(it.qty) || 0) > 0);
+          if(src.length === payload.items.length) payload.items.forEach((p, i) => { const u = okUrl(src[i].image); if(u) p.image = u; });
+          payload.image_url = COVER || '';
+        }catch(e){}
+      }
+      return o.apply(this, arguments);
+    });
+    // "New proposal (copy this one)" keeps the cover photo too
+    wrap('catNewProposal', o => function(){ try{ const from = (typeof CAT_Q !== 'undefined' && CAT_Q) || null; const box = $('catQuote'); if(box) box.__coverFrom = (from && from.image_url) || ''; }catch(e){} return o.apply(this, arguments); });
+    // live gratuity line: "Gratuity (N%)" = N% of every other line
+    wrap('catTotals', o => function(){
+      try{
+        let base = 0; CAT_ITEMS.forEach(it => { if(!GRAT_RE.test(it.name || '')) base += Math.round((Number(it.qty) || 0) * (it.price_cents || 0)); });
+        const rows = document.querySelectorAll('#catItems .cat-item');
+        CAT_ITEMS.forEach((it, i) => {
+          const m = GRAT_RE.exec(it.name || ''); if(!m) return;
+          const per = Math.round(Math.round(base * Number(m[1]) / 100) / ((Number(it.qty) > 0) ? Number(it.qty) : 1));
+          it.price_cents = per; it.note = m[1] + '% of ' + catMoney(base);
+          const row = rows[i]; if(!row) return;
+          const p = row.querySelector('.ci-price'), n = row.querySelector('.ci-note');
+          if(p && document.activeElement !== p) p.value = (per / 100).toFixed(2);
+          if(n && document.activeElement !== n) n.value = it.note;
+        });
+      }catch(e){}
+      return o.apply(this, arguments);
+    });
+    // agreement fill-ins the catering fn doesn't know: fill them into what gets saved, keep the textarea as typed
+    wrap('catSaveQuote', o => function(){
+      const ta = $('cq_contract'); let raw = null;
+      try{ if(ta && /\{\{\s*(today|venue|client_email|client_phone|client_address|shop_address|shop_phone|occasion)\s*\}\}/.test(ta.value)){ raw = ta.value; ta.value = fill(raw, { only: LATE_KEYS, contract: true }); } }catch(e){}
+      const p = o.apply(this, arguments);           // builds its payload before its first await
+      if(raw != null && ta) ta.value = raw;
+      return p;
+    });
+    // don't let one customer's filled-in details become the default agreement
+    wrap('catSaveTemplate', o => function(){
+      try{ const t = ($('cq_contract') || {}).value || '', r = cur() || {};
+        if([r.email, r.phone, r.address].some(x => x && String(x).trim().length > 4 && t.indexOf(String(x).trim()) >= 0)){
+          $('cqMsg').textContent = '⚠ This agreement has this customer’s details in it — pick the template again from 📜 before saving it as the default.'; return; } }catch(e){}
+      return o.apply(this, arguments);
+    });
+    wrap('catRender', o => function(){
+      const r = o.apply(this, arguments);
+      try{ const chips = $('catTools') || $('catChips');   // CAT-LOOK moved the buttons to #catTools
+        if(chips && !chips.querySelector('.ctpl-btn')){
+          const ref = [...chips.querySelectorAll('button')].find(b => /Refresh/.test(b.textContent));
+          const html = '<button class="btn btn-ghost btn-sm ctpl-btn" onclick="ctplOpen()">📚 Templates</button>';
+          if(ref) ref.insertAdjacentHTML('afterend', html); else chips.insertAdjacentHTML('beforeend', html);
+        } }catch(e){}
+      return r;
+    });
+    const noteBtn = document.querySelector('#catConvo button[onclick="catLog(true)"]');
+    if(noteBtn && !$('ctplSaveReplyBtn')) noteBtn.insertAdjacentHTML('afterend', '<button class="btn btn-ghost btn-sm" id="ctplSaveReplyBtn" onclick="ctplSaveReply()" title="Save what is in the reply box as a template">💾 Save as template</button>');
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>
+<!-- ═══ INQUIRY FORM EDITOR (2026-10-08) ═══════════════════════════════════════════
+     Experiences → 📝 Inquiry Form. Edits the one customer inquiry form (Greys-Sites
+     inquiry.html): which kinds of inquiry are offered, the wording for each, and the
+     extra questions asked under each. Saved to site_content 'inquiry_form' (public read,
+     admin write); the form falls back to its built-in wording for anything blank.
+     Shop, guests, date/time, the experience picker and the contact details are built
+     into the form (holds and availability depend on them) and are not editable here.
+     The preview is the real page in a frame (?preview=1) fed the unsaved form.
+     ═══════════════════════════════════════════════════════════════════════════════ -->
+<style id="iqf-css">
+  .iqf{display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,44%);gap:22px;align-items:start;}
+  .iqf-side{position:sticky;top:70px;}
+  .iqf-frame{display:block;width:100%;height:calc(100vh - 190px);min-height:480px;border:1px solid var(--line);border-radius:10px;background:#F5F7F2;}
+  .iqf-cap{display:flex;align-items:center;gap:10px;margin:0 0 8px;font-size:.8rem;font-weight:700;color:var(--sub);}
+  .iqf h3{margin:0 0 4px;font-size:1rem;}
+  .iqf-box{border:1px solid var(--line);border-radius:10px;padding:16px;margin:0 0 16px;background:#fff;}
+  .iqf-box > .hint{margin-bottom:12px;}
+  .iqf-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px;}
+  .iqf-full{grid-column:1 / -1;}
+  .iqf label.f{display:block;font-size:.76rem;font-weight:700;color:var(--sub);margin:0 0 4px;}
+  .iqf input[type=text],.iqf textarea,.iqf select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;
+    font:inherit;font-size:.9rem;background:#fff;color:var(--ink);}
+  .iqf textarea{min-height:64px;resize:vertical;line-height:1.4;}
+  .iqf input:focus,.iqf textarea:focus,.iqf select:focus{outline:2px solid #06273a;outline-offset:0;}
+  .iqf-check{display:inline-flex;align-items:center;gap:7px;font-size:.86rem;font-weight:700;cursor:pointer;}
+  .iqf-check input{width:17px;height:17px;}
+  .iqf-types{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px;}
+  .iqf-type{border:1px solid var(--line);background:#fff;border-radius:8px;padding:9px 14px;font:inherit;font-size:.86rem;font-weight:700;cursor:pointer;color:var(--ink);}
+  .iqf-type.on{background:#06273a;border-color:#06273a;color:#fff;}
+  .iqf-type.off{text-decoration:line-through;opacity:.7;}
+  .iqf-q{border:1px solid var(--line);border-left:4px solid #06273a;border-radius:8px;padding:12px 14px;margin:0 0 12px;background:#fafbfc;}
+  .iqf-q.hidden{border-left-color:#cbd5e1;opacity:.75;}
+  .iqf-qhead{display:flex;align-items:center;gap:8px;margin:0 0 10px;}
+  .iqf-qhead b{flex:1;min-width:0;font-size:.8rem;color:var(--sub);text-transform:uppercase;letter-spacing:.06em;}
+  .iqf-ico{border:1px solid var(--line);background:#fff;border-radius:7px;min-width:34px;height:32px;cursor:pointer;font-size:.9rem;color:var(--ink);}
+  .iqf-ico:disabled{opacity:.35;cursor:default;}
+  .iqf-ico.del{color:#b91c1c;}
+  .iqf-row{display:flex;flex-wrap:wrap;gap:18px;margin-top:10px;}
+  .iqf-built{margin:0 0 14px;padding:10px 12px;background:#f1f5f9;border-radius:8px;font-size:.82rem;color:var(--sub);line-height:1.5;}
+  .iqf-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 16px;}
+  .iqf-msg{font-size:.84rem;font-weight:700;}
+  .iqf-msg.ok{color:#15803d;} .iqf-msg.bad{color:#b91c1c;} .iqf-msg.warn{color:#b45309;}
+  @media (max-width:1180px){ .iqf{grid-template-columns:minmax(0,1fr);} .iqf-side{position:static;} .iqf-frame{height:640px;} }
+  @media (max-width:640px){ .iqf-grid{grid-template-columns:minmax(0,1fr);} }
+</style>
+<script>
+(function(){
+  "use strict";
+  // ---------- the editable form (site_content 'inquiry_form') ----------
+  // The inquiry types, their wording and their extra questions are saved from the manager
+  // console (Experiences → Inquiry Form). FORM_DEFAULTS is what shows when nothing is saved,
+  // a field is blank, or the request fails. THIS BLOCK IS DUPLICATED, byte for byte, in
+  // Greys-Sites/inquiry.html and staff-portal/manager.html — change both or neither.
+  var FORM_DEFAULTS = {
+    "v": 1,
+    "heading": "How can we help?",
+    "lede": "A table, an experience, catering or a private event. A few quick questions and you're done.",
+    "ask": "What are you planning?",
+    "types": [
+      {
+        "key": "table",
+        "on": true,
+        "label": "Reserve a table",
+        "sub": "Lunch, dinner or a glass of wine, for up to 5",
+        "title": "Reserve a table",
+        "lede": "Book a table in Memphis, or request one in Nashville.",
+        "msg_label": "Anything we should know?",
+        "msg_hint": "A birthday, a high chair, an allergy, where you'd like to sit",
+        "questions": []
+      },
+      {
+        "key": "experience",
+        "on": true,
+        "label": "Book a Dine In Experience",
+        "sub": "Fondue, raclette, tastings and more",
+        "title": "Ask about an experience",
+        "lede": "Pick an experience, then a date and a time. We hold it for 48 hours while we answer you.",
+        "msg_label": "Your question",
+        "msg_hint": "Extras, a surprise, timing — anything else we should know",
+        "questions": [
+          {
+            "id": "dietary",
+            "label": "Anything we should know?",
+            "hint": "",
+            "kind": "many",
+            "required": false,
+            "on": true,
+            "options": [
+              "Vegetarian",
+              "Gluten-free",
+              "Nut allergy",
+              "Pregnant guest",
+              "No pork",
+              "Something else"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "catering",
+        "on": true,
+        "label": "Catering and Greysing Tables",
+        "sub": "Off site and delivery charcuterie boards, box lunches, platters and Greysing Tables",
+        "title": "Plan your catering",
+        "lede": "Tell us about your event and we'll send ideas and a proposal. Nothing is charged.",
+        "msg_label": "Tell us about your event",
+        "msg_hint": "What you have in mind, favorite cheeses, anything we should know",
+        "questions": [
+          {
+            "id": "budget",
+            "label": "Do you have a budget in mind?",
+            "hint": "",
+            "kind": "one",
+            "required": false,
+            "on": true,
+            "options": [
+              "Under $250",
+              "$250 – $500",
+              "$500 – $1,000",
+              "Over $1,000",
+              "Not sure yet"
+            ]
+          },
+          {
+            "id": "company",
+            "label": "Company or organization",
+            "hint": "",
+            "kind": "text",
+            "required": false,
+            "on": true,
+            "options": []
+          }
+        ]
+      },
+      {
+        "key": "event",
+        "on": true,
+        "label": "Private Event and Large Parties",
+        "sub": "On site private parties, buyouts, workshops and large reservations",
+        "title": "Plan a private event",
+        "lede": "Tell us the date, the size of your group and what you have in mind. We'll check it and get right back to you.",
+        "msg_label": "Tell us about your event",
+        "msg_hint": "What you have in mind, timing, anything else we should know",
+        "questions": [
+          {
+            "id": "event_kind",
+            "label": "What kind of event?",
+            "hint": "",
+            "kind": "one",
+            "required": true,
+            "on": true,
+            "options": [
+              "Big party (6 or more)",
+              "Private event / buyout",
+              "Workshop or class for my group",
+              "Not sure yet"
+            ]
+          },
+          {
+            "id": "food",
+            "label": "What would you like served?",
+            "hint": "",
+            "kind": "many",
+            "required": false,
+            "on": true,
+            "options": [
+              "Cheese & charcuterie",
+              "Wine",
+              "A full meal",
+              "Fondue or raclette",
+              "Not sure yet"
+            ]
+          },
+          {
+            "id": "dietary",
+            "label": "Any dietary needs?",
+            "hint": "",
+            "kind": "many",
+            "required": false,
+            "on": true,
+            "options": [
+              "Vegetarian",
+              "Gluten-free",
+              "Nut allergy",
+              "No pork",
+              "Something else"
+            ]
+          }
+        ]
+      }
+    ]
+  };
+  var FORM_KINDS = ["one", "many", "text", "long"];
+  function formTidyQ(q, i) {
+    if (!q || typeof q !== "object") return null;
+    var label = String(q.label || "").trim().slice(0, 120);
+    if (!label) return null;
+    var id = String(q.id || "").replace(/[^a-z0-9_]/gi, "").slice(0, 40) || "q" + (i + 1);
+    return {
+      id: id, label: label, hint: String(q.hint || "").trim().slice(0, 300),
+      kind: FORM_KINDS.indexOf(q.kind) !== -1 ? q.kind : "text",
+      options: (Array.isArray(q.options) ? q.options : []).map(function (o) { return String(o == null ? "" : o).trim().slice(0, 80); })
+        .filter(function (o, n, a) { return o && a.indexOf(o) === n; }).slice(0, 30),
+      required: !!q.required, on: q.on !== false,
+    };
+  }
+  // saved row → a complete form: every missing or blank piece falls back to the default
+  function formOf(saved) {
+    var out = JSON.parse(JSON.stringify(FORM_DEFAULTS));
+    if (!saved || typeof saved !== "object") return out;
+    ["heading", "lede", "ask"].forEach(function (k) { if (typeof saved[k] === "string" && saved[k].trim()) out[k] = saved[k].trim().slice(0, 400); });
+    var list = Array.isArray(saved.types) ? saved.types : [], by = {}, pos = {};
+    list.forEach(function (t, i) { if (t && typeof t.key === "string" && !(t.key in by)) { by[t.key] = t; pos[t.key] = i; } });
+    out.types.forEach(function (t) {
+      var s = by[t.key];
+      if (!s) return;
+      ["label", "sub", "title", "lede", "msg_label", "msg_hint"].forEach(function (k) {
+        if (typeof s[k] === "string" && s[k].trim()) t[k] = s[k].trim().slice(0, 400);
+      });
+      t.on = s.on !== false;
+      if (Array.isArray(s.questions)) {
+        var seen = {};
+        t.questions = s.questions.map(formTidyQ).filter(function (q) {
+          if (!q || seen[q.id]) return false;
+          seen[q.id] = 1; return true;
+        }).slice(0, 20);
+      }
+    });
+    out.types.sort(function (a, b) { return (a.key in pos ? pos[a.key] : 99) - (b.key in pos ? pos[b.key] : 99); });
+    if (!out.types.some(function (t) { return t.on; })) out.types.forEach(function (t) { t.on = true; });
+    return out;
+  }
+
+  var KEY = 'inquiry_form';
+  var KIND_NAMES = { one:'Buttons — pick one', many:'Buttons — pick any', text:'Short typed answer', long:'Long typed answer' };
+  var BUILT_IN = {
+    table: 'Built in: which shop, guests (1 to 5), date and time, then name, email, phone and a note. Memphis books the table on the spot (it lands in Wix reservations and they get a confirmation email). Nashville sends a request to 💼 Catering Leads tagged Table request. Questions you add here show on a "A few details" screen.',
+    experience: 'Built in: which experience (and tasting), shop, guests, date and time (held 48 h in Memphis), the address for Raclette at Home, then name, email, phone and a message. Shows in 💼 Catering Leads tagged Experience. The questions below share one "A few details" screen.',
+    catering: 'Built in: shop and pickup / delivery / on site / off site (plus the address), then guests, date and time, then the interest buttons (Greysing Table, Charcuterie board, Private event, Sandwiches / box lunches), name, email, phone and a message. Goes to 💼 Catering Leads. The questions below show under the date on the second screen.',
+    event: 'Built in: shop, guests, date and time (12–2, 4–7 or other), then name, email, phone and a message. Goes to 💼 Catering Leads tagged Private event, so it can get a proposal and an invoice. The questions below share one "A few details" screen.'
+  };
+  var STAGING = /staging/i.test(location.hostname);
+  var FORM_SITE = STAGING ? 'https://ticket-rennet.onrender.com/inquiry.html' : 'https://tickets.greyscheese.com/inquiry.html';
+  // Until the new inquiry form is live on tickets.greyscheese.com, the editor shows on the test portal only — drop these two lines once Greys-Sites main has the new inquiry.html.
+  if(!STAGING){ var tabEl = document.querySelector(".tab[onclick=\"mtab('inqform')\"]"); if(tabEl) tabEl.style.display = 'none'; }
+  var st = { form: formOf(null), saved: null, type: 'table', loaded: false, dirty: false, frameReady: false };
+
+  function h(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  function $(id){ return document.getElementById(id); }
+  function cur(){ return st.form.types.filter(function(t){ return t.key===st.type; })[0] || st.form.types[0]; }
+  function msg(text, cls){ var el=$('iqfMsg'); if(el){ el.textContent=text||''; el.className='iqf-msg '+(cls||''); } }
+  function touch(){ st.dirty=true; msg('Not saved yet','warn'); postSoon(); }
+
+  function text(label, path, val, opts){
+    opts = opts || {};
+    return '<div class="'+(opts.full?'iqf-full':'')+'"><label class="f">'+h(label)+'</label>'
+      + (opts.area ? '<textarea data-p="'+path+'" maxlength="'+(opts.max||400)+'">'+h(val)+'</textarea>'
+                   : '<input type="text" data-p="'+path+'" maxlength="'+(opts.max||400)+'" value="'+h(val)+'">') + '</div>';
+  }
+
+  function draw(){
+    var root = $('iqfEdit'); if(!root) return;
+    var f = st.form, t = cur(), ti = f.types.indexOf(t), o = [];
+    o.push('<div class="iqf-box"><h3>Opening question</h3><div class="hint">The first screen, over the photo, before they pick a kind of inquiry. Skipped when only one kind is switched on.</div><div class="iqf-grid">'
+      + text('Page heading','heading',f.heading,{max:80})
+      + text('The question','ask',f.ask,{max:80})
+      + text('Intro line','lede',f.lede,{full:true,area:true,max:300}) + '</div></div>');
+
+    o.push('<div class="iqf-box"><h3>Kinds of inquiry</h3><div class="hint">Pick one to edit. Each kind has its own wording and its own questions.</div><div class="iqf-types">');
+    f.types.forEach(function(x){ o.push('<button type="button" class="iqf-type'+(x.key===t.key?' on':'')+(x.on?'':' off')+'" data-type="'+x.key+'">'+h(x.label)+'</button>'); });
+    o.push('</div>');
+    o.push('<div class="iqf-row" style="margin:0 0 14px;"><label class="iqf-check"><input type="checkbox" data-p="t.on"'+(t.on?' checked':'')+'> Show this kind on the form</label>'
+      + '<span><button type="button" class="iqf-ico" data-act="tup" title="Move earlier"'+(ti===0?' disabled':'')+'>←</button> '
+      + '<button type="button" class="iqf-ico" data-act="tdown" title="Move later"'+(ti===f.types.length-1?' disabled':'')+'>→</button> <span class="hint" style="margin:0;">order of the buttons</span></span></div>');
+    o.push('<div class="iqf-grid">'
+      + text('Button label','t.label',t.label,{max:60})
+      + text('Small line under the button','t.sub',t.sub,{max:120})
+      + text('Small heading on every screen','t.title',t.title,{max:80})
+      + text('Message box label','t.msg_label',t.msg_label,{max:80})
+      + text('Intro line on its first screen','t.lede',t.lede,{full:true,area:true,max:300})
+      + text('Message box hint (gray text inside it)','t.msg_hint',t.msg_hint,{full:true,max:160})
+      + '</div></div>');
+
+    o.push('<div class="iqf-box"><h3>Questions for “'+h(t.label)+'”</h3><div class="iqf-built">'+h(BUILT_IN[t.key]||'')+'</div>');
+    if(!t.questions.length) o.push('<div class="hint">No extra questions yet.</div>');
+    t.questions.forEach(function(q,i){
+      var btn = q.kind==='one' || q.kind==='many';
+      o.push('<div class="iqf-q'+(q.on?'':' hidden')+'" data-q="'+i+'"><div class="iqf-qhead"><b>Question '+(i+1)+(q.on?'':' · hidden')+'</b>'
+        + '<button type="button" class="iqf-ico" data-act="qup" data-i="'+i+'" title="Move up"'+(i===0?' disabled':'')+'>↑</button>'
+        + '<button type="button" class="iqf-ico" data-act="qdown" data-i="'+i+'" title="Move down"'+(i===t.questions.length-1?' disabled':'')+'>↓</button>'
+        + '<button type="button" class="iqf-ico del" data-act="qdel" data-i="'+i+'" title="Delete this question">🗑</button></div>'
+        + '<div class="iqf-grid">'
+        + text('Question','q.'+i+'.label',q.label,{max:120})
+        + '<div><label class="f">Answer type</label><select data-p="q.'+i+'.kind">'
+        + FORM_KINDS.map(function(k){ return '<option value="'+k+'"'+(q.kind===k?' selected':'')+'>'+KIND_NAMES[k]+'</option>'; }).join('') + '</select></div>'
+        + (btn ? '<div class="iqf-full"><label class="f">Choices — one per line</label><textarea data-p="q.'+i+'.options" style="min-height:'+Math.max(64, 22*(q.options.length+1)+18)+'px">'+h(q.options.join('\n'))+'</textarea></div>' : '')
+        + text('Helper line under the question (optional)','q.'+i+'.hint',q.hint,{full:true,max:300})
+        + '</div><div class="iqf-row">'
+        + '<label class="iqf-check"><input type="checkbox" data-p="q.'+i+'.required"'+(q.required?' checked':'')+'> Required</label>'
+        + '<label class="iqf-check"><input type="checkbox" data-p="q.'+i+'.on"'+(q.on?' checked':'')+'> Show on the form</label>'
+        + '</div></div>');
+    });
+    o.push('<button type="button" class="btn btn-ghost" data-act="qadd">＋ Add a question</button></div>');
+    root.innerHTML = o.join('');
+  }
+
+  // write one field of the form from its data-p path
+  function setPath(p, v){
+    var t = cur(), parts = p.split('.');
+    if(parts[0]==='t'){ t[parts[1]] = v; return; }
+    if(parts[0]==='q'){
+      var q = t.questions[+parts[1]]; if(!q) return;
+      if(parts[2]==='options') q.options = String(v).split('\n').map(function(s){ return s.trim(); }).filter(Boolean);
+      else q[parts[2]] = v;
+      return;
+    }
+    st.form[p] = v;
+  }
+
+  function wire(){
+    var root = $('iqfEdit');
+    root.addEventListener('input', function(e){
+      var p = e.target.getAttribute('data-p'); if(!p || e.target.type==='checkbox' || e.target.tagName==='SELECT') return;
+      setPath(p, e.target.value); touch();
+    });
+    root.addEventListener('change', function(e){
+      var el = e.target, p = el.getAttribute('data-p'); if(!p) return;
+      if(el.type==='checkbox'){ setPath(p, el.checked); touch(); draw(); }
+      else if(el.tagName==='SELECT'){ setPath(p, el.value); touch(); draw(); }
+      else if(p==='t.label'){ draw(); }
+    });
+    root.addEventListener('click', function(e){
+      var b = e.target.closest('button'); if(!b) return;
+      var t = cur(), a = b.getAttribute('data-act'), i = +b.getAttribute('data-i'), ty = b.getAttribute('data-type');
+      if(ty){ st.type = ty; draw(); post(); return; }
+      if(!a) return;
+      var qs = t.questions, ts = st.form.types, ti = ts.indexOf(t);
+      if(a==='qadd'){
+        qs.push({ id:'q'+Date.now().toString(36), label:'New question', hint:'', kind:'one', options:['Choice 1','Choice 2'], required:false, on:true });
+      } else if(a==='qdel'){
+        if(!confirm('Delete “'+qs[i].label+'”?')) return;
+        qs.splice(i,1);
+      } else if(a==='qup' && i>0){ qs.splice(i-1,0,qs.splice(i,1)[0]); }
+      else if(a==='qdown' && i<qs.length-1){ qs.splice(i+1,0,qs.splice(i,1)[0]); }
+      else if(a==='tup' && ti>0){ ts.splice(ti-1,0,ts.splice(ti,1)[0]); }
+      else if(a==='tdown' && ti<ts.length-1){ ts.splice(ti+1,0,ts.splice(ti,1)[0]); }
+      else return;
+      touch(); draw();
+      if(a==='qadd'){ var last = root.querySelector('.iqf-q:last-of-type input[type=text]'); if(last){ last.focus(); last.select(); } }
+    });
+  }
+
+  // ---- live preview: the real form in a frame, fed the unsaved form ----
+  var postT = 0;
+  function postSoon(){ clearTimeout(postT); postT = setTimeout(post, 350); }
+  function post(){
+    var fr = $('iqfFrame'); if(!fr || !fr.contentWindow || !st.frameReady) return;
+    try{ fr.contentWindow.postMessage({ greysInquiryForm: st.form, type: st.type }, new URL(FORM_SITE).origin); }catch(_){}
+  }
+  window.addEventListener('message', function(e){
+    if(e.data && e.data.greysInquiryPreview === 'ready' && e.origin === new URL(FORM_SITE).origin){ st.frameReady = true; post(); }
+  });
+
+  // what stops a save: a blank question, or buttons with nothing to press
+  function problem(){
+    var bad = '';
+    st.form.types.forEach(function(t){
+      t.questions.forEach(function(q,i){
+        if(bad) return;
+        if(!String(q.label||'').trim()) bad = t.label+': question '+(i+1)+' has no wording.';
+        else if((q.kind==='one'||q.kind==='many') && !q.options.length) bad = t.label+': “'+q.label+'” needs at least one choice.';
+      });
+    });
+    if(!bad && !st.form.types.some(function(t){ return t.on; })) bad = 'Leave at least one kind of inquiry switched on.';
+    return bad;
+  }
+
+  async function load(){
+    try{
+      var r = await sb.from('site_content').select('data').eq('key', KEY).maybeSingle();
+      if(r.error) throw r.error;
+      st.saved = r.data ? r.data.data : null;
+    }catch(e){ st.saved = null; msg('Could not load the saved form — showing the built-in one.','bad'); }
+    st.form = formOf(st.saved); st.loaded = true; st.dirty = false;
+    if(!cur() || cur().key !== st.type) st.type = st.form.types[0].key;
+    draw(); post();
+  }
+  async function save(){
+    var bad = problem(); if(bad){ msg(bad,'bad'); return; }
+    var data = formOf(st.form), who = '';
+    try{ var s = await sb.auth.getSession(); who = (s.data && s.data.session && s.data.session.user && s.data.session.user.email) || ''; }catch(_){}
+    msg('Saving…','');
+    var r = await sb.from('site_content').upsert({ key: KEY, data: data, updated_at: new Date().toISOString(), updated_by: who || null });
+    if(r.error){ msg('Not saved: '+r.error.message,'bad'); return; }
+    st.saved = data; st.form = formOf(data); st.dirty = false;
+    draw(); post(); msg('Saved — the form is updated.','ok');
+  }
+  function revert(){
+    if(!confirm('Put the built-in questions and wording back? Nothing changes on the form until you press Save.')) return;
+    st.form = formOf(null); touch(); draw();
+  }
+  function undo(){
+    if(st.dirty && !confirm('Throw away the changes you haven\'t saved?')) return;
+    st.form = formOf(st.saved); st.dirty = false; draw(); post(); msg('','');
+  }
+
+  function init(){
+    if(!$('iqfEdit')) return;
+    wire();
+    $('iqfSave').addEventListener('click', save);
+    $('iqfUndo').addEventListener('click', undo);
+    $('iqfRevert').addEventListener('click', revert);
+    $('iqfOpen').href = FORM_SITE;
+    // load the form and the preview the first time the tab is opened
+    var _mtab = window.mtab;
+    window.mtab = function(name){
+      _mtab.apply(this, arguments);
+      if(name === 'inqform'){
+        if(!st.loaded) load();
+        var fr = $('iqfFrame'); if(fr && !fr.src) fr.src = FORM_SITE + '?preview=1';
+      }
+    };
+    window.addEventListener('beforeunload', function(e){ if(st.dirty){ e.preventDefault(); e.returnValue = ''; } });
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+  window.__iqf = { state: st, load: load, problem: problem };
 })();
 </script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
