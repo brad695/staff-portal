@@ -14496,6 +14496,16 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 }
 @media(max-width:820px){
   .tabs.v3 .v3-lk, .tabs.v3 .v3-lkgrp{ display:none !important; }
+  .navmore .nm-links{ border-top:1px solid #eee; margin-top:6px; padding-top:6px; }
+  .navmore .nm-h{ padding:8px 22px 4px; font-size:11px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#8a8a8a; }
+  .navmore .nm-links .sect{ display:flex; width:100%; min-height:48px; color:#06273a; text-decoration:none; font-weight:500; background:none; }
+  .navmore .nm-links .sect .ico{ display:flex; align-items:center; justify-content:center; color:#06273a; }
+  .navmore .nm-links svg{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .navmore .nm-dd svg.chev{ margin-left:auto; width:14px; height:14px; color:#9aa; transform:rotate(180deg); transition:transform .15s; }
+  .navmore .nm-dd.x svg.chev{ transform:rotate(0deg); }
+  .navmore .nm-sub{ display:none; }
+  .navmore .nm-sub.x{ display:block; }
+  .navmore .nm-sub .sect{ padding-left:44px; min-height:44px; font-size:0.9rem; }
   .v3-title{ display:none; }
   .tabs.v3 .v3-brand, .tabs.v3 .v3-search, .tabs.v3 .v3-foot, .tabs.v3 .chev, .tabs.v3 .v3-dot{ display:none; }
   .tabs.v3 .v3-list{ display:contents; }
@@ -14638,6 +14648,23 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     const sorted = G.groups.slice().sort((a,b)=>{ const x=ORDER.indexOf(a.name), y=ORDER.indexOf(b.name); return (x<0?99:x)-(y<0?99:y); });
     sorted.forEach(g=> list.appendChild(g.btn));
     list.append(lkBtn, lkGrp);
+    // phone: the same links live at the bottom of the "More" sheet (the v3
+    // sidebar, Links included, is desktop-only)
+    const sheet = document.querySelector('.navmore');
+    if(sheet && !sheet.querySelector('.nm-links')){
+      const nm = document.createElement('div'); nm.className = 'nm-links';
+      const nmA = l=> '<a class="sect" href="'+l[0]+'"'+(l[3] ? ' target="_blank" rel="noopener"' : '')+'><span class="ico">'+svg(l[1])+'</span><span class="lbl">'+l[2]+'</span></a>';
+      nm.innerHTML = '<div class="nm-h">Links</div>' + LINKS.map(nmA).join('')
+        + '<button type="button" class="sect nm-dd" aria-expanded="false"><span class="ico">'+svg('flask')+'</span><span class="lbl">Test sites</span>'+svg('chev').replace('<svg','<svg class="chev"')+'</button>'
+        + '<div class="nm-sub">'+TEST_LINKS.map(nmA).join('')+'</div>';
+      sheet.appendChild(nm);
+      const dd = nm.querySelector('.nm-dd'), sub = nm.querySelector('.nm-sub');
+      dd.addEventListener('click', ()=>{
+        const open = !sub.classList.contains('x');
+        sub.classList.toggle('x', open); dd.classList.toggle('x', open); dd.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if(open) sub.scrollIntoView({ block:'nearest' });
+      });
+    }
     const moreBtn = list.querySelector('.sect.more'); if(moreBtn) list.appendChild(moreBtn);
     list.addEventListener('click', e=>{
       if(!DESK.matches) return;
