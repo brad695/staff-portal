@@ -10,6 +10,14 @@ const TW_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
 const PUBLIC_URL = `${SB_URL}/functions/v1/chat-sms-in`;
 const twiml = (s = 200) => new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', { status: s, headers: { "Content-Type": "text/xml" } });
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const e164 = (p: unknown) => {
+  const raw = String(p ?? "").trim(), d = raw.replace(/\D/g, "");
+  if (!raw) return "";
+  if (raw.startsWith("+")) return /^\d{8,15}$/.test(d) ? "+" + d : "";
+  if (d.length === 10) return "+1" + d;
+  if (d.length === 11 && d.startsWith("1")) return "+" + d;
+  return "";
+};
 
 async function validSig(url: string, params: URLSearchParams, sig: string) {
   if (!TW_TOKEN || !sig) return false;
@@ -42,6 +50,27 @@ Deno.serve(async (req) => {
   if (!from) return twiml();
   const { data: dup } = await db.from("chat_messages").select("id").eq("ext_id", sid).maybeSingle();
   if (dup) return twiml();
+
+  // A text from a staff member's phone (e.g. a reply to a shift reminder) goes to a group DM with the managers
+  const { data: contacts } = await db.from("portal_employee_contacts").select("employee_id,phone");
+  const staff = (contacts || []).find((x) => e164(x.phone) === from);
+  if (staff) {
+    const { data: emps } = await db.from("portal_employees").select("id,role,active");
+    const me = (emps || []).find((e) => e.id === staff.employee_id && e.active);
+    if (me) {
+      const ids = [...new Set([me.id, ...(emps || []).filter((e) => e.active && /manager|owner|admin/i.test(e.role || "")).map((e) => e.id)])].sort((a, b) => a - b);
+      const dm_key = ids.join("-");
+      let { data: dm } = await db.from("chat_convos").select("id").eq("dm_key", dm_key).maybeSingle();
+      if (!dm) {
+        const { data: nd } = await db.from("chat_convos").insert({ kind: "dm", dm_key, created_by: me.id }).select("id").single();
+        dm = nd;
+        await db.from("chat_members").insert(ids.map((e) => ({ convo_id: dm!.id, emp_id: e })));
+      }
+      const html = "📱 " + esc(body).replace(/\n/g, "<br>");
+      await db.from("chat_messages").insert({ convo_id: dm!.id, emp_id: me.id, author_kind: "staff", body_html: html, ext_id: sid });
+      return twiml();
+    }
+  }
 
   let { data: c } = await db.from("chat_convos").select("id").eq("kind", "client").eq("client_phone", from).eq("archived", false).order("created_at").limit(1).maybeSingle();
   if (!c) {
