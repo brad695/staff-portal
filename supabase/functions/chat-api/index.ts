@@ -258,6 +258,52 @@ async function handle(a: string, b: any, me: number) {
       const { data: mems } = await db.from("chat_members").select("emp_id").eq("convo_id", c.id);
       return { convo: { ...c, members: (mems || []).map((x) => x.emp_id), me: mine } };
     }
+    case "since": {
+      // catch-up after sleep / a dropped realtime connection: anything new, edited or deleted
+      const after = new Date(Number(b.after) || Date.now() - 5 * 60000).toISOString();
+      const { data: mine } = await db.from("chat_members").select("convo_id").eq("emp_id", me);
+      const ids = (mine || []).map((m) => m.convo_id);
+      if (!ids.length) return { messages: [], convos: [] };
+      const { data } = await db.from("chat_messages").select(MSG_COLS).in("convo_id", ids)
+        .or(`created_at.gt.${after},edited_at.gt.${after},deleted_at.gt.${after}`).order("created_at").limit(500);
+      return { messages: await withReactions(data || []), convos: ids };
+    }
+    case "people": {
+      const { data: people } = await db.from("portal_employees").select("id,name,role,location").eq("active", true).order("name");
+      const { data: profs } = await db.from("chat_profiles").select("emp_id,title,color,status_emoji,status_text,away");
+      const pmap: Record<number, any> = {};
+      (profs || []).forEach((p) => (pmap[p.emp_id] = p));
+      return { people: (people || []).map((e) => ({ id: e.id, name: e.name, role: e.role, location: e.location, title: pmap[e.id]?.title || "", color: pmap[e.id]?.color || "", status_e: pmap[e.id]?.status_emoji || "", status_t: pmap[e.id]?.status_text || "", away: !!pmap[e.id]?.away })) };
+    }
+    case "unread": {
+      // small summary for the portal home tile
+      const { data: mine } = await db.from("chat_members").select("convo_id,last_read_at,muted").eq("emp_id", me);
+      const rows = (mine || []).filter((m) => !m.muted);
+      if (!rows.length) return { items: [] };
+      const lr: Record<string, number> = {};
+      rows.forEach((r) => (lr[r.convo_id] = Date.parse(r.last_read_at)));
+      const min = new Date(Math.min(...rows.map((r) => lr[r.convo_id]))).toISOString();
+      const { data: ms } = await db.from("chat_messages").select("convo_id,emp_id,created_at").in("convo_id", rows.map((r) => r.convo_id))
+        .is("parent_id", null).is("deleted_at", null).gt("created_at", min).limit(3000);
+      const cnt: Record<string, number> = {};
+      (ms || []).forEach((m) => { if (m.emp_id === me) return; if (Date.parse(m.created_at) > lr[m.convo_id]) cnt[m.convo_id] = (cnt[m.convo_id] || 0) + 1; });
+      const ids = Object.keys(cnt);
+      if (!ids.length) return { items: [] };
+      const { data: cs } = await db.from("chat_convos").select("id,kind,name,client_name").in("id", ids);
+      const { data: mem } = await db.from("chat_members").select("convo_id,emp_id").in("convo_id", ids);
+      const { data: ppl } = await db.from("portal_employees").select("id,name");
+      const pn: Record<number, string> = {};
+      (ppl || []).forEach((p) => (pn[p.id] = p.name));
+      const items = (cs || []).map((c) => {
+        let name = c.kind === "channel" ? "#" + c.name : c.kind === "client" ? (c.client_name || c.name) : "";
+        if (c.kind === "dm") {
+          const o = (mem || []).filter((m) => m.convo_id === c.id && m.emp_id !== me).map((m) => str(pn[m.emp_id]).split(" ")[0]);
+          name = o.join(", ") || "You";
+        }
+        return { id: c.id, kind: c.kind, name, n: cnt[c.id] };
+      }).sort((x, y) => (x.kind === "channel" ? 1 : 0) - (y.kind === "channel" ? 1 : 0) || y.n - x.n);
+      return { items };
+    }
     case "history": {
       await mustMember(str(b.convo), me);
       const { data } = await db.from("chat_messages").select(MSG_COLS).eq("convo_id", str(b.convo)).is("deleted_at", null)

@@ -1425,7 +1425,10 @@ document.addEventListener('paste',e=>{const inp=e.target.closest?.('.c-input');i
   const t=e.clipboardData?.getData('text/plain');if(t!=null){e.preventDefault();document.execCommand('insertText',false,t);}});
 document.addEventListener('dragover',e=>{if(e.target.closest?.('.main,.pane'))e.preventDefault();});
 document.addEventListener('drop',e=>{const z=e.target.closest?.('.main,.pane');if(!z||!e.dataTransfer.files.length)return;e.preventDefault();addFiles([...e.dataTransfer.files],z.classList.contains('pane')?'thread':'main');});
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&S.view==='convo'&&convos[S.cur]?.joined){markRead(convos[S.cur]);renderSide();renderRail();}track();});
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden'){S._hiddenAt=Date.now();}
+  else{if(S._hiddenAt&&Date.now()-S._hiddenAt>20000)catchUp();if(S.view==='convo'&&convos[S.cur]?.joined){markRead(convos[S.cur]);renderSide();renderRail();}}
+  track();});
 
 /* ---------- realtime ---------- */
 let RT=null;
@@ -1451,6 +1454,7 @@ async function onPing(p){
     if(S.view==='convo'&&S.cur===c.id&&S.tab==='messages')rerenderMsgs();else if(S.view!=='convo')renderMain();
     if(S.pane)renderPane();renderSide();renderRail();showTyping();
   }else if(p.t==='convo'){if(convos[p.c]){await refetchConvo(p.c);ping(()=>{renderSide();if(S.cur===p.c&&S.view==='convo'&&!S.editing&&!inputOf('main')?.textContent.trim())renderMain();},'cv');}}
+  else if(p.t==='prof'){ping(refreshPeople,'ppl');}
   else if(p.t==='mem'){if(String(p.e)===ME||convos[p.c]){const nc=await refetchConvo(p.c);if(nc&&nc.joined&&!(msgs[nc.id]||[]).length)await loadHistory(nc.id,true).catch(()=>{});ping(renderSide,'side');ping(renderRail,'rail');}}
 }
 function connect(){
@@ -1460,9 +1464,20 @@ function connect(){
   RT.on('broadcast',{event:'chg'},({payload})=>{onPing(payload);})
     .on('broadcast',{event:'typing'},({payload})=>{if(!payload||payload.u===ME||!convos[payload.c]?.joined)return;(S.typing[payload.c]=S.typing[payload.c]||{})[payload.u]=Date.now();showTyping();setTimeout(showTyping,5200);})
     .on('presence',{event:'sync'},()=>{const st=RT.presenceState();ONLINE.clear();Object.values(st).forEach(arr=>arr.forEach(x=>{if(!x.away)ONLINE.add(String(x.u));}));ping(()=>{renderSide();renderRail();if(S.pane?.type==='profile')renderPane();},'pres');})
-    .subscribe(st=>{$('#conn').hidden=st==='SUBSCRIBED';if(st==='SUBSCRIBED'){track();if(S._wasDown){S._wasDown=false;resync();}}else if(st==='CHANNEL_ERROR'||st==='TIMED_OUT'||st==='CLOSED')S._wasDown=true;});
+    .subscribe(st=>{S._rtOk=st==='SUBSCRIBED';$('#conn').hidden=S._rtOk;if(S._rtOk){track();if(S._wasDown){S._wasDown=false;catchUp();}}else if(st==='CHANNEL_ERROR'||st==='TIMED_OUT'||st==='CLOSED')S._wasDown=true;});
 }
 async function resync(){try{const d=await api('boot');ingest(d);renderAll();}catch(e){}}
+async function refreshPeople(){try{const d=await api('people');d.people.forEach(mapPerson);STAFF=d.people.map(p=>String(p.id));renderSide();renderRail();if(S.view==='convo'&&S.tab==='messages'&&!S.editing)rerenderMsgs();if(S.pane)renderPane();}catch(e){}}
+/* catch-up for anything realtime missed (phone asleep, dropped connection): new, edited or deleted messages */
+async function catchUp(){
+  if(!ME||S._catching)return;S._catching=true;
+  const after=(S.lastSync||Date.now())-120000;const started=Date.now();
+  try{const d=await api('since',{after});S.lastSync=started;
+    const ms=d.messages.map(mapMsg);if(ms.length){ms.filter(m=>!m.parent).forEach(upsertMsg);ms.filter(m=>m.parent).forEach(upsertMsg);
+      for(const id of d.convos||[])if(!convos[id])await refetchConvo(id);
+      if(!S.editing)refreshMsg();}}
+  catch(e){}finally{S._catching=false;}
+}
 
 /* ---------- boot ---------- */
 function ingest(d){
@@ -1475,7 +1490,7 @@ function ingest(d){
   ms.filter(m=>!m.parent).forEach(upsertMsg);ms.filter(m=>m.parent).forEach(upsertMsg);
   S.later={};d.saved.forEach(s=>S.later[s.message_id]=s.done?'done':'open');
   S.activitySeen=d.activity_seen_at?Date.parse(d.activity_seen_at):Date.now();
-  S.sms=d.sms;
+  S.sms=d.sms;S.lastSync=Date.now();
 }
 function showGate(err){
   $('#gate').hidden=false;
@@ -1502,6 +1517,7 @@ async function start(){
   renderAll();
   if(hashMid&&byId[hashMid])jump(hashMid);
   connect();
+  setInterval(()=>{if(!S._rtOk&&document.visibilityState==='visible')catchUp();},30000);
   setInterval(()=>{if(S.view==='convo'&&S.tab==='messages'&&!S.editing&&!$('#layer').children.length)$$('.tsum .lr').length&&rerenderMsgs();},60000);
 }
 
