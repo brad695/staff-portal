@@ -12005,6 +12005,30 @@ function cpEdit(){
    above. Every change the shop makes is logged in club_log as staff:<email>. */
 const MB={data:null,body:null,draw:0,q:'',filter:'current',shop:'',club:'',cur:null,busy:false};
 const mbCall=(action,p)=>ccFnJson('square-club',Object.assign({action},p||{}));
+/* Gift memberships: the member row is the GIVER (pays, manages); club_members.gift_* is who picks up
+   (written by the club-gift edge function). Read straight from the table, keyed by member id. */
+const GIFTS={at:0,by:{}};
+async function giftLoad(force){
+  if(!force&&Date.now()-GIFTS.at<60000)return GIFTS.by;
+  try{
+    const {data,error}=await sb.from('club_members').select('id,gift_first_name,gift_last_name,gift_email,gift_note,gift_notified_at').eq('gift',true).limit(3000);
+    if(!error){const by={};(data||[]).forEach(g=>{by[g.id]=g;});GIFTS.by=by;GIFTS.at=Date.now();}
+  }catch(_){}
+  return GIFTS.by;
+}
+const giftName=id=>{const g=GIFTS.by[id];return g?((g.gift_first_name||'')+' '+(g.gift_last_name||'')).trim():'';};
+function giftFact(id){
+  const g=GIFTS.by[id];if(!g)return '';
+  return `<b>${esc(giftName(id))}</b> picks up · <a href="mailto:${esc(g.gift_email)}">${esc(g.gift_email)}</a>`+
+    (g.gift_note?`<br><i>“${esc(g.gift_note)}”</i>`:'')+
+    `<br><small>${g.gift_notified_at?'Gift email sent '+esc(mbDay(g.gift_notified_at)):'Gift email not sent yet'} · <a href="#" data-gift-resend="${esc(id)}">${g.gift_notified_at?'Send it again':'Send it'}</a></small>`;
+}
+document.addEventListener('click',async e=>{
+  const a=e.target&&e.target.closest&&e.target.closest('[data-gift-resend]');if(!a)return;
+  e.preventDefault();if(a.dataset.busy)return;a.dataset.busy='1';const was=a.textContent;a.textContent='Sending…';
+  try{await ccFnJson('club-gift',{action:'resend',id:a.getAttribute('data-gift-resend')});a.textContent='Sent';toast('Gift email sent.');GIFTS.at=0;}
+  catch(err){a.textContent=was;delete a.dataset.busy;toast(err.message||'The email didn’t go out.',true);}
+});
 const mbLive=()=>ADMIN_TAB==='members';
 const MB_SHOP={memphis:'Memphis',nashville:'Nashville'};
 const mbMoney=c=>'$'+(Math.round(Number(c)||0)/100).toFixed(2).replace(/\.00$/,'');
@@ -12028,6 +12052,7 @@ async function drawMembers(body){
   MB.body=body;const my=++MB.draw;MB.cur=null;
   body.innerHTML='';body.append($(`<div class="muted" style="padding:6px 2px">Loading members…</div>`));
   try{MB.data=await mbCall('roster');}catch(e){if(my!==MB.draw)return;body.innerHTML='';body.append($(`<div class="empty">${esc(e.message)}</div>`));return;}
+  await giftLoad(true);
   if(my!==MB.draw||!mbLive())return;
   mbList();
 }
@@ -12064,11 +12089,12 @@ function mbList(){
   const paint=()=>{
     const s=MB.q.trim().toLowerCase(),digits=s.replace(/\D/g,'');
     const shown=all.filter(m=>mbMatch(m,MB.filter)&&(!MB.shop||m.shop===MB.shop)&&(!MB.club||m.club.slug===MB.club)&&(!s||
-      [m.name,m.email,m.code,m.club.name].join(' ').toLowerCase().includes(s)||(digits.length>=3&&String(m.phone||'').replace(/\D/g,'').includes(digits))));
+      [m.name,m.email,m.code,m.club.name,giftName(m.id)].join(' ').toLowerCase().includes(s)||(digits.length>=3&&String(m.phone||'').replace(/\D/g,'').includes(digits))));
     list.innerHTML='';
     if(!shown.length){list.append($(`<div class="empty">${all.length?'Nobody matches.':'No members yet.'}</div>`));return;}
     shown.forEach(m=>{
       const tags=[mbKind(m)];
+      if(giftName(m.id))tags.push(`<span class="cp-flag" title="A gift: ${esc(m.name)} pays, ${esc(giftName(m.id))} picks up">🎁 For ${esc(giftName(m.id))}</span>`);
       if(m.problem)tags.push(`<span class="cp-flag mb-flag-bad" title="${esc(m.problem)}">⚠ ${esc(m.problem.length>34?m.problem.slice(0,32)+'…':m.problem)}</span>`);
       if(m.comp&&m.comp.ending_soon&&m.live)tags.push('<span class="cp-flag cp-soon">Ending soon</span>');
       if(m.comp&&m.comp.skipping)tags.push(`<span class="cp-flag">Skipping ${esc(cpShort(m.comp.skipping.month))}</span>`);
@@ -12145,6 +12171,7 @@ function mbDetail(r){
       ${fact('Email',`<a href="mailto:${esc(i.email)}">${esc(i.email)}</a>${i.phone?' · <a href="tel:'+esc(String(i.phone).replace(/[^\d+]/g,''))+'">'+esc(i.phone)+'</a>':''}`)}
       ${fact('Birthday',i.birthday?esc(mbDay(i.birthday)):'')}
       ${fact('Newsletter',i.newsletter_opt_out?'Unsubscribed':'')}
+      ${fact('Gift for',giftFact(i.id))}
       ${fact('Note',i.note?esc(i.note):'')}
     </dl>
     <div class="cp-acts"></div>
@@ -12277,7 +12304,7 @@ async function drawBoxes(body,month){
   BX.body=body;const my=++BX.draw;
   if(month!==undefined)BX.month=month;
   body.innerHTML='';body.append($(`<div class="muted" style="padding:6px 2px">Loading boxes…</div>`));
-  try{BX.data=await mbCall('boxes',BX.month?{month:BX.month}:{});}catch(e){if(my!==BX.draw)return;body.innerHTML='';body.append($(`<div class="empty">${esc(e.message)}</div>`));return;}
+  try{BX.data=await mbCall('boxes',BX.month?{month:BX.month}:{});await giftLoad();}catch(e){if(my!==BX.draw)return;body.innerHTML='';body.append($(`<div class="empty">${esc(e.message)}</div>`));return;}
   if(my!==BX.draw||!bxLive())return;
   BX.month=BX.data.month;
   bxView();
@@ -12324,7 +12351,7 @@ function bxView(){
       const kind=b.kind==='prepaid'?'Prepaid':b.kind==='comp'?'On us':b.kind==='first_box'?'Paid at sign-up':'Paid on the 1st';
       const tr=$(`<tr class="${b.status==='failed'?'bx-bad':''}${on?' bx-done':''}">
         <td class="bx-ck">${can?`<button type="button" class="bx-tick${on?' on':''}" aria-pressed="${on}" title="${on?'Picked up — click to undo':'Mark picked up'}"><span aria-hidden="true">${on?'✓':''}</span><span class="sr">${on?'Picked up':'Not picked up'}</span></button>`:''}</td>
-        <td><a href="#" class="bx-who" data-id="${esc(b.member_id)}"><b>${esc(b.name)}</b></a><small>${esc(b.phone||b.email)}${b.note?' · '+esc(b.note):''}</small></td>
+        <td><a href="#" class="bx-who" data-id="${esc(b.member_id)}"><b>${esc(giftName(b.member_id)||b.name)}</b></a><small>${giftName(b.member_id)?'🎁 gift from '+esc(b.name)+' · ':''}${esc(b.phone||b.email)}${b.note?' · '+esc(b.note):''}</small></td>
         <td>${esc(b.club.name)}${b.club.age_21?' <span class="cp-flag mb-21">21+ · check ID</span>':''}</td>
         <td><span class="mb-box mb-b-${esc(b.status)}">${esc(BOX_WORD[b.status]||b.status)}</span><small>${b.status==='failed'?'Don’t hand it out until it’s paid':esc(kind)+(b.cents?' · '+mbMoney(b.cents):'')}</small></td>
       </tr>`);
@@ -12349,7 +12376,7 @@ function bxPrint(){
     const held=(d.boxes||[]).filter(b=>b.shop===shop&&b.status==='failed');
     if(!give.length&&!held.length)return;
     html+=`<section><h2>${e2(MB_SHOP[shop])} <span class="cnt">· ${give.length} box${give.length===1?'':'es'}</span></h2><table><thead><tr><th class="chk">✓</th><th>Member</th><th>Club</th><th>Notes</th></tr></thead><tbody>`;
-    give.forEach(b=>{html+=`<tr><td class="chk">${b.status==='picked_up'?'✓':''}</td><td><b>${e2(b.name)}</b><div class="sub">${e2(b.phone||b.email)}</div></td><td>${e2(b.club.name)}</td><td>${[b.club.age_21?'<b>21+ · check ID</b>':'',b.kind==='prepaid'?'Prepaid':b.kind==='comp'?'On us':'',b.note?e2(b.note):''].filter(Boolean).join(' · ')}</td></tr>`;});
+    give.forEach(b=>{html+=`<tr><td class="chk">${b.status==='picked_up'?'✓':''}</td><td><b>${e2(giftName(b.member_id)||b.name)}</b><div class="sub">${giftName(b.member_id)?'Gift from '+e2(b.name)+' · ':''}${e2(b.phone||b.email)}</div></td><td>${e2(b.club.name)}</td><td>${[b.club.age_21?'<b>21+ · check ID</b>':'',b.kind==='prepaid'?'Prepaid':b.kind==='comp'?'On us':'',b.note?e2(b.note):''].filter(Boolean).join(' · ')}</td></tr>`;});
     html+='</tbody></table>';
     if(held.length)html+=`<p class="held"><b>Payment failed — hold until paid:</b> ${held.map(b=>e2(b.name)+' ('+e2(b.club.name)+')').join(', ')}</p>`;
     html+='</section>';
