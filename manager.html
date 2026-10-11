@@ -15073,8 +15073,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   #ctplPrev .pv-bar .pv-ttl{ flex:1; min-width:160px; font-weight:800; }
   #ctplPrev .pv-bar .pv-with{ display:block; font-size:.74rem; font-weight:400; color:#64748b; }
   #ctplPrev .pv-page{ background:#E9DFC7; color:#221E1B; font-family:Georgia,'Times New Roman',serif; font-size:15px; line-height:1.55; padding:22px 16px 36px; }
-  #ctplPrev .pv-top{ background:#211D19; color:#FBF7EB; padding:12px 18px; font-weight:900; font-size:20px; line-height:1; }
-  #ctplPrev .pv-top small{ display:block; font:400 10px Arial,sans-serif; letter-spacing:.2em; text-transform:uppercase; color:#E0A21C; margin-top:4px; }
+  #ctplPrev .pv-top{ background:#06273A; color:#FFFFFF; padding:12px 18px; font-weight:900; font-size:20px; line-height:1; }
+  #ctplPrev .pv-top small{ display:block; font:400 10px Arial,sans-serif; letter-spacing:.2em; text-transform:uppercase; color:#FFFFFF; margin-top:4px; }
   #ctplPrev .pv-eyebrow{ font:600 11px Arial,sans-serif; text-transform:uppercase; letter-spacing:.22em; color:#A52B1E; margin:0 0 6px; }
   #ctplPrev h1.pv-h1{ font:900 34px/1.05 Georgia,serif; margin:0 0 12px; color:#221E1B; }
   #ctplPrev h2.pv-h2{ font:800 22px Georgia,serif; margin:0 0 10px; color:#221E1B; }
@@ -15594,7 +15594,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   function pvEmail(t, c){
     return '<div class="pv-mail"><div class="pv-mailhead"><div><b>To:</b> ' + esc(c.name) + ' &lt;' + esc(c.client_email) + '&gt;</div><div><b>Subject:</b> Re: Your GREYS catering question [#' + esc(c.code) + ']</div>'
       + (t.subject ? '<div style="color:#94a3b8;">HoneyBook’s subject was “' + esc(t.subject) + '” — portal emails keep the thread’s subject so replies land back on the lead.</div>' : '') + '</div>'
-      + '<div class="pv-mailbody"><div style="font:700 22px Georgia,serif;letter-spacing:.04em;border-bottom:2px solid #E0A21C;padding-bottom:8px;margin-bottom:18px;">GREYS <span style="font:400 12px Arial,sans-serif;">Fine Cheeses · Charcuterie · Wine</span></div>'
+      + '<div class="pv-mailbody"><div style="background:#06273A;color:#FFFFFF;padding:14px 18px;margin:-22px -20px 18px;font:700 22px Georgia,serif;letter-spacing:.04em;">GREYS <span style="font:400 12px Arial,sans-serif;color:#FFFFFF;">Fine Cheeses · Charcuterie · Wine</span></div>'
       +   '<p style="margin:0;">' + para(pfill(t.body, c)) + '</p><p style="font:12px Arial,sans-serif;color:#6E6353;margin:28px 0 0;">Just reply to this email to keep the conversation going.</p></div>'
       + ((t.attachments || []).length ? '<p class="pv-mailhead" style="margin-top:12px;">📎 In HoneyBook this email attached ' + esc(t.attachments.join(', ')) + ' — nothing is attached here.</p>' : '') + '</div>';
   }
