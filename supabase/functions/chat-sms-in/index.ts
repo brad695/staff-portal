@@ -1,6 +1,8 @@
 // chat-sms-in — Twilio webhooks for Greys Chat (verify_jwt = false; Twilio signature checked).
 //   POST ?status=<message id>   delivery status callback for a text we sent
-//   POST (no query)              an incoming text from a client → lands in that client's conversation
+//   POST (no query)              an incoming text: a number with an open client conversation → that
+//                                conversation (even if it's a staff phone); other staff phones → a group
+//                                DM with the managers; anyone else → a new client conversation
 // Point the Twilio number's "A message comes in" webhook here (HTTP POST).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -51,8 +53,12 @@ Deno.serve(async (req) => {
   const { data: dup } = await db.from("chat_messages").select("id").eq("ext_id", sid).maybeSingle();
   if (dup) return twiml();
 
-  // A text from a staff member's phone (e.g. a reply to a shift reminder) goes to a group DM with the managers
-  const { data: contacts } = await db.from("portal_employee_contacts").select("employee_id,phone");
+  // A number with an open client conversation is a client, even when it's also a staff member's phone
+  // (someone set themselves up as a client, e.g. to test) — the reply belongs in that conversation.
+  let { data: c } = await db.from("chat_convos").select("id").eq("kind", "client").eq("client_phone", from).eq("archived", false).order("created_at").limit(1).maybeSingle();
+
+  // Otherwise a text from a staff member's phone (e.g. a reply to a shift reminder) goes to a group DM with the managers
+  const { data: contacts } = c ? { data: [] as any[] } : await db.from("portal_employee_contacts").select("employee_id,phone");
   const staff = (contacts || []).find((x) => e164(x.phone) === from);
   if (staff) {
     const { data: emps } = await db.from("portal_employees").select("id,role,active");
@@ -85,7 +91,6 @@ Deno.serve(async (req) => {
     }
   }
 
-  let { data: c } = await db.from("chat_convos").select("id").eq("kind", "client").eq("client_phone", from).eq("archived", false).order("created_at").limit(1).maybeSingle();
   if (!c) {
     const pretty = from.replace(/^\+1(\d{3})(\d{3})(\d{4})$/, "($1) $2-$3");
     const { data: nc } = await db.from("chat_convos").insert({ kind: "client", name: pretty, client_name: pretty, client_phone: from, client_via: "sms", client_tag: "New texter", client_meta: "Texted the GREYS number" }).select("id").single();
