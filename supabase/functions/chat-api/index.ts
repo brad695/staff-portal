@@ -9,6 +9,11 @@
 // public 'greys-chat' topic. Clients refetch the row here, so no content ever
 // leaves except through a membership check.
 //
+// Catering leads (2026-10-12): every catering_leads row has a client conversation (chat_convos.lead_id)
+// with all managers on it; DB triggers mirror messages both ways with catering_messages (see
+// sql/2026-10-12_chat_catering_leads.sql). Here: lead details on boot/convo (managers only),
+// lead_stage, and lead emails sent in the catering format.
+//
 // POST { a: <action>, ...args }   header x-chat-token: <token>   (verify_jwt = false)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -19,6 +24,13 @@ const TW_SID = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
 const TW_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
 const TW_FROM = Deno.env.get("TWILIO_FROM") ?? "";
 const CHAT_FROM = Deno.env.get("CHAT_MAIL_FROM") ?? "info@greyscheese.com";
+// Catering leads (chat_convos.lead_id): emails keep the catering subject "[#CODE]" and Reply-To, so the
+// customer's reply comes back through the inquiry Gmail sync → catering_messages → a DB trigger → chat.
+const LEAD_REPLY_TO = Deno.env.get("CATERING_REPLY_TO") || Deno.env.get("INQUIRY_REPLY_TO") || "brad@greyscheese.com";
+const LEAD_FROM_ADDR = (/<([^>]+)>/.exec(Deno.env.get("INQUIRY_FROM") || "") || [])[1] || CHAT_FROM;
+const STAGES = ["new", "replied", "quoted", "contract_sent", "signed", "invoiced", "deposit_paid", "paid", "lost"];
+const LEAD_COLS = "id,code,name,email,phone,company,location,event_date,event_time,guests,fulfillment,address,occasion,budget,stage,unread,last_message_at,created_at,beo_rev";
+const QUOTE_COLS = "lead_id,status,total_cents,deposit_pct,amount_paid_cents,invoice_status,invoice_url,invoice_number,sent_at,viewed_at,signed_at,signed_name,invoice_only,balance_due_date,deposit_paid_at,paid_at,created_at";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -154,14 +166,16 @@ async function signFiles(rows: any[]) {
   (data || []).forEach((d: any) => { if (d.path && d.signedUrl) map[d.path] = d.signedUrl; });
   rows.forEach((r) => (r.files || []).forEach((f: any) => { if (f.path) f.url = map[f.path] || ""; }));
 }
+// .in() filters ride in the URL, so long id lists go in slices
+async function inAll(ids: string[], q: (part: string[]) => PromiseLike<{ data: any[] | null }>, size = 100): Promise<any[]> {
+  const out: any[] = [];
+  for (let i = 0; i < ids.length; i += size) { const { data } = await q(ids.slice(i, i + size)); out.push(...(data || [])); }
+  return out;
+}
 async function withReactions(rows: any[]) {
   if (!rows.length) return rows;
   const ids = rows.map((r) => r.id);
-  const rx: any[] = [];
-  for (let i = 0; i < ids.length; i += 300) {
-    const { data } = await db.from("chat_reactions").select("message_id,emp_id,emoji").in("message_id", ids.slice(i, i + 300));
-    rx.push(...(data || []));
-  }
+  const rx = await inAll(ids, (p) => db.from("chat_reactions").select("message_id,emp_id,emoji").in("message_id", p), 150);
   const by: Record<string, Record<string, number[]>> = {};
   rx.forEach((r) => { ((by[r.message_id] ||= {})[r.emoji] ||= []).push(r.emp_id); });
   rows.forEach((r) => (r.rx = by[r.id] || {}));
@@ -209,19 +223,57 @@ async function replyTo(c: any, me: number) {
   const { data: ct } = await db.from("portal_employee_contacts").select("email").eq("employee_id", me).maybeSingle();
   return str(ct?.email);
 }
-async function sendEmail(to: string, subject: string, html: string, fromName: string, replyTo: string) {
-  if (!to) return { ok: false, err: "That client has no email address." };
-  const body = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1d1c1d">${html}</div>
-    <p style="margin-top:24px;color:#6b7280;font-size:13px">${fromName}<br>GREYS Fine Cheeses · greyscheese.com</p>`;
+const escH = (s: unknown) => str(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+// attachments go out as links (signed for 7 days)
+const fileList = (files: any[]) => files.length
+  ? `<p style="margin:14px 0 0;font-size:14px">${files.map((f) => `📎 <a href="${escH(f.url)}">${escH(f.name)}</a>`).join("<br>")}</p>` : "";
+async function mail(to: string, subject: string, html: string, from: string, replyTo: string) {
   try {
     const r = await fetch(`${SB_URL}/functions/v1/send-mail`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${SB_SERVICE}` },
-      body: JSON.stringify({ to, subject, html: body, from: `${fromName} at GREYS <${CHAT_FROM}>`, replyTo: replyTo || CHAT_FROM }),
+      body: JSON.stringify({ to, subject, html, from, replyTo }),
     });
     const d: any = await r.json().catch(() => ({}));
     return d.ok ? { ok: true } : { ok: false, err: "Email didn't send. Try again." };
   } catch (e) { return { ok: false, err: String(e) }; }
+}
+async function sendEmail(to: string, subject: string, html: string, fromName: string, replyTo: string, files: any[] = []) {
+  if (!to) return { ok: false, err: "That client has no email address." };
+  const body = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1d1c1d">${html}${fileList(files)}</div>
+    <p style="margin-top:24px;color:#6b7280;font-size:13px">${escH(fromName)}<br>GREYS Fine Cheeses · greyscheese.com</p>`;
+  return mail(to, subject, body, `${fromName} at GREYS <${CHAT_FROM}>`, replyTo || CHAT_FROM);
+}
+// a catering lead gets the same branded email as the rest of its thread (catering function's look)
+async function sendLeadEmail(to: string, subject: string, html: string, fromName: string, files: any[] = []) {
+  if (!to) return { ok: false, err: "This lead has no email address." };
+  const body = `<div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;color:#221E1B;line-height:1.55">
+     <div style="background:#06273A;color:#FFFFFF;padding:14px 18px;margin-bottom:18px;font:700 22px Georgia,serif;letter-spacing:.04em">GREYS <span style="font:400 12px Arial;color:#FFFFFF">Fine Cheeses · Charcuterie · Wine</span></div>
+     <div style="font-size:16px">${html}</div>${fileList(files)}
+     <p style="margin-top:22px">${escH(fromName)}<br><span style="font:13px Arial;color:#6E6353">GREYS Fine Cheeses · greyscheese.com</span></p>
+     <p style="font:12px Arial;color:#6E6353;margin-top:28px">Just reply to this email to keep the conversation going.</p></div>`;
+  return mail(to, subject, body, `${fromName} at GREYS <${LEAD_FROM_ADDR}>`, LEAD_REPLY_TO);
+}
+const leadSubject = (code: string) => `Re: Your GREYS catering question [#${code}]`;
+
+/* ---------- catering leads ---------- */
+// lead row + its current proposal/invoice (newest one that isn't canceled), by lead id
+async function leadsFor(ids: string[]) {
+  const out: Record<string, any> = {};
+  if (!ids.length) return out;
+  (await inAll(ids, (p) => db.from("catering_leads").select(LEAD_COLS).in("id", p))).forEach((l) => (out[l.id] = { ...l, quote: null }));
+  const qs = await inAll(ids, (p) => db.from("catering_quotes").select(QUOTE_COLS).in("lead_id", p).neq("status", "canceled"));
+  qs.sort((a, b) => str(b.created_at).localeCompare(str(a.created_at)))
+    .forEach((q) => { const l = out[q.lead_id]; if (l && !l.quote) l.quote = q; });
+  return out;
+}
+// lead details only ever go to managers (catering data is manager-only in the portal too)
+async function withLeads(list: any[], mgr: boolean) {
+  const ids = [...new Set(list.filter((c) => c.lead_id).map((c) => str(c.lead_id)))];
+  if (!ids.length || !mgr) return list;
+  const map = await leadsFor(ids);
+  list.forEach((c) => { if (c.lead_id) c.lead = map[c.lead_id] || null; });
+  return list;
 }
 
 /* ---------- actions ---------- */
@@ -240,42 +292,42 @@ async function boot(me: number) {
     away: !!pmap[e.id]?.away, email: cmap[e.id]?.email || "",
   }));
   if (!pmap[me]) await db.from("chat_profiles").insert({ emp_id: me });
+  const mgr = isMgr((people || []).find((e) => e.id === me));
+  // managers are on every catering lead (a new manager catches up here)
+  if (mgr) await db.rpc("chat_lead_join", { p_emp: me });
 
   const { data: mine } = await db.from("chat_members").select("*").eq("emp_id", me);
   const myIds = (mine || []).map((m) => m.convo_id);
   const { data: pub } = await db.from("chat_convos").select("*").eq("kind", "channel").eq("is_private", false).eq("archived", false);
-  const { data: memConvos } = myIds.length ? await db.from("chat_convos").select("*").in("id", myIds) : { data: [] as any[] };
+  const memConvos = await inAll(myIds, (p) => db.from("chat_convos").select("*").in("id", p));
   const all: Record<string, any> = {};
-  [...(pub || []), ...(memConvos || [])].forEach((c) => (all[c.id] = c));
+  [...(pub || []), ...memConvos].forEach((c) => (all[c.id] = c));
   const ids = Object.keys(all);
-  const { data: mems } = ids.length ? await db.from("chat_members").select("convo_id,emp_id").in("convo_id", ids) : { data: [] as any[] };
+  const mems = await inAll(ids, (p) => db.from("chat_members").select("convo_id,emp_id").in("convo_id", p));
   const memBy: Record<string, number[]> = {};
-  (mems || []).forEach((m) => (memBy[m.convo_id] ||= []).push(m.emp_id));
+  mems.forEach((m) => (memBy[m.convo_id] ||= []).push(m.emp_id));
   const myBy: Record<string, any> = {};
   (mine || []).forEach((m) => (myBy[m.convo_id] = m));
-  const convos = Object.values(all).map((c) => ({ ...c, members: memBy[c.id] || [], me: myBy[c.id] || null }));
+  const convos = await withLeads(Object.values(all).map((c) => ({ ...c, members: memBy[c.id] || [], me: myBy[c.id] || null })), mgr);
 
   // recent history for every conversation I'm in (45 days, newest 4000)
   let msgs: any[] = [];
   if (myIds.length) {
     const since = new Date(Date.now() - 45 * 864e5).toISOString();
-    const { data } = await db.from("chat_messages").select(MSG_COLS).in("convo_id", myIds).is("deleted_at", null)
-      .gte("created_at", since).order("created_at", { ascending: false }).limit(4000);
-    msgs = data || [];
-    // conversations quiet for 45 days still show their last few messages
+    msgs = (await inAll(myIds, (p) => db.from("chat_messages").select(MSG_COLS).in("convo_id", p).is("deleted_at", null)
+      .gte("created_at", since).order("created_at", { ascending: false }).limit(4000)))
+      .sort((a, b) => str(b.created_at).localeCompare(str(a.created_at))).slice(0, 4000);
+    // conversations quiet for 45 days still show their last few messages (one call for all of them)
     const have = new Set(msgs.map((m) => m.convo_id));
-    for (const cid of myIds.filter((c) => !have.has(c))) {
-      const { data: old } = await db.from("chat_messages").select(MSG_COLS).eq("convo_id", cid).is("deleted_at", null).is("parent_id", null)
-        .order("created_at", { ascending: false }).limit(25);
-      msgs.push(...(old || []));
+    const quiet = myIds.filter((c) => !have.has(c));
+    if (quiet.length) {
+      const { data: old } = await db.rpc("chat_tail", { p_convos: quiet, p_n: 25 });
+      msgs.push(...((old || []) as any[]).map((m) => { const o: any = {}; MSG_COLS.split(",").forEach((k) => (o[k] = m[k])); return o; }));
     }
     // thread parents older than the window
     const known = new Set(msgs.map((m) => m.id));
-    const missing = [...new Set(msgs.filter((m) => m.parent_id && !known.has(m.parent_id)).map((m) => m.parent_id))];
-    if (missing.length) {
-      const { data: par } = await db.from("chat_messages").select(MSG_COLS).in("id", missing);
-      msgs.push(...(par || []));
-    }
+    const missing = [...new Set(msgs.filter((m) => m.parent_id && !known.has(m.parent_id)).map((m) => m.parent_id))] as string[];
+    if (missing.length) msgs.push(...(await inAll(missing, (p) => db.from("chat_messages").select(MSG_COLS).in("id", p))));
   }
   await withReactions(msgs);
   const { data: saved } = await db.from("chat_saved").select("message_id,done").eq("emp_id", me);
@@ -299,7 +351,8 @@ async function handle(a: string, b: any, me: number) {
       const mine = await member(c.id, me);
       if (!mine && (c.kind !== "channel" || c.is_private)) return { convo: null };
       const { data: mems } = await db.from("chat_members").select("emp_id").eq("convo_id", c.id);
-      return { convo: { ...c, members: (mems || []).map((x) => x.emp_id), me: mine } };
+      const [out] = await withLeads([{ ...c, members: (mems || []).map((x) => x.emp_id), me: mine }], !!mine && isMgr(await emp(me)));
+      return { convo: out };
     }
     case "since": {
       // catch-up after sleep / a dropped realtime connection: anything new, edited or deleted
@@ -307,9 +360,10 @@ async function handle(a: string, b: any, me: number) {
       const { data: mine } = await db.from("chat_members").select("convo_id").eq("emp_id", me);
       const ids = (mine || []).map((m) => m.convo_id);
       if (!ids.length) return { messages: [], convos: [] };
-      const { data } = await db.from("chat_messages").select(MSG_COLS).in("convo_id", ids)
-        .or(`created_at.gt.${after},edited_at.gt.${after},deleted_at.gt.${after}`).order("created_at").limit(500);
-      return { messages: await withReactions(data || []), convos: ids };
+      const data = (await inAll(ids, (p) => db.from("chat_messages").select(MSG_COLS).in("convo_id", p)
+        .or(`created_at.gt.${after},edited_at.gt.${after},deleted_at.gt.${after}`).order("created_at").limit(500)))
+        .sort((x, y) => str(x.created_at).localeCompare(str(y.created_at))).slice(0, 500);
+      return { messages: await withReactions(data), convos: ids };
     }
     case "people": {
       const { data: people } = await db.from("portal_employees").select("id,name,role,location").eq("active", true).order("name");
@@ -326,14 +380,14 @@ async function handle(a: string, b: any, me: number) {
       const lr: Record<string, number> = {};
       rows.forEach((r) => (lr[r.convo_id] = Date.parse(r.last_read_at)));
       const min = new Date(Math.min(...rows.map((r) => lr[r.convo_id]))).toISOString();
-      const { data: ms } = await db.from("chat_messages").select("convo_id,emp_id,created_at").in("convo_id", rows.map((r) => r.convo_id))
-        .is("parent_id", null).is("deleted_at", null).gt("created_at", min).limit(3000);
+      const ms = await inAll(rows.map((r) => r.convo_id), (p) => db.from("chat_messages").select("convo_id,emp_id,created_at").in("convo_id", p)
+        .is("parent_id", null).is("deleted_at", null).gt("created_at", min).limit(3000));
       const cnt: Record<string, number> = {};
-      (ms || []).forEach((m) => { if (m.emp_id === me) return; if (Date.parse(m.created_at) > lr[m.convo_id]) cnt[m.convo_id] = (cnt[m.convo_id] || 0) + 1; });
+      ms.forEach((m) => { if (m.emp_id === me) return; if (Date.parse(m.created_at) > lr[m.convo_id]) cnt[m.convo_id] = (cnt[m.convo_id] || 0) + 1; });
       const ids = Object.keys(cnt);
       if (!ids.length) return { items: [] };
-      const { data: cs } = await db.from("chat_convos").select("id,kind,name,client_name").in("id", ids);
-      const { data: mem } = await db.from("chat_members").select("convo_id,emp_id").in("convo_id", ids);
+      const cs = await inAll(ids, (p) => db.from("chat_convos").select("id,kind,name,client_name,lead_id").in("id", p));
+      const mem = await inAll(ids, (p) => db.from("chat_members").select("convo_id,emp_id").in("convo_id", p));
       const { data: ppl } = await db.from("portal_employees").select("id,name");
       const pn: Record<number, string> = {};
       (ppl || []).forEach((p) => (pn[p.id] = p.name));
@@ -376,9 +430,14 @@ async function handle(a: string, b: any, me: number) {
         }
       }
       let via: string | null = null;
+      // a catering lead: the email subject is fixed so the customer's reply finds its way back
+      const lead = c.lead_id ? (await db.from("catering_leads").select("id,code,email").eq("id", c.lead_id).maybeSingle()).data : null;
       if (c.kind === "client" && !row.parent_id) {
         if (b.note) row.is_note = true;
-        else { via = b.via === "email" ? "email" : "sms"; row.via = via; row.status = "sending"; if (via === "email") row.subject = str(b.subject).slice(0, 200) || "GREYS Fine Cheeses"; }
+        else {
+          via = b.via === "email" ? "email" : "sms"; row.via = via; row.status = "sending";
+          if (via === "email") row.subject = lead ? leadSubject(lead.code) : (str(b.subject).slice(0, 200) || "GREYS Fine Cheeses");
+        }
       }
       const { data: ins, error } = await db.from("chat_messages").insert(row).select(MSG_COLS).single();
       if (error) fail(500, error.message);
@@ -390,11 +449,14 @@ async function handle(a: string, b: any, me: number) {
         const sender = await emp(me);
         const first = str(sender?.name).split(" ")[0] || "GREYS";
         let res: any;
+        if (files.length) await signFiles([ins]);
         if (via === "sms") {
-          const fileLinks = files.length ? "\n" + (await (async () => { await signFiles([ins]); return ins.files.map((f: any) => f.url).join("\n"); })()) : "";
+          const fileLinks = files.length ? "\n" + ins.files.map((f: any) => f.url).join("\n") : "";
           res = await sendSms(str(c.client_phone), plain(html) + fileLinks + `\n– ${first}, GREYS`, ins.id);
+        } else if (lead) {
+          res = await sendLeadEmail(str(lead.email || c.client_email), ins.subject, html, str(sender?.name || "GREYS"), ins.files || []);
         } else {
-          res = await sendEmail(str(c.client_email), ins.subject, html, str(sender?.name || "GREYS"), await replyTo(c, me));
+          res = await sendEmail(str(c.client_email), ins.subject, html, str(sender?.name || "GREYS"), await replyTo(c, me), ins.files || []);
         }
         const upd = res.ok ? { status: via === "sms" ? "sent" : "delivered", ext_id: res.sid || null } : { status: "failed", error: res.err };
         await db.from("chat_messages").update(upd).eq("id", ins.id);
@@ -446,6 +508,21 @@ async function handle(a: string, b: any, me: number) {
     }
     case "read": {
       await db.from("chat_members").update({ last_read_at: b.at ? new Date(b.at).toISOString() : new Date().toISOString() }).eq("convo_id", str(b.convo)).eq("emp_id", me);
+      // reading a lead here clears its "unread" dot in the manager console too
+      const { data: c } = await db.from("chat_convos").select("lead_id").eq("id", str(b.convo)).maybeSingle();
+      if (c?.lead_id && (await member(str(b.convo), me))) await db.from("catering_leads").update({ unread: false }).eq("id", c.lead_id).eq("unread", true);
+      return { ok: true };
+    }
+    case "lead_stage": {
+      const c = await convo(str(b.convo));
+      if (!c?.lead_id) fail(404, "That isn't a catering lead.");
+      await mustMember(c.id, me);
+      const e = await emp(me);
+      if (!isMgr(e)) fail(403, "Only managers can move catering leads.");
+      const st = str(b.stage);
+      if (!STAGES.includes(st)) fail(400, "Pick a stage.");
+      const { error } = await db.rpc("chat_lead_set_stage", { p_lead: c.lead_id, p_stage: st, p_by: str(e?.name) });
+      if (error) fail(500, error.message);
       return { ok: true };
     }
     case "prefs": {
@@ -464,10 +541,23 @@ async function handle(a: string, b: any, me: number) {
       if (b.description != null) upd.description = str(b.description).slice(0, 1000);
       if (b.name != null && c.kind === "channel") upd.name = str(b.name).toLowerCase().replace(/[^a-z0-9-_]+/g, "-").slice(0, 80) || c.name;
       if (Array.isArray(b.bookmarks)) upd.bookmarks = b.bookmarks.slice(0, 20).map((x: any) => ({ t: str(x.t).slice(0, 80), u: /^https?:\/\//.test(str(x.u)) ? str(x.u) : "", e: str(x.e).slice(0, 8) })).filter((x: any) => x.u);
-      if (c.kind === "client") {
+      if (c.kind === "client" && c.lead_id) {
+        // a catering lead's contact lives on the lead (the manager console shows the same); a trigger copies it here
+        const lu: any = {};
+        if (b.client_name != null && str(b.client_name).trim()) lu.name = str(b.client_name).trim().slice(0, 120);
+        if (b.client_email != null && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(str(b.client_email).trim())) lu.email = str(b.client_email).trim().toLowerCase().slice(0, 200);
+        if (b.client_phone != null) lu.phone = str(b.client_phone).trim().slice(0, 40) || null;
+        if (Object.keys(lu).length) {
+          if (!isMgr(await emp(me))) fail(403, "Only managers can edit catering leads.");
+          const { error: le } = await db.from("catering_leads").update(lu).eq("id", c.lead_id);
+          if (le) fail(400, le.message);
+        }
+        if (b.client_via === "sms" || b.client_via === "email") upd.client_via = b.client_via;
+      } else if (c.kind === "client") {
         for (const k of ["client_name", "client_phone", "client_email", "client_tag", "client_meta"]) if (b[k] != null) upd[k] = k === "client_phone" ? e164(b[k]) : str(b[k]).slice(0, 200);
         if (b.client_via === "sms" || b.client_via === "email") upd.client_via = b.client_via;
       }
+      if (!Object.keys(upd).length) return { ok: true };
       const { error } = await db.from("chat_convos").update(upd).eq("id", c.id);
       if (error) fail(400, /unique/.test(error.message) ? "A channel with that name already exists." : error.message);
       return { ok: true };
@@ -488,6 +578,8 @@ async function handle(a: string, b: any, me: number) {
       return { ok: true };
     }
     case "leave": {
+      const c = await convo(str(b.convo));
+      if (c?.lead_id && isMgr(await emp(me))) fail(400, "Managers stay on every catering lead. Mute it instead.");
       await db.from("chat_members").delete().eq("convo_id", str(b.convo)).eq("emp_id", me);
       return { ok: true };
     }
@@ -500,6 +592,7 @@ async function handle(a: string, b: any, me: number) {
       if (!who || who === me) fail(400, "To take yourself out, leave instead.");
       await mustMember(c.id, me);
       if (!isMgr(await emp(me)) && Number(c.created_by) !== me) fail(403, "Only managers or whoever made this channel can remove people.");
+      if (c.lead_id && isMgr(await emp(who))) fail(400, "Managers stay on every catering lead.");
       await db.from("chat_members").delete().eq("convo_id", c.id).eq("emp_id", who);
       return { ok: true };
     }
@@ -508,6 +601,11 @@ async function handle(a: string, b: any, me: number) {
       if (!c || c.kind === "dm") fail(400, "Start a new group message instead.");
       await mustMember(c.id, me);
       const ids = ((b.ids || []) as any[]).map(Number).filter(Boolean);
+      if (c.lead_id && ids.length) {
+        // catering leads stay with managers (the lead's details are manager-only)
+        const { data: ppl } = await db.from("portal_employees").select("id,role,active").in("id", ids);
+        if ((ppl || []).length !== ids.length || (ppl || []).some((p) => !p.active || !isMgr(p))) fail(400, "Only managers can be on catering leads.");
+      }
       if (ids.length) await db.from("chat_members").upsert(ids.map((e) => ({ convo_id: c.id, emp_id: e })));
       return { ok: true };
     }
@@ -528,7 +626,8 @@ async function handle(a: string, b: any, me: number) {
       const phone = e164(b.phone), email = str(b.email).trim().slice(0, 200);
       if (!phone && !email) fail(400, "Add a mobile number or an email.");
       if (phone) {
-        const { data: ex } = await db.from("chat_convos").select("id").eq("kind", "client").eq("client_phone", phone).eq("archived", false).maybeSingle();
+        const { data: ex } = await db.from("chat_convos").select("id").eq("kind", "client").eq("client_phone", phone).eq("archived", false)
+          .is("lead_id", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
         if (ex) { await db.from("chat_members").upsert({ convo_id: ex.id, emp_id: me }); return { id: ex.id, existed: true }; }
       }
       const { data: c, error } = await db.from("chat_convos").insert({

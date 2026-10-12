@@ -2337,12 +2337,18 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
     $('wgLeadList').innerHTML = act.slice(0,3).map(function(r){ var e=evLbl(r.event_date);
       var sub=r.unread ? ['<em>new message</em>', r.guests?r.guests+' guests':''].filter(Boolean).join(' · ')
                        : [r.guests?r.guests+' guests':'', STAGE[r.stage]||esc(r.stage)].filter(Boolean).join(' · ');
-      return '<span class="wg-row"><span class="when">'+e.day+'<b>'+e.date+'</b></span>'
+      return '<span class="wg-row" data-lead="'+esc(r.code||'')+'"><span class="when">'+e.day+'<b>'+e.date+'</b></span>'
         +'<span class="nm"><b>'+(r.unread?'<i class="dot"></i>':'')+esc(r.company||r.name||'Lead')+'</b><small>'+sub+'</small></span></span>';
     }).join('') || '<span class="wg-empty"><i class="ti ti-mood-smile"></i>No open leads</span><i class="ti ti-briefcase wg-art" aria-hidden="true"></i>';
     $('wgLeadFoot').innerHTML = unread ? '<span class="wg-pill"><i class="ti ti-mail"></i>'+unread+' unread</span>'
       : (open||booked) ? [open?'<b>'+open+'</b> open':'', booked?'<b>'+booked+'</b> booked':''].filter(Boolean).join(' · ') : 'No open leads';
   }
+  // a lead row opens that lead's conversation in Greys Chat (the rest of the tile still opens the manager console)
+  (function(){ var t=$('tile-catering'); if(!t) return;
+    t.addEventListener('click', function(ev){ var row=ev.target.closest && ev.target.closest('[data-lead]'); if(!row || !row.getAttribute('data-lead')) return;
+      if(t.closest('.dash.editing')) return;
+      ev.preventDefault(); ev.stopImmediatePropagation(); location.href='chat.html#lead='+encodeURIComponent(row.getAttribute('data-lead')); }, true);
+  })();
   function drawPulse(p){
     var open=Number(p.open)||0, booked=Number(p.booked)||0, unread=Number(p.unread)||0, next=p.next_event ? evLbl(p.next_event) : null;
     $('wgLeadChip').hidden=true;

@@ -1,8 +1,9 @@
 // chat-sms-in — Twilio webhooks for Greys Chat (verify_jwt = false; Twilio signature checked).
 //   POST ?status=<message id>   delivery status callback for a text we sent
 //   POST (no query)              an incoming text: a number with an open client conversation → that
-//                                conversation (even if it's a staff phone); other staff phones → a group
-//                                DM with the managers; anyone else → a new client conversation
+//                                conversation (even if it's a staff phone; with several, the one with the
+//                                latest texts); other staff phones → a group DM with the managers;
+//                                anyone else → a new client conversation
 // Point the Twilio number's "A message comes in" webhook here (HTTP POST).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -55,7 +56,16 @@ Deno.serve(async (req) => {
 
   // A number with an open client conversation is a client, even when it's also a staff member's phone
   // (someone set themselves up as a client, e.g. to test) — the reply belongs in that conversation.
-  let { data: c } = await db.from("chat_convos").select("id").eq("kind", "client").eq("client_phone", from).eq("archived", false).order("created_at").limit(1).maybeSingle();
+  // One number can have several (a client chat plus catering leads): the one with the latest text
+  // back and forth wins — that's what they're answering — else the newest conversation.
+  const { data: cs } = await db.from("chat_convos").select("id,created_at").eq("kind", "client").eq("client_phone", from).eq("archived", false);
+  let c: { id: string } | null = null;
+  if (cs && cs.length === 1) c = cs[0];
+  else if (cs && cs.length > 1) {
+    const { data: lastSms } = await db.from("chat_messages").select("convo_id").in("convo_id", cs.map((x) => x.id)).eq("via", "sms")
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    c = cs.find((x) => x.id === lastSms?.convo_id) || [...cs].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0];
+  }
 
   // Otherwise a text from a staff member's phone (e.g. a reply to a shift reminder) goes to a group DM with the managers
   const { data: contacts } = c ? { data: [] as any[] } : await db.from("portal_employee_contacts").select("employee_id,phone");

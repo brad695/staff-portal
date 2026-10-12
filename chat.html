@@ -532,6 +532,39 @@ body{display:flex;flex-direction:column}
 .mrow .mrm{margin-left:auto;visibility:hidden}
 .mrow:hover .mrm,.mrow .mrm:focus-visible{visibility:visible}
 @media (hover:none){.bm-more{display:grid}.mrow .mrm{visibility:visible}}
+/* catering leads: sidebar section, stage pills, lead panel */
+.lst{--c:#6b7280;display:inline-flex;align-items:center;flex:none;height:18px;padding:0 7px;border-radius:9px;font-size:11px;font-weight:800;letter-spacing:.01em;white-space:nowrap;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent)}
+.st-new{--c:#d97706}.st-replied{--c:#2563eb}.st-quoted{--c:#4f46e5}.st-contract_sent{--c:#7c3aed}.st-signed{--c:#059669}.st-invoiced{--c:#0d9488}.st-deposit_paid{--c:#16a34a}.st-paid{--c:#15803d}.st-lost{--c:#6b7280}
+.s-item .lst{margin-left:auto;height:16px;padding:0 6px;font-size:10.5px;color:rgba(226,236,243,.78);background:rgba(255,255,255,.1)}
+.s-item .lst.st-new{color:#f3cf72;background:rgba(230,179,60,.2)}
+.s-item.active .lst{color:#fff;background:rgba(255,255,255,.2)}
+.s-lead .ld{font-weight:400;opacity:.65;font-size:12.5px}
+.icon-btn.lead-btn.on{background:var(--rx-mine);color:var(--link)}
+.lead-strip .lst{height:20px}
+.lead-li .lt{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.lead-li .lco{font-weight:400;color:var(--muted)}
+.lead-pane{padding:16px 18px 24px}
+.lp-top{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.lp-name{font-size:18px;font-weight:900;line-height:1.2}
+.lp-co{color:var(--muted)}
+.lp-stage{display:flex;align-items:center;gap:10px;margin:0 0 14px;font-weight:700}
+.lp-stage select{flex:1;height:34px;border:1px solid var(--cbr);border-radius:8px;padding:0 8px;background:var(--bg);color:var(--fg);font:inherit;font-weight:700}
+.lp-rows{border:1px solid var(--line);border-radius:10px;padding:4px 12px;margin-bottom:16px}
+.lp-row{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--line-soft);font-size:14px;line-height:1.35}
+.lp-row:last-child{border-bottom:0}
+.lp-row small{display:block;font-size:12px;color:var(--muted);font-weight:700}
+.lp-row > div{min-width:0;overflow-wrap:anywhere}
+.lp-i{width:20px;flex:none;text-align:center}
+.lp-h{margin:0 0 8px;font-size:15px;font-weight:900}
+.lp-q{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:14px;display:flex;flex-direction:column;gap:6px}
+.lp-money{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--muted);font-size:13px}
+.lp-money b{color:var(--fg)}
+.lp-btns{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.lp-btns .btn{text-decoration:none;color:var(--fg)}
+.lp-btns .btn.primary{color:#fff}
+.lp-hint{margin:0;font-size:12.5px;color:var(--muted);line-height:1.45}
+.c-subj input[readonly]{color:var(--muted);cursor:default}
+.v-head a.btn{text-decoration:none;color:var(--fg)}
 </style>
 
 </head>
@@ -704,6 +737,7 @@ bold:'<path d="M7 5h6a3.5 3.5 0 0 1 0 7H7zM7 12h7a3.5 3.5 0 0 1 0 7H7z"/>',itali
 strike:'<path d="M5 12h14M16 7.5C15.4 6 14 5 12 5c-2.5 0-4 1.3-4 3 0 1.4.9 2.3 2.5 3M8 16.5c.6 1.6 2 2.5 4 2.5 2.5 0 4-1.3 4-3 0-.7-.2-1.3-.6-1.8"/>',
 apps:'<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',
 store:'<path d="M4 9.5 5.5 4h13L20 9.5M4 9.5h16M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0M5.5 12v8h13v-8"/>',
+brief:'<rect x="3.5" y="7.5" width="17" height="12" rx="2"/><path d="M9 7.5V5.8A1.3 1.3 0 0 1 10.3 4.5h3.4A1.3 1.3 0 0 1 15 5.8v1.7M3.5 12.5h17M11 12.5v1.5h2v-1.5"/>',
 };
 const ic=(n,s=18,sw=1.7)=>`<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]||''}</svg>`;
 
@@ -723,7 +757,14 @@ const CAT_ICON={'Frequently used':'🕘','Smileys & people':'😀','Food & drink
 
 /* ---------- state ---------- */
 let ME=null;
-const users={bot:{name:'Greys Portal',title:'App · staff.greyscheese.com',color:'#06273a',bot:true,glyph:'🧀'}};
+const users={bot:{name:'Greys Portal',title:'App · staff.greyscheese.com',color:'#06273a',bot:true,glyph:'🧀'},
+  console:{name:'Manager console',title:'Sent from staff.greyscheese.com/manager',color:'#0f3b57',bot:true,glyph:'💼'}};
+/* catering leads (a client conversation with a lead): stages + links into the manager console */
+const STAGE=[['new','New'],['replied','Replied'],['quoted','Quoting'],['contract_sent','Proposal sent'],['signed','Signed'],['invoiced','Invoiced'],['deposit_paid','Deposit paid'],['paid','Paid'],['lost','Lost']];
+const STAGE_L=Object.fromEntries(STAGE);
+const OPEN_ST=['new','replied','quoted','contract_sent'],BOOKED_ST=['signed','invoiced','deposit_paid','paid'];
+const PORTAL_BASE=/^chat\./.test(location.hostname)?'https://staff.greyscheese.com/':'';
+const leadUrl=(code,tab)=>PORTAL_BASE+'manager.html#catering/'+encodeURIComponent(code)+(tab?'/'+tab:'');
 let STAFF=[];
 const convos={}; const msgs={}; const byId={};
 const ONLINE=new Set();
@@ -747,17 +788,41 @@ function mapConvo(c){
     joined:!!c.me,lastRead:c.me?Date.parse(c.me.last_read_at):Infinity,muted:!!c.me?.muted,starred:!!c.me?.starred,archived:c.archived};
   if(prev&&prev.lastRead>o.lastRead)o.lastRead=prev.lastRead;
   if(c.kind==='client'){const u='k:'+c.id;o.client={u,via:c.client_via||'sms',phone:c.client_phone||'',email:c.client_email||'',tag:c.client_tag||'Client',meta:c.client_meta||''};
-    users[u]={name:o.name,title:'Client'+(o.client.tag?' · '+o.client.tag:''),color:'#64748b',external:true,phone:prettyPhone(o.client.phone),email:o.client.email};}
+    if(c.lead_id)o.lead=c.lead?mapLead(c.lead):(prev?.lead||null);
+    users[u]={name:o.name,title:(o.lead?o.client.tag+' lead':'Client'+(o.client.tag?' · '+o.client.tag:'')),color:o.lead?'#0f766e':'#64748b',external:true,phone:prettyPhone(o.client.phone),email:o.client.email};}
   convos[c.id]=o; if(!msgs[c.id])msgs[c.id]=[];
   return o;
 }
+function mapLead(l){const q=l.quote;
+  return {id:l.id,code:l.code,name:l.name||'',company:l.company||'',email:l.email||'',phone:l.phone||'',loc:l.location||'',date:l.event_date||'',time:l.event_time||'',
+    guests:l.guests,ful:l.fulfillment||'',addr:l.address||'',occ:l.occasion||'',budget:l.budget||'',stage:l.stage||'new',unread:!!l.unread,beo:l.beo_rev||0,
+    quote:q?{status:q.status,total:q.total_cents||0,dep:q.deposit_pct,paid:q.amount_paid_cents||0,inv:q.invoice_status||'',url:q.invoice_url||'',num:q.invoice_number||'',
+      sent:q.sent_at,viewed:q.viewed_at,signed:q.signed_at,signer:q.signed_name||'',only:!!q.invoice_only,due:q.balance_due_date,depAt:q.deposit_paid_at,paidAt:q.paid_at}:null};}
+const isLead=c=>!!(c&&c.lead);
+const money=c=>'$'+(Math.round(c)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+function leadTime(t){const m=/^(\d{1,2}):(\d{2})/.exec(t||'');if(!m)return t||'';const h=+m[1];return ((h%12)||12)+':'+m[2]+(h>=12?' PM':' AM');}
+function leadDate(d,o){return d?new Date(d+'T12:00:00').toLocaleDateString([],o||{weekday:'short',month:'short',day:'numeric'}):'';}
+function leadWhen(L){return L.date?leadDate(L.date)+(L.time?' · '+leadTime(L.time):''):'Date TBD';}
+const FUL={pickup:'Pick-up',delivery:'Delivery',onsite:'On-site service'};
+// open = still being sold; booked = signed+ and the event hasn't passed; closed = lost, or the event is over
+const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function leadState(L){const today=ymd(new Date()),past=L.date&&L.date<today;
+  if(L.stage==='lost')return 'closed';if(BOOKED_ST.includes(L.stage))return past?'closed':'booked';return past?'closed':'open';}
+function quoteLine(q){if(!q)return '';
+  if(q.status==='paid')return 'Paid in full · '+money(q.total);
+  if(q.status==='deposit_paid')return 'Deposit paid · '+money(q.paid)+' of '+money(q.total);
+  if(q.status==='signed')return (q.only?'Invoice sent':'Signed'+(q.signer?' by '+q.signer:''))+' · '+money(q.total)+(q.inv?' · invoice '+q.inv.toLowerCase().replace(/_/g,' '):'');
+  if(q.status==='sent')return 'Proposal sent'+(q.sent?' '+leadDate(String(q.sent).slice(0,10),{month:'short',day:'numeric'}):'')+(q.viewed?' · opened':'')+' · '+money(q.total);
+  if(q.status==='draft')return 'Draft proposal · '+money(q.total);
+  return cap(q.status)+' · '+money(q.total);}
 function prettyPhone(p){const m=String(p||'').match(/^\+1(\d{3})(\d{3})(\d{4})$/);return m?`(${m[1]}) ${m[2]}-${m[3]}`:(p||'');}
 function mapMsg(r){
-  const u=r.author_kind==='staff'?String(r.emp_id):r.author_kind==='client'?'k:'+r.convo_id:'bot';
+  // 'system' = written in the manager console under a shared login (mirrored from a catering lead)
+  const u=r.author_kind==='staff'?String(r.emp_id):r.author_kind==='client'?'k:'+r.convo_id:r.author_kind==='system'?'console':'bot';
   const rx={};Object.entries(r.rx||{}).forEach(([e,a])=>rx[e]=a.map(String));
   return {id:r.id,cid:r.convo_id,parent:r.parent_id||null,u,ts:Date.parse(r.created_at),html:r.body_html||'',rx,replies:[],
     files:(r.files||[]).map(f=>({name:f.name,size:f.size,kind:f.kind,url:f.url||f.ext||'',img:f.kind==='img'?(f.url||f.ext||''):null,path:f.path})),
-    via:r.via||null,out:r.author_kind==='staff'&&!!r.via,status:r.status,error:r.error,note:r.is_note,subject:r.subject,
+    via:r.via||null,out:(r.author_kind==='staff'||r.author_kind==='system')&&!!r.via,status:r.status,error:r.error,note:r.is_note,subject:r.subject,
     card:r.card?{t:r.card.t,f:r.card.f||[],btn:r.card.btn,url:r.card.url}:null,
     fwd:r.fwd?{u:r.fwd.emp_id?String(r.fwd.emp_id):'bot',html:r.fwd.html,from:r.fwd.from,ts:Date.parse(r.fwd.ts)}:null,
     pinned:!!r.pinned_by,edited:!!r.edited_at,bcast:r.also_channel,deleted:!!r.deleted_at};
@@ -831,7 +896,7 @@ function renderRail(){
   const dmUnread=Object.values(convos).filter(c=>c.type!=='channel').reduce((a,c)=>a+(c.muted?0:unread(c)),0);
   const act=actUnseen();
   const later=allLater().filter(x=>!x.done).length;
-  const b=(v,i,l,dot)=>`<button class="r-btn ${S.view===v||(v==='convo'&&['convo','threads','drafts','browse','people','search','compose','clients'].includes(S.view))?'on':''}" data-rail="${v}"><span class="ri">${ic(i,20)}${dot?`<span class="dot">${dot}</span>`:''}</span>${l}</button>`;
+  const b=(v,i,l,dot)=>`<button class="r-btn ${S.view===v||(v==='convo'&&['convo','threads','drafts','browse','people','search','compose','clients','leads'].includes(S.view))?'on':''}" data-rail="${v}"><span class="ri">${ic(i,20)}${dot?`<span class="dot">${dot}</span>`:''}</span>${l}</button>`;
   $('#rail').innerHTML=`<button class="ws-tile" title="GREYS Fine Cheeses" data-act="wsmenu">G</button>
     ${b('convo','home','Home')}${b('dms','dms','DMs',dmUnread||'')}${b('activity','bell','Activity',act||'')}${b('later','later','Later',later||'')}${b('more','dots','More')}
     <span class="spacer"></span>
@@ -845,6 +910,8 @@ function renderRail(){
 /* ---------- SIDEBAR ---------- */
 function sItem(c){
   const n=unread(c),mc=mentionCount(c),active=S.view==='convo'&&S.cur===c.id;
+  if(isLead(c)){const L=c.lead,d=L.date?leadDate(L.date,{month:'numeric',day:'numeric'}):'';
+    return `<button class="s-item s-lead ${n&&!c.muted?'unread':''} ${c.muted?'muted':''} ${active?'active':''}" data-go="${c.id}" title="${esc(c.name+(L.company?' · '+L.company:'')+' · '+leadWhen(L)+' · '+(STAGE_L[L.stage]||L.stage))}"><span class="ico">${ic('brief',15,1.9)}</span><span class="lbl">${esc(c.name)}${d?` <span class="ld">${esc(d)}</span>`:''}</span>${mc&&!c.muted?`<span class="badge">${mc}</span>`:`<span class="lst st-${L.stage}">${esc(STAGE_L[L.stage]||L.stage)}</span>`}</button>`;}
   let icon;
   if(c.type==='channel')icon=`<span class="ico">${ic(c.private?'lock':'hash',16,2)}</span>`;
   else if(c.type==='client')icon=`<span class="ico">${ic(c.client.via==='email'?'mail':'phone',16,1.9)}</span>`;
@@ -863,16 +930,23 @@ function renderSide(){
   const starred=all.filter(c=>c.starred);
   const ch=all.filter(c=>c.type==='channel'&&!c.starred).sort((a,b)=>a.name.localeCompare(b.name));
   const dms=all.filter(c=>c.type==='dm'&&!c.starred).sort((a,b)=>(last(b)?.ts||b.created)-(last(a)?.ts||a.created));
-  const cl=all.filter(c=>c.type==='client'&&!c.starred).sort((a,b)=>(last(b)?.ts||b.created)-(last(a)?.ts||a.created));
+  const cl=all.filter(c=>c.type==='client'&&!isLead(c)&&!c.starred).sort((a,b)=>(last(b)?.ts||b.created)-(last(a)?.ts||a.created));
+  // catering leads still in play (or with something new), soonest event first, date TBD last
+  const leads=all.filter(c=>isLead(c)&&!c.starred&&(leadState(c.lead)!=='closed'||unread(c)||S.cur===c.id))
+    .sort((a,b)=>(a.lead.date||'9999').localeCompare(b.lead.date||'9999')||a.name.localeCompare(b.name));
+  const leadCount=Object.values(convos).filter(c=>isLead(c)&&c.joined).length;
   const drafts=Object.keys(S.drafts).filter(k=>S.drafts[k]&&convos[k]).length;
   const top=(v,i,l,meta)=>`<button class="s-item ${S.view===v?'active':''}" data-view="${v}"><span class="ico">${ic(i,17)}</span><span class="lbl">${l}</span>${meta?`<span class="meta">${meta}</span>`:''}</button>`;
+  const leadsSec=leadCount?`<div class="sec ${S.collapsed.catering?'closed':''}"><div class="sec-head" data-sec="catering" role="button" tabindex="0"><span class="car">${ic('chev',16,2)}</span><span>Catering</span><button class="add" data-view="leads" title="All catering leads">${ic('brief',14,2)}</button></div>
+      ${leads.map(sItem).join('')}<button class="s-item s-add" data-view="leads"><span class="ico">${ic('brief',14,2)}</span><span class="lbl">All leads</span><span class="meta">${leadCount}</span></button></div>`:'';
   $('#side').innerHTML=`<div class="ws-head"><button class="ws-name" data-act="wsmenu"><span>GREYS Fine Cheeses</span>${ic('chev',16,2)}</button>
     <div class="ws-tools"><button data-act="prefs" title="Preferences">${ic('vdots',18)}</button><button class="compose" data-view="compose" title="New message">${ic('compose',18,2)}</button></div></div>
     <div class="side-scroll">
-      ${top('threads','thread','Threads')}${top('drafts','send','Drafts & sent',drafts||'')}${top('clients','store','Clients')}${top('browse','hash','All channels')}
+      ${top('threads','thread','Threads')}${top('drafts','send','Drafts & sent',drafts||'')}${top('clients','store','Clients')}${leadCount?top('leads','brief','Catering leads'):''}${top('browse','hash','All channels')}
       ${starred.length?sec('starred','Starred',starred.map(sItem).join(''),null,''):''}
       ${sec('channels','Channels',ch.map(sItem).join(''),'newchannel','Add channels')}
       ${sec('dms','Direct messages',dms.map(sItem).join(''),'newdm','Add coworkers')}
+      ${leadsSec}
       ${sec('clients','Clients',cl.map(sItem).join(''),'newclient','Add a client')}
     </div>`;
 }
@@ -905,7 +979,7 @@ function msgHTML(m,prev,ctx={}){
   if(S.later[m.id])lbls.push(`<span class="sv">${ic('later',14)}</span>Saved for later`);
   if(m.note)lbls.push(`${ic('note',14)}Internal note · only your team sees this`);
   if(m.bcast)lbls.push(`${ic('thread',14)}Replied to a thread`);
-  const viaTag=u.external?`<span class="ext ${m.via}">${m.via==='email'?'EMAIL':'SMS'}</span>`:'';
+  const viaTag=(u.external||m.u==='console')&&m.via?`<span class="ext ${m.via}">${m.via==='email'?'EMAIL':'SMS'}</span>`:'';
   const card=m.card?`<div class="card"><h4>${esc(m.card.t)}</h4><div class="fields">${m.card.f.map(([k,v])=>`<div><b>${esc(k)}</b>${esc(v)}</div>`).join('')}</div>${m.card.btn?`<a class="btn sm" href="${esc(/^https?:/.test(m.card.url||'')?m.card.url:'https://staff.greyscheese.com/manager')}" target="_blank" rel="noopener">${esc(m.card.btn)}</a>`:''}</div>`:'';
   const fwd=m.fwd?`<div class="fwd"><div class="fh">${av(m.fwd.u,20)}${esc(nm(m.fwd.u))}</div><div class="m-body">${m.fwd.html}</div><div class="ff">Posted in ${esc(m.fwd.from)} · ${shortWhen(m.fwd.ts)}</div></div>`:'';
   const ust=u.status&&!u.external&&!u.bot?`<span class="m-status" title="${esc(u.status.t)}">${esc(u.status.e)}</span>`:'';
@@ -941,6 +1015,7 @@ function intro(c){
   const older=!S.noMore[c.id]&&(msgs[c.id]||[]).length>=20?`<div class="older"><button class="btn sm" data-act="older">Load earlier messages</button></div>`:'';
   if(c.type==='channel')return older+`<div class="intro"><h2>${ic(c.private?'lock':'hash',22,2.2)}${esc(c.name)}</h2><p>${c.creator&&users[c.creator]?`<span class="mention">@${esc(nm(c.creator))}</span> created this channel on ${new Date(c.created).toLocaleDateString([], {month:'long',day:'numeric'})}. `:''}This is the very beginning of the <b>#${esc(c.name)}</b> channel.${c.desc?' '+esc(c.desc):''}</p>
     <div class="btns"><button class="btn sm" data-act="details" data-tabx="about">${ic('edit',14)}${c.desc?'Edit description':'Add description'}</button><button class="btn sm" data-act="details" data-tabx="members">${ic('people',14)}Add people</button></div></div>`;
+  if(isLead(c)){const L=c.lead,u=c.client.u;return older+`<div class="intro"><div class="big-av" style="margin-bottom:12px">${av(u,72)}</div><h2>${esc(nm(u))}${L.company?` <span style="font-weight:400;color:var(--muted)">· ${esc(L.company)}</span>`:''}</h2><p>${esc(c.client.tag)} lead <b>#${esc(L.code)}</b> · ${esc(leadWhen(L))}${L.guests?' · '+L.guests+' guests':''}. Emails go to <b>${esc(c.client.email||'—')}</b> with the lead's subject line, so their replies land back here${c.client.phone?`; texts go to <b>${esc(prettyPhone(c.client.phone))}</b>`:''}. Everything here also shows in the manager console. Use <b>Internal note</b> for anything the client shouldn't see.</p><div class="btns"><button class="btn sm" data-act="leadpane">${ic('brief',14)}Lead details</button><a class="btn sm" href="${esc(leadUrl(L.code,'quote'))}" target="_blank" rel="noopener">Proposal &amp; invoice</a></div></div>`;}
   if(c.type==='client'){const u=c.client.u;return older+`<div class="intro"><div class="big-av" style="margin-bottom:12px">${av(u,72)}</div><h2>${esc(nm(u))}</h2><p>${c.client.phone?`Texts go to <b>${esc(prettyPhone(c.client.phone))}</b> from the GREYS number`:''}${c.client.phone&&c.client.email?' and emails go to ':c.client.email?'Emails go to ':''}${c.client.email?`<b>${esc(c.client.email)}</b>`:''}. Their text replies land back here. Use <b>Internal note</b> for anything the client shouldn't see.</p><div class="btns"><button class="btn sm" data-act="clientedit">${ic('edit',14)}Edit client</button><a class="btn sm" href="https://staff.greyscheese.com/manager" target="_blank" rel="noopener">Open portal</a></div></div>`;}
   const o=c.members.filter(m=>m!==ME);
   if(!o.length)return older+`<div class="intro"><div class="big-av" style="margin-bottom:12px">${av(ME,72)}</div><h2>${esc(nm(ME))} <span style="font-weight:400;color:var(--muted)">(you)</span></h2><p><b>This is your space.</b> Draft messages, list your to-dos, or keep links and files handy.</p></div>`;
@@ -952,6 +1027,9 @@ function convoHead(c){
   if(c.type==='channel'){
     title=`<button class="ch-title" data-act="details">${ic(c.private?'lock':'hash',18,2.2)}<span>${esc(c.name)}</span>${ic('chev',16,2)}</button>${c.joined?`<button class="ch-star ${c.starred?'on':''}" data-act="star" title="${c.starred?'Unstar':'Star'} channel">${c.starred?'<svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="m12 3.8 2.5 5.2 5.7.8-4.1 4 1 5.7-5.1-2.7-5.1 2.7 1-5.7-4.1-4 5.7-.8z"/></svg>':ic('star',17)}</button>`:''}`;
     right=`<button class="mem-btn" data-act="details" data-tabx="members"><span class="stack">${c.members.slice(0,3).map(u=>av(u,20)).join('')}</span><span class="n">${c.members.length}</span></button><button class="icon-btn" data-act="chmore" title="More">${ic('vdots',18)}</button>`;
+  }else if(isLead(c)){
+    const u=c.client.u;title=`<button class="ch-title" data-act="leadpane">${av(u,24)}<span>${esc(nm(u))}</span>${ic('chev',16,2)}</button>`;
+    right=`<button class="mem-btn" data-act="details" data-tabx="members" title="Managers on this lead"><span class="stack">${c.members.slice(0,3).map(u=>av(u,20)).join('')}</span><span class="n">${c.members.length}</span></button><button class="icon-btn lead-btn ${S.pane?.type==='lead'?'on':''}" data-act="leadpane" title="Lead details">${ic('brief',18)}</button><button class="icon-btn" data-act="chmore" title="More">${ic('vdots',18)}</button>`;
   }else if(c.type==='client'){
     const u=c.client.u;title=`<button class="ch-title" data-act="profile" data-uid="${u}">${av(u,24)}<span>${esc(nm(u))}</span>${ic('chev',16,2)}</button>`;
     right=`<button class="mem-btn" data-act="details" data-tabx="members" title="Team on this client"><span class="stack">${c.members.slice(0,3).map(u=>av(u,20)).join('')}</span><span class="n">${c.members.length}</span></button><button class="icon-btn" data-act="chmore" title="More">${ic('vdots',18)}</button>`;
@@ -962,9 +1040,11 @@ function convoHead(c){
   }
   const pins=(msgs[c.id]||[]).filter(m=>m.pinned).length;const files=allMsgs(c.id).filter(m=>m.files.length).length;
   const tab=(k,i,l,n)=>`<button class="tab ${S.tab===k?'on':''}" data-tab2="${k}">${ic(i,16)}${l}${n?` <span class="n">${n}</span>`:''}</button>`;
-  const tabs=`<div class="tabs">${tab('messages','dms','Messages')}${c.type==='client'?tab('details','note','Client details'):''}${tab('files','file','Files',files)}${tab('pins','pin','Pins',pins)}${c.type==='channel'&&c.joined?`<button class="tab" data-act="addbm" title="Add a bookmark">${ic('plus',16)}</button>`:''}</div>`;
+  const tabs=`<div class="tabs">${tab('messages','dms','Messages')}${c.type==='client'&&!isLead(c)?tab('details','note','Client details'):''}${tab('files','file','Files',files)}${tab('pins','pin','Pins',pins)}${c.type==='channel'&&c.joined?`<button class="tab" data-act="addbm" title="Add a bookmark">${ic('plus',16)}</button>`:''}</div>`;
   const bm=c.type==='channel'&&(c.bookmarks.length||c.joined)?`<div class="bm-bar">${c.bookmarks.map((b,i)=>`<span class="bm-w"><a class="bm" href="${esc(b.u)}" target="_blank" rel="noopener" data-bm="${i}">${esc(b.e||'🔗')} ${esc(b.t)}</a>${c.joined?`<button class="bm-more" data-act="bmmenu" data-bmi="${i}" title="Edit or remove" aria-label="Bookmark options">${ic('dots',14)}</button>`:''}</span>`).join('')}${c.joined?`<button class="bm add" data-act="addbm">${ic('plus',14)} Add a bookmark</button>`:''}</div>`:'';
-  const strip=c.type==='client'?`<div class="client-strip">${c.client.tag?`<span class="tagpill">${esc(c.client.tag)}</span>`:''}${c.client.meta?`<span>${esc(c.client.meta)}</span>`:''}${c.client.phone?`<span class="ct">${ic('phone',14)}${esc(prettyPhone(c.client.phone))}</span>`:''}${c.client.email?`<span class="ct">${ic('mail',14)}${esc(c.client.email)}</span>`:''}<button class="portal-link" data-act="clientedit">${ic('edit',15)}Edit</button></div>`:'';
+  const L=c.lead;
+  const strip=isLead(c)?`<div class="client-strip lead-strip"><span class="lst st-${L.stage}">${esc(STAGE_L[L.stage]||L.stage)}</span><span class="ct">${ic('clock',14)}${esc(leadWhen(L))}</span>${L.guests?`<span class="ct">${ic('people',14)}${L.guests} guests</span>`:''}${L.ful?`<span>${esc(FUL[L.ful]||L.ful)}</span>`:''}${L.quote?`<span>${esc(quoteLine(L.quote))}</span>`:''}<button class="portal-link" data-act="leadpane">${ic('brief',15)}Lead</button></div>`
+    :c.type==='client'?`<div class="client-strip">${c.client.tag?`<span class="tagpill">${esc(c.client.tag)}</span>`:''}${c.client.meta?`<span>${esc(c.client.meta)}</span>`:''}${c.client.phone?`<span class="ct">${ic('phone',14)}${esc(prettyPhone(c.client.phone))}</span>`:''}${c.client.email?`<span class="ct">${ic('mail',14)}${esc(c.client.email)}</span>`:''}<button class="portal-link" data-act="clientedit">${ic('edit',15)}Edit</button></div>`:'';
   return `<div class="ch-head">${back}${title}<div class="right">${right}</div></div>${tabs}${bm}${strip}`;
 }
 function renderMain(){
@@ -1002,7 +1082,8 @@ function composerHTML(key,c){
   if(isClient)S.mode[c.id]=md;
   const lastSubj=isClient?((msgs[c.id]||[]).slice().reverse().find(m=>m.subject)?.subject||''):'';
   const modes=isClient?`<div class="c-modes"><button class="${md==='sms'?'on':''}" data-mode="sms" ${c.client.phone?'':'disabled title="Add a mobile number first"'}>${ic('phone',13,2)}Text</button><button class="${md==='email'?'on':''}" data-mode="email" ${c.client.email?'':'disabled title="Add an email first"'}>${ic('mail',13,2)}Email</button><button class="note-on ${md==='note'?'on':''}" data-mode="note">${ic('note',13,2)}Internal note</button></div>`:'';
-  const subj=isClient&&md==='email'?`<div class="c-subj"><span>Subject</span><input id="subj" value="${esc(lastSubj?('Re: '+lastSubj).replace(/^(Re: )+/,'Re: '):'GREYS Fine Cheeses')}"></div>`:'';
+  const subj=isClient&&md==='email'?(isLead(c)?`<div class="c-subj" title="Kept as is so their reply comes back to this conversation"><span>Subject</span><input id="subj" value="${esc('Re: Your GREYS catering question [#'+c.lead.code+']')}" readonly></div>`
+    :`<div class="c-subj"><span>Subject</span><input id="subj" value="${esc(lastSubj?('Re: '+lastSubj).replace(/^(Re: )+/,'Re: '):'GREYS Fine Cheeses')}"></div>`):'';
   const tl=(cmd,i,t)=>`<button data-fmt="${cmd}" title="${t}" tabindex="-1">${ic(i,16,2)}</button>`;
   const files=S.files[key]||[];
   return `<div class="comp-wrap" data-key="${key}">
@@ -1162,6 +1243,9 @@ function renderPane(){
     const pb=$('#pbody');if(atB)pb.scrollTop=pb.scrollHeight;
     if(keep){inputOf('thread').innerHTML=keep;updSend('thread');}
     if(!S.pane.focused){S.pane.focused=1;setTimeout(()=>placeEnd(inputOf('thread')),0);}
+  }else if(S.pane.type==='lead'){
+    const c=convos[S.cur];if(!isLead(c)){S.pane=null;return renderPane();}
+    p.innerHTML=leadPaneHTML(c);
   }else if(S.pane.type==='profile'){
     const id=S.pane.uid,u=users[id];if(!u){S.pane=null;return renderPane();}
     const local=new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'});
@@ -1180,6 +1264,44 @@ function renderPane(){
   }
 }
 
+/* ---------- catering lead panel ---------- */
+function leadPane(force){const c=convos[S.cur];if(!isLead(c))return;
+  if(S.pane?.type==='lead'&&!force){S.pane=null;}else S.pane={type:'lead'};
+  renderPane();if(S.view==='convo')renderMain();}
+function leadPaneHTML(c){const L=c.lead,q=L.quote,mgr=isMgrU(ME);
+  const row=(i,k,v,copy)=>v?`<div class="lp-row"><span class="lp-i">${i}</span><div><small>${k}</small>${copy?`<span class="linkish" data-act="copytext" data-t="${esc(v)}">${esc(v)}</span>`:`<span>${esc(v)}</span>`}</div></div>`:'';
+  const opts=STAGE.map(([k,l])=>`<option value="${k}" ${k===L.stage?'selected':''}>${esc(l)}</option>`).join('');
+  let qbox;
+  if(q){const dep=q.dep>0&&q.dep<100?Math.round(q.total*q.dep/100):0;
+    qbox=`<div class="lp-q"><b>${esc(quoteLine(q))}</b>
+      ${q.total?`<div class="lp-money"><span>Total <b>${money(q.total)}</b></span>${dep?`<span>Deposit ${q.dep}% <b>${money(dep)}</b></span>`:''}<span>Paid <b>${money(q.paid)}</b></span>${q.total>q.paid?`<span>Balance <b>${money(q.total-q.paid)}</b>${q.due?' due '+esc(leadDate(q.due,{month:'short',day:'numeric'})):''}</span>`:''}</div>`:''}
+      ${q.url?`<a class="linkish" href="${esc(q.url)}" target="_blank" rel="noopener">Open the Square invoice${q.num?' #'+esc(q.num):''}</a>`:''}</div>`;}
+  else qbox=`<div class="lp-q"><span style="color:var(--muted)">No proposal or invoice yet.</span></div>`;
+  return `<div class="p-head"><div style="min-width:0"><h3>${esc(c.client.tag)} lead</h3><div class="sub">#${esc(L.code)}${L.loc?' · '+esc(cap(L.loc)):''}</div></div><button class="icon-btn x" data-act="closepane" aria-label="Close">${ic('x',20)}</button></div>
+    <div class="p-body lead-pane">
+      <div class="lp-top">${av(c.client.u,48)}<div style="min-width:0"><div class="lp-name">${esc(c.name)}</div>${L.company?`<div class="lp-co">${esc(L.company)}</div>`:''}</div></div>
+      <label class="lp-stage"><span>Stage</span><select data-leadstage ${mgr?'':'disabled'}>${opts}</select></label>
+      <div class="lp-rows">
+        ${row('📅','When',leadWhen(L))}${row('👥','Guests',L.guests?String(L.guests):'')}${row('🚚','Service',FUL[L.ful]||L.ful)}
+        ${row('🏪','Shop',cap(L.loc))}${row('📍','Address',L.addr)}${row('🎉','Occasion',L.occ)}${row('💰','Budget',L.budget)}
+        ${row('✉️','Email',c.client.email,true)}${row('📱','Phone',prettyPhone(c.client.phone)||L.phone,true)}
+      </div>
+      <h4 class="lp-h">Proposal &amp; invoice</h4>${qbox}
+      <div class="lp-btns">
+        <a class="btn sm primary" href="${esc(leadUrl(L.code,'quote'))}" target="_blank" rel="noopener">📄 Proposal &amp; invoice</a>
+        <a class="btn sm" href="${esc(leadUrl(L.code,'beo'))}" target="_blank" rel="noopener">📋 BEO${L.beo?' · rev '+L.beo:''}</a>
+        <a class="btn sm" href="${esc(leadUrl(L.code))}" target="_blank" rel="noopener">Open in manager console</a>
+        <button class="btn sm" data-act="clientedit">${ic('edit',14)}Edit contact</button>
+      </div>
+      <p class="lp-hint">Proposals, invoices and BEOs are made in the manager console. Every text, email and note here shows there too, and its replies and updates show here.</p>
+    </div>`;}
+async function setLeadStage(sel){const c=convos[S.cur];if(!isLead(c))return;const v=sel.value,was=c.lead.stage;if(v===was)return;
+  c.lead.stage=v;sel.disabled=true;renderSide();if(S.view==='convo')renderMain();
+  try{await api('lead_stage',{convo:c.id,stage:v});toast('Moved to '+STAGE_L[v]);}
+  catch(e){c.lead.stage=was;toast(e.message);}finally{sel.disabled=false;renderSide();if(S.view==='convo')renderMain();renderPane();}}
+function leadByCode(code){code=String(code||'').toUpperCase();return Object.values(convos).find(c=>isLead(c)&&c.lead.code===code);}
+function openLead(code){const c=leadByCode(code);if(!c)return false;open(c.id);if(matchMedia('(min-width:1100px)').matches){S.pane={type:'lead'};renderPane();renderMain();}return true;}
+
 /* ---------- other views ---------- */
 function vhead(t,extra=''){return `<div class="ch-head v-head"><button class="icon-btn back-btn" data-act="mback" aria-label="Back">${ic('left',20,2)}</button><h2>${t}</h2>${extra}</div>`;}
 function preview(m){return (m.html||m.card?.t||(m.files[0]?.name)||(m.fwd?'Forwarded a message':'')||'').replace(/<br>/g,' ').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#39;/g,"'").replace(/&quot;/g,'"');}
@@ -1189,7 +1311,7 @@ function renderView(){
     const all=activity();const f=S.actFilter;const list=all.filter(a=>f==='all'||a.k===f);
     const chip=(k,l)=>`<button class="chip ${f===k?'on':''}" data-af="${k}">${l}</button>`;
     main.innerHTML=vhead('Activity')+`<div class="v-filters">${chip('all','All')}${chip('mention','@ Mentions')}${chip('thread','Threads')}${chip('reaction','Reactions')}${chip('client','Client replies')}</div><div class="v-list">${list.length?list.map(a=>{const c=convos[a.cid];
-      const lbl=a.k==='mention'?`${ic('at',14)}Mention in ${esc(cTitle(c))}`:a.k==='reaction'?`Reaction in ${esc(cTitle(c))}`:a.k==='thread'?`${ic('thread',14)}Thread in ${esc(cTitle(c))}`:`${ic(c.client.via==='email'?'mail':'phone',14)}Client reply · ${esc(c.name)}`;
+      const lbl=a.k==='mention'?`${ic('at',14)}Mention in ${esc(cTitle(c))}`:a.k==='reaction'?`Reaction in ${esc(cTitle(c))}`:a.k==='thread'?`${ic('thread',14)}Thread in ${esc(cTitle(c))}`:`${ic(isLead(c)?'brief':c.client.via==='email'?'mail':'phone',14)}${isLead(c)?'Lead':'Client'} reply · ${esc(c.name)}`;
       const lead=a.k==='reaction'?`<span class="kind">${esc(a.e)}</span>`:av(a.m.u);
       const body=a.k==='reaction'?`<div class="ln">${esc(nm(a.u))} reacted to your message</div><div class="lp" style="color:var(--muted)">${esc(preview(a.m))}</div>`:`<div class="ln">${esc(nm(a.m.u))}</div><div class="lp">${esc(preview(a.m))}</div>`;
       return `<div class="li ${a.ts>S.activitySeen&&a.k!=='reaction'?'unseen':''}" data-jump="${a.m.id}">${lead}<div style="min-width:0"><div class="lt">${lbl}</div>${body}</div><span class="when">${shortWhen(a.ts)}</span></div>`;}).join(''):`<div class="empty"><h3>You're all caught up</h3>Mentions, thread replies, reactions and client replies show up here.</div>`}</div>`;
@@ -1199,8 +1321,17 @@ function renderView(){
     const items=allLater();const f=S.laterFilter;const list=items.filter(x=>f==='open'?!x.done:x.done);
     main.innerHTML=vhead('Later')+`<div class="v-filters"><button class="chip ${f==='open'?'on':''}" data-lf="open">In progress ${items.filter(x=>!x.done).length}</button><button class="chip ${f==='done'?'on':''}" data-lf="done">Completed ${items.filter(x=>x.done).length}</button></div><div class="v-list">${list.length?list.map(x=>`<div class="li" data-jump="${x.m.id}">${av(x.m.u)}<div style="min-width:0"><div class="lt">${esc(cTitle(convos[x.cid]))}</div><div class="ln">${esc(nm(x.m.u))}</div><div class="lp">${esc(preview(x.m))}</div></div><button class="btn sm" data-act="laterdone" data-mid="${x.m.id}">${x.done?'Move back':ic('check',14,2.2)+'Complete'}</button></div>`).join(''):`<div class="empty"><h3>${f==='open'?'Nothing saved yet':'Nothing completed'}</h3>Hover any message and click the bookmark to save it for later.</div>`}</div>`;return;
   }
+  if(v==='leads'){
+    const all=Object.values(convos).filter(c=>isLead(c)&&c.joined);const f=S.leadFilter||'open';
+    const n=k=>all.filter(c=>k==='all'||leadState(c.lead)===k).length;
+    const list=all.filter(c=>f==='all'||leadState(c.lead)===f).sort((a,b)=>f==='closed'||f==='all'?(last(b)?.ts||b.created)-(last(a)?.ts||a.created):(a.lead.date||'9999').localeCompare(b.lead.date||'9999'));
+    const chip=(k,l)=>`<button class="chip ${f===k?'on':''}" data-lfil="${k}">${l} ${n(k)}</button>`;
+    main.innerHTML=vhead('Catering leads',`<a class="btn sm" style="margin-left:auto" href="${esc(PORTAL_BASE+'manager.html#catering')}" target="_blank" rel="noopener">${ic('brief',14)}Manager console</a>`)
+      +`<div class="v-filters">${chip('open','Open')}${chip('booked','Booked')}${chip('closed','Closed')}${chip('all','All')}</div><div class="v-list">${list.length?list.map(c=>{const L=c.lead,l=last(c),un=unread(c);
+        return `<div class="li lead-li" data-go="${c.id}">${av(c.client.u)}<div style="min-width:0"><div class="lt"><span class="lst st-${L.stage}">${esc(STAGE_L[L.stage]||L.stage)}</span>${c.client.tag!=='Catering'?`<span class="tagpill">${esc(c.client.tag)}</span>`:''}<span>${esc(leadWhen(L))}${L.guests?' · '+L.guests+' guests':''}${L.quote?' · '+money(L.quote.total):''}</span></div><div class="ln" style="${un?'':'font-weight:700'}">${esc(c.name)}${L.company?` <span class="lco">${esc(L.company)}</span>`:''}</div><div class="lp" style="color:var(--muted)">${l?(l.u===ME?'You: ':'')+esc(preview(l)):'No messages yet'}</div></div><span class="when">${l?shortWhen(l.ts):''}${un?`<br><span class="badge" style="display:inline-block;margin-top:4px">${un}</span>`:''}</span></div>`;}).join(''):`<div class="empty"><h3>${f==='open'?'No open leads':f==='booked'?'Nothing booked ahead':'Nothing here'}</h3>New catering inquiries show up here and in the sidebar as they come in.</div>`}</div>`;return;
+  }
   if(v==='dms'||v==='clients'){
-    const type=v==='dms'?'dm':'client';const list=Object.values(convos).filter(c=>c.type===type&&c.joined).sort((a,b)=>(last(b)?.ts||b.created)-(last(a)?.ts||a.created));
+    const type=v==='dms'?'dm':'client';const list=Object.values(convos).filter(c=>c.type===type&&c.joined&&!isLead(c)).sort((a,b)=>(last(b)?.ts||b.created)-(last(a)?.ts||a.created));
     main.innerHTML=vhead(v==='dms'?'Direct messages':'Clients',v==='clients'?`<button class="btn sm" style="margin-left:auto" data-act="newclient">${ic('plus',14)}Add client</button>`:`<button class="btn sm" style="margin-left:auto" data-view="compose">${ic('compose',14)}New message</button>`)+`<div class="v-list">${list.length?list.map(c=>{const l=last(c);const o=c.type==='client'?c.client.u:(c.members.find(m=>m!==ME)||ME);const un=unread(c);
       return `<div class="li" data-go="${c.id}">${av(o)}<div style="min-width:0"><div class="lt">${c.type==='client'&&c.client.tag?`<span class="tagpill">${esc(c.client.tag)}</span>`:''}</div><div class="ln" style="${un?'':'font-weight:700'}">${esc(cName(c))}</div><div class="lp" style="color:var(--muted)">${l?(l.u===ME?'You: ':'')+esc(preview(l)):'No messages yet'}</div></div><span class="when">${l?shortWhen(l.ts):''}${un?`<br><span class="badge" style="display:inline-block;margin-top:4px">${un}</span>`:''}</span></div>`;}).join(''):`<div class="empty"><h3>${v==='dms'?'No direct messages yet':'No clients yet'}</h3>${v==='dms'?'Start one with the pencil button.':'Add a client to text or email them from here.'}</div>`}</div>`;return;
   }
@@ -1252,11 +1383,14 @@ function open(cid,opts={}){
   S.view='convo';S.cur=cid;S.tab='messages';if(c.joined)markRead(c);store.set('cur',cid);
   if(S.hist[S.hi]!==cid){S.hist=S.hist.slice(0,S.hi+1);S.hist.push(cid);S.hi=S.hist.length-1;}
   S.mobMain=true;if(S.pane?.type==='thread'&&find(S.pane.mid)?.cid!==cid)S.pane=null;
+  // a catering lead opens with its panel on wide screens; other conversations close it
+  if(S.pane?.type==='lead'&&!isLead(c))S.pane=null;
+  else if(isLead(c)&&!S.pane&&matchMedia('(min-width:1280px)').matches)S.pane={type:'lead'};
   renderAll();
   if(opts.jump)setTimeout(()=>{const el=$('#msg-'+opts.jump);if(el){el.scrollIntoView({block:'center'});el.classList.add('flash');}},30);
   if(!opts.nofocus&&matchMedia('(min-width:761px)').matches)setTimeout(()=>{const i=inputOf('main');if(i)placeEnd(i);},0);
 }
-function setView(v){saveDraft();S.view=v;S.mobMain=true;renderAll();}
+function setView(v){saveDraft();S.view=v;S.mobMain=true;if(v!=='convo'&&S.pane?.type==='lead')S.pane=null;renderAll();}
 function jump(mid){const f=find(mid);if(!f)return;open(f.cid,{jump:f.parent?f.parent.id:mid,nofocus:!!f.parent});if(f.parent){S.pane={type:'thread',mid:f.parent.id};renderPane();setTimeout(()=>{const el=$('#pane #msg-'+mid);if(el){el.scrollIntoView({block:'center'});el.classList.add('flash');}},40);}}
 function renderAll(){renderRail();renderSide();renderMain();renderPane();$('#client').classList.toggle('m-main',S.mobMain);$('#app').classList.toggle('inconvo',S.mobMain&&S.view==='convo');}
 function refreshMsg(){if(S.view==='convo')rerenderMsgs();else renderMain();if(S.pane)renderPane();renderRail();renderSide();}
@@ -1349,11 +1483,12 @@ async function loadHistory(cid,fresh){
 }
 function details(tab='about'){
   const c=convos[S.cur];if(!c)return;
+  if(isLead(c)&&tab!=='members'){leadPane(true);return;}
   if(c.type==='client'&&tab!=='members'){S.tab='details';renderMain();return;}
   const tabs=`<div class="mtabs">${['about','members','settings'].filter(t=>c.type!=='client'||t==='members').map(t=>`<button class="${t===tab?'on':''}" data-dt="${t}">${t[0].toUpperCase()+t.slice(1)}${t==='members'?' '+c.members.length:''}</button>`).join('')}</div>`;
   let body='';
   if(tab==='about')body=`<div class="dbox">${c.type==='channel'?`<div class="drow"><b>Channel name${c.joined?'<a data-ed="name">Edit</a>':''}</b><p>#${esc(c.name)}</p></div>`:''}<div class="drow"><b>Topic${c.joined?'<a data-ed="topic">Edit</a>':''}</b><p>${esc(c.topic)||'<span style="color:var(--muted)">Add a topic</span>'}</p></div><div class="drow"><b>Description${c.joined?'<a data-ed="desc">Edit</a>':''}</b><p>${esc(c.desc)||'<span style="color:var(--muted)">Add a description</span>'}</p></div><div class="drow"><b>Created by</b><p>${esc(nm(c.creator))} on ${new Date(c.created).toLocaleDateString([], {month:'long',day:'numeric',year:'numeric'})}</p></div></div>${c.type==='channel'&&c.joined?`<button class="linkish" style="color:#e01e5a" data-dleave>Leave channel</button>`:''}`;
-  if(tab==='members')body=`<div style="padding-top:12px">${c.type!=='dm'&&c.joined?`<button class="mrow" data-addppl style="width:100%;text-align:left"><span class="av" style="background:var(--rx);color:var(--link)">${ic('plus',18,2)}</span><b>Add people</b></button>`:''}${c.members.filter(u=>users[u]).map(u=>`<div class="mrow">${av(u)}<div><b>${esc(nm(u))}${u===ME?' (you)':''}</b><small>${esc(users[u].title)}</small></div>${canRemove(c)&&u!==ME?`<button class="btn sm mrm" data-rmm="${u}">Remove</button>`:''}<span style="margin-left:${canRemove(c)&&u!==ME?'10px':'auto'};flex:none;width:10px;height:10px;border-radius:50%;${users[u].presence==='active'?'background:var(--online)':'box-shadow:inset 0 0 0 2px var(--muted)'}"></span></div>`).join('')}</div>`;
+  if(tab==='members')body=`<div style="padding-top:12px">${c.type!=='dm'&&c.joined?`<button class="mrow" data-addppl style="width:100%;text-align:left"><span class="av" style="background:var(--rx);color:var(--link)">${ic('plus',18,2)}</span><b>Add people</b></button>`:''}${c.members.filter(u=>users[u]).map(u=>`<div class="mrow">${av(u)}<div><b>${esc(nm(u))}${u===ME?' (you)':''}</b><small>${esc(users[u].title)}</small></div>${canRemove(c)&&u!==ME&&!(isLead(c)&&isMgrU(u))?`<button class="btn sm mrm" data-rmm="${u}">Remove</button>`:''}<span style="margin-left:${canRemove(c)&&u!==ME&&!(isLead(c)&&isMgrU(u))?'10px':'auto'};flex:none;width:10px;height:10px;border-radius:50%;${users[u].presence==='active'?'background:var(--online)':'box-shadow:inset 0 0 0 2px var(--muted)'}"></span></div>`).join('')}</div>`;
   if(tab==='settings')body=`<div class="dbox"><div class="drow"><b>Notifications</b><p>${c.muted?'Muted':'Every new message'} <button class="linkish" data-mute>${c.muted?'Unmute':'Mute'}</button></p></div></div>`;
   const back=modal(c.type==='channel'?`${c.private?'🔒':'#'} ${esc(c.name)}`:esc(cName(c)),body,'',{tabs});
   back.addEventListener('click',e=>{
@@ -1367,17 +1502,18 @@ function details(tab='about'){
     const rmm=e.target.closest('[data-rmm]');if(rmm){back.remove();confirmRemove(c,rmm.dataset.rmm);}
   });
 }
-function addPeople(c){const opts=STAFF.filter(u=>!c.members.includes(u));const back=modal('Add people to '+esc(cTitle(c)),opts.length?opts.map(u=>`<label class="mrow" style="font-weight:400;margin:0"><input type="checkbox" value="${u}">${av(u)}<div><b>${esc(nm(u))}</b><small>${esc(users[u].title)}</small></div></label>`).join(''):'<p>Everyone is already here.</p>',`<button class="btn" data-close>Cancel</button>${opts.length?'<button class="btn primary" id="apG">Add</button>':''}`);
+function addPeople(c){const opts=STAFF.filter(u=>!c.members.includes(u)&&(!isLead(c)||isMgrU(u)));const back=modal('Add people to '+esc(cTitle(c)),opts.length?opts.map(u=>`<label class="mrow" style="font-weight:400;margin:0"><input type="checkbox" value="${u}">${av(u)}<div><b>${esc(nm(u))}</b><small>${esc(users[u].title)}</small></div></label>`).join(''):'<p>Everyone is already here.</p>',`<button class="btn" data-close>Cancel</button>${opts.length?'<button class="btn primary" id="apG">Add</button>':''}`);
   $('#apG',back)&&($('#apG',back).onclick=()=>busy($('#apG',back),async()=>{const ids=$$('input:checked',back).map(i=>+i.value);if(!ids.length)return;await api('add_members',{convo:c.id,ids});await refetchConvo(c.id);back.remove();renderAll();toast('Added '+ids.length+(ids.length>1?' people':' person'));}));}
 function newChannel(){const back=modal('Create a channel',`<label for="ncN">Name</label><input id="ncN" class="fld" placeholder="e.g. holiday-party" maxlength="80"><div class="hint">Channels are where conversations happen around a topic. Use lowercase, no spaces.</div><label for="ncT">Topic (optional)</label><input id="ncT" class="fld" placeholder="What's it for?"><label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" id="ncP"> Make private, only invited people can see it</label>`,`<button class="btn" data-close>Cancel</button><button class="btn primary" id="ncG" disabled>Create</button>`);
   const n=$('#ncN',back);n.oninput=()=>{n.value=n.value.toLowerCase().replace(/\s/g,'-').replace(/[^a-z0-9-_]/g,'');$('#ncG',back).disabled=!n.value;};
   $('#ncG',back).onclick=()=>busy($('#ncG',back),async()=>{const r=await api('create_channel',{name:n.value,private:$('#ncP',back).checked,topic:$('#ncT',back).value});await refetchConvo(r.id);back.remove();open(r.id);if(!$('#ncP',back).checked)toast('Channel created. Add people from the member button.');});}
 function clientForm(c){
-  const back=modal(c?'Edit client':'Add a client',`<label for="clN">Name</label><input id="clN" class="fld" placeholder="Client or company name" value="${esc(c?.name||'')}"><label for="clP">Mobile number</label><input id="clP" class="fld" inputmode="tel" placeholder="(901) 555-0123" value="${esc(prettyPhone(c?.client.phone||''))}"><label for="clE">Email</label><input id="clE" class="fld" type="email" placeholder="name@example.com" value="${esc(c?.client.email||'')}"><label for="clT">What it's for</label><input id="clT" class="fld" placeholder="Catering · Holiday party Dec 12" value="${esc(c?.client.tag||'')}"><label for="clM">Notes</label><input id="clM" class="fld" placeholder="Guests, date, anything handy" value="${esc(c?.client.meta||'')}">${c?`<label>Reply by default with</label><div class="seg-ctl"><button data-v="sms" class="${c.client.via==='sms'?'on':''}">Text</button><button data-v="email" class="${c.client.via==='email'?'on':''}">Email</button></div>`:''}<div class="hint">Your replies go out by text or email from GREYS. Their text replies come back into this conversation.</div>`,`<button class="btn" data-close>Cancel</button><button class="btn primary" id="clG">${c?'Save':'Add client'}</button>`);
+  const back=modal(c?(isLead(c)?'Edit lead contact':'Edit client'):'Add a client',`<label for="clN">Name</label><input id="clN" class="fld" placeholder="Client or company name" value="${esc(c?.name||'')}"><label for="clP">Mobile number</label><input id="clP" class="fld" inputmode="tel" placeholder="(901) 555-0123" value="${esc(prettyPhone(c?.client.phone||''))}"><label for="clE">Email</label><input id="clE" class="fld" type="email" placeholder="name@example.com" value="${esc(c?.client.email||'')}">${isLead(c)?'':`<label for="clT">What it's for</label><input id="clT" class="fld" placeholder="Catering · Holiday party Dec 12" value="${esc(c?.client.tag||'')}"><label for="clM">Notes</label><input id="clM" class="fld" placeholder="Guests, date, anything handy" value="${esc(c?.client.meta||'')}">`}${c?`<label>Reply by default with</label><div class="seg-ctl"><button data-v="sms" class="${c.client.via==='sms'?'on':''}">Text</button><button data-v="email" class="${c.client.via==='email'?'on':''}">Email</button></div>`:''}<div class="hint">Your replies go out by text or email from GREYS. Their text replies come back into this conversation.</div>`,`<button class="btn" data-close>Cancel</button><button class="btn primary" id="clG">${c?'Save':'Add client'}</button>`);
   let via=c?.client.via;back.addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(b){via=b.dataset.v;$$('[data-v]',back).forEach(x=>x.classList.toggle('on',x===b));}});
   $('#clG',back).onclick=()=>busy($('#clG',back),async()=>{const name=$('#clN',back).value.trim();if(!name){$('#clN',back).focus();throw new Error('Add the client\'s name.');}
-    const v={name,phone:$('#clP',back).value.trim(),email:$('#clE',back).value.trim(),tag:$('#clT',back).value.trim(),meta:$('#clM',back).value.trim()};
-    if(c){await api('update_convo',{convo:c.id,client_name:v.name,client_phone:v.phone,client_email:v.email,client_tag:v.tag,client_meta:v.meta,client_via:via});await refetchConvo(c.id);back.remove();renderAll();toast('Client saved');}
+    const v={name,phone:$('#clP',back).value.trim(),email:$('#clE',back).value.trim(),tag:$('#clT',back)?.value.trim()||'',meta:$('#clM',back)?.value.trim()||''};
+    if(c&&isLead(c)){await api('update_convo',{convo:c.id,client_name:v.name,client_phone:v.phone,client_email:v.email,client_via:via});await refetchConvo(c.id);back.remove();renderAll();toast('Lead updated (manager console too)');}
+    else if(c){await api('update_convo',{convo:c.id,client_name:v.name,client_phone:v.phone,client_email:v.email,client_tag:v.tag,client_meta:v.meta,client_via:via});await refetchConvo(c.id);back.remove();renderAll();toast('Client saved');}
     else{const r=await api('create_client',v);await refetchConvo(r.id);if(r.existed)await loadHistory(r.id,true);back.remove();open(r.id);if(r.existed)toast('That number already had a conversation');}
   });
 }
@@ -1481,6 +1617,9 @@ document.addEventListener('click',e=>{
   const t2=t.closest('[data-tab2]');if(t2){S.tab=t2.dataset.tab2;renderMain();return;}
   const af=t.closest('[data-af]');if(af){S.actFilter=af.dataset.af;renderMain();return;}
   const lf=t.closest('[data-lf]');if(lf){S.laterFilter=lf.dataset.lf;renderMain();return;}
+  const lfl=t.closest('[data-lfil]');if(lfl){S.leadFilter=lfl.dataset.lfil;renderMain();return;}
+  // links to a lead's conversation (the #portal-alerts card) open right here
+  const la=t.closest('a[href*="chat.html#lead="]');if(la){const m=/#lead=([A-Za-z0-9]+)/.exec(la.getAttribute('href')||'');if(m&&leadByCode(m[1])){e.preventDefault();openLead(m[1]);return;}}
   const sq=t.closest('[data-sq]');if(sq){S.searchQ=sq.dataset.sq.trim();$('#search').value=S.searchQ;renderMain();return;}
   const md2=t.closest('[data-mode]');if(md2&&!md2.disabled){const c=convos[S.cur];const keep=inputOf('main')?.innerHTML;S.mode[c.id]=md2.dataset.mode;renderMain();if(keep){inputOf('main').innerHTML=keep;updSend('main');}placeEnd(inputOf('main'));return;}
   const fm=t.closest('[data-fmt]');if(fm){e.preventDefault();fmt(fm.dataset.fmt,fm.closest('.comp-wrap'));return;}
@@ -1500,7 +1639,8 @@ document.addEventListener('click',e=>{
     case 'more':moreMenu(a,mid);break;
     case 'permalink':copy(location.origin+location.pathname+'#'+mid);break;
     case 'profile':if(users[a.dataset.uid]){S.pane={type:'profile',uid:a.dataset.uid};renderPane();}break;
-    case 'closepane':S.pane=null;renderPane();break;
+    case 'closepane':{const wasLead=S.pane?.type==='lead';S.pane=null;renderPane();if(wasLead&&S.view==='convo')renderMain();break;}
+    case 'leadpane':leadPane();break;
     case 'details':details(a.dataset.tabx||'about');break;
     case 'star':{const c=convos[S.cur];c.starred=!c.starred;api('prefs',{convo:c.id,starred:c.starred}).catch(er=>toast(er.message));renderSide();renderMain();break;}
     case 'join':{const c=convos[a.dataset.cid||S.cur];busy(a,()=>joinC(c));break;}
@@ -1520,7 +1660,7 @@ document.addEventListener('click',e=>{
     case 'clientedit':{const c=S.pane?.type==='profile'&&users[S.pane.uid]?.external?Object.values(convos).find(x=>x.client?.u===S.pane.uid):convos[S.cur];if(c?.client)clientForm(c);break;}
     case 'addbm':addBookmark();break;
     case 'bmmenu':bookmarkMenu(a,+a.dataset.bmi);break;
-    case 'chmore':{const c=convos[S.cur];menu(a,[{k:'det',l:'Conversation details',fn:()=>details(c.type==='client'?'members':'about')},...(c.joined?[{k:'mute',l:c.muted?'Unmute conversation':'Mute conversation',fn:()=>{c.muted=!c.muted;api('prefs',{convo:c.id,muted:c.muted}).catch(er=>toast(er.message));renderSide();toast(c.muted?'Muted':'Unmuted');}},{k:'star',l:c.starred?'Unstar':'Star',fn:()=>{c.starred=!c.starred;api('prefs',{convo:c.id,starred:c.starred}).catch(er=>toast(er.message));renderAll();}}]:[]),{k:'search',l:'Search in conversation',fn:()=>{const s=$('#search');s.value=(c.type==='channel'?'in:#'+c.name:'in:'+cName(c).split(' ')[0])+' ';s.focus();}},...(c.joined&&c.type!=='dm'?['-',{k:'leave',l:c.type==='client'?'Leave client conversation':'Leave channel',red:true,fn:()=>leave(c).catch(er=>toast(er.message))}]:[])],'left');break;}
+    case 'chmore':{const c=convos[S.cur];menu(a,[...(isLead(c)?[{k:'lead',l:'Lead details',fn:()=>leadPane(true)},{k:'mc',l:'Open in manager console',fn:()=>window.open(leadUrl(c.lead.code),'_blank')},'-']:[]),{k:'det',l:'Conversation details',fn:()=>details(c.type==='client'?'members':'about')},...(c.joined?[{k:'mute',l:c.muted?'Unmute conversation':'Mute conversation',fn:()=>{c.muted=!c.muted;api('prefs',{convo:c.id,muted:c.muted}).catch(er=>toast(er.message));renderSide();toast(c.muted?'Muted':'Unmuted');}},{k:'star',l:c.starred?'Unstar':'Star',fn:()=>{c.starred=!c.starred;api('prefs',{convo:c.id,starred:c.starred}).catch(er=>toast(er.message));renderAll();}}]:[]),{k:'search',l:'Search in conversation',fn:()=>{const s=$('#search');s.value=(c.type==='channel'?'in:#'+c.name:'in:'+cName(c).split(' ')[0])+' ';s.focus();}},...(c.joined&&c.type!=='dm'&&!isLead(c)?['-',{k:'leave',l:c.type==='client'?'Leave client conversation':'Leave channel',red:true,fn:()=>leave(c).catch(er=>toast(er.message))}]:[])],'left');break;}
     case 'wsmenu':menu(a,[`<div class="me-card"><span class="ws-tile" style="margin:0;box-shadow:none">G</span><div><b>GREYS Fine Cheeses</b><small>Memphis · Nashville</small></div></div>`,'-',{k:'pref',l:'Preferences',fn:prefs},{k:'kb',l:'Keyboard shortcuts',fn:shortcuts},'-',{k:'portal',l:'Open staff portal',fn:()=>window.open('https://staff.greyscheese.com','_blank')}]);break;
     case 'memenu':meMenu(a);break;
     case 'create':menu(a,[{k:'m',l:ic('compose',16)+'Message',fn:()=>setView('compose')},{k:'c',l:ic('hash',16)+'Channel',fn:newChannel},{k:'cl',l:ic('store',16)+'Client conversation',fn:()=>clientForm(null)}],'right');break;
@@ -1546,6 +1686,8 @@ function fmt(cmd,wrap){
   else document.execCommand(cmd);
   updSend(inp.dataset.key);
 }
+window.addEventListener('hashchange',()=>{const m=/^#lead=([A-Za-z0-9]+)/.exec(location.hash||'');if(m&&ME){openLead(m[1]);history.replaceState(null,'',location.pathname+location.search);}});
+document.addEventListener('change',e=>{const sel=e.target.closest?.('[data-leadstage]');if(sel)setLeadStage(sel);});
 document.addEventListener('input',e=>{const inp=e.target.closest?.('.c-input');if(!inp)return;updSend(inp.dataset.key);checkAC(inp);
   if(RT&&S.cur&&(!S._lastType||Date.now()-S._lastType>2500)){S._lastType=Date.now();try{RT.send({type:'broadcast',event:'typing',payload:{c:S.cur,u:ME}});}catch(er){}}});
 document.addEventListener('keydown',e=>{
@@ -1595,7 +1737,7 @@ async function onPing(p){
     if(S.editing)return;
     if(S.view==='convo'&&S.cur===c.id&&S.tab==='messages')rerenderMsgs();else if(S.view!=='convo')renderMain();
     if(S.pane)renderPane();renderSide();renderRail();showTyping();
-  }else if(p.t==='convo'){if(convos[p.c]){await refetchConvo(p.c);ping(()=>{renderSide();if(S.cur===p.c&&S.view==='convo'&&!S.editing&&!inputOf('main')?.textContent.trim())renderMain();},'cv');}}
+  }else if(p.t==='convo'){if(convos[p.c]){await refetchConvo(p.c);ping(()=>{renderSide();if(S.cur===p.c&&S.view==='convo'&&!S.editing&&!inputOf('main')?.textContent.trim())renderMain();if(S.cur===p.c&&S.pane?.type==='lead'&&!document.activeElement?.closest?.('#pane'))renderPane();if(S.view==='leads')renderMain();},'cv');}}
   else if(p.t==='prof'){ping(refreshPeople,'ppl');}
   else if(p.t==='mem'){if(String(p.e)===ME||convos[p.c]){const nc=await refetchConvo(p.c);if(nc&&nc.joined&&!(msgs[nc.id]||[]).length)await loadHistory(nc.id,true).catch(()=>{});ping(renderSide,'side');ping(renderRail,'rail');}}
 }
@@ -1657,7 +1799,9 @@ async function start(){
   S.mobMain=matchMedia('(min-width:761px)').matches;
   if(first){S.cur=first;const c=convos[first];S.newMarker[first]=unread(c)?c.lastRead:null;S.scrollNew=!!S.newMarker[first];markRead(c);S.hist=[first];}
   renderAll();
-  if(hashMid&&byId[hashMid])jump(hashMid);else if(hashCid&&convos[hashCid]?.joined)open(hashCid);
+  const leadHash=/^#lead=([A-Za-z0-9]+)/.exec(location.hash||'');
+  if(leadHash){if(!openLead(leadHash[1]))toast('That catering lead isn\'t in your chat.');}
+  else if(hashMid&&byId[hashMid])jump(hashMid);else if(hashCid&&convos[hashCid]?.joined)open(hashCid);
   if(location.hash)history.replaceState(null,'',location.pathname+location.search);
   connect();
   beat(true);setInterval(()=>beat(),60000);

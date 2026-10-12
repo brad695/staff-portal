@@ -850,7 +850,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="rec-card" style="background:#fff;max-width:900px;width:100%;border-radius:14px;padding:22px;">
       <div class="cat-mhead">
         <div style="flex:1;min-width:220px;"><h3 id="catTitle"></h3><div id="catMeta" class="hint"></div></div>
-        <div class="cat-mhead-r"><span class="cat-stagelbl">Stage</span><select id="catStage" class="loc-sel" onchange="catSetStage(this.value)"></select>
+        <div class="cat-mhead-r"><a class="btn btn-ghost btn-sm" id="catChatLink" href="chat.html" target="_blank" rel="noopener" title="This lead's conversation in Greys Chat — texts, emails and notes stay in step with this one">💬 Chat</a><span class="cat-stagelbl">Stage</span><select id="catStage" class="loc-sel" onchange="catSetStage(this.value)"></select>
         <button class="btn btn-ghost btn-sm" onclick="catClose()">✕</button></div>
       </div>
       <div class="cat-tabbar" id="catTabs">
@@ -1777,10 +1777,21 @@ function mtab(name){
 }
 // Deep links from the staff portal: manager.html#plu opens that tab on login.
 function openHashTab(){
-  const want = (location.hash || '').replace('#','').trim();
-  if (!want) return;
+  const raw = (location.hash || '').replace('#','').trim();
+  if (!raw) return;
+  // manager.html#catering/<CODE>[/quote|/beo] opens that lead (links from Greys Chat)
+  const [want, code, view] = raw.split('/');
   if (want === 'inquiries') { mtab('catering'); return; } // old links in staff emails
   if (document.getElementById('panel-' + want)) mtab(want);
+  if (want === 'catering' && code) catOpenByCode(code, view);
+}
+async function catOpenByCode(code, view){
+  code = decodeURIComponent(String(code || '')).toUpperCase();
+  let r = CAT_ROWS.find(x => x.code === code);
+  if (!r) { await catLoad(); r = CAT_ROWS.find(x => x.code === code); }
+  if (!r) return;
+  await catOpen(r.id);
+  if (view === 'quote' || view === 'beo') catView(view);
 }
 window.addEventListener('hashchange', openHashTab);
 
@@ -2065,6 +2076,7 @@ async function catOpen(id){
 function catHead(){
   const r = CAT_CUR;
   document.getElementById('catTitle').textContent = r.name + (r.company ? ' — ' + r.company : '');
+  const cl = document.getElementById('catChatLink'); if(cl) cl.href = 'chat.html#lead=' + encodeURIComponent(r.code);
   const fact = x => x ? '<span class="cat-fact">'+x+'</span>' : '';
   document.getElementById('catMeta').innerHTML = fact('<a href="mailto:'+esc(r.email)+'">'+esc(r.email)+'</a>') + fact(r.phone?esc(r.phone):'')
     + fact(r.event_date?'📅 '+fmtDisplay(r.event_date)+(r.event_time?' · '+catTime(r.event_time):''):'') + fact(r.guests?'👥 '+r.guests:'')
