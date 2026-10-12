@@ -984,6 +984,18 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
 }
 @media print{ .dash-tools, .home-editbar, .today-fold, .v8-sheet, .v8-toast{ display:none !important; } }
 </style>
+<style id="home-day-tile">
+/* TODAY tile: the day at a glance, white like a desk calendar (HOME-DAY script at the bottom) */
+.dash .wg-day{ --fg:#111827; --fg2:#6b7280; --chip:#f3f4f6; background:#fff; box-shadow:inset 0 0 0 1px #e7e9ee, 0 12px 24px -18px rgba(15,23,42,.35); gap:6px; }
+.wg-day .wg-dow{ font-size:.72rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#dc2626; }
+.wg-day .wg-dnum{ display:block; font-size:2.25rem; font-weight:800; line-height:1; letter-spacing:-.03em; color:#111827; }
+.wg-day .wg-evs{ display:flex; flex-direction:column; gap:5px; min-width:0; flex:1 1 auto; }
+.wg-day .wg-ev{ display:flex; align-items:center; gap:7px; min-width:0; font-size:.76rem; font-weight:700; line-height:1.25; color:#1f2937; }
+.wg-day .wg-ev i{ flex:none; width:7px; height:7px; border-radius:2px; background:currentColor; }
+.wg-day .wg-ev span{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wg-day .wg-ev.none{ color:#9ca3af; font-weight:600; }
+@media(min-width:1000px){ .wg-day .wg-dnum{ font-size:2.6rem; } .wg-day .wg-ev{ font-size:.82rem; } }
+</style>
 </head>
 <body>
 <div class="app">
@@ -1012,7 +1024,13 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
         <span class="wg-hrs" id="wgResHrs"></span>
         <span class="wg-foot" id="wgResFoot">Loading&hellip;</span>
       </button>
-      <div class="wg wg-sch" id="tile-myshifts" style="--i:1" data-tile="schedule" data-name="Schedule" data-icon="ti-calendar-week" data-swatch="#e7eeff" data-ink="#3730a3">
+      <button class="wg wg-day" id="tile-day" style="--i:1" onclick="showView('calendar')" aria-label="Today on the calendar" data-tile="day" data-name="Today" data-icon="ti-calendar-event" data-swatch="#ffffff" data-ink="#dc2626">
+        <span class="wg-head"><span class="wg-t wg-dow" id="wgDayDow">Today</span><span class="wg-chip opt" id="wgDayMon" hidden></span></span>
+        <span class="wg-dnum" id="wgDayNum"></span>
+        <span class="wg-evs" id="wgDayList"></span>
+        <span class="wg-foot" id="wgDayFoot">Loading&hellip;</span>
+      </button>
+      <div class="wg wg-sch" id="tile-myshifts" style="--i:2" data-tile="schedule" data-name="Schedule" data-icon="ti-calendar-week" data-swatch="#e7eeff" data-ink="#3730a3">
         <a class="wg-cover" href="schedule.html" aria-label="Schedule"></a>
         <span class="wg-head"><span class="wg-t">Schedule</span><span class="wg-chip opt">Today</span></span>
         <span class="wg-ppl" id="wgSchPpl"></span>
@@ -1024,7 +1042,7 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
           <a class="wg-btn" href="schedule.html#swap"><i class="ti ti-switch-horizontal"></i>Shift swap</a>
         </span>
       </div>
-      <button class="wg wg-chz" id="tile-cheese-entry" style="--i:2" onclick="location.href='manager.html#plu'" aria-label="Cheese Entry" data-tile="cheese" data-name="Cheese Entry" data-icon="ti-cheese" data-swatch="#ff7f52" data-ink="#ffffff">
+      <button class="wg wg-chz" id="tile-cheese-entry" style="--i:3" onclick="location.href='manager.html#plu'" aria-label="Cheese Entry" data-tile="cheese" data-name="Cheese Entry" data-icon="ti-cheese" data-swatch="#ff7f52" data-ink="#ffffff">
         <img class="wg-greysie" src="greysie-cheesemonger-sticker.svg" alt="" width="132" height="132">
         <svg class="wg-wave" viewBox="0 0 200 100" preserveAspectRatio="none" aria-hidden="true"><path d="M0 24 C 28 6, 60 30, 98 17 S 162 0, 200 14 L 200 100 L 0 100 Z"/></svg>
         <span class="wg-t">Cheese<br>Entry</span>
@@ -1032,21 +1050,21 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
         <span class="wg-chz-n"><b id="wgChzN">&ndash;</b><span>cheeses</span></span>
         <span class="wg-foot" id="wgChzFoot">Loading&hellip;</span>
       </button>
-      <button class="wg wg-cat" id="tile-catering" style="--i:3" onclick="location.href='manager.html#catering'" aria-label="Catering leads" data-tile="leads" data-name="Catering Leads" data-icon="ti-briefcase" data-swatch="#0a6e4c" data-ink="#ffffff">
+      <button class="wg wg-cat" id="tile-catering" style="--i:4" onclick="location.href='manager.html#catering'" aria-label="Catering leads" data-tile="leads" data-name="Catering Leads" data-icon="ti-briefcase" data-swatch="#0a6e4c" data-ink="#ffffff">
         <span class="wg-head"><span class="wg-t">Catering Leads</span><span class="wg-chip opt" id="wgLeadChip" hidden></span></span>
         <span class="wg-list" id="wgLeadList"></span>
         <span class="wg-foot" id="wgLeadFoot">Loading&hellip;</span>
-      </button>
-      <button class="wg wg-chat" id="tile-chat" style="--i:4" onclick="location.href='chat.html'" aria-label="Greys Chat" data-tile="chat" data-name="Chat" data-icon="ti-messages" data-swatch="#06273a" data-ink="#ffffff">
-        <i class="ti ti-messages wg-art" aria-hidden="true"></i>
-        <span class="wg-head"><span class="wg-t">Chat</span><span class="wg-chip" id="wgChatN" hidden></span></span>
-        <span class="wg-list" id="wgChatList"></span>
-        <span class="wg-foot" id="wgChatFoot">Channels, DMs and clients</span>
       </button>
       <button class="wg wg-stf" id="tile-stuff" style="--i:5" onclick="showView('stuff')" aria-label="Stuff to Know" data-tile="stuff" data-name="Stuff to Know" data-icon="ti-info-circle" data-swatch="#fff3d4" data-ink="#a16207">
         <span class="wg-head"><span class="wg-t">Stuff to Know</span><span class="wg-chip" id="wgStfN" hidden></span></span>
         <span class="wg-list" id="wgStfList"></span>
         <span class="wg-foot" id="wgStfFoot">Loading&hellip;</span>
+      </button>
+      <button class="wg wg-chat" id="tile-chat" style="--i:6" onclick="location.href='chat.html'" aria-label="Greys Chat" data-tile="chat" data-name="Chat" data-icon="ti-messages" data-swatch="#06273a" data-ink="#ffffff">
+        <i class="ti ti-messages wg-art" aria-hidden="true"></i>
+        <span class="wg-head"><span class="wg-t">Chat</span><span class="wg-chip" id="wgChatN" hidden></span></span>
+        <span class="wg-list" id="wgChatList"></span>
+        <span class="wg-foot" id="wgChatFoot">Channels, DMs and clients</span>
       </button>
     </div>
     <div class="dash-tools" id="dashTools"><button type="button" class="dash-edit" id="dashEdit"><i class="ti ti-pencil" aria-hidden="true"></i>Edit tiles</button></div>
@@ -2589,6 +2607,61 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
       }).catch(function(){});
   }
   load(); setInterval(load, 60000); document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') load(); });
+})();
+</script>
+<!-- HOME-DAY TILE: today's calendar at a glance. Reads today out of the month the Today card (or the full
+     calendar) already loads, via a renderAgenda hook; if that card is folded it loads today on its own.
+     Tap opens the full calendar. Revert = delete this script, the #home-day-tile style and the #tile-day button. -->
+<script>
+(function(){
+  var $=function(id){ return document.getElementById(id); };
+  if(!$('tile-day') || typeof window.renderAgenda!=='function') return;
+  var TMP='wgDayTmp', last=0, CAN=['CANCELLED','CANCELED','DECLINED','NO_SHOW'];
+  var INK={ 't-special':'#047857','t-order':'#047857','t-pickup':'#4338ca','t-delivery':'#a16207','t-event':'#be185d','t-class':'#b45309','t-exp':'#c2410c','t-sched':'#c2410c','t-off':'#b91c1c','t-res':'#1d4ed8' };
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function box(){ var b=$(TMP); if(!b){ b=document.createElement('div'); b.id=TMP; b.hidden=true; document.body.appendChild(b); } return b; }
+  function head(){ var d=new Date();
+    $('wgDayDow').textContent=d.toLocaleDateString('en-US',{ weekday:'long' });
+    $('wgDayNum').textContent=d.getDate();
+    $('wgDayMon').textContent=d.toLocaleDateString('en-US',{ month:'short' }); $('wgDayMon').hidden=false; }
+  function draw(res){
+    head();
+    var items=[];
+    [].forEach.call(box().querySelectorAll('.ag-row'), function(r){
+      var tag=r.querySelector('.ag-tag'); if(!tag) return;
+      var k=[].filter.call(tag.classList, function(c){ return c.indexOf('t-')===0; })[0]||'';
+      if(k==='t-res' || k==='t-cancel') return;                      // reservations become one line below
+      var b=r.querySelector('.ag-body > span') || r.querySelector('.ag-body'); if(!b) return;
+      var t=b.textContent.replace(/\u25be/g,'').replace(/\s+/g,' ').trim();
+      if(k==='t-special' || k==='t-off' || k==='t-sched') t=tag.textContent.trim()+': '+t;
+      items.push({ k:k, t:t });
+    });
+    var ok=(res||[]).filter(function(x){ return CAN.indexOf(x.status)<0; });
+    if(ok.length){ var g=ok.reduce(function(n,x){ return n+(Number(x.party)||0); },0);
+      items.push({ k:'t-res', t:ok.length+' reservation'+(ok.length===1?'':'s')+' · '+g+' guest'+(g===1?'':'s') }); }
+    $('wgDayList').innerHTML = items.length
+      ? items.slice(0,3).map(function(x){ return '<span class="wg-ev"><i style="color:'+(INK[x.k]||'#6b7280')+'"></i><span>'+esc(x.t)+'</span></span>'; }).join('')
+      : '<span class="wg-ev none"><span>Nothing on the calendar</span></span>';
+    $('wgDayFoot').textContent = items.length>3 ? '+'+(items.length-3)+' more today →' : 'Full calendar →';
+    last=Date.now();
+  }
+  // Today card / full calendar load the month through renderAgenda: pick today's rows out of it
+  var _ra=window.renderAgenda;
+  window.renderAgenda=function(y,m,tgt,only){
+    var r=_ra.apply(this, arguments);
+    try{ var n=new Date();
+      if(y===n.getFullYear() && m===n.getMonth()){
+        var today=fmt(n), res=((_calData.res||{})[today]||[]).slice();
+        if(!(tgt && tgt.list===TMP)) _ra(y, m, { list:TMP }, today);
+        draw(res);
+      } }catch(e){}
+    return r;
+  };
+  function load(){ var n=new Date(); box(); renderCalendar({ y:n.getFullYear(), m:n.getMonth(), target:{ list:TMP }, only:fmt(n) }); }
+  head();
+  setTimeout(function(){ if(!last) load(); }, 2500);                 // Today card folded or still loading
+  setInterval(function(){ if(document.visibilityState==='visible' && Date.now()-last>5*60e3) load(); }, 60e3);
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible' && Date.now()-last>2*60e3) load(); });
 })();
 </script>
 </body>
