@@ -777,6 +777,13 @@ body > div[style*="text-align:center"]{ background:#161618; }
 /* CATERING LEADS — green card: unread first, then the open pipeline, then booked events */
 .wg-row .nm b .dot{ display:inline-block; width:7px; height:7px; border-radius:2px; background:#fde68a; margin-right:5px; vertical-align:1px; }
 .dash .wg-cat{ --chip:rgba(0,30,18,.24); background:linear-gradient(155deg,#0b7f57 0%,#0a6e4c 52%,#065c40 100%); }
+/* CHAT — GREYS navy card: unread conversations from Greys Chat (chat.html), via chat-api action=unread */
+.dash .wg-chat{ --chip:rgba(255,255,255,.16); background:linear-gradient(155deg,#12466a 0%,#06273a 55%,#041d2c 100%); }
+.wg-chat .wg-row i{ flex:none; font-size:14px; color:#e6b33c; }
+.wg-chat .wg-row .n{ flex:none; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:#e01e5a; color:#fff; font-size:.66rem; font-weight:800; display:inline-flex; align-items:center; justify-content:center; }
+/* phones (2 columns): full width under Stuff to Know; 3-column screens: a normal tile */
+.dash .wg-chat{ grid-column:span 2; min-height:0; }
+@media(min-width:640px){ .dash .wg-chat{ grid-column:auto; min-height:204px; } }
 .wg-row .nm{ display:block; flex:1 1 auto; min-width:0; }
 .wg-row .nm b{ display:block; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .wg-row .nm small{ display:block; margin-top:2px; font-size:.68rem; font-weight:700; color:var(--fg2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -930,6 +937,12 @@ body > div[style*="text-align:center"]{ background:#fff; }
         <span class="wg-head"><span class="wg-t">Stuff to Know</span><span class="wg-chip" id="wgStfN" hidden></span></span>
         <span class="wg-list" id="wgStfList"></span>
         <span class="wg-foot" id="wgStfFoot">Loading&hellip;</span>
+      </button>
+      <button class="wg wg-chat" id="tile-chat" style="--i:5" onclick="location.href='chat.html'" aria-label="Greys Chat" data-tile="chat" data-name="Chat" data-icon="ti-messages" data-swatch="#06273a" data-ink="#ffffff">
+        <i class="ti ti-messages wg-art" aria-hidden="true"></i>
+        <span class="wg-head"><span class="wg-t">Chat</span><span class="wg-chip" id="wgChatN" hidden></span></span>
+        <span class="wg-list" id="wgChatList"></span>
+        <span class="wg-foot" id="wgChatFoot">Channels, DMs and clients</span>
       </button>
     </div>
     <div id="homePreview" class="home-preview" style="display:none;"></div>
@@ -2109,5 +2122,27 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
 </script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
 <script>(function(){if(location.hostname.indexOf("staging")<0)return;document.title="[STAGING] "+document.title;var m=document.createElement("meta");m.name="robots";m.content="noindex";document.head.appendChild(m);var b=document.createElement("div");b.textContent="STAGING \u2014 test copy. Same live database: data changes, emails and Square actions are REAL.";b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#c62828;color:#fff;font:600 12px/1.2 system-ui,sans-serif;text-align:center;padding:5px 8px;pointer-events:none;opacity:.92";document.body.appendChild(b);})();</script>
+<!-- CHAT TILE: unread conversations from Greys Chat (chat.html saves its sign-in as gc_token on this site). -->
+<script>
+(function(){
+  var list=document.getElementById('wgChatList'), foot=document.getElementById('wgChatFoot'), chip=document.getElementById('wgChatN');
+  if(!list) return;
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function load(){
+    var tok=null; try{ tok=JSON.parse(localStorage.getItem('gc_token')||'null'); }catch(e){}
+    if(!tok) return;
+    fetch('https://vdvtrevhqalmjwhjhjug.supabase.co/functions/v1/chat-api',{ method:'POST', headers:{ 'Content-Type':'application/json', 'x-chat-token':tok }, body:JSON.stringify({ a:'unread' }) })
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if(!d || !Array.isArray(d.items)) return;
+        var n=d.items.reduce(function(a,x){ return a+(x.n||0); },0);
+        chip.hidden=!n; chip.textContent=n+' new';
+        list.innerHTML=d.items.slice(0,3).map(function(x){ return '<span class="wg-row"><i class="ti '+(x.kind==='channel'?'ti-hash':x.kind==='client'?'ti-phone':'ti-message')+'"></i><span class="who">'+esc(x.name)+'</span><span class="n">'+x.n+'</span></span>'; }).join('');
+        foot.innerHTML=n ? '<b>'+n+'</b> unread' : 'All caught up';
+      }).catch(function(){});
+  }
+  load(); setInterval(load, 60000); document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') load(); });
+})();
+</script>
 </body>
 </html>
