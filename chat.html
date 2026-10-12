@@ -522,6 +522,16 @@ body{display:flex;flex-direction:column}
 .nbar-x:hover{background:rgba(0,0,0,.1)}
 .pf-note{margin:0 0 10px;color:var(--muted)}
 .pf-row{display:flex;gap:8px;flex-wrap:wrap}
+/* bookmarks: ⋯ on hover (always on touch) for edit / remove; members: Remove on hover */
+.bm-w{position:relative;display:inline-flex;align-items:center;flex:none;border-radius:6px}
+.bm-w:hover{background:var(--soft)}
+.bm-w .bm{padding-right:4px}
+.bm-more{display:none;place-items:center;width:20px;height:20px;margin-right:2px;border:0;border-radius:4px;background:none;color:var(--muted);cursor:pointer}
+.bm-more:hover{background:var(--line);color:var(--fg)}
+.bm-w:hover .bm-more,.bm-more:focus-visible{display:grid}
+.mrow .mrm{margin-left:auto;visibility:hidden}
+.mrow:hover .mrm,.mrow .mrm:focus-visible{visibility:visible}
+@media (hover:none){.bm-more{display:grid}.mrow .mrm{visibility:visible}}
 </style>
 
 </head>
@@ -953,7 +963,7 @@ function convoHead(c){
   const pins=(msgs[c.id]||[]).filter(m=>m.pinned).length;const files=allMsgs(c.id).filter(m=>m.files.length).length;
   const tab=(k,i,l,n)=>`<button class="tab ${S.tab===k?'on':''}" data-tab2="${k}">${ic(i,16)}${l}${n?` <span class="n">${n}</span>`:''}</button>`;
   const tabs=`<div class="tabs">${tab('messages','dms','Messages')}${c.type==='client'?tab('details','note','Client details'):''}${tab('files','file','Files',files)}${tab('pins','pin','Pins',pins)}${c.type==='channel'&&c.joined?`<button class="tab" data-act="addbm" title="Add a bookmark">${ic('plus',16)}</button>`:''}</div>`;
-  const bm=c.type==='channel'&&(c.bookmarks.length||c.joined)?`<div class="bm-bar">${c.bookmarks.map((b,i)=>`<a class="bm" href="${esc(b.u)}" target="_blank" rel="noopener" data-bm="${i}">${esc(b.e||'🔗')} ${esc(b.t)}</a>`).join('')}${c.joined?`<button class="bm add" data-act="addbm">${ic('plus',14)} Add a bookmark</button>`:''}</div>`:'';
+  const bm=c.type==='channel'&&(c.bookmarks.length||c.joined)?`<div class="bm-bar">${c.bookmarks.map((b,i)=>`<span class="bm-w"><a class="bm" href="${esc(b.u)}" target="_blank" rel="noopener" data-bm="${i}">${esc(b.e||'🔗')} ${esc(b.t)}</a>${c.joined?`<button class="bm-more" data-act="bmmenu" data-bmi="${i}" title="Edit or remove" aria-label="Bookmark options">${ic('dots',14)}</button>`:''}</span>`).join('')}${c.joined?`<button class="bm add" data-act="addbm">${ic('plus',14)} Add a bookmark</button>`:''}</div>`:'';
   const strip=c.type==='client'?`<div class="client-strip">${c.client.tag?`<span class="tagpill">${esc(c.client.tag)}</span>`:''}${c.client.meta?`<span>${esc(c.client.meta)}</span>`:''}${c.client.phone?`<span class="ct">${ic('phone',14)}${esc(prettyPhone(c.client.phone))}</span>`:''}${c.client.email?`<span class="ct">${ic('mail',14)}${esc(c.client.email)}</span>`:''}<button class="portal-link" data-act="clientedit">${ic('edit',15)}Edit</button></div>`:'';
   return `<div class="ch-head">${back}${title}<div class="right">${right}</div></div>${tabs}${bm}${strip}`;
 }
@@ -1033,7 +1043,7 @@ function clean(node){
 }
 function tidy(h){return h.replace(/^(\s|<br>|&nbsp;)+/,'').replace(/(\s|<br>|&nbsp;)+$/,'');}
 
-const CMDS=[['/shrug','Append ¯\\_(ツ)_/¯ to your message','[message]'],['/status','Set your status','[:emoji:] [text]'],['/away','Toggle your away status',''],['/topic','Set the channel topic','[text]'],['/invite','Invite someone to this channel','@person'],['/leave','Leave this channel',''],['/mute','Mute this conversation','']];
+const CMDS=[['/shrug','Append ¯\\_(ツ)_/¯ to your message','[message]'],['/status','Set your status','[:emoji:] [text]'],['/away','Toggle your away status',''],['/topic','Set the channel topic','[text]'],['/invite','Invite someone to this channel','@person'],['/remove','Remove someone from this channel','@person'],['/leave','Leave this channel',''],['/mute','Mute this conversation','']];
 async function send(key){
   const inp=inputOf(key);if(!inp)return;
   const c=convos[S.cur];const plain=inp.innerText.trim();const fl=S.files[key]||[];
@@ -1069,6 +1079,12 @@ async function runCmd(t,c){
     if(cmd==='/mute'){c.muted=!c.muted;await api('prefs',{convo:c.id,muted:c.muted});toast(c.muted?'Muted '+cTitle(c):'Unmuted '+cTitle(c));renderSide();return true;}
     if(cmd==='/leave'&&c.type==='channel'){await leave(c);return true;}
     if(cmd==='/invite'&&c.type==='channel'){addPeople(c);return true;}
+    if((cmd==='/remove'||cmd==='/kick')&&c.type!=='dm'){
+      const name=arg.replace(/^@/,'').trim().toLowerCase();const u=STAFF.find(id=>users[id].name.toLowerCase()===name)||userByHandle(name.split(/\s+/)[0]||'');
+      if(!u||!c.members.includes(u)){toast('Who? Try '+cmd+' @name');return true;}
+      if(u===ME){toast('Use /leave to leave '+cTitle(c));return true;}
+      if(!canRemove(c)){toast('Only managers or whoever made '+cTitle(c)+' can remove people.');return true;}
+      confirmRemove(c,u);return true;}
   }catch(e){toast(e.message);return true;}
   toast(cmd+' isn\'t a valid command');return true;
 }
@@ -1337,7 +1353,7 @@ function details(tab='about'){
   const tabs=`<div class="mtabs">${['about','members','settings'].filter(t=>c.type!=='client'||t==='members').map(t=>`<button class="${t===tab?'on':''}" data-dt="${t}">${t[0].toUpperCase()+t.slice(1)}${t==='members'?' '+c.members.length:''}</button>`).join('')}</div>`;
   let body='';
   if(tab==='about')body=`<div class="dbox">${c.type==='channel'?`<div class="drow"><b>Channel name${c.joined?'<a data-ed="name">Edit</a>':''}</b><p>#${esc(c.name)}</p></div>`:''}<div class="drow"><b>Topic${c.joined?'<a data-ed="topic">Edit</a>':''}</b><p>${esc(c.topic)||'<span style="color:var(--muted)">Add a topic</span>'}</p></div><div class="drow"><b>Description${c.joined?'<a data-ed="desc">Edit</a>':''}</b><p>${esc(c.desc)||'<span style="color:var(--muted)">Add a description</span>'}</p></div><div class="drow"><b>Created by</b><p>${esc(nm(c.creator))} on ${new Date(c.created).toLocaleDateString([], {month:'long',day:'numeric',year:'numeric'})}</p></div></div>${c.type==='channel'&&c.joined?`<button class="linkish" style="color:#e01e5a" data-dleave>Leave channel</button>`:''}`;
-  if(tab==='members')body=`<div style="padding-top:12px">${c.type!=='dm'&&c.joined?`<button class="mrow" data-addppl style="width:100%;text-align:left"><span class="av" style="background:var(--rx);color:var(--link)">${ic('plus',18,2)}</span><b>Add people</b></button>`:''}${c.members.filter(u=>users[u]).map(u=>`<div class="mrow">${av(u)}<div><b>${esc(nm(u))}${u===ME?' (you)':''}</b><small>${esc(users[u].title)}</small></div><span style="margin-left:auto;width:10px;height:10px;border-radius:50%;${users[u].presence==='active'?'background:var(--online)':'box-shadow:inset 0 0 0 2px var(--muted)'}"></span></div>`).join('')}</div>`;
+  if(tab==='members')body=`<div style="padding-top:12px">${c.type!=='dm'&&c.joined?`<button class="mrow" data-addppl style="width:100%;text-align:left"><span class="av" style="background:var(--rx);color:var(--link)">${ic('plus',18,2)}</span><b>Add people</b></button>`:''}${c.members.filter(u=>users[u]).map(u=>`<div class="mrow">${av(u)}<div><b>${esc(nm(u))}${u===ME?' (you)':''}</b><small>${esc(users[u].title)}</small></div>${canRemove(c)&&u!==ME?`<button class="btn sm mrm" data-rmm="${u}">Remove</button>`:''}<span style="margin-left:${canRemove(c)&&u!==ME?'10px':'auto'};flex:none;width:10px;height:10px;border-radius:50%;${users[u].presence==='active'?'background:var(--online)':'box-shadow:inset 0 0 0 2px var(--muted)'}"></span></div>`).join('')}</div>`;
   if(tab==='settings')body=`<div class="dbox"><div class="drow"><b>Notifications</b><p>${c.muted?'Muted':'Every new message'} <button class="linkish" data-mute>${c.muted?'Unmute':'Mute'}</button></p></div></div>`;
   const back=modal(c.type==='channel'?`${c.private?'🔒':'#'} ${esc(c.name)}`:esc(cName(c)),body,'',{tabs});
   back.addEventListener('click',e=>{
@@ -1348,6 +1364,7 @@ function details(tab='about'){
     if(e.target.closest('[data-dleave]')){back.remove();leave(c).catch(er=>toast(er.message));}
     if(e.target.closest('[data-mute]')){c.muted=!c.muted;api('prefs',{convo:c.id,muted:c.muted}).catch(er=>toast(er.message));back.remove();renderSide();details('settings');}
     if(e.target.closest('[data-addppl]')){back.remove();addPeople(c);}
+    const rmm=e.target.closest('[data-rmm]');if(rmm){back.remove();confirmRemove(c,rmm.dataset.rmm);}
   });
 }
 function addPeople(c){const opts=STAFF.filter(u=>!c.members.includes(u));const back=modal('Add people to '+esc(cTitle(c)),opts.length?opts.map(u=>`<label class="mrow" style="font-weight:400;margin:0"><input type="checkbox" value="${u}">${av(u)}<div><b>${esc(nm(u))}</b><small>${esc(users[u].title)}</small></div></label>`).join(''):'<p>Everyone is already here.</p>',`<button class="btn" data-close>Cancel</button>${opts.length?'<button class="btn primary" id="apG">Add</button>':''}`);
@@ -1404,8 +1421,27 @@ function switcher(){
   back.addEventListener('click',e=>{const m=e.target.closest('[data-i]');if(m)go(items[+m.dataset.i]);});
 }
 function shortcuts(){modal('Keyboard shortcuts',`<div class="dbox">${[['Ctrl/⌘ + K','Jump to a conversation'],['↑ in an empty message box','Edit your last message'],['Enter','Send'],['Shift + Enter','New line'],['Ctrl/⌘ + B / I','Bold / italic'],['@ · # · :','Mention, channel, emoji'],['/','Shortcuts like /status, /topic, /shrug'],['Esc','Close panels, or mark the conversation read'],['Alt + ↑ / ↓','Previous / next conversation']].map(([k,v])=>`<div class="drow" style="display:flex;justify-content:space-between;gap:12px"><span>${v}</span><b style="white-space:nowrap">${k}</b></div>`).join('')}</div>`,`<button class="btn primary" data-close>Got it</button>`);}
-function addBookmark(){const c=convos[S.cur];const back=modal('Add a bookmark',`<label for="bmU">Link</label><input id="bmU" class="fld" placeholder="https://staff.greyscheese.com/…"><label for="bmT">Name</label><input id="bmT" class="fld" placeholder="Name it">`,`<button class="btn" data-close>Cancel</button><button class="btn primary" id="bmG">Add</button>`);
-  $('#bmG',back).onclick=()=>busy($('#bmG',back),async()=>{let u=$('#bmU',back).value.trim();if(!u)return;if(!/^https?:/.test(u))u='https://'+u;const list=[...c.bookmarks,{t:$('#bmT',back).value.trim()||u.replace(/^https?:\/\//,''),u,e:'🔗'}];await api('update_convo',{convo:c.id,bookmarks:list});c.bookmarks=list;back.remove();renderMain();});}
+function addBookmark(idx){const c=convos[S.cur];const cur=idx!=null?c.bookmarks[idx]:null;
+  const back=modal(cur?'Edit bookmark':'Add a bookmark',`<label for="bmU">Link</label><input id="bmU" class="fld" placeholder="https://staff.greyscheese.com/…" value="${esc(cur?.u||'')}"><label for="bmT">Name</label><input id="bmT" class="fld" placeholder="Name it" value="${esc(cur?.t||'')}">`,`<button class="btn" data-close>Cancel</button><button class="btn primary" id="bmG">${cur?'Save':'Add'}</button>`);
+  $('#bmG',back).onclick=()=>busy($('#bmG',back),async()=>{let u=$('#bmU',back).value.trim();if(!u)return;if(!/^https?:/.test(u))u='https://'+u;
+    const item={t:$('#bmT',back).value.trim()||u.replace(/^https?:\/\//,''),u,e:cur?.e||'🔗'};
+    const list=cur?c.bookmarks.map((b,j)=>j===idx?item:b):[...c.bookmarks,item];
+    await api('update_convo',{convo:c.id,bookmarks:list});c.bookmarks=list;back.remove();renderMain();});}
+/* bookmark ⋯ button / right-click: open, copy, edit, remove (anyone in the channel, like Slack) */
+function bookmarkMenu(anchor,i){const c=convos[S.cur];const b=c&&c.bookmarks[i];if(!b)return;
+  menu(anchor,[{k:'open',l:ic('link',16)+'Open link',fn:()=>window.open(b.u,'_blank','noopener')},
+    {k:'copy',l:'Copy link',fn:()=>{try{navigator.clipboard.writeText(b.u).then(()=>toast('Link copied'),()=>toast(b.u));}catch(e){toast(b.u);}}},
+    {k:'edit',l:ic('edit',16)+'Edit bookmark',fn:()=>addBookmark(i)},'-',
+    {k:'rm',l:'Remove bookmark',red:true,fn:()=>removeBookmark(i)}]);}
+async function removeBookmark(i){const c=convos[S.cur];if(!c)return;const list=c.bookmarks.filter((_,j)=>j!==i);
+  try{await api('update_convo',{convo:c.id,bookmarks:list});c.bookmarks=list;renderMain();toast('Bookmark removed');}catch(e){toast(e.message);}}
+document.addEventListener('contextmenu',e=>{const b=e.target.closest?.('.bm[data-bm]');if(!b||!convos[S.cur]?.joined)return;e.preventDefault();bookmarkMenu(b,+b.dataset.bm);});
+/* removing people: managers, or whoever made the channel; never from #general or a DM */
+const isMgrU=u=>/manager|owner|admin/i.test(users[u]?.role||'');
+function canRemove(c){return !!c&&c.joined&&c.type!=='dm'&&!(c.type==='channel'&&c.name==='general')&&(isMgrU(ME)||c.creator===ME);}
+function confirmRemove(c,u){const first=nm(u).split(' ')[0];
+  const back=modal(`Remove ${esc(nm(u))}?`,`<p style="margin:0">${esc(first)} will be removed from ${esc(cTitle(c))}${c.type==='channel'&&!c.private?'. They can rejoin it from Channels if they need to.':' and won\'t see it anymore.'}</p>`,`<button class="btn" data-close>Cancel</button><button class="btn danger" id="rmG">Remove</button>`);
+  $('#rmG',back).onclick=()=>busy($('#rmG',back),async()=>{await api('remove_member',{convo:c.id,emp:+u});await refetchConvo(c.id);back.remove();renderAll();details('members');toast(first+' was removed from '+cTitle(c));});}
 async function dmWith(ids){try{const r=await api('dm',{ids:ids.map(Number)});if(!convos[r.id]||!convos[r.id].joined)await refetchConvo(r.id);if(!(msgs[r.id]||[]).length)await loadHistory(r.id,true).catch(()=>{});S.composeTo=[];open(r.id);}catch(e){toast(e.message);}}
 
 /* ---------- uploads ---------- */
@@ -1483,6 +1519,7 @@ document.addEventListener('click',e=>{
     case 'newclient':clientForm(null);break;
     case 'clientedit':{const c=S.pane?.type==='profile'&&users[S.pane.uid]?.external?Object.values(convos).find(x=>x.client?.u===S.pane.uid):convos[S.cur];if(c?.client)clientForm(c);break;}
     case 'addbm':addBookmark();break;
+    case 'bmmenu':bookmarkMenu(a,+a.dataset.bmi);break;
     case 'chmore':{const c=convos[S.cur];menu(a,[{k:'det',l:'Conversation details',fn:()=>details(c.type==='client'?'members':'about')},...(c.joined?[{k:'mute',l:c.muted?'Unmute conversation':'Mute conversation',fn:()=>{c.muted=!c.muted;api('prefs',{convo:c.id,muted:c.muted}).catch(er=>toast(er.message));renderSide();toast(c.muted?'Muted':'Unmuted');}},{k:'star',l:c.starred?'Unstar':'Star',fn:()=>{c.starred=!c.starred;api('prefs',{convo:c.id,starred:c.starred}).catch(er=>toast(er.message));renderAll();}}]:[]),{k:'search',l:'Search in conversation',fn:()=>{const s=$('#search');s.value=(c.type==='channel'?'in:#'+c.name:'in:'+cName(c).split(' ')[0])+' ';s.focus();}},...(c.joined&&c.type!=='dm'?['-',{k:'leave',l:c.type==='client'?'Leave client conversation':'Leave channel',red:true,fn:()=>leave(c).catch(er=>toast(er.message))}]:[])],'left');break;}
     case 'wsmenu':menu(a,[`<div class="me-card"><span class="ws-tile" style="margin:0;box-shadow:none">G</span><div><b>GREYS Fine Cheeses</b><small>Memphis · Nashville</small></div></div>`,'-',{k:'pref',l:'Preferences',fn:prefs},{k:'kb',l:'Keyboard shortcuts',fn:shortcuts},'-',{k:'portal',l:'Open staff portal',fn:()=>window.open('https://staff.greyscheese.com','_blank')}]);break;
     case 'memenu':meMenu(a);break;

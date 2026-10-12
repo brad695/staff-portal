@@ -186,6 +186,29 @@ async function sendSms(to: string, body: string, msgId: string) {
     return r.ok ? { ok: true, sid: d.sid } : { ok: false, err: str(d.message || r.status) };
   } catch (e) { return { ok: false, err: String(e) }; }
 }
+// Client email replies come back into chat: Reply-To is info+c<code>@greyscheese.com (one private code
+// per client conversation). info@ mail lands in brad@greyscheese.com's Gmail, where the "Greys Chat
+// mail" Apps Script hands those replies to chat-mail-in.
+async function replyAddress(c: any) {
+  let code = str(c.reply_token);
+  if (!/^[a-z0-9]{10}$/.test(code)) {
+    const abc = "abcdefghijkmnpqrstuvwxyz23456789"; // 32 symbols, no look-alikes
+    code = [...crypto.getRandomValues(new Uint8Array(10))].map((x) => abc[x % 32]).join("");
+    await db.from("chat_convos").update({ reply_token: code }).eq("id", c.id).is("reply_token", null);
+    const { data } = await db.from("chat_convos").select("reply_token").eq("id", c.id).maybeSingle(); // a racing send may have won
+    code = str(data?.reply_token) || code;
+  }
+  const [local, domain] = CHAT_FROM.split("@");
+  return `${local}+c${code}@${domain}`;
+}
+// Until the Gmail script has checked in (chat-mail-in pins app_secrets 'chat_mail_aud' on its first
+// call), replies keep going to the sender's own inbox as before.
+async function replyTo(c: any, me: number) {
+  const { data: live } = await db.from("app_secrets").select("name").eq("name", "chat_mail_aud").maybeSingle();
+  if (live) return replyAddress(c);
+  const { data: ct } = await db.from("portal_employee_contacts").select("email").eq("employee_id", me).maybeSingle();
+  return str(ct?.email);
+}
 async function sendEmail(to: string, subject: string, html: string, fromName: string, replyTo: string) {
   if (!to) return { ok: false, err: "That client has no email address." };
   const body = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1d1c1d">${html}</div>
@@ -371,8 +394,7 @@ async function handle(a: string, b: any, me: number) {
           const fileLinks = files.length ? "\n" + (await (async () => { await signFiles([ins]); return ins.files.map((f: any) => f.url).join("\n"); })()) : "";
           res = await sendSms(str(c.client_phone), plain(html) + fileLinks + `\n– ${first}, GREYS`, ins.id);
         } else {
-          const { data: ct } = await db.from("portal_employee_contacts").select("email").eq("employee_id", me).maybeSingle();
-          res = await sendEmail(str(c.client_email), ins.subject, html, str(sender?.name || "GREYS"), str(ct?.email));
+          res = await sendEmail(str(c.client_email), ins.subject, html, str(sender?.name || "GREYS"), await replyTo(c, me));
         }
         const upd = res.ok ? { status: via === "sms" ? "sent" : "delivered", ext_id: res.sid || null } : { status: "failed", error: res.err };
         await db.from("chat_messages").update(upd).eq("id", ins.id);
@@ -467,6 +489,18 @@ async function handle(a: string, b: any, me: number) {
     }
     case "leave": {
       await db.from("chat_members").delete().eq("convo_id", str(b.convo)).eq("emp_id", me);
+      return { ok: true };
+    }
+    case "remove_member": {
+      // managers, or whoever made the conversation; never from a DM or #general
+      const c = await convo(str(b.convo));
+      if (!c || c.kind === "dm") fail(400, "People can't be removed from a direct message.");
+      if (c.kind === "channel" && c.name === "general") fail(400, "Everyone stays in #general.");
+      const who = Number(b.emp);
+      if (!who || who === me) fail(400, "To take yourself out, leave instead.");
+      await mustMember(c.id, me);
+      if (!isMgr(await emp(me)) && Number(c.created_by) !== me) fail(403, "Only managers or whoever made this channel can remove people.");
+      await db.from("chat_members").delete().eq("convo_id", c.id).eq("emp_id", who);
       return { ok: true };
     }
     case "add_members": {
