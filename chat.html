@@ -621,8 +621,10 @@ async function pushSync(){
 async function pushOn(){
   if(!pushOK())throw new Error('This browser can\'t show notifications.');
   if(!S.vapid)throw new Error('Notifications aren\'t ready yet. Reload and try again.');
+  if(S.swFail)throw new Error('Notifications aren\'t available on this site yet.');
   let reg=SWREG;
-  if(!reg){if(Notification.permission==='default'&&await Notification.requestPermission()!=='granted')throw new Error('Notifications weren\'t allowed.');reg=await swReg();}
+  if(!reg){if(Notification.permission==='default'&&await Notification.requestPermission()!=='granted')throw new Error('Notifications weren\'t allowed.');
+    try{reg=await swReg();}catch(e){S.swFail=true;throw new Error('Notifications aren\'t available on this site yet.');}}
   const key=unb64u(S.vapid);let sub;
   try{sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});}
   catch(e){
@@ -641,7 +643,7 @@ function beat(force){if(!ME||!TOKEN)return;const a=isActive();if(!force&&!a&&las
 function renderBanner(){const el=$('#nbar');if(!el)return;let h='';
   if(ME&&!store.get('pushOff',false)&&Date.now()-store.get('nbarX',0)>7*DAY){
     if(isIOS&&!standalone())h='Get Greys Chat notifications on this phone: tap <b>Share</b>, then <b>Add to Home Screen</b>, and open Greys Chat from your Home Screen.';
-    else if(pushOK()&&S.vapid&&Notification.permission==='default')h='Greys Chat needs your permission to enable notifications. <button class="nbar-go" data-nb-on>Enable notifications</button>';}
+    else if(SWREG&&S.vapid&&Notification.permission==='default')h='Greys Chat needs your permission to enable notifications. <button class="nbar-go" data-nb-on>Enable notifications</button>';}
   el.hidden=!h;el.innerHTML=h?`<span>${h}</span><button class="nbar-x" data-nb-x aria-label="Dismiss">${ic('x',16)}</button>`:'';
   const cn=$('#conn');if(cn)cn.style.top=h?(48+el.offsetHeight)+'px':'';}
 document.addEventListener('click',e=>{
@@ -1373,6 +1375,7 @@ function notifPref(){
   const what='direct messages, @mentions, replies in your threads and client messages while you\'re away from chat';
   if(isIOS&&!standalone())return '<p class="pf-note">To get notifications on an iPhone or iPad, add Greys Chat to your Home Screen: tap <b>Share</b>, then <b>Add to Home Screen</b>. Open Greys Chat from your Home Screen and turn them on here.</p>';
   if(!pushOK())return '<p class="pf-note">This browser can\'t show notifications.</p>';
+  if(S.swFail)return '<p class="pf-note">Notifications aren\'t available on this site yet.</p>';
   if(Notification.permission==='denied')return '<p class="pf-note">Notifications are blocked for this site. Allow them in your browser\'s site settings, then come back here.</p>';
   if(S.pushOn)return `<p class="pf-note">On for this device. You'll get a notification for ${what}.</p><div class="pf-row"><button class="btn sm" data-ptest>Send a test</button><button class="btn sm" data-poff>Turn off for this device</button></div>`;
   return `<p class="pf-note">Get a notification on this device for ${what}.</p><button class="btn sm primary" data-pon>Turn on notifications</button>`;}
@@ -1621,7 +1624,7 @@ async function start(){
   if(location.hash)history.replaceState(null,'',location.pathname+location.search);
   connect();
   beat(true);setInterval(()=>beat(),60000);
-  if(pushOK()&&!(isIOS&&!standalone()))swReg().then(pushSync).catch(()=>renderBanner());else renderBanner();
+  if(pushOK()&&!(isIOS&&!standalone()))swReg().then(pushSync).catch(()=>{S.swFail=true;renderBanner();});else renderBanner();
   setInterval(()=>{if(!S._rtOk&&document.visibilityState==='visible')catchUp();},30000);
   setInterval(()=>{if(S.view==='convo'&&S.tab==='messages'&&!S.editing&&!$('#layer').children.length)$$('.tsum .lr').length&&rerenderMsgs();},60000);
 }
