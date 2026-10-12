@@ -787,7 +787,7 @@ function mapConvo(c){
     members:(c.members||[]).map(String),bookmarks:c.bookmarks||[],created:Date.parse(c.created_at),creator:c.created_by?String(c.created_by):'bot',
     joined:!!c.me,lastRead:c.me?Date.parse(c.me.last_read_at):Infinity,muted:!!c.me?.muted,starred:!!c.me?.starred,archived:c.archived};
   if(prev&&prev.lastRead>o.lastRead)o.lastRead=prev.lastRead;
-  if(c.kind==='client'){const u='k:'+c.id;o.client={u,via:c.client_via||'sms',phone:c.client_phone||'',email:c.client_email||'',tag:c.client_tag||'Client',meta:c.client_meta||''};
+  if(c.kind==='client'){const u='k:'+c.id;o.client={u,via:c.client_via||'sms',phone:c.client_phone||'',email:c.client_email||'',tag:c.client_tag||'Client',meta:c.client_meta||'',code:c.mail_code||''};
     if(c.lead_id)o.lead=c.lead?mapLead(c.lead):(prev?.lead||null);
     users[u]={name:o.name,title:(o.lead?o.client.tag+' lead':'Client'+(o.client.tag?' · '+o.client.tag:'')),color:o.lead?'#0f766e':'#64748b',external:true,phone:prettyPhone(o.client.phone),email:o.client.email};}
   convos[c.id]=o; if(!msgs[c.id])msgs[c.id]=[];
@@ -1016,7 +1016,7 @@ function intro(c){
   if(c.type==='channel')return older+`<div class="intro"><h2>${ic(c.private?'lock':'hash',22,2.2)}${esc(c.name)}</h2><p>${c.creator&&users[c.creator]?`<span class="mention">@${esc(nm(c.creator))}</span> created this channel on ${new Date(c.created).toLocaleDateString([], {month:'long',day:'numeric'})}. `:''}This is the very beginning of the <b>#${esc(c.name)}</b> channel.${c.desc?' '+esc(c.desc):''}</p>
     <div class="btns"><button class="btn sm" data-act="details" data-tabx="about">${ic('edit',14)}${c.desc?'Edit description':'Add description'}</button><button class="btn sm" data-act="details" data-tabx="members">${ic('people',14)}Add people</button></div></div>`;
   if(isLead(c)){const L=c.lead,u=c.client.u;return older+`<div class="intro"><div class="big-av" style="margin-bottom:12px">${av(u,72)}</div><h2>${esc(nm(u))}${L.company?` <span style="font-weight:400;color:var(--muted)">· ${esc(L.company)}</span>`:''}</h2><p>${esc(c.client.tag)} lead <b>#${esc(L.code)}</b> · ${esc(leadWhen(L))}${L.guests?' · '+L.guests+' guests':''}. Emails go to <b>${esc(c.client.email||'—')}</b> with the lead's subject line, so their replies land back here${c.client.phone?`; texts go to <b>${esc(prettyPhone(c.client.phone))}</b>`:''}. Everything here also shows in the manager console. Use <b>Internal note</b> for anything the client shouldn't see.</p><div class="btns"><button class="btn sm" data-act="leadpane">${ic('brief',14)}Lead details</button><a class="btn sm" href="${esc(leadUrl(L.code,'quote'))}" target="_blank" rel="noopener">Proposal &amp; invoice</a></div></div>`;}
-  if(c.type==='client'){const u=c.client.u;return older+`<div class="intro"><div class="big-av" style="margin-bottom:12px">${av(u,72)}</div><h2>${esc(nm(u))}</h2><p>${c.client.phone?`Texts go to <b>${esc(prettyPhone(c.client.phone))}</b> from the GREYS number`:''}${c.client.phone&&c.client.email?' and emails go to ':c.client.email?'Emails go to ':''}${c.client.email?`<b>${esc(c.client.email)}</b>`:''}. Their text replies land back here. Use <b>Internal note</b> for anything the client shouldn't see.</p><div class="btns"><button class="btn sm" data-act="clientedit">${ic('edit',14)}Edit client</button><a class="btn sm" href="https://staff.greyscheese.com/manager" target="_blank" rel="noopener">Open portal</a></div></div>`;}
+  if(c.type==='client'){const u=c.client.u;return older+`<div class="intro"><div class="big-av" style="margin-bottom:12px">${av(u,72)}</div><h2>${esc(nm(u))}</h2><p>${c.client.phone?`Texts go to <b>${esc(prettyPhone(c.client.phone))}</b> from the GREYS number`:''}${c.client.phone&&c.client.email?' and emails go to ':c.client.email?'Emails go to ':''}${c.client.email?`<b>${esc(c.client.email)}</b>`:''}. Their replies — texts and emails — land back here. Use <b>Internal note</b> for anything the client shouldn't see.</p><div class="btns"><button class="btn sm" data-act="clientedit">${ic('edit',14)}Edit client</button><a class="btn sm" href="https://staff.greyscheese.com/manager" target="_blank" rel="noopener">Open portal</a></div></div>`;}
   const o=c.members.filter(m=>m!==ME);
   if(!o.length)return older+`<div class="intro"><div class="big-av" style="margin-bottom:12px">${av(ME,72)}</div><h2>${esc(nm(ME))} <span style="font-weight:400;color:var(--muted)">(you)</span></h2><p><b>This is your space.</b> Draft messages, list your to-dos, or keep links and files handy.</p></div>`;
   return older+`<div class="intro"><div class="big-av" style="margin-bottom:12px;display:flex;gap:6px">${o.slice(0,4).map(u=>av(u,72)).join('')}</div><h2>${esc(o.map(nm).join(', '))}</h2><p>This conversation is just between ${o.map(u=>`<span class="mention" data-uid="${u}">@${esc(nm(u))}</span>`).join(', ')} and you.</p>${o.length===1?`<div class="btns"><button class="btn sm" data-act="profile" data-uid="${o[0]}">View profile</button></div>`:''}</div>`;
@@ -1076,6 +1076,13 @@ function placeholder(c,key){
   if(c.type==='client'){const md=S.mode[c.id]||c.client.via;if(md==='note')return 'Add an internal note, only your team sees this';return md==='email'?'Email '+c.name:'Text '+c.name;}
   return 'Message '+(c.type==='channel'?'#'+c.name:cName(c));
 }
+// A client email's subject carries the conversation's reply code (chat_convos.mail_code, set by chat-api on the
+// first email): the inquiry Gmail sync reads it off the customer's reply and drops the reply back in here.
+function clientSubj(c,lastSubj){
+  const code=c.client.code||((/\[#([G-Z][A-Z0-9]{5})\]/.exec(lastSubj||'')||[])[1])||'';
+  const again=(msgs[c.id]||[]).some(m=>m.via==='email');
+  return (again?'Re: ':'')+'Your GREYS question'+(code?' [#'+code+']':'');
+}
 function composerHTML(key,c){
   const isClient=c.type==='client'&&key==='main';let md=isClient?(S.mode[c.id]||c.client.via):null;
   if(isClient&&md==='sms'&&!c.client.phone)md='email';if(isClient&&md==='email'&&!c.client.email)md=c.client.phone?'sms':'note';
@@ -1083,7 +1090,7 @@ function composerHTML(key,c){
   const lastSubj=isClient?((msgs[c.id]||[]).slice().reverse().find(m=>m.subject)?.subject||''):'';
   const modes=isClient?`<div class="c-modes"><button class="${md==='sms'?'on':''}" data-mode="sms" ${c.client.phone?'':'disabled title="Add a mobile number first"'}>${ic('phone',13,2)}Text</button><button class="${md==='email'?'on':''}" data-mode="email" ${c.client.email?'':'disabled title="Add an email first"'}>${ic('mail',13,2)}Email</button><button class="note-on ${md==='note'?'on':''}" data-mode="note">${ic('note',13,2)}Internal note</button></div>`:'';
   const subj=isClient&&md==='email'?(isLead(c)?`<div class="c-subj" title="Kept as is so their reply comes back to this conversation"><span>Subject</span><input id="subj" value="${esc('Re: Your GREYS catering question [#'+c.lead.code+']')}" readonly></div>`
-    :`<div class="c-subj"><span>Subject</span><input id="subj" value="${esc(lastSubj?('Re: '+lastSubj).replace(/^(Re: )+/,'Re: '):'GREYS Fine Cheeses')}"></div>`):'';
+    :`<div class="c-subj" title="Kept as is so their reply comes back to this conversation"><span>Subject</span><input id="subj" value="${esc(clientSubj(c,lastSubj))}" readonly></div>`):'';
   const tl=(cmd,i,t)=>`<button data-fmt="${cmd}" title="${t}" tabindex="-1">${ic(i,16,2)}</button>`;
   const files=S.files[key]||[];
   return `<div class="comp-wrap" data-key="${key}">
@@ -1146,7 +1153,9 @@ async function send(key){
   c.lastRead=Date.now();S.newMarker[c.id]=null;
   if(key==='thread')renderPane();else rerenderMsgs(false);
   renderSide();
-  try{const r=await api('send',body);removeMsg(tmp.id);upsertMsg(mapMsg(r.msg));if(r.msg.status==='failed')toast(r.msg.error||'Message not sent');}
+  try{const r=await api('send',body);removeMsg(tmp.id);upsertMsg(mapMsg(r.msg));if(r.msg.status==='failed')toast(r.msg.error||'Message not sent');
+    // the first email gave this conversation its reply code: show it in the subject from now on
+    if(mode==='email'&&!isLead(c)){const code=(/\[#([G-Z][A-Z0-9]{5})\]/.exec(r.msg.subject||'')||[])[1];if(code)c.client.code=code;const si=$('#subj');if(si&&S.cur===c.id)si.value=clientSubj(c,r.msg.subject);}}
   catch(e){removeMsg(tmp.id);toast(e.message);if(!inp.textContent.trim())inp.innerHTML=html;}
   refreshMsg();
 }
