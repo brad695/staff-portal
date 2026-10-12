@@ -13,6 +13,9 @@
 // with all managers on it; DB triggers mirror messages both ways with catering_messages (see
 // sql/2026-10-12_chat_catering_leads.sql). Here: lead details on boot/convo (managers only),
 // lead_stage, and lead emails sent in the catering format.
+// Client emails (2026-10-12): subject "Your GREYS question [#CODE]" (chat_convos.mail_code), Reply-To the inquiry
+// inbox — the inquiry Gmail sync in brad@greyscheese.com (subject:(GREYS question)) posts the customer's reply to
+// inquiries?action=ingest, which drops it into the conversation with that code.
 //
 // POST { a: <action>, ...args }   header x-chat-token: <token>   (verify_jwt = false)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -215,14 +218,28 @@ async function replyAddress(c: any) {
   const [local, domain] = CHAT_FROM.split("@");
   return `${local}+c${code}@${domain}`;
 }
-// Until the Gmail script has checked in (chat-mail-in pins app_secrets 'chat_mail_aud' on its first
-// call), replies keep going to the sender's own inbox as before.
-async function replyTo(c: any, me: number) {
+// Replies come back by the subject code through the inquiry Gmail sync, so they go to the inquiry inbox.
+// (If the "Greys Chat mail" script is ever installed — chat-mail-in pins app_secrets 'chat_mail_aud' — the
+// plus-address route is used instead; both drop the reply in the same conversation, deduped on the Gmail id.)
+async function replyTo(c: any) {
   const { data: live } = await db.from("app_secrets").select("name").eq("name", "chat_mail_aud").maybeSingle();
-  if (live) return replyAddress(c);
-  const { data: ct } = await db.from("portal_employee_contacts").select("email").eq("employee_id", me).maybeSingle();
-  return str(ct?.email);
+  return live ? replyAddress(c) : LEAD_REPLY_TO;
 }
+// A client conversation's reply code: 6 characters, the first a letter G–Z so it can never match an
+// inquiry's or a catering lead's hex code. Made on the first email; a racing send keeps whichever won.
+async function mailCode(c: any) {
+  if (/^[G-Z][A-Z0-9]{5}$/.test(str(c.mail_code))) return str(c.mail_code);
+  const L = "GHJKMNPQRSTVWXYZ", A = "GHJKMNPQRSTVWXYZ23456789";
+  for (let i = 0; i < 5; i++) {
+    const r = crypto.getRandomValues(new Uint8Array(6));
+    const code = L[r[0] % L.length] + [...r.slice(1)].map((x) => A[x % A.length]).join("");
+    await db.from("chat_convos").update({ mail_code: code }).eq("id", c.id).is("mail_code", null); // a taken code just fails here
+    const { data } = await db.from("chat_convos").select("mail_code").eq("id", c.id).maybeSingle();
+    if (data?.mail_code) return str(data.mail_code);
+  }
+  fail(500, "Couldn't make a reply code. Try again.");
+}
+const clientSubject = (code: string, again: boolean) => `${again ? "Re: " : ""}Your GREYS question [#${code}]`;
 const escH = (s: unknown) => str(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 // attachments go out as links (signed for 7 days)
 const fileList = (files: any[]) => files.length
@@ -436,7 +453,12 @@ async function handle(a: string, b: any, me: number) {
         if (b.note) row.is_note = true;
         else {
           via = b.via === "email" ? "email" : "sms"; row.via = via; row.status = "sending";
-          if (via === "email") row.subject = lead ? leadSubject(lead.code) : (str(b.subject).slice(0, 200) || "GREYS Fine Cheeses");
+          if (via === "email" && lead) row.subject = leadSubject(lead.code);
+          else if (via === "email") {
+            // the reply code in the subject is how the customer's answer finds its way back here
+            const { count } = await db.from("chat_messages").select("id", { count: "exact", head: true }).eq("convo_id", cid).eq("via", "email");
+            row.subject = clientSubject(await mailCode(c), !!count);
+          }
         }
       }
       const { data: ins, error } = await db.from("chat_messages").insert(row).select(MSG_COLS).single();
@@ -456,7 +478,7 @@ async function handle(a: string, b: any, me: number) {
         } else if (lead) {
           res = await sendLeadEmail(str(lead.email || c.client_email), ins.subject, html, str(sender?.name || "GREYS"), ins.files || []);
         } else {
-          res = await sendEmail(str(c.client_email), ins.subject, html, str(sender?.name || "GREYS"), await replyTo(c, me), ins.files || []);
+          res = await sendEmail(str(c.client_email), ins.subject, html, str(sender?.name || "GREYS"), await replyTo(c), ins.files || []);
         }
         const upd = res.ok ? { status: via === "sms" ? "sent" : "delivered", ext_id: res.sid || null } : { status: "failed", error: res.err };
         await db.from("chat_messages").update(upd).eq("id", ins.id);
