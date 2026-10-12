@@ -2417,10 +2417,12 @@ function catLockedHtml(q){
     +   '<div class="big"><span>Total</span><span>'+catMoney(q.total_cents)+'</span></div>'
     +   (split?'<div><span>Deposit ('+q.deposit_pct+'%)</span><span>'+catMoney(dep)+'</span></div>':'')
     +   '<div class="paid"><span>Paid so far</span><span>'+catMoney(q.amount_paid_cents)+'</span></div>'
+    +   (q.refunded_cents>0?'<div style="color:#b91c1c;"><span>↩ Refunded</span><span>−'+catMoney(q.refunded_cents)+'</span></div>':'')
     +   '<div><span>Still owed</span><span>'+catMoney(Math.max(0,q.total_cents-q.amount_paid_cents))+'</span></div>'
     + '</div></div>'
     + '<div class="cat-actions">'
     +   '<span class="save-msg" id="cqMsg"></span>'
+    +   (q.square_invoice_id && (q.amount_paid_cents||0) > (q.refunded_cents||0) ? '<button class="btn btn-ghost btn-sm" style="color:#b91c1c;border-color:#fecaca;" onclick="catRefund(\''+q.id+'\')">↩ Refund…</button>' : '')
     +   (['signed','invoiced'].includes(q.status)?'<button class="btn btn-ghost btn-sm" onclick="catCancelInvoice(\''+q.id+'\')">Cancel '+(q.square_invoice_id||q.invoice_only?'invoice':'proposal')+'</button>':'')
     +   '<button class="btn btn-ghost btn-sm" onclick="catNewProposal()">＋ New proposal / invoice (copy this one)</button>'
     + '</div>'
@@ -2434,6 +2436,25 @@ function catNewProposal(){
 async function catPdf(id){
   const r = await catApi('contract_url', { quote_id:id });
   if(r.ok) window.open(r.data.url, '_blank'); else document.getElementById('cqMsg').textContent = '❌ '+(r.data.error||'Could not open');
+}
+/* ↩ Refund (2026-10-12): catering?action=refund refunds money paid on the Square invoice (real money, back to their card). */
+async function catRefund(id){
+  const q = CAT_Q && CAT_Q.id===id ? CAT_Q : (CAT_QUOTES||[]).find(x=>x.id===id);
+  if(!q) return;
+  const max = (q.amount_paid_cents||0) - (q.refunded_cents||0);
+  const amtStr = prompt('Refund how much to '+(CAT_CUR&&CAT_CUR.name||'the customer')+'?\nUp to '+catMoney(max)+' can be refunded.', (max/100).toFixed(2));
+  if(amtStr===null) return;
+  const cents = Math.round(parseFloat(String(amtStr).replace(/[$,\s]/g,''))*100);
+  if(!(cents>0) || cents>max){ alert('Enter an amount between $0.01 and '+catMoney(max)+'.'); return; }
+  const reason = prompt('Reason (shows on their card statement / Square receipt):', 'GREYS catering refund');
+  if(reason===null) return;
+  if(!confirm('Refund '+catMoney(cents)+' to '+(CAT_CUR&&CAT_CUR.name||'the customer')+' on invoice #'+(q.invoice_number||'')+'?\n\nThis is real money — it goes back to their card in 5–10 business days and can\'t be undone.')) return;
+  const m = document.getElementById('cqMsg'); if(m) m.textContent = 'Refunding…';
+  const r = await catApi('refund', { quote_id:id, amount_cents:cents, reason });
+  await catQuoteLoad();
+  const m2 = document.getElementById('cqMsg');
+  if(m2) m2.textContent = r.ok ? '✓ Refunded '+catMoney(r.data.refunded_cents) : '❌ '+(r.data.error||'Refund failed');
+  catThread(); catLoad();
 }
 async function catSync(id){
   document.getElementById('cqMsg').textContent = 'Checking Square…';
