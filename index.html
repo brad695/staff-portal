@@ -2301,8 +2301,9 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
 
   // ── CATERING LEADS: names need a manager sign-in on this device (catering_leads is admin-only);
   //    everyone else gets counts from portal_catering_pulse (no names, no contact info) ──
-  var OPEN=['new','replied','quoted','contract_sent'], BOOKED=['signed','deposit_paid','paid'];
-  var STAGE={ new:'New', replied:'Replied', quoted:'Quoted', contract_sent:'Contract sent', signed:'Signed', deposit_paid:'Deposit paid', paid:'Paid' };
+  // experience inquiries are leads too (2026-10-12): link_sent / booked are theirs
+  var OPEN=['new','replied','quoted','contract_sent','link_sent'], BOOKED=['signed','invoiced','deposit_paid','paid','booked'];
+  var STAGE={ new:'New', replied:'Replied', quoted:'Quoted', contract_sent:'Contract sent', signed:'Signed', invoiced:'Invoiced', deposit_paid:'Deposit paid', paid:'Paid', link_sent:'Link sent', booked:'Booked' };
   function evLbl(d){ if(!d) return { day:'TBD', date:'—' }; var x=new Date(d+'T12:00:00'); return { day:dayLbl(x.getTime()), date:(x.getMonth()+1)+'/'+x.getDate() }; }
   async function leads(){
     var rows=null;
@@ -2314,6 +2315,11 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
           var q=await sb.from('catering_leads').select('code,name,company,event_date,guests,stage,unread,last_message_at,created_at')
             .ilike('location', LOC).neq('stage','lost').order('created_at',{ ascending:false }).limit(80);
           if(!q.error) rows=q.data||[];
+          // experience inquiries (their own table, same one list as the manager console's Catering Leads)
+          var qi=await sb.from('inquiries').select('code,name,preferred_date,party_size,stage,unread,last_message_at,created_at')
+            .ilike('location', LOC).neq('stage','lost').order('created_at',{ ascending:false }).limit(80);
+          if(rows && !qi.error) (qi.data||[]).forEach(function(r){ rows.push({ code:r.code, name:r.name, company:'', event_date:r.preferred_date,
+            guests:r.party_size, stage:r.stage, unread:r.unread, last_message_at:r.last_message_at, created_at:r.created_at }); });
         }
       }
     }catch(e){}

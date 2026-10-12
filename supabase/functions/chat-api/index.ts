@@ -13,6 +13,10 @@
 // with all managers on it; DB triggers mirror messages both ways with catering_messages (see
 // sql/2026-10-12_chat_catering_leads.sql). Here: lead details on boot/convo (managers only),
 // lead_stage, and lead emails sent in the catering format.
+// Experience inquiries (2026-10-12): the same for every inquiries row (chat_convos.inquiry_id, see
+// sql/2026-10-12_chat_experience_inquiries.sql) — managers get the inquiry + its held/booked reservation as `inq`,
+// lead_stage moves it, emails go out in the inquiries look with its "[#CODE]" subject. A booking link sent from
+// here restarts the 48 h hold (DB trigger), like a reply from the manager console.
 // Client emails (2026-10-12): subject "Your GREYS question [#CODE]" (chat_convos.mail_code), Reply-To the inquiry
 // inbox — the inquiry Gmail sync in brad@greyscheese.com (subject:(GREYS question)) posts the customer's reply to
 // inquiries?action=ingest, which drops it into the conversation with that code.
@@ -32,6 +36,11 @@ const CHAT_FROM = Deno.env.get("CHAT_MAIL_FROM") ?? "info@greyscheese.com";
 const LEAD_REPLY_TO = Deno.env.get("CATERING_REPLY_TO") || Deno.env.get("INQUIRY_REPLY_TO") || "brad@greyscheese.com";
 const LEAD_FROM_ADDR = (/<([^>]+)>/.exec(Deno.env.get("INQUIRY_FROM") || "") || [])[1] || CHAT_FROM;
 const STAGES = ["new", "replied", "quoted", "contract_sent", "signed", "invoiced", "deposit_paid", "paid", "lost"];
+// experience inquiries (chat_convos.inquiry_id): replies go where the inquiries function sends them
+const INQ_REPLY_TO = Deno.env.get("INQUIRY_REPLY_TO") || "brad@greyscheese.com";
+const ISTAGES = ["new", "replied", "link_sent", "booked", "lost"];
+const INQ_COLS = "id,code,name,email,phone,location,experience_type_id,experience_name,preferred_date,preferred_time,party_size,stage,unread,last_message_at,created_at,reservation_id,reservation_code,hold_expires_at,option_label,event_address,details";
+const RES_COLS = "id,code,status,payment_status,total_cents,refunded_cents,starts_at";
 const LEAD_COLS = "id,code,name,email,phone,company,location,event_date,event_time,guests,fulfillment,address,occasion,budget,stage,unread,last_message_at,created_at,beo_rev";
 const QUOTE_COLS = "lead_id,status,total_cents,deposit_pct,amount_paid_cents,invoice_status,invoice_url,invoice_number,sent_at,viewed_at,signed_at,signed_name,invoice_only,balance_due_date,deposit_paid_at,paid_at,created_at";
 
@@ -272,6 +281,17 @@ async function sendLeadEmail(to: string, subject: string, html: string, fromName
   return mail(to, subject, body, `${fromName} at GREYS <${LEAD_FROM_ADDR}>`, LEAD_REPLY_TO);
 }
 const leadSubject = (code: string) => `Re: Your GREYS catering question [#${code}]`;
+// an experience inquiry: the inquiries function's look (gold rule) and subject, so the reply comes back the same way
+async function sendInqEmail(to: string, subject: string, html: string, fromName: string, files: any[] = []) {
+  if (!to) return { ok: false, err: "This inquiry has no email address." };
+  const body = `<div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;color:#221E1B;line-height:1.55">
+     <div style="font:700 22px Georgia,serif;letter-spacing:.04em;border-bottom:2px solid #E0A21C;padding-bottom:8px;margin-bottom:18px">GREYS <span style="font:400 12px Arial">Fine Cheeses · Charcuterie · Wine</span></div>
+     <div style="font-size:16px">${html}</div>${fileList(files)}
+     <p style="margin-top:22px">${escH(fromName)}<br><span style="font:13px Arial;color:#6E6353">GREYS Fine Cheeses · greyscheese.com</span></p>
+     <p style="font:12px Arial;color:#6E6353;margin-top:28px">Just reply to this email to keep the conversation going.</p></div>`;
+  return mail(to, subject, body, `${fromName} at GREYS <${LEAD_FROM_ADDR}>`, INQ_REPLY_TO);
+}
+const inqSubject = (q: any) => `Re: Your GREYS ${str(q.experience_name).trim() || "experience"} question [#${q.code}]`;
 
 /* ---------- catering leads ---------- */
 // lead row + its current proposal/invoice (newest one that isn't canceled), by lead id
@@ -284,12 +304,32 @@ async function leadsFor(ids: string[]) {
     .forEach((q) => { const l = out[q.lead_id]; if (l && !l.quote) l.quote = q; });
   return out;
 }
-// lead details only ever go to managers (catering data is manager-only in the portal too)
+// inquiry rows + the reservation each one holds or booked, by inquiry id
+async function inqsFor(ids: string[]) {
+  const out: Record<string, any> = {};
+  if (!ids.length) return out;
+  (await inAll(ids, (p) => db.from("inquiries").select(INQ_COLS).in("id", p))).forEach((q) => (out[q.id] = { ...q, res: null }));
+  const rids = [...new Set(Object.values(out).map((q: any) => str(q.reservation_id)).filter(Boolean))];
+  if (rids.length) {
+    const by: Record<string, any> = {};
+    (await inAll(rids, (p) => db.from("rb_reservations").select(RES_COLS).in("id", p))).forEach((r) => (by[r.id] = r));
+    Object.values(out).forEach((q: any) => { if (q.reservation_id) q.res = by[q.reservation_id] || null; });
+  }
+  return out;
+}
+// lead and inquiry details only ever go to managers (they're manager-only in the portal too)
 async function withLeads(list: any[], mgr: boolean) {
+  if (!mgr) return list;
   const ids = [...new Set(list.filter((c) => c.lead_id).map((c) => str(c.lead_id)))];
-  if (!ids.length || !mgr) return list;
-  const map = await leadsFor(ids);
-  list.forEach((c) => { if (c.lead_id) c.lead = map[c.lead_id] || null; });
+  if (ids.length) {
+    const map = await leadsFor(ids);
+    list.forEach((c) => { if (c.lead_id) c.lead = map[c.lead_id] || null; });
+  }
+  const qids = [...new Set(list.filter((c) => c.inquiry_id).map((c) => str(c.inquiry_id)))];
+  if (qids.length) {
+    const map = await inqsFor(qids);
+    list.forEach((c) => { if (c.inquiry_id) c.inq = map[c.inquiry_id] || null; });
+  }
   return list;
 }
 
@@ -310,7 +350,7 @@ async function boot(me: number) {
   }));
   if (!pmap[me]) await db.from("chat_profiles").insert({ emp_id: me });
   const mgr = isMgr((people || []).find((e) => e.id === me));
-  // managers are on every catering lead (a new manager catches up here)
+  // managers are on every catering lead and experience inquiry (a new manager catches up here)
   if (mgr) await db.rpc("chat_lead_join", { p_emp: me });
 
   const { data: mine } = await db.from("chat_members").select("*").eq("emp_id", me);
@@ -447,13 +487,15 @@ async function handle(a: string, b: any, me: number) {
         }
       }
       let via: string | null = null;
-      // a catering lead: the email subject is fixed so the customer's reply finds its way back
+      // a catering lead / experience inquiry: the email subject is fixed so the customer's reply finds its way back
       const lead = c.lead_id ? (await db.from("catering_leads").select("id,code,email").eq("id", c.lead_id).maybeSingle()).data : null;
+      const inq = c.inquiry_id ? (await db.from("inquiries").select("id,code,email,experience_name").eq("id", c.inquiry_id).maybeSingle()).data : null;
       if (c.kind === "client" && !row.parent_id) {
         if (b.note) row.is_note = true;
         else {
           via = b.via === "email" ? "email" : "sms"; row.via = via; row.status = "sending";
           if (via === "email" && lead) row.subject = leadSubject(lead.code);
+          else if (via === "email" && inq) row.subject = inqSubject(inq);
           else if (via === "email") {
             // the reply code in the subject is how the customer's answer finds its way back here
             const { count } = await db.from("chat_messages").select("id", { count: "exact", head: true }).eq("convo_id", cid).eq("via", "email");
@@ -477,6 +519,8 @@ async function handle(a: string, b: any, me: number) {
           res = await sendSms(str(c.client_phone), plain(html) + fileLinks + `\n– ${first}, GREYS`, ins.id);
         } else if (lead) {
           res = await sendLeadEmail(str(lead.email || c.client_email), ins.subject, html, str(sender?.name || "GREYS"), ins.files || []);
+        } else if (inq) {
+          res = await sendInqEmail(str(inq.email || c.client_email), ins.subject, html, str(sender?.name || "GREYS"), ins.files || []);
         } else {
           res = await sendEmail(str(c.client_email), ins.subject, html, str(sender?.name || "GREYS"), await replyTo(c), ins.files || []);
         }
@@ -530,20 +574,25 @@ async function handle(a: string, b: any, me: number) {
     }
     case "read": {
       await db.from("chat_members").update({ last_read_at: b.at ? new Date(b.at).toISOString() : new Date().toISOString() }).eq("convo_id", str(b.convo)).eq("emp_id", me);
-      // reading a lead here clears its "unread" dot in the manager console too
-      const { data: c } = await db.from("chat_convos").select("lead_id").eq("id", str(b.convo)).maybeSingle();
-      if (c?.lead_id && (await member(str(b.convo), me))) await db.from("catering_leads").update({ unread: false }).eq("id", c.lead_id).eq("unread", true);
+      // reading a lead / inquiry here clears its "unread" dot in the manager console too
+      const { data: c } = await db.from("chat_convos").select("lead_id,inquiry_id").eq("id", str(b.convo)).maybeSingle();
+      if ((c?.lead_id || c?.inquiry_id) && (await member(str(b.convo), me))) {
+        if (c.lead_id) await db.from("catering_leads").update({ unread: false }).eq("id", c.lead_id).eq("unread", true);
+        if (c.inquiry_id) await db.from("inquiries").update({ unread: false }).eq("id", c.inquiry_id).eq("unread", true);
+      }
       return { ok: true };
     }
     case "lead_stage": {
       const c = await convo(str(b.convo));
-      if (!c?.lead_id) fail(404, "That isn't a catering lead.");
+      if (!c?.lead_id && !c?.inquiry_id) fail(404, "That isn't a lead.");
       await mustMember(c.id, me);
       const e = await emp(me);
-      if (!isMgr(e)) fail(403, "Only managers can move catering leads.");
+      if (!isMgr(e)) fail(403, "Only managers can move leads.");
       const st = str(b.stage);
-      if (!STAGES.includes(st)) fail(400, "Pick a stage.");
-      const { error } = await db.rpc("chat_lead_set_stage", { p_lead: c.lead_id, p_stage: st, p_by: str(e?.name) });
+      if (!(c.inquiry_id ? ISTAGES : STAGES).includes(st)) fail(400, "Pick a stage.");
+      const { error } = c.inquiry_id
+        ? await db.rpc("chat_inq_set_stage", { p_inq: c.inquiry_id, p_stage: st, p_by: str(e?.name) })
+        : await db.rpc("chat_lead_set_stage", { p_lead: c.lead_id, p_stage: st, p_by: str(e?.name) });
       if (error) fail(500, error.message);
       return { ok: true };
     }
@@ -563,15 +612,16 @@ async function handle(a: string, b: any, me: number) {
       if (b.description != null) upd.description = str(b.description).slice(0, 1000);
       if (b.name != null && c.kind === "channel") upd.name = str(b.name).toLowerCase().replace(/[^a-z0-9-_]+/g, "-").slice(0, 80) || c.name;
       if (Array.isArray(b.bookmarks)) upd.bookmarks = b.bookmarks.slice(0, 20).map((x: any) => ({ t: str(x.t).slice(0, 80), u: /^https?:\/\//.test(str(x.u)) ? str(x.u) : "", e: str(x.e).slice(0, 8) })).filter((x: any) => x.u);
-      if (c.kind === "client" && c.lead_id) {
-        // a catering lead's contact lives on the lead (the manager console shows the same); a trigger copies it here
+      if (c.kind === "client" && (c.lead_id || c.inquiry_id)) {
+        // a lead's / inquiry's contact lives on that row (the manager console shows the same); a trigger copies it here
         const lu: any = {};
         if (b.client_name != null && str(b.client_name).trim()) lu.name = str(b.client_name).trim().slice(0, 120);
         if (b.client_email != null && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(str(b.client_email).trim())) lu.email = str(b.client_email).trim().toLowerCase().slice(0, 200);
         if (b.client_phone != null) lu.phone = str(b.client_phone).trim().slice(0, 40) || null;
         if (Object.keys(lu).length) {
-          if (!isMgr(await emp(me))) fail(403, "Only managers can edit catering leads.");
-          const { error: le } = await db.from("catering_leads").update(lu).eq("id", c.lead_id);
+          if (!isMgr(await emp(me))) fail(403, "Only managers can edit leads.");
+          const { error: le } = c.lead_id ? await db.from("catering_leads").update(lu).eq("id", c.lead_id)
+            : await db.from("inquiries").update(lu).eq("id", c.inquiry_id);
           if (le) fail(400, le.message);
         }
         if (b.client_via === "sms" || b.client_via === "email") upd.client_via = b.client_via;
@@ -601,7 +651,7 @@ async function handle(a: string, b: any, me: number) {
     }
     case "leave": {
       const c = await convo(str(b.convo));
-      if (c?.lead_id && isMgr(await emp(me))) fail(400, "Managers stay on every catering lead. Mute it instead.");
+      if ((c?.lead_id || c?.inquiry_id) && isMgr(await emp(me))) fail(400, "Managers stay on every lead. Mute it instead.");
       await db.from("chat_members").delete().eq("convo_id", str(b.convo)).eq("emp_id", me);
       return { ok: true };
     }
@@ -614,7 +664,7 @@ async function handle(a: string, b: any, me: number) {
       if (!who || who === me) fail(400, "To take yourself out, leave instead.");
       await mustMember(c.id, me);
       if (!isMgr(await emp(me)) && Number(c.created_by) !== me) fail(403, "Only managers or whoever made this channel can remove people.");
-      if (c.lead_id && isMgr(await emp(who))) fail(400, "Managers stay on every catering lead.");
+      if ((c.lead_id || c.inquiry_id) && isMgr(await emp(who))) fail(400, "Managers stay on every lead.");
       await db.from("chat_members").delete().eq("convo_id", c.id).eq("emp_id", who);
       return { ok: true };
     }
@@ -623,10 +673,10 @@ async function handle(a: string, b: any, me: number) {
       if (!c || c.kind === "dm") fail(400, "Start a new group message instead.");
       await mustMember(c.id, me);
       const ids = ((b.ids || []) as any[]).map(Number).filter(Boolean);
-      if (c.lead_id && ids.length) {
-        // catering leads stay with managers (the lead's details are manager-only)
+      if ((c.lead_id || c.inquiry_id) && ids.length) {
+        // leads stay with managers (their details are manager-only)
         const { data: ppl } = await db.from("portal_employees").select("id,role,active").in("id", ids);
-        if ((ppl || []).length !== ids.length || (ppl || []).some((p) => !p.active || !isMgr(p))) fail(400, "Only managers can be on catering leads.");
+        if ((ppl || []).length !== ids.length || (ppl || []).some((p) => !p.active || !isMgr(p))) fail(400, "Only managers can be on leads.");
       }
       if (ids.length) await db.from("chat_members").upsert(ids.map((e) => ({ convo_id: c.id, emp_id: e })));
       return { ok: true };
@@ -649,7 +699,7 @@ async function handle(a: string, b: any, me: number) {
       if (!phone && !email) fail(400, "Add a mobile number or an email.");
       if (phone) {
         const { data: ex } = await db.from("chat_convos").select("id").eq("kind", "client").eq("client_phone", phone).eq("archived", false)
-          .is("lead_id", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
+          .is("lead_id", null).is("inquiry_id", null).order("created_at", { ascending: false }).limit(1).maybeSingle();
         if (ex) { await db.from("chat_members").upsert({ convo_id: ex.id, emp_id: me }); return { id: ex.id, existed: true }; }
       }
       const { data: c, error } = await db.from("chat_convos").insert({

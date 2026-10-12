@@ -535,6 +535,7 @@ body{display:flex;flex-direction:column}
 /* catering leads: sidebar section, stage pills, lead panel */
 .lst{--c:#6b7280;display:inline-flex;align-items:center;flex:none;height:18px;padding:0 7px;border-radius:9px;font-size:11px;font-weight:800;letter-spacing:.01em;white-space:nowrap;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent)}
 .st-new{--c:#d97706}.st-replied{--c:#2563eb}.st-quoted{--c:#4f46e5}.st-contract_sent{--c:#7c3aed}.st-signed{--c:#059669}.st-invoiced{--c:#0d9488}.st-deposit_paid{--c:#16a34a}.st-paid{--c:#15803d}.st-lost{--c:#6b7280}
+.st-link_sent{--c:#7c3aed}.st-booked{--c:#15803d} /* experience inquiries */
 .s-item .lst{margin-left:auto;height:16px;padding:0 6px;font-size:10.5px;color:rgba(226,236,243,.78);background:rgba(255,255,255,.1)}
 .s-item .lst.st-new{color:#f3cf72;background:rgba(230,179,60,.2)}
 .s-item.active .lst{color:#fff;background:rgba(255,255,255,.2)}
@@ -738,6 +739,7 @@ strike:'<path d="M5 12h14M16 7.5C15.4 6 14 5 12 5c-2.5 0-4 1.3-4 3 0 1.4.9 2.3 2
 apps:'<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>',
 store:'<path d="M4 9.5 5.5 4h13L20 9.5M4 9.5h16M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0M5.5 12v8h13v-8"/>',
 brief:'<rect x="3.5" y="7.5" width="17" height="12" rx="2"/><path d="M9 7.5V5.8A1.3 1.3 0 0 1 10.3 4.5h3.4A1.3 1.3 0 0 1 15 5.8v1.7M3.5 12.5h17M11 12.5v1.5h2v-1.5"/>',
+cal:'<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4M9 14.5l2 2 4-4"/>',
 };
 const ic=(n,s=18,sw=1.7)=>`<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]||''}</svg>`;
 
@@ -765,6 +767,17 @@ const STAGE_L=Object.fromEntries(STAGE);
 const OPEN_ST=['new','replied','quoted','contract_sent'],BOOKED_ST=['signed','invoiced','deposit_paid','paid'];
 const PORTAL_BASE=/^chat\./.test(location.hostname)?'https://staff.greyscheese.com/':'';
 const leadUrl=(code,tab)=>PORTAL_BASE+'manager.html#catering/'+encodeURIComponent(code)+(tab?'/'+tab:'');
+/* experience inquiries (a client conversation with an inquiry, lead.kind 'exp'): their own stages, the booking link
+   the manager console sends (holds restart when it goes out), and the console's inquiry modal */
+const ISTAGE=[['new','New'],['replied','Replied'],['link_sent','Link sent'],['booked','Booked'],['lost','Lost']];
+const ISTAGE_L=Object.fromEntries(ISTAGE);
+const INQ_SITE='https://tickets.greyscheese.com/experiences.html';
+const inqUrl=code=>PORTAL_BASE+'manager.html#inquiries/'+encodeURIComponent(code);
+const stL=L=>(L.kind==='exp'?ISTAGE_L:STAGE_L)[L.stage]||L.stage;
+const lUrl=L=>L.kind==='exp'?inqUrl(L.code):leadUrl(L.code);
+// the subject chat-api sends with (the same as the catering / inquiries functions), so replies come back here
+const leadSubj=L=>L.kind==='exp'?'Re: Your GREYS '+((L.exp||'').trim()||'experience')+' question [#'+L.code+']':'Re: Your GREYS catering question [#'+L.code+']';
+const KIND_ORDER=['Catering','Experience','Private event','Table request'],KIND_PL={Catering:'Catering',Experience:'Experiences','Private event':'Private events','Table request':'Table requests'};
 let STAFF=[];
 const convos={}; const msgs={}; const byId={};
 const ONLINE=new Set();
@@ -789,16 +802,24 @@ function mapConvo(c){
   if(prev&&prev.lastRead>o.lastRead)o.lastRead=prev.lastRead;
   if(c.kind==='client'){const u='k:'+c.id;o.client={u,via:c.client_via||'sms',phone:c.client_phone||'',email:c.client_email||'',tag:c.client_tag||'Client',meta:c.client_meta||'',code:c.mail_code||''};
     if(c.lead_id)o.lead=c.lead?mapLead(c.lead):(prev?.lead||null);
+    else if(c.inquiry_id)o.lead=c.inq?mapInq(c.inq):(prev?.lead||null);
     users[u]={name:o.name,title:(o.lead?o.client.tag+' lead':'Client'+(o.client.tag?' · '+o.client.tag:'')),color:o.lead?'#0f766e':'#64748b',external:true,phone:prettyPhone(o.client.phone),email:o.client.email};}
   convos[c.id]=o; if(!msgs[c.id])msgs[c.id]=[];
   return o;
 }
 function mapLead(l){const q=l.quote;
-  return {id:l.id,code:l.code,name:l.name||'',company:l.company||'',email:l.email||'',phone:l.phone||'',loc:l.location||'',date:l.event_date||'',time:l.event_time||'',
+  return {kind:'cat',id:l.id,code:l.code,name:l.name||'',company:l.company||'',email:l.email||'',phone:l.phone||'',loc:l.location||'',date:l.event_date||'',time:l.event_time||'',
     guests:l.guests,ful:l.fulfillment||'',addr:l.address||'',occ:l.occasion||'',budget:l.budget||'',stage:l.stage||'new',unread:!!l.unread,beo:l.beo_rev||0,
     quote:q?{status:q.status,total:q.total_cents||0,dep:q.deposit_pct,paid:q.amount_paid_cents||0,inv:q.invoice_status||'',url:q.invoice_url||'',num:q.invoice_number||'',
       sent:q.sent_at,viewed:q.viewed_at,signed:q.signed_at,signer:q.signed_name||'',only:!!q.invoice_only,due:q.balance_due_date,depAt:q.deposit_paid_at,paidAt:q.paid_at}:null};}
+function mapInq(q){const d=q.details||{},r=q.res;
+  return {kind:'exp',id:q.id,code:q.code,name:q.name||'',company:'',email:q.email||'',phone:q.phone||'',loc:q.location||'',date:q.preferred_date||'',time:q.preferred_time||'',
+    guests:q.party_size,exp:q.experience_name||'',typeId:q.experience_type_id||'',opt:q.option_label||'',addr:q.event_address||'',stage:q.stage||'new',unread:!!q.unread,
+    event:d.kind==='event',occ:d.occasion||'',diet:Array.isArray(d.dietary)?d.dietary:[],answers:Array.isArray(d.answers)?d.answers:[],contact:d.contact_pref||'',
+    resId:q.reservation_id||'',resCode:q.reservation_code||'',hold:q.hold_expires_at||'',
+    res:r?{code:r.code||'',status:r.status||'',pay:r.payment_status||'',total:r.total_cents||0,refunded:r.refunded_cents||0,starts:r.starts_at}:null};}
 const isLead=c=>!!(c&&c.lead);
+const isInq=c=>isLead(c)&&c.lead.kind==='exp';
 const money=c=>'$'+(Math.round(c)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 function leadTime(t){const m=/^(\d{1,2}):(\d{2})/.exec(t||'');if(!m)return t||'';const h=+m[1];return ((h%12)||12)+':'+m[2]+(h>=12?' PM':' AM');}
 function leadDate(d,o){return d?new Date(d+'T12:00:00').toLocaleDateString([],o||{weekday:'short',month:'short',day:'numeric'}):'';}
@@ -807,7 +828,23 @@ const FUL={pickup:'Pick-up',delivery:'Delivery',onsite:'On-site service'};
 // open = still being sold; booked = signed+ and the event hasn't passed; closed = lost, or the event is over
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 function leadState(L){const today=ymd(new Date()),past=L.date&&L.date<today;
-  if(L.stage==='lost')return 'closed';if(BOOKED_ST.includes(L.stage))return past?'closed':'booked';return past?'closed':'open';}
+  if(L.stage==='lost')return 'closed';if(L.kind==='exp'?L.stage==='booked':BOOKED_ST.includes(L.stage))return past?'closed':'booked';return past?'closed':'open';}
+const holdWhen=iso=>new Date(iso).toLocaleString([],{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+// an experience inquiry's booking: paid / refunded / held until … / hold expired
+function inqLine(L){const r=L.res;
+  if(r&&r.pay==='paid')return 'Booked · paid '+money(r.total)+(r.refunded?' · refunded '+money(r.refunded):'');
+  if(r&&r.pay==='refunded')return 'Refunded '+money(r.refunded||r.total);
+  if(L.hold)return Date.parse(L.hold)>Date.now()?'Held until '+holdWhen(L.hold):'Hold expired';
+  return '';}
+// the same link the manager console's "Insert booking link" makes: prefilled, and it pays for the held reservation
+function bookLink(L){const [first,...rest]=(L.name||'').trim().split(/\s+/);const p=new URLSearchParams();
+  if(L.typeId)p.set('book',L.typeId);else p.set('ask','');
+  if(L.date)p.set('date',L.date);if(L.guests)p.set('party',L.guests);
+  if(L.time&&/^\d{2}:\d{2}$/.test(L.time))p.set('time',L.time);
+  if(L.resId&&L.resCode&&L.hold){p.set('hold',L.resId);p.set('hc',L.resCode);}
+  if(first)p.set('first',first);if(rest.length)p.set('last',rest.join(' '));
+  if(L.email)p.set('email',L.email);if(L.phone)p.set('phone',L.phone);
+  return INQ_SITE+'?'+p.toString();}
 function quoteLine(q){if(!q)return '';
   if(q.status==='paid')return 'Paid in full · '+money(q.total);
   if(q.status==='deposit_paid')return 'Deposit paid · '+money(q.paid)+' of '+money(q.total);
@@ -911,7 +948,7 @@ function renderRail(){
 function sItem(c){
   const n=unread(c),mc=mentionCount(c),active=S.view==='convo'&&S.cur===c.id;
   if(isLead(c)){const L=c.lead,d=L.date?leadDate(L.date,{month:'numeric',day:'numeric'}):'';
-    return `<button class="s-item s-lead ${n&&!c.muted?'unread':''} ${c.muted?'muted':''} ${active?'active':''}" data-go="${c.id}" title="${esc(c.name+(L.company?' · '+L.company:'')+' · '+leadWhen(L)+' · '+(STAGE_L[L.stage]||L.stage))}"><span class="ico">${ic('brief',15,1.9)}</span><span class="lbl">${esc(c.name)}${d?` <span class="ld">${esc(d)}</span>`:''}</span>${mc&&!c.muted?`<span class="badge">${mc}</span>`:`<span class="lst st-${L.stage}">${esc(STAGE_L[L.stage]||L.stage)}</span>`}</button>`;}
+    return `<button class="s-item s-lead ${n&&!c.muted?'unread':''} ${c.muted?'muted':''} ${active?'active':''}" data-go="${c.id}" title="${esc(c.name+(L.company?' · '+L.company:'')+(L.exp&&!L.event?' · '+L.exp:'')+' · '+leadWhen(L)+' · '+stL(L))}"><span class="ico">${ic(L.kind==='exp'?'cal':'brief',15,1.9)}</span><span class="lbl">${esc(c.name)}${d?` <span class="ld">${esc(d)}</span>`:''}</span>${mc&&!c.muted?`<span class="badge">${mc}</span>`:`<span class="lst st-${L.stage}">${esc(stL(L))}</span>`}</button>`;}
   let icon;
   if(c.type==='channel')icon=`<span class="ico">${ic(c.private?'lock':'hash',16,2)}</span>`;
   else if(c.type==='client')icon=`<span class="ico">${ic(c.client.via==='email'?'mail':'phone',16,1.9)}</span>`;
@@ -931,18 +968,18 @@ function renderSide(){
   const ch=all.filter(c=>c.type==='channel'&&!c.starred).sort((a,b)=>a.name.localeCompare(b.name));
   const dms=all.filter(c=>c.type==='dm'&&!c.starred).sort((a,b)=>(last(b)?.ts||b.created)-(last(a)?.ts||a.created));
   const cl=all.filter(c=>c.type==='client'&&!isLead(c)&&!c.starred).sort((a,b)=>(last(b)?.ts||b.created)-(last(a)?.ts||a.created));
-  // catering leads still in play (or with something new), soonest event first, date TBD last
+  // leads (catering + experience inquiries) still in play (or with something new), soonest event first, date TBD last
   const leads=all.filter(c=>isLead(c)&&!c.starred&&(leadState(c.lead)!=='closed'||unread(c)||S.cur===c.id))
     .sort((a,b)=>(a.lead.date||'9999').localeCompare(b.lead.date||'9999')||a.name.localeCompare(b.name));
   const leadCount=Object.values(convos).filter(c=>isLead(c)&&c.joined).length;
   const drafts=Object.keys(S.drafts).filter(k=>S.drafts[k]&&convos[k]).length;
   const top=(v,i,l,meta)=>`<button class="s-item ${S.view===v?'active':''}" data-view="${v}"><span class="ico">${ic(i,17)}</span><span class="lbl">${l}</span>${meta?`<span class="meta">${meta}</span>`:''}</button>`;
-  const leadsSec=leadCount?`<div class="sec ${S.collapsed.catering?'closed':''}"><div class="sec-head" data-sec="catering" role="button" tabindex="0"><span class="car">${ic('chev',16,2)}</span><span>Catering</span><button class="add" data-view="leads" title="All catering leads">${ic('brief',14,2)}</button></div>
+  const leadsSec=leadCount?`<div class="sec ${S.collapsed.catering?'closed':''}"><div class="sec-head" data-sec="catering" role="button" tabindex="0"><span class="car">${ic('chev',16,2)}</span><span>Leads</span><button class="add" data-view="leads" title="All leads">${ic('brief',14,2)}</button></div>
       ${leads.map(sItem).join('')}<button class="s-item s-add" data-view="leads"><span class="ico">${ic('brief',14,2)}</span><span class="lbl">All leads</span><span class="meta">${leadCount}</span></button></div>`:'';
   $('#side').innerHTML=`<div class="ws-head"><button class="ws-name" data-act="wsmenu"><span>GREYS Fine Cheeses</span>${ic('chev',16,2)}</button>
     <div class="ws-tools"><button data-act="prefs" title="Preferences">${ic('vdots',18)}</button><button class="compose" data-view="compose" title="New message">${ic('compose',18,2)}</button></div></div>
     <div class="side-scroll">
-      ${top('threads','thread','Threads')}${top('drafts','send','Drafts & sent',drafts||'')}${top('clients','store','Clients')}${leadCount?top('leads','brief','Catering leads'):''}${top('browse','hash','All channels')}
+      ${top('threads','thread','Threads')}${top('drafts','send','Drafts & sent',drafts||'')}${top('clients','store','Clients')}${leadCount?top('leads','brief','Leads'):''}${top('browse','hash','All channels')}
       ${starred.length?sec('starred','Starred',starred.map(sItem).join(''),null,''):''}
       ${sec('channels','Channels',ch.map(sItem).join(''),'newchannel','Add channels')}
       ${sec('dms','Direct messages',dms.map(sItem).join(''),'newdm','Add coworkers')}
@@ -1015,7 +1052,7 @@ function intro(c){
   const older=!S.noMore[c.id]&&(msgs[c.id]||[]).length>=20?`<div class="older"><button class="btn sm" data-act="older">Load earlier messages</button></div>`:'';
   if(c.type==='channel')return older+`<div class="intro"><h2>${ic(c.private?'lock':'hash',22,2.2)}${esc(c.name)}</h2><p>${c.creator&&users[c.creator]?`<span class="mention">@${esc(nm(c.creator))}</span> created this channel on ${new Date(c.created).toLocaleDateString([], {month:'long',day:'numeric'})}. `:''}This is the very beginning of the <b>#${esc(c.name)}</b> channel.${c.desc?' '+esc(c.desc):''}</p>
     <div class="btns"><button class="btn sm" data-act="details" data-tabx="about">${ic('edit',14)}${c.desc?'Edit description':'Add description'}</button><button class="btn sm" data-act="details" data-tabx="members">${ic('people',14)}Add people</button></div></div>`;
-  if(isLead(c)){const L=c.lead,u=c.client.u;return older+`<div class="intro"><div class="big-av" style="margin-bottom:12px">${av(u,72)}</div><h2>${esc(nm(u))}${L.company?` <span style="font-weight:400;color:var(--muted)">· ${esc(L.company)}</span>`:''}</h2><p>${esc(c.client.tag)} lead <b>#${esc(L.code)}</b> · ${esc(leadWhen(L))}${L.guests?' · '+L.guests+' guests':''}. Emails go to <b>${esc(c.client.email||'—')}</b> with the lead's subject line, so their replies land back here${c.client.phone?`; texts go to <b>${esc(prettyPhone(c.client.phone))}</b>`:''}. Everything here also shows in the manager console. Use <b>Internal note</b> for anything the client shouldn't see.</p><div class="btns"><button class="btn sm" data-act="leadpane">${ic('brief',14)}Lead details</button><a class="btn sm" href="${esc(leadUrl(L.code,'quote'))}" target="_blank" rel="noopener">Proposal &amp; invoice</a></div></div>`;}
+  if(isLead(c)){const L=c.lead,u=c.client.u,ex=L.kind==='exp',w=ex?'inquiry':'lead';return older+`<div class="intro"><div class="big-av" style="margin-bottom:12px">${av(u,72)}</div><h2>${esc(nm(u))}${L.company?` <span style="font-weight:400;color:var(--muted)">· ${esc(L.company)}</span>`:''}</h2><p>${esc(c.client.tag)} ${w} <b>#${esc(L.code)}</b>${ex&&L.exp&&!L.event?' · '+esc(L.exp):''} · ${esc(leadWhen(L))}${L.guests?' · '+L.guests+' guests':''}. Emails go to <b>${esc(c.client.email||'—')}</b> with the ${w}'s subject line, so their replies land back here${c.client.phone?`; texts go to <b>${esc(prettyPhone(c.client.phone))}</b>`:''}. Everything here also shows in the manager console. Use <b>Internal note</b> for anything the client shouldn't see.</p><div class="btns"><button class="btn sm" data-act="leadpane">${ic(ex?'cal':'brief',14)}${ex?'Inquiry':'Lead'} details</button>${ex?`<button class="btn sm" data-act="booklink">${ic('link',14)}Add booking link</button>`:`<a class="btn sm" href="${esc(leadUrl(L.code,'quote'))}" target="_blank" rel="noopener">Proposal &amp; invoice</a>`}</div></div>`;}
   if(c.type==='client'){const u=c.client.u;return older+`<div class="intro"><div class="big-av" style="margin-bottom:12px">${av(u,72)}</div><h2>${esc(nm(u))}</h2><p>${c.client.phone?`Texts go to <b>${esc(prettyPhone(c.client.phone))}</b> from the GREYS number`:''}${c.client.phone&&c.client.email?' and emails go to ':c.client.email?'Emails go to ':''}${c.client.email?`<b>${esc(c.client.email)}</b>`:''}. Their replies — texts and emails — land back here. Use <b>Internal note</b> for anything the client shouldn't see.</p><div class="btns"><button class="btn sm" data-act="clientedit">${ic('edit',14)}Edit client</button><a class="btn sm" href="https://staff.greyscheese.com/manager" target="_blank" rel="noopener">Open portal</a></div></div>`;}
   const o=c.members.filter(m=>m!==ME);
   if(!o.length)return older+`<div class="intro"><div class="big-av" style="margin-bottom:12px">${av(ME,72)}</div><h2>${esc(nm(ME))} <span style="font-weight:400;color:var(--muted)">(you)</span></h2><p><b>This is your space.</b> Draft messages, list your to-dos, or keep links and files handy.</p></div>`;
@@ -1029,7 +1066,8 @@ function convoHead(c){
     right=`<button class="mem-btn" data-act="details" data-tabx="members"><span class="stack">${c.members.slice(0,3).map(u=>av(u,20)).join('')}</span><span class="n">${c.members.length}</span></button><button class="icon-btn" data-act="chmore" title="More">${ic('vdots',18)}</button>`;
   }else if(isLead(c)){
     const u=c.client.u;title=`<button class="ch-title" data-act="leadpane">${av(u,24)}<span>${esc(nm(u))}</span>${ic('chev',16,2)}</button>`;
-    right=`<button class="mem-btn" data-act="details" data-tabx="members" title="Managers on this lead"><span class="stack">${c.members.slice(0,3).map(u=>av(u,20)).join('')}</span><span class="n">${c.members.length}</span></button><button class="icon-btn lead-btn ${S.pane?.type==='lead'?'on':''}" data-act="leadpane" title="Lead details">${ic('brief',18)}</button><button class="icon-btn" data-act="chmore" title="More">${ic('vdots',18)}</button>`;
+    const ex=c.lead.kind==='exp';
+    right=`<button class="mem-btn" data-act="details" data-tabx="members" title="Managers on this ${ex?'inquiry':'lead'}"><span class="stack">${c.members.slice(0,3).map(u=>av(u,20)).join('')}</span><span class="n">${c.members.length}</span></button><button class="icon-btn lead-btn ${S.pane?.type==='lead'?'on':''}" data-act="leadpane" title="${ex?'Inquiry':'Lead'} details">${ic(ex?'cal':'brief',18)}</button><button class="icon-btn" data-act="chmore" title="More">${ic('vdots',18)}</button>`;
   }else if(c.type==='client'){
     const u=c.client.u;title=`<button class="ch-title" data-act="profile" data-uid="${u}">${av(u,24)}<span>${esc(nm(u))}</span>${ic('chev',16,2)}</button>`;
     right=`<button class="mem-btn" data-act="details" data-tabx="members" title="Team on this client"><span class="stack">${c.members.slice(0,3).map(u=>av(u,20)).join('')}</span><span class="n">${c.members.length}</span></button><button class="icon-btn" data-act="chmore" title="More">${ic('vdots',18)}</button>`;
@@ -1043,7 +1081,9 @@ function convoHead(c){
   const tabs=`<div class="tabs">${tab('messages','dms','Messages')}${c.type==='client'&&!isLead(c)?tab('details','note','Client details'):''}${tab('files','file','Files',files)}${tab('pins','pin','Pins',pins)}${c.type==='channel'&&c.joined?`<button class="tab" data-act="addbm" title="Add a bookmark">${ic('plus',16)}</button>`:''}</div>`;
   const bm=c.type==='channel'&&(c.bookmarks.length||c.joined)?`<div class="bm-bar">${c.bookmarks.map((b,i)=>`<span class="bm-w"><a class="bm" href="${esc(b.u)}" target="_blank" rel="noopener" data-bm="${i}">${esc(b.e||'🔗')} ${esc(b.t)}</a>${c.joined?`<button class="bm-more" data-act="bmmenu" data-bmi="${i}" title="Edit or remove" aria-label="Bookmark options">${ic('dots',14)}</button>`:''}</span>`).join('')}${c.joined?`<button class="bm add" data-act="addbm">${ic('plus',14)} Add a bookmark</button>`:''}</div>`:'';
   const L=c.lead;
-  const strip=isLead(c)?`<div class="client-strip lead-strip"><span class="lst st-${L.stage}">${esc(STAGE_L[L.stage]||L.stage)}</span><span class="ct">${ic('clock',14)}${esc(leadWhen(L))}</span>${L.guests?`<span class="ct">${ic('people',14)}${L.guests} guests</span>`:''}${L.ful?`<span>${esc(FUL[L.ful]||L.ful)}</span>`:''}${L.quote?`<span>${esc(quoteLine(L.quote))}</span>`:''}<button class="portal-link" data-act="leadpane">${ic('brief',15)}Lead</button></div>`
+  const strip=isLead(c)?`<div class="client-strip lead-strip"><span class="lst st-${L.stage}">${esc(stL(L))}</span><span class="ct">${ic('clock',14)}${esc(leadWhen(L))}</span>${L.guests?`<span class="ct">${ic('people',14)}${L.guests} guests</span>`:''}${L.kind==='exp'
+      ?(L.exp&&!L.event?`<span>${esc(L.exp)}${L.opt?' · '+esc(L.opt):''}</span>`:'')+(inqLine(L)?`<span>${esc(inqLine(L))}</span>`:'')
+      :(L.ful?`<span>${esc(FUL[L.ful]||L.ful)}</span>`:'')+(L.quote?`<span>${esc(quoteLine(L.quote))}</span>`:'')}<button class="portal-link" data-act="leadpane">${ic(L.kind==='exp'?'cal':'brief',15)}${L.kind==='exp'?'Inquiry':'Lead'}</button></div>`
     :c.type==='client'?`<div class="client-strip">${c.client.tag?`<span class="tagpill">${esc(c.client.tag)}</span>`:''}${c.client.meta?`<span>${esc(c.client.meta)}</span>`:''}${c.client.phone?`<span class="ct">${ic('phone',14)}${esc(prettyPhone(c.client.phone))}</span>`:''}${c.client.email?`<span class="ct">${ic('mail',14)}${esc(c.client.email)}</span>`:''}<button class="portal-link" data-act="clientedit">${ic('edit',15)}Edit</button></div>`:'';
   return `<div class="ch-head">${back}${title}<div class="right">${right}</div></div>${tabs}${bm}${strip}`;
 }
@@ -1089,7 +1129,7 @@ function composerHTML(key,c){
   if(isClient)S.mode[c.id]=md;
   const lastSubj=isClient?((msgs[c.id]||[]).slice().reverse().find(m=>m.subject)?.subject||''):'';
   const modes=isClient?`<div class="c-modes"><button class="${md==='sms'?'on':''}" data-mode="sms" ${c.client.phone?'':'disabled title="Add a mobile number first"'}>${ic('phone',13,2)}Text</button><button class="${md==='email'?'on':''}" data-mode="email" ${c.client.email?'':'disabled title="Add an email first"'}>${ic('mail',13,2)}Email</button><button class="note-on ${md==='note'?'on':''}" data-mode="note">${ic('note',13,2)}Internal note</button></div>`:'';
-  const subj=isClient&&md==='email'?(isLead(c)?`<div class="c-subj" title="Kept as is so their reply comes back to this conversation"><span>Subject</span><input id="subj" value="${esc('Re: Your GREYS catering question [#'+c.lead.code+']')}" readonly></div>`
+  const subj=isClient&&md==='email'?(isLead(c)?`<div class="c-subj" title="Kept as is so their reply comes back to this conversation"><span>Subject</span><input id="subj" value="${esc(leadSubj(c.lead))}" readonly></div>`
     :`<div class="c-subj" title="Kept as is so their reply comes back to this conversation"><span>Subject</span><input id="subj" value="${esc(clientSubj(c,lastSubj))}" readonly></div>`):'';
   const tl=(cmd,i,t)=>`<button data-fmt="${cmd}" title="${t}" tabindex="-1">${ic(i,16,2)}</button>`;
   const files=S.files[key]||[];
@@ -1124,7 +1164,8 @@ function clean(node){
     if(!t){out+=clean(n);return;}
     if(t==='br'){out+='<br>';return;}
     if(t==='div'){const inner=clean(n);out+=(out&&!/<br>$|<\/(blockquote|pre|ul|ol)>$/.test(out)?'<br>':'')+(inner||'');return;}
-    if(t==='a'){const href=n.getAttribute('href')||'';out+=/^https?:/i.test(href)?`<a href="${esc(href)}" target="_blank" rel="noopener">${clean(n)}</a>`:clean(n);return;}
+    // a link's own text isn't linkified again (a pasted / inserted URL as the text made a link inside a link)
+    if(t==='a'){const href=n.getAttribute('href')||'';out+=/^https?:/i.test(href)?`<a href="${esc(href)}" target="_blank" rel="noopener">${esc(n.textContent)}</a>`:clean(n);return;}
     out+=`<${t}>${clean(n)}</${t}>`;
   });
   return out;
@@ -1277,7 +1318,7 @@ function renderPane(){
 function leadPane(force){const c=convos[S.cur];if(!isLead(c))return;
   if(S.pane?.type==='lead'&&!force){S.pane=null;}else S.pane={type:'lead'};
   renderPane();if(S.view==='convo')renderMain();}
-function leadPaneHTML(c){const L=c.lead,q=L.quote,mgr=isMgrU(ME);
+function leadPaneHTML(c){if(isInq(c))return inqPaneHTML(c);const L=c.lead,q=L.quote,mgr=isMgrU(ME);
   const row=(i,k,v,copy)=>v?`<div class="lp-row"><span class="lp-i">${i}</span><div><small>${k}</small>${copy?`<span class="linkish" data-act="copytext" data-t="${esc(v)}">${esc(v)}</span>`:`<span>${esc(v)}</span>`}</div></div>`:'';
   const opts=STAGE.map(([k,l])=>`<option value="${k}" ${k===L.stage?'selected':''}>${esc(l)}</option>`).join('');
   let qbox;
@@ -1304,9 +1345,49 @@ function leadPaneHTML(c){const L=c.lead,q=L.quote,mgr=isMgrU(ME);
       </div>
       <p class="lp-hint">Proposals, invoices and BEOs are made in the manager console. Every text, email and note here shows there too, and its replies and updates show here.</p>
     </div>`;}
+// an experience inquiry: what they asked for, the hold / booking, and the booking link
+function inqPaneHTML(c){const L=c.lead,r=L.res,mgr=isMgrU(ME);
+  const row=(i,k,v,copy)=>v?`<div class="lp-row"><span class="lp-i">${i}</span><div><small>${esc(k)}</small>${copy?`<span class="linkish" data-act="copytext" data-t="${esc(v)}">${esc(v)}</span>`:`<span>${esc(v)}</span>`}</div></div>`:'';
+  const opts=ISTAGE.map(([k,l])=>`<option value="${k}" ${k===L.stage?'selected':''}>${esc(l)}</option>`).join('');
+  const ans=L.answers.filter(a=>a&&a.label&&a.value!=null&&String(a.value).trim());const has=id=>ans.some(a=>a.id===id);
+  const hold=L.hold?Date.parse(L.hold):0;let bbox;
+  if(r&&(r.pay==='paid'||r.pay==='refunded'))bbox=`<b>${r.pay==='paid'?'✅ Booked and paid':'↩️ Refunded'}</b><div class="lp-money"><span>Paid <b>${money(r.total)}</b></span>${r.refunded?`<span>Refunded <b>${money(r.refunded)}</b></span>`:''}${r.code?`<span>Reservation <b>#${esc(r.code)}</b></span>`:''}</div>`;
+  else if(hold&&hold>Date.now())bbox=`<b>⏳ Held until ${esc(holdWhen(L.hold))}</b><span style="color:var(--muted)">Sending the booking link restarts the 48 hours.${L.resCode?' Reservation #'+esc(L.resCode)+'.':''}</span>`;
+  else if(hold)bbox=`<b>Hold expired</b><span style="color:var(--muted)">The booking link still works if the time is open.</span>`;
+  else bbox=`<span style="color:var(--muted)">${L.event?'Private event — nothing is held. Check the date, then reply.':L.typeId?'Nothing is held yet. Send the booking link when the time works.':'They didn\'t pick an experience — the booking link opens the Experiences page.'}</span>`;
+  return `<div class="p-head"><div style="min-width:0"><h3>${esc(c.client.tag)} inquiry</h3><div class="sub">#${esc(L.code)}${L.loc?' · '+esc(cap(L.loc)):''}</div></div><button class="icon-btn x" data-act="closepane" aria-label="Close">${ic('x',20)}</button></div>
+    <div class="p-body lead-pane">
+      <div class="lp-top">${av(c.client.u,48)}<div style="min-width:0"><div class="lp-name">${esc(c.name)}</div>${L.exp&&!L.event?`<div class="lp-co">${esc(L.exp)}${L.opt?' · '+esc(L.opt):''}</div>`:''}</div></div>
+      <label class="lp-stage"><span>Stage</span><select data-leadstage ${mgr?'':'disabled'}>${opts}</select></label>
+      <div class="lp-rows">
+        ${row('📅','When',leadWhen(L))}${row('👥','Guests',L.guests?String(L.guests):'')}${row('🏪','Shop',cap(L.loc))}${row('📍','Address',L.addr)}
+        ${has('occasion')?'':row('🎉','Occasion',L.occ)}${has('dietary')||!L.diet.length?'':row('🥗','Dietary',L.diet.join(', '))}
+        ${ans.map(a=>row('📝',a.label,String(a.value))).join('')}${row('💬','Best way to reach them',L.contact)}
+        ${row('✉️','Email',c.client.email,true)}${row('📱','Phone',prettyPhone(c.client.phone)||L.phone,true)}
+      </div>
+      <h4 class="lp-h">Booking</h4><div class="lp-q">${bbox}</div>
+      <div class="lp-btns">
+        <button class="btn sm primary" data-act="booklink">${ic('link',14)}Add booking link</button>
+        <a class="btn sm" href="${esc(inqUrl(L.code))}" target="_blank" rel="noopener">Open in manager console</a>
+        <button class="btn sm" data-act="clientedit">${ic('edit',14)}Edit contact</button>
+      </div>
+      <p class="lp-hint">The booking link goes into your message. Sending it by email or text restarts their 48-hour hold and moves the stage to Link sent; paying online moves it to Booked. Every text, email and note here also shows in the manager console.</p>
+    </div>`;}
+// put the booking link in the message box (switching an internal note to email: a link in a note goes nowhere)
+function addBookLink(){const c=convos[S.cur];if(!isInq(c))return;
+  const keep=inputOf('main')?.innerHTML;let re=false;
+  if(!matchMedia('(min-width:1280px)').matches&&S.pane?.type==='lead'){S.pane=null;renderPane();re=true;} // the panel covers the composer here
+  if(S.tab!=='messages'){S.tab='messages';re=true;}
+  if(S.mode[c.id]==='note'){S.mode[c.id]=c.client.email?'email':'sms';re=true;}
+  if(re){renderMain();const i=inputOf('main');if(keep&&i)i.innerHTML=keep;}
+  const inp=inputOf('main');if(!inp)return;
+  const url=bookLink(c.lead);placeEnd(inp);
+  document.execCommand('insertHTML',false,(inp.textContent.trim()?'<br><br>':'')+`<a href="${esc(url)}">${esc(url)}</a>&nbsp;`);
+  updSend('main');
+  if(!c.lead.typeId)toast('They didn\'t pick an experience — the link opens the Experiences page.');}
 async function setLeadStage(sel){const c=convos[S.cur];if(!isLead(c))return;const v=sel.value,was=c.lead.stage;if(v===was)return;
   c.lead.stage=v;sel.disabled=true;renderSide();if(S.view==='convo')renderMain();
-  try{await api('lead_stage',{convo:c.id,stage:v});toast('Moved to '+STAGE_L[v]);}
+  try{await api('lead_stage',{convo:c.id,stage:v});toast('Moved to '+stL(c.lead));}
   catch(e){c.lead.stage=was;toast(e.message);}finally{sel.disabled=false;renderSide();if(S.view==='convo')renderMain();renderPane();}}
 function leadByCode(code){code=String(code||'').toUpperCase();return Object.values(convos).find(c=>isLead(c)&&c.lead.code===code);}
 function openLead(code){const c=leadByCode(code);if(!c)return false;open(c.id);if(matchMedia('(min-width:1100px)').matches){S.pane={type:'lead'};renderPane();renderMain();}return true;}
@@ -1331,13 +1412,17 @@ function renderView(){
     main.innerHTML=vhead('Later')+`<div class="v-filters"><button class="chip ${f==='open'?'on':''}" data-lf="open">In progress ${items.filter(x=>!x.done).length}</button><button class="chip ${f==='done'?'on':''}" data-lf="done">Completed ${items.filter(x=>x.done).length}</button></div><div class="v-list">${list.length?list.map(x=>`<div class="li" data-jump="${x.m.id}">${av(x.m.u)}<div style="min-width:0"><div class="lt">${esc(cTitle(convos[x.cid]))}</div><div class="ln">${esc(nm(x.m.u))}</div><div class="lp">${esc(preview(x.m))}</div></div><button class="btn sm" data-act="laterdone" data-mid="${x.m.id}">${x.done?'Move back':ic('check',14,2.2)+'Complete'}</button></div>`).join(''):`<div class="empty"><h3>${f==='open'?'Nothing saved yet':'Nothing completed'}</h3>Hover any message and click the bookmark to save it for later.</div>`}</div>`;return;
   }
   if(v==='leads'){
-    const all=Object.values(convos).filter(c=>isLead(c)&&c.joined);const f=S.leadFilter||'open';
+    const every=Object.values(convos).filter(c=>isLead(c)&&c.joined);const f=S.leadFilter||'open';
+    const kinds=KIND_ORDER.filter(t=>every.some(c=>c.client.tag===t));const kd=kinds.includes(S.leadKind)?S.leadKind:'all';
+    const all=every.filter(c=>kd==='all'||c.client.tag===kd);
     const n=k=>all.filter(c=>k==='all'||leadState(c.lead)===k).length;
+    const kchip=(k,l)=>`<button class="chip ${kd===k?'on':''}" data-lkind="${esc(k)}">${esc(l)}</button>`;
     const list=all.filter(c=>f==='all'||leadState(c.lead)===f).sort((a,b)=>f==='closed'||f==='all'?(last(b)?.ts||b.created)-(last(a)?.ts||a.created):(a.lead.date||'9999').localeCompare(b.lead.date||'9999'));
     const chip=(k,l)=>`<button class="chip ${f===k?'on':''}" data-lfil="${k}">${l} ${n(k)}</button>`;
-    main.innerHTML=vhead('Catering leads',`<a class="btn sm" style="margin-left:auto" href="${esc(PORTAL_BASE+'manager.html#catering')}" target="_blank" rel="noopener">${ic('brief',14)}Manager console</a>`)
+    main.innerHTML=vhead('Leads',`<a class="btn sm" style="margin-left:auto" href="${esc(PORTAL_BASE+'manager.html#catering')}" target="_blank" rel="noopener">${ic('brief',14)}Manager console</a>`)
+      +(kinds.length>1?`<div class="v-filters">${kchip('all','All kinds')}${kinds.map(t=>kchip(t,KIND_PL[t]||t)).join('')}</div>`:'')
       +`<div class="v-filters">${chip('open','Open')}${chip('booked','Booked')}${chip('closed','Closed')}${chip('all','All')}</div><div class="v-list">${list.length?list.map(c=>{const L=c.lead,l=last(c),un=unread(c);
-        return `<div class="li lead-li" data-go="${c.id}">${av(c.client.u)}<div style="min-width:0"><div class="lt"><span class="lst st-${L.stage}">${esc(STAGE_L[L.stage]||L.stage)}</span>${c.client.tag!=='Catering'?`<span class="tagpill">${esc(c.client.tag)}</span>`:''}<span>${esc(leadWhen(L))}${L.guests?' · '+L.guests+' guests':''}${L.quote?' · '+money(L.quote.total):''}</span></div><div class="ln" style="${un?'':'font-weight:700'}">${esc(c.name)}${L.company?` <span class="lco">${esc(L.company)}</span>`:''}</div><div class="lp" style="color:var(--muted)">${l?(l.u===ME?'You: ':'')+esc(preview(l)):'No messages yet'}</div></div><span class="when">${l?shortWhen(l.ts):''}${un?`<br><span class="badge" style="display:inline-block;margin-top:4px">${un}</span>`:''}</span></div>`;}).join(''):`<div class="empty"><h3>${f==='open'?'No open leads':f==='booked'?'Nothing booked ahead':'Nothing here'}</h3>New catering inquiries show up here and in the sidebar as they come in.</div>`}</div>`;return;
+        return `<div class="li lead-li" data-go="${c.id}">${av(c.client.u)}<div style="min-width:0"><div class="lt"><span class="lst st-${L.stage}">${esc(stL(L))}</span>${c.client.tag!=='Catering'?`<span class="tagpill">${esc(c.client.tag)}</span>`:''}<span>${L.kind==='exp'&&L.exp&&!L.event?esc(L.exp)+' · ':''}${esc(leadWhen(L))}${L.guests?' · '+L.guests+' guests':''}${L.quote?' · '+money(L.quote.total):''}${L.res&&L.res.pay==='paid'?' · '+money(L.res.total):''}</span></div><div class="ln" style="${un?'':'font-weight:700'}">${esc(c.name)}${L.company?` <span class="lco">${esc(L.company)}</span>`:''}</div><div class="lp" style="color:var(--muted)">${l?(l.u===ME?'You: ':'')+esc(preview(l)):'No messages yet'}</div></div><span class="when">${l?shortWhen(l.ts):''}${un?`<br><span class="badge" style="display:inline-block;margin-top:4px">${un}</span>`:''}</span></div>`;}).join(''):`<div class="empty"><h3>${f==='open'?'No open leads':f==='booked'?'Nothing booked ahead':'Nothing here'}</h3>New catering and experience inquiries show up here and in the sidebar as they come in.</div>`}</div>`;return;
   }
   if(v==='dms'||v==='clients'){
     const type=v==='dms'?'dm':'client';const list=Object.values(convos).filter(c=>c.type===type&&c.joined&&!isLead(c)).sort((a,b)=>(last(b)?.ts||b.created)-(last(a)?.ts||a.created));
@@ -1627,6 +1712,7 @@ document.addEventListener('click',e=>{
   const af=t.closest('[data-af]');if(af){S.actFilter=af.dataset.af;renderMain();return;}
   const lf=t.closest('[data-lf]');if(lf){S.laterFilter=lf.dataset.lf;renderMain();return;}
   const lfl=t.closest('[data-lfil]');if(lfl){S.leadFilter=lfl.dataset.lfil;renderMain();return;}
+  const lkd=t.closest('[data-lkind]');if(lkd){S.leadKind=lkd.dataset.lkind;renderMain();return;}
   // links to a lead's conversation (the #portal-alerts card) open right here
   const la=t.closest('a[href*="chat.html#lead="]');if(la){const m=/#lead=([A-Za-z0-9]+)/.exec(la.getAttribute('href')||'');if(m&&leadByCode(m[1])){e.preventDefault();openLead(m[1]);return;}}
   const sq=t.closest('[data-sq]');if(sq){S.searchQ=sq.dataset.sq.trim();$('#search').value=S.searchQ;renderMain();return;}
@@ -1650,6 +1736,7 @@ document.addEventListener('click',e=>{
     case 'profile':if(users[a.dataset.uid]){S.pane={type:'profile',uid:a.dataset.uid};renderPane();}break;
     case 'closepane':{const wasLead=S.pane?.type==='lead';S.pane=null;renderPane();if(wasLead&&S.view==='convo')renderMain();break;}
     case 'leadpane':leadPane();break;
+    case 'booklink':addBookLink();break;
     case 'details':details(a.dataset.tabx||'about');break;
     case 'star':{const c=convos[S.cur];c.starred=!c.starred;api('prefs',{convo:c.id,starred:c.starred}).catch(er=>toast(er.message));renderSide();renderMain();break;}
     case 'join':{const c=convos[a.dataset.cid||S.cur];busy(a,()=>joinC(c));break;}
@@ -1669,7 +1756,7 @@ document.addEventListener('click',e=>{
     case 'clientedit':{const c=S.pane?.type==='profile'&&users[S.pane.uid]?.external?Object.values(convos).find(x=>x.client?.u===S.pane.uid):convos[S.cur];if(c?.client)clientForm(c);break;}
     case 'addbm':addBookmark();break;
     case 'bmmenu':bookmarkMenu(a,+a.dataset.bmi);break;
-    case 'chmore':{const c=convos[S.cur];menu(a,[...(isLead(c)?[{k:'lead',l:'Lead details',fn:()=>leadPane(true)},{k:'mc',l:'Open in manager console',fn:()=>window.open(leadUrl(c.lead.code),'_blank')},'-']:[]),{k:'det',l:'Conversation details',fn:()=>details(c.type==='client'?'members':'about')},...(c.joined?[{k:'mute',l:c.muted?'Unmute conversation':'Mute conversation',fn:()=>{c.muted=!c.muted;api('prefs',{convo:c.id,muted:c.muted}).catch(er=>toast(er.message));renderSide();toast(c.muted?'Muted':'Unmuted');}},{k:'star',l:c.starred?'Unstar':'Star',fn:()=>{c.starred=!c.starred;api('prefs',{convo:c.id,starred:c.starred}).catch(er=>toast(er.message));renderAll();}}]:[]),{k:'search',l:'Search in conversation',fn:()=>{const s=$('#search');s.value=(c.type==='channel'?'in:#'+c.name:'in:'+cName(c).split(' ')[0])+' ';s.focus();}},...(c.joined&&c.type!=='dm'&&!isLead(c)?['-',{k:'leave',l:c.type==='client'?'Leave client conversation':'Leave channel',red:true,fn:()=>leave(c).catch(er=>toast(er.message))}]:[])],'left');break;}
+    case 'chmore':{const c=convos[S.cur];menu(a,[...(isLead(c)?[{k:'lead',l:isInq(c)?'Inquiry details':'Lead details',fn:()=>leadPane(true)},...(isInq(c)?[{k:'bl',l:'Add booking link',fn:addBookLink}]:[]),{k:'mc',l:'Open in manager console',fn:()=>window.open(lUrl(c.lead),'_blank')},'-']:[]),{k:'det',l:'Conversation details',fn:()=>details(c.type==='client'?'members':'about')},...(c.joined?[{k:'mute',l:c.muted?'Unmute conversation':'Mute conversation',fn:()=>{c.muted=!c.muted;api('prefs',{convo:c.id,muted:c.muted}).catch(er=>toast(er.message));renderSide();toast(c.muted?'Muted':'Unmuted');}},{k:'star',l:c.starred?'Unstar':'Star',fn:()=>{c.starred=!c.starred;api('prefs',{convo:c.id,starred:c.starred}).catch(er=>toast(er.message));renderAll();}}]:[]),{k:'search',l:'Search in conversation',fn:()=>{const s=$('#search');s.value=(c.type==='channel'?'in:#'+c.name:'in:'+cName(c).split(' ')[0])+' ';s.focus();}},...(c.joined&&c.type!=='dm'&&!isLead(c)?['-',{k:'leave',l:c.type==='client'?'Leave client conversation':'Leave channel',red:true,fn:()=>leave(c).catch(er=>toast(er.message))}]:[])],'left');break;}
     case 'wsmenu':menu(a,[`<div class="me-card"><span class="ws-tile" style="margin:0;box-shadow:none">G</span><div><b>GREYS Fine Cheeses</b><small>Memphis · Nashville</small></div></div>`,'-',{k:'pref',l:'Preferences',fn:prefs},{k:'kb',l:'Keyboard shortcuts',fn:shortcuts},'-',{k:'portal',l:'Open staff portal',fn:()=>window.open('https://staff.greyscheese.com','_blank')}]);break;
     case 'memenu':meMenu(a);break;
     case 'create':menu(a,[{k:'m',l:ic('compose',16)+'Message',fn:()=>setView('compose')},{k:'c',l:ic('hash',16)+'Channel',fn:newChannel},{k:'cl',l:ic('store',16)+'Client conversation',fn:()=>clientForm(null)}],'right');break;
@@ -1809,7 +1896,7 @@ async function start(){
   if(first){S.cur=first;const c=convos[first];S.newMarker[first]=unread(c)?c.lastRead:null;S.scrollNew=!!S.newMarker[first];markRead(c);S.hist=[first];}
   renderAll();
   const leadHash=/^#lead=([A-Za-z0-9]+)/.exec(location.hash||'');
-  if(leadHash){if(!openLead(leadHash[1]))toast('That catering lead isn\'t in your chat.');}
+  if(leadHash){if(!openLead(leadHash[1]))toast('That lead isn\'t in your chat.');}
   else if(hashMid&&byId[hashMid])jump(hashMid);else if(hashCid&&convos[hashCid]?.joined)open(hashCid);
   if(location.hash)history.replaceState(null,'',location.pathname+location.search);
   connect();
