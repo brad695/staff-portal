@@ -52,6 +52,26 @@ async function verify(tok: string): Promise<number | null> {
   return Number(p[0]) || null;
 }
 
+/* ---------- phone / desktop notifications (Web Push) ----------
+   The VAPID key pair lives in app_secrets 'chat_vapid' as {pub, jwk}; it's made here on first use
+   (one row, so two first calls can't end up with mismatched halves). Only `pub` ever leaves.
+   chat-notify does the sending. */
+async function vapidPub(): Promise<string> {
+  const read = async () => (await db.from("app_secrets").select("value").eq("name", "chat_vapid").maybeSingle()).data?.value as string | undefined;
+  let v = await read();
+  if (!v) {
+    const kp = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]) as CryptoKeyPair;
+    const jwk = await crypto.subtle.exportKey("jwk", kp.privateKey);
+    const pub = b64u(await crypto.subtle.exportKey("raw", kp.publicKey));
+    await db.from("app_secrets").upsert({ name: "chat_vapid", value: JSON.stringify({ pub, jwk }) }, { onConflict: "name", ignoreDuplicates: true });
+    v = await read();
+  }
+  try { return JSON.parse(v || "{}").pub || ""; } catch { return ""; }
+}
+// only real browser push services — chat-notify POSTs to these URLs
+const PUSH_HOSTS = /(^|\.)(fcm\.googleapis\.com|android\.googleapis\.com|push\.services\.mozilla\.com|push\.apple\.com|notify\.windows\.com)$/;
+const b64norm = (s: unknown) => str(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
 /* ---------- html sanitizer (stored messages render as HTML in every browser) ---------- */
 const ALLOW = new Set(["b", "i", "s", "code", "pre", "blockquote", "ul", "ol", "li", "br", "a", "span"]);
 function sanitize(html: string): string {
@@ -236,7 +256,7 @@ async function boot(me: number) {
   }
   await withReactions(msgs);
   const { data: saved } = await db.from("chat_saved").select("message_id,done").eq("emp_id", me);
-  return { me, people: ppl, convos, messages: msgs, saved: saved || [], activity_seen_at: pmap[me]?.activity_seen_at || null, sms: !!(TW_SID && TW_TOKEN && TW_FROM) };
+  return { me, people: ppl, convos, messages: msgs, saved: saved || [], activity_seen_at: pmap[me]?.activity_seen_at || null, sms: !!(TW_SID && TW_TOKEN && TW_FROM), vapid: await vapidPub().catch(() => "") };
 }
 
 async function handle(a: string, b: any, me: number) {
@@ -494,6 +514,8 @@ async function handle(a: string, b: any, me: number) {
       if (typeof b.away === "boolean") upd.away = b.away;
       if (b.title != null) upd.title = str(b.title).slice(0, 80);
       if (b.activity_seen) upd.activity_seen_at = new Date().toISOString();
+      // the app says when a chat window is in front of someone; chat-notify skips them while it is
+      if (typeof b.active === "boolean") upd.focus_at = b.active ? new Date().toISOString() : null;
       await db.from("chat_profiles").upsert({ emp_id: me, ...upd });
       return { ok: true };
     }
@@ -508,6 +530,35 @@ async function handle(a: string, b: any, me: number) {
       if (error) fail(500, error.message);
       const { data: s } = await db.storage.from("chat-files").createSignedUrl(path, 60 * 60 * 24 * 7);
       return { path, url: s?.signedUrl || "" };
+    }
+    case "push_sub": { // this device turned notifications on (or the app re-confirming it on load)
+      const s = b.sub || {};
+      const endpoint = str(s.endpoint), p256dh = b64norm(s.keys?.p256dh), auth = b64norm(s.keys?.auth);
+      let host = "";
+      try { const u = new URL(endpoint); if (u.protocol === "https:") host = u.hostname; } catch { /* not a URL */ }
+      if (!host || !PUSH_HOSTS.test(host) || endpoint.length > 1000) fail(400, "This browser's notification service isn't supported.");
+      if (!/^[A-Za-z0-9_-]{86,88}$/.test(p256dh) || !/^[A-Za-z0-9_-]{21,24}$/.test(auth)) fail(400, "This browser sent bad notification keys.");
+      // one row per device; a shared device follows whoever signed in last
+      const { error } = await db.from("chat_push_subs").upsert(
+        { emp_id: me, endpoint, p256dh, auth, ua: str(b.ua).slice(0, 200), fails: 0, last_err: null, updated_at: new Date().toISOString() },
+        { onConflict: "endpoint" },
+      );
+      if (error) fail(500, "Couldn't save this device. Try again.");
+      return { ok: true };
+    }
+    case "push_unsub": {
+      await db.from("chat_push_subs").delete().eq("endpoint", str(b.endpoint)).eq("emp_id", me);
+      return { ok: true };
+    }
+    case "push_test": {
+      const { data: sec } = await db.from("app_secrets").select("value").eq("name", "chat_notify_secret").maybeSingle();
+      const r = await fetch(`${SB_URL}/functions/v1/chat-notify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-chat-secret": sec?.value || "" },
+        body: JSON.stringify({ test: me, endpoint: str(b.endpoint) || undefined }),
+      }).catch(() => null);
+      const d: any = r ? await r.json().catch(() => ({})) : {};
+      return { sent: Number(d.sent || 0) };
     }
   }
   fail(400, "Unknown action.");

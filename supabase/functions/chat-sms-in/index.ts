@@ -58,6 +58,20 @@ Deno.serve(async (req) => {
     const { data: emps } = await db.from("portal_employees").select("id,role,active");
     const me = (emps || []).find((e) => e.id === staff.employee_id && e.active);
     if (me) {
+      const html = "📱 " + esc(body).replace(/\n/g, "<br>");
+      // a reply to a chat notification text goes back into that conversation (thread kept);
+      // in a client conversation it lands as an internal note — never sent on to the client
+      const { data: last } = await db.from("chat_notify_log").select("convo_id,parent_id").eq("emp_id", me.id).eq("ok", true)
+        .gte("sent_at", new Date(Date.now() - 12 * 3600e3).toISOString()).order("sent_at", { ascending: false }).limit(1).maybeSingle();
+      if (last) {
+        const { data: mem } = await db.from("chat_members").select("emp_id").eq("convo_id", last.convo_id).eq("emp_id", me.id).maybeSingle();
+        const { data: conv } = await db.from("chat_convos").select("kind").eq("id", last.convo_id).maybeSingle();
+        if (mem && conv) {
+          await db.from("chat_messages").insert({ convo_id: last.convo_id, parent_id: last.parent_id, emp_id: me.id, author_kind: "staff", body_html: html, is_note: conv.kind === "client" && !last.parent_id, ext_id: sid });
+          await db.from("chat_members").update({ last_read_at: new Date().toISOString() }).eq("convo_id", last.convo_id).eq("emp_id", me.id);
+          return twiml();
+        }
+      }
       const ids = [...new Set([me.id, ...(emps || []).filter((e) => e.active && /manager|owner|admin/i.test(e.role || "")).map((e) => e.id)])].sort((a, b) => a - b);
       const dm_key = ids.join("-");
       let { data: dm } = await db.from("chat_convos").select("id").eq("dm_key", dm_key).maybeSingle();
@@ -66,7 +80,6 @@ Deno.serve(async (req) => {
         dm = nd;
         await db.from("chat_members").insert(ids.map((e) => ({ convo_id: dm!.id, emp_id: e })));
       }
-      const html = "📱 " + esc(body).replace(/\n/g, "<br>");
       await db.from("chat_messages").insert({ convo_id: dm!.id, emp_id: me.id, author_kind: "staff", body_html: html, ext_id: sid });
       return twiml();
     }

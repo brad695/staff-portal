@@ -8,6 +8,11 @@
 <title>Greys Chat</title>
 <link rel="icon" href="/favicon-32.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/chat-manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Greys Chat">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;0,700;0,900;1,400&display=swap" rel="stylesheet">
@@ -507,10 +512,21 @@ mark{background:#fdf0c7;color:inherit;border-radius:2px}
 .sig-hint{font-size:12px;color:var(--muted)}
 .conn{position:fixed;left:50%;top:48px;transform:translateX(-50%);z-index:85;background:#e01e5a;color:#fff;font-size:13px;font-weight:700;padding:4px 12px;border-radius:12px}
 .conn[hidden]{display:none}
+/* notifications: Slack-style permission strip above the app + Preferences rows */
+body{display:flex;flex-direction:column}
+#app{flex:1 1 auto;min-height:0;height:auto}
+.nbar{flex:none;position:relative;display:flex;align-items:center;justify-content:center;gap:10px;padding:7px 44px;background:var(--gold);color:#03192a;font-size:14px;line-height:1.35;text-align:center}
+.nbar[hidden]{display:none}
+.nbar-go{border:0;background:none;color:inherit;font:inherit;font-weight:900;text-decoration:underline;cursor:pointer;padding:0;white-space:nowrap}
+.nbar-x{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:28px;height:28px;border:0;border-radius:6px;background:none;color:inherit;display:grid;place-items:center;cursor:pointer}
+.nbar-x:hover{background:rgba(0,0,0,.1)}
+.pf-note{margin:0 0 10px;color:var(--muted)}
+.pf-row{display:flex;gap:8px;flex-wrap:wrap}
 </style>
 
 </head>
 <body>
+<div class="nbar" id="nbar" hidden></div>
 <div id="app">
   <header class="top">
     <div class="hist">
@@ -568,7 +584,72 @@ async function api(a,body={}){
   if(!r.ok)throw new Error((d&&d.error)||'Something went wrong. Try again.');
   return d;
 }
-function signOut(){TOKEN=null;store.set('token',null);try{RT&&RT.unsubscribe();}catch(e){}location.reload();}
+async function signOut(user){
+  // signing out on purpose also stops this device's notifications for you
+  if(user===true){try{const sub=await pushSub();if(sub){await api('push_unsub',{endpoint:sub.endpoint}).catch(()=>{});await sub.unsubscribe();}}catch(e){}}
+  TOKEN=null;store.set('token',null);try{RT&&RT.unsubscribe();}catch(e){}location.reload();}
+// chat.greyscheese.com/ and staff.greyscheese.com/chat.html both live at /chat.html (the app's home-screen + notification scope)
+if(/^chat\./.test(location.hostname)&&/^\/(index\.html)?$/.test(location.pathname))history.replaceState(null,'','/chat.html'+location.search+location.hash);
+
+/* ---------- notifications on this device ----------
+   Real phone/computer notifications (Web Push): chat-sw.js shows them, the chat-notify edge function
+   sends them when someone's away from chat. Android + computers: any modern browser. iPhone/iPad:
+   only once Greys Chat is added to the Home Screen and opened from there (iOS 16.4+). */
+const PUSH_SCOPE='/chat.html';
+const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const standalone=()=>navigator.standalone===true||matchMedia('(display-mode: standalone)').matches;
+const pushOK=()=>window.isSecureContext&&'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+const b64u=buf=>btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const unb64u=s=>{let t=String(s).replace(/-/g,'+').replace(/_/g,'/');while(t.length%4)t+='=';return Uint8Array.from(atob(t),c=>c.charCodeAt(0));};
+let SWREG=null;
+async function swReg(){
+  if(SWREG)return SWREG;if(!pushOK())return null;
+  const reg=await navigator.serviceWorker.register('/chat-sw.js',{scope:PUSH_SCOPE});
+  if(!reg.active){const w=reg.installing||reg.waiting;if(w)await new Promise(r=>{const f=()=>{if(w.state==='activated'||w.state==='redundant'){w.removeEventListener('statechange',f);r();}};w.addEventListener('statechange',f);});}
+  return SWREG=reg;}
+async function pushSub(){try{const reg=SWREG||(pushOK()?await navigator.serviceWorker.getRegistration(PUSH_SCOPE):null);return reg?await reg.pushManager.getSubscription():null;}catch(e){return null;}}
+async function pushSave(sub){await api('push_sub',{sub:sub.toJSON(),ua:navigator.userAgent.slice(0,200)});S.pushOn=true;}
+/* every load: if this device already allows notifications, keep its subscription on file */
+async function pushSync(){
+  try{if(!pushOK()||Notification.permission!=='granted'||!S.vapid||store.get('pushOff',false)){S.pushOn=false;return;}
+    const reg=await swReg();let sub=await reg.pushManager.getSubscription();
+    try{if(sub&&sub.options&&sub.options.applicationServerKey&&b64u(sub.options.applicationServerKey)!==S.vapid){await sub.unsubscribe();sub=null;}}catch(e){}
+    if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:unb64u(S.vapid)});
+    await pushSave(sub);
+  }catch(e){S.pushOn=false;}finally{renderBanner();}}
+/* from a tap: subscribe() asks for permission itself, so it must start inside the click (iPhone insists) */
+async function pushOn(){
+  if(!pushOK())throw new Error('This browser can\'t show notifications.');
+  if(!S.vapid)throw new Error('Notifications aren\'t ready yet. Reload and try again.');
+  let reg=SWREG;
+  if(!reg){if(Notification.permission==='default'&&await Notification.requestPermission()!=='granted')throw new Error('Notifications weren\'t allowed.');reg=await swReg();}
+  const key=unb64u(S.vapid);let sub;
+  try{sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});}
+  catch(e){
+    if(Notification.permission==='denied')throw new Error('Notifications are blocked for this site. Allow them in your browser\'s site settings.');
+    const old=await reg.pushManager.getSubscription();if(!old||Notification.permission!=='granted')throw new Error('Notifications weren\'t turned on.');
+    await old.unsubscribe();sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});}
+  store.set('pushOff',null);await pushSave(sub);renderBanner();
+  return api('push_test',{endpoint:sub.endpoint}).catch(()=>({sent:0}));}
+async function pushOff(){store.set('pushOff',true);const sub=await pushSub();if(sub){await api('push_unsub',{endpoint:sub.endpoint}).catch(()=>{});try{await sub.unsubscribe();}catch(e){}}S.pushOn=false;renderBanner();}
+/* "I'm here": while a chat window is in front of someone (touched in the last 10 min) their phone stays quiet */
+let lastInput=Date.now(),lastBeat=null;
+const isActive=()=>document.visibilityState==='visible'&&Date.now()-lastInput<10*60000;
+function beat(force){if(!ME||!TOKEN)return;const a=isActive();if(!force&&!a&&lastBeat===false)return;lastBeat=a;api('profile',{active:a}).catch(()=>{});}
+['pointerdown','keydown','touchstart','wheel','mousemove'].forEach(t=>addEventListener(t,()=>{lastInput=Date.now();if(lastBeat===false&&document.visibilityState==='visible')beat(true);},{passive:true,capture:true}));
+/* Slack-style strip at the top asking for permission (or, on an iPhone in Safari, to add to Home Screen) */
+function renderBanner(){const el=$('#nbar');if(!el)return;let h='';
+  if(ME&&!store.get('pushOff',false)&&Date.now()-store.get('nbarX',0)>7*DAY){
+    if(isIOS&&!standalone())h='Get Greys Chat notifications on this phone: tap <b>Share</b>, then <b>Add to Home Screen</b>, and open Greys Chat from your Home Screen.';
+    else if(pushOK()&&S.vapid&&Notification.permission==='default')h='Greys Chat needs your permission to enable notifications. <button class="nbar-go" data-nb-on>Enable notifications</button>';}
+  el.hidden=!h;el.innerHTML=h?`<span>${h}</span><button class="nbar-x" data-nb-x aria-label="Dismiss">${ic('x',16)}</button>`:'';
+  const cn=$('#conn');if(cn)cn.style.top=h?(48+el.offsetHeight)+'px':'';}
+document.addEventListener('click',e=>{
+  if(e.target.closest('[data-nb-x]')){store.set('nbarX',Date.now());renderBanner();return;}
+  const b=e.target.closest('[data-nb-on]');if(b)busy(b,async()=>{const r=await pushOn();toast(r.sent?'Notifications are on. We sent a test to this device.':'Notifications are on for this device.');});});
+/* tapping a notification focuses an open chat window and jumps to the message */
+if('serviceWorker' in navigator){navigator.serviceWorker.addEventListener('message',e=>{const d=e.data||{};if(d.type==='open'&&ME)openFromNote(d.m,d.c);});try{navigator.serviceWorker.startMessages();}catch(e){}}
+async function openFromNote(mid,cid){if(mid&&!find(mid))await catchUp();if(mid&&find(mid))jump(mid);else if(cid&&convos[cid])open(cid);}
 
 /* ---------- icons ---------- */
 const P={
@@ -993,8 +1074,17 @@ function showTyping(){const t=$('#main [data-typing]');if(!t)return;const who=Ob
   t.innerHTML=who.length?`<i><b></b><b></b><b></b></i><b>${esc(who.join(', '))}</b>&nbsp;${who.length>1?'are':'is'} typing…`:'';}
 function notify(c,m){
   const t=document.createElement('div');t.className='toast';t.innerHTML=`${av(m.u,36)}<div style="min-width:0"><div class="tt">${esc(nm(m.u))} · ${esc(cTitle(c))}</div><div class="tb">${esc(preview(m))}</div></div>`;t.onclick=()=>{open(c.id,{jump:m.parent||m.id});t.remove();};$('#toasts').appendChild(t);setTimeout(()=>t.remove(),6500);
-  try{if(document.visibilityState!=='visible'&&'Notification' in window&&Notification.permission==='granted'){const n=new Notification(nm(m.u)+' · '+cTitle(c),{body:preview(m).slice(0,140),tag:m.id});n.onclick=()=>{window.focus();open(c.id,{jump:m.parent||m.id});n.close();};}}catch(e){}
+  try{if(document.visibilityState!=='visible'&&'Notification' in window&&Notification.permission==='granted'){
+    // same wording + tag as chat-notify's push, so when both arrive the push replaces this one quietly
+    const {t,b}=nText(c,m),o={body:b,tag:'c'+c.id,renotify:true,icon:'/icon-192.png',badge:'/chat-badge.png',data:{m:m.id,c:c.id}};
+    if(SWREG)SWREG.showNotification(t,o).catch(()=>{});
+    else{const n=new Notification(t,o);n.onclick=()=>{window.focus();open(c.id,{jump:m.parent||m.id});n.close();};}}}catch(e){}
 }
+function nText(c,m){
+  const fromClient=String(m.u||'').startsWith('k:'),who=nm(m.u)||'Someone',solo=c.type==='dm'&&c.members.length<=2;
+  let t=c.type==='channel'?'#'+c.name:c.type==='client'?c.name:solo?who:cName(c);if(m.parent)t='Thread in '+t;
+  let b=preview(m)||(m.files&&m.files.length?'Sent a file':'New message');if(b.length>180)b=b.slice(0,177)+'…';
+  return {t,b:solo||fromClient?b:who.split(' ')[0]+': '+b};}
 function toast(s){const t=document.createElement('div');t.className='toast plain';t.textContent=s;$('#toasts').appendChild(t);setTimeout(()=>t.remove(),3200);}
 
 /* ---------- autocomplete ---------- */
@@ -1279,9 +1369,20 @@ function setStatus(){const pre=[['🗓️','In a meeting'],['🚚','Delivering']
   $('#stE',back).onclick=()=>picker($('#stE',back),x=>{e=x;$('#stE',back).textContent=x;});
   $('#stS',back).onclick=()=>busy($('#stS',back),async()=>{const t=$('#stT',back).value.trim();await api('profile',{status_e:t?e:'',status_t:t});users[ME].status=t?{e,t}:null;back.remove();renderAll();toast('Status updated');});
   $('#stX',back).onclick=()=>busy($('#stX',back),async()=>{await api('profile',{status_e:'',status_t:''});users[ME].status=null;back.remove();renderAll();});}
-function prefs(){const t=store.get('theme','system');const nperm='Notification' in window?Notification.permission:'unsupported';
-  const back=modal('Preferences',`<label>Color mode</label><div class="seg-ctl">${[['light','Light'],['dark','Dark'],['system','Sync with OS']].map(([k,l])=>`<button class="${t===k?'on':''}" data-th="${k}">${l}</button>`).join('')}</div><label>Desktop notifications</label>${nperm==='granted'?'<p style="margin:0;color:var(--muted)">On. You\'ll get a notification for DMs, mentions and client replies when this tab is in the background.</p>':nperm==='denied'?'<p style="margin:0;color:var(--muted)">Blocked in this browser. Allow notifications for this site in your browser settings.</p>':nperm==='unsupported'?'<p style="margin:0;color:var(--muted)">This browser doesn\'t support notifications.</p>':'<button class="btn sm" data-np>Turn on notifications</button>'}<label>Your title</label><input id="pfT" class="fld" value="${esc(users[ME].title)}" placeholder="e.g. Cheesemonger · Memphis">`,`<button class="btn primary" id="pfS">Done</button>`);
-  back.addEventListener('click',e=>{const b=e.target.closest('[data-th]');if(b){applyTheme(b.dataset.th);$$('[data-th]',back).forEach(x=>x.classList.toggle('on',x===b));}if(e.target.closest('[data-np]')){Notification.requestPermission().then(()=>{back.remove();prefs();});}});
+function notifPref(){
+  const what='direct messages, @mentions, replies in your threads and client messages while you\'re away from chat';
+  if(isIOS&&!standalone())return '<p class="pf-note">To get notifications on an iPhone or iPad, add Greys Chat to your Home Screen: tap <b>Share</b>, then <b>Add to Home Screen</b>. Open Greys Chat from your Home Screen and turn them on here.</p>';
+  if(!pushOK())return '<p class="pf-note">This browser can\'t show notifications.</p>';
+  if(Notification.permission==='denied')return '<p class="pf-note">Notifications are blocked for this site. Allow them in your browser\'s site settings, then come back here.</p>';
+  if(S.pushOn)return `<p class="pf-note">On for this device. You'll get a notification for ${what}.</p><div class="pf-row"><button class="btn sm" data-ptest>Send a test</button><button class="btn sm" data-poff>Turn off for this device</button></div>`;
+  return `<p class="pf-note">Get a notification on this device for ${what}.</p><button class="btn sm primary" data-pon>Turn on notifications</button>`;}
+function prefs(){const t=store.get('theme','system');
+  const back=modal('Preferences',`<label>Color mode</label><div class="seg-ctl">${[['light','Light'],['dark','Dark'],['system','Sync with OS']].map(([k,l])=>`<button class="${t===k?'on':''}" data-th="${k}">${l}</button>`).join('')}</div><label>Notifications</label><div id="pfN">${notifPref()}</div><label>Your title</label><input id="pfT" class="fld" value="${esc(users[ME].title)}" placeholder="e.g. Cheesemonger · Memphis">`,`<button class="btn primary" id="pfS">Done</button>`);
+  const redo=()=>{const n=$('#pfN',back);if(n)n.innerHTML=notifPref();};
+  back.addEventListener('click',e=>{const b=e.target.closest('[data-th]');if(b){applyTheme(b.dataset.th);$$('[data-th]',back).forEach(x=>x.classList.toggle('on',x===b));}
+    const on=e.target.closest('[data-pon]');if(on)busy(on,async()=>{const r=await pushOn();redo();toast(r.sent?'Notifications are on. We sent a test to this device.':'Notifications are on for this device.');});
+    const tst=e.target.closest('[data-ptest]');if(tst)busy(tst,async()=>{const sub=await pushSub();const r=await api('push_test',{endpoint:sub?sub.endpoint:''});toast(r.sent?'Test sent. Check your notifications.':'Couldn\'t reach this device. Turn notifications off and on again.');});
+    const off=e.target.closest('[data-poff]');if(off)busy(off,async()=>{await pushOff();redo();toast('Notifications are off for this device.');});});
   $('#pfS',back).onclick=()=>busy($('#pfS',back),async()=>{const v=$('#pfT',back).value.trim();if(v!==users[ME].title){await api('profile',{title:v});users[ME].title=v;renderAll();}back.remove();});}
 function switcher(){
   const back=modal(null,`<div class="sw-in">${ic('search',20)}<input id="swq" placeholder="Jump to a channel, person or client"></div><div class="sw-list" id="swl"></div><div class="sw-foot">↑↓ to navigate · ↵ to open · esc to close</div>`,'',{cls:'switcher'});
@@ -1393,7 +1494,7 @@ function jumpDay(d){const target=new Date(new Date(Date.now()-d*DAY).toDateStrin
 function meMenu(anchor){const u=users[ME];menu(anchor,[`<div class="me-card">${av(ME,36)}<div><b>${esc(u.name)}</b><small><span style="width:8px;height:8px;border-radius:50%;${u.presence==='active'?'background:var(--online)':'box-shadow:inset 0 0 0 1.5px var(--muted)'}"></span>${u.presence==='active'?'Active':'Away'}</small></div></div>`,
   {k:'st',l:u.status?esc(u.status.e+' '+u.status.t):'😀 Update your status',fn:setStatus},
   {k:'aw',l:'Set yourself as <b>&nbsp;'+(u.away?'active':'away')+'</b>',fn:()=>{u.away=!u.away;api('profile',{away:u.away}).catch(er=>toast(er.message));track();renderAll();}},'-',
-  {k:'pr',l:'Profile',fn:()=>{S.pane={type:'profile',uid:ME};renderPane();}},{k:'pf',l:'Preferences',fn:prefs},{k:'kb',l:'Keyboard shortcuts',fn:shortcuts},'-',{k:'so',l:'Sign out',fn:signOut}],'right');}
+  {k:'pr',l:'Profile',fn:()=>{S.pane={type:'profile',uid:ME};renderPane();}},{k:'pf',l:'Preferences',fn:prefs},{k:'kb',l:'Keyboard shortcuts',fn:shortcuts},'-',{k:'so',l:'Sign out',fn:()=>signOut(true)}],'right');}
 function fmt(cmd,wrap){
   const inp=$('.c-input',wrap);inp.focus();
   if(cmd==='link'){const sel=getSelection();const txt=sel.toString();const rg=sel.rangeCount?sel.getRangeAt(0).cloneRange():null;
@@ -1427,8 +1528,9 @@ document.addEventListener('dragover',e=>{if(e.target.closest?.('.main,.pane'))e.
 document.addEventListener('drop',e=>{const z=e.target.closest?.('.main,.pane');if(!z||!e.dataTransfer.files.length)return;e.preventDefault();addFiles([...e.dataTransfer.files],z.classList.contains('pane')?'thread':'main');});
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='hidden'){S._hiddenAt=Date.now();}
-  else{if(S._hiddenAt&&Date.now()-S._hiddenAt>20000)catchUp();if(S.view==='convo'&&convos[S.cur]?.joined){markRead(convos[S.cur]);renderSide();renderRail();}}
-  track();});
+  else{lastInput=Date.now();if(S._hiddenAt&&Date.now()-S._hiddenAt>20000)catchUp();if(S.view==='convo'&&convos[S.cur]?.joined){markRead(convos[S.cur]);renderSide();renderRail();}
+    if(ME&&pushOK()&&Notification.permission==='granted'&&!S.pushOn&&!store.get('pushOff',false))pushSync();else renderBanner();}
+  beat(true);track();});
 
 /* ---------- realtime ---------- */
 let RT=null;
@@ -1490,7 +1592,7 @@ function ingest(d){
   ms.filter(m=>!m.parent).forEach(upsertMsg);ms.filter(m=>m.parent).forEach(upsertMsg);
   S.later={};d.saved.forEach(s=>S.later[s.message_id]=s.done?'done':'open');
   S.activitySeen=d.activity_seen_at?Date.parse(d.activity_seen_at):Date.now();
-  S.sms=d.sms;S.lastSync=Date.now();
+  S.sms=d.sms;S.vapid=d.vapid||null;S.lastSync=Date.now();
 }
 function showGate(err){
   $('#gate').hidden=false;
@@ -1509,14 +1611,17 @@ async function start(){
   let d;try{d=await api('boot');}catch(e){if(!TOKEN)return showGate();return showGate(e.message);}
   ingest(d);
   $('#gate').hidden=true;
-  const hashMid=(location.hash||'').slice(1);
+  const [hashMid,hashCid]=(location.hash||'').slice(1).split('@');
   const saved=store.get('cur',null);
   const first=convos[saved]?.joined?saved:(Object.values(convos).find(c=>c.joined&&c.name==='general')||Object.values(convos).find(c=>c.joined))?.id;
   S.mobMain=matchMedia('(min-width:761px)').matches;
   if(first){S.cur=first;const c=convos[first];S.newMarker[first]=unread(c)?c.lastRead:null;S.scrollNew=!!S.newMarker[first];markRead(c);S.hist=[first];}
   renderAll();
-  if(hashMid&&byId[hashMid])jump(hashMid);
+  if(hashMid&&byId[hashMid])jump(hashMid);else if(hashCid&&convos[hashCid]?.joined)open(hashCid);
+  if(location.hash)history.replaceState(null,'',location.pathname+location.search);
   connect();
+  beat(true);setInterval(()=>beat(),60000);
+  if(pushOK()&&!(isIOS&&!standalone()))swReg().then(pushSync).catch(()=>renderBanner());else renderBanner();
   setInterval(()=>{if(!S._rtOk&&document.visibilityState==='visible')catchUp();},30000);
   setInterval(()=>{if(S.view==='convo'&&S.tab==='messages'&&!S.editing&&!$('#layer').children.length)$$('.tsum .lr').length&&rerenderMsgs();},60000);
 }
