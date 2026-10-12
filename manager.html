@@ -724,7 +724,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="rec-card" style="background:#fff;max-width:720px;width:100%;border-radius:14px;padding:22px;">
       <div class="cat-mhead" style="padding-bottom:0;">
         <div style="flex:1;min-width:0;"><h3 id="inqTitle"></h3><div id="inqMeta" class="hint"></div></div>
-        <div class="cat-mhead-r"><span class="cat-stagelbl">Stage</span><select id="inqStage" class="loc-sel" onchange="inqSetStage(this.value)">
+        <div class="cat-mhead-r"><a class="btn btn-ghost btn-sm" id="inqChatLink" href="chat.html" target="_blank" rel="noopener" title="This inquiry's conversation in Greys Chat — texts, emails and notes stay in step with this one">💬 Chat</a><span class="cat-stagelbl">Stage</span><select id="inqStage" class="loc-sel" onchange="inqSetStage(this.value)">
           <option value="new">New</option><option value="replied">Replied</option><option value="link_sent">Booking link sent</option><option value="booked">Booked</option><option value="lost">Lost</option>
         </select>
         <button class="btn btn-ghost btn-sm" onclick="inqClose()">✕</button></div>
@@ -1787,9 +1787,16 @@ function openHashTab(){
   if (!raw) return;
   // manager.html#catering/<CODE>[/quote|/beo] opens that lead (links from Greys Chat)
   const [want, code, view] = raw.split('/');
-  if (want === 'inquiries') { mtab('catering'); return; } // old links in staff emails
+  // old links in staff emails; manager.html#inquiries/<CODE> (from Greys Chat) opens that experience inquiry
+  if (want === 'inquiries') { mtab('catering'); if (code) inqOpenByCode(code); return; }
   if (document.getElementById('panel-' + want)) mtab(want);
   if (want === 'catering' && code) catOpenByCode(code, view);
+}
+async function inqOpenByCode(code){
+  code = decodeURIComponent(String(code || '')).toUpperCase();
+  let r = INQ_ROWS.find(x => x.code === code);
+  if (!r) { await inqLoad(); r = INQ_ROWS.find(x => x.code === code); }
+  if (r) inqOpen(r.id);
 }
 async function catOpenByCode(code, view){
   code = decodeURIComponent(String(code || '')).toUpperCase();
@@ -1876,6 +1883,7 @@ async function inqOpen(id){
         ? '<div style="margin-top:4px;color:#92400e;">⏳ Held until '+esc(inqWhen(r.hold_expires_at))+' — sending the booking link restarts the 48 h.</div>'
         : '<div style="margin-top:4px;color:#b91c1c;">Hold expired — the link still works if the time is open.</div>') : '');
   document.getElementById('inqStage').value = r.stage;
+  const icl = document.getElementById('inqChatLink'); if(icl) icl.href = 'chat.html#lead=' + encodeURIComponent(r.code);
   document.getElementById('inqHideCal').checked = !!r.hide_on_calendar;
   document.getElementById('inqBody').value = '';
   document.getElementById('inqMsg').textContent = '';
