@@ -1993,8 +1993,9 @@ async function loadCalClasses(mS,mE){
     const evs = data||[];
     const booked = {};
     if(evs.length){
-      const { data: regs } = await sb.from('registrations').select('event_id,qty,refunded').in('event_id', evs.map(e=>e.id));
-      (regs||[]).forEach(r=>{ if(!r.refunded) booked[r.event_id]=(booked[r.event_id]||0)+(r.qty||0); });
+      const { data: regs } = await sb.from('registrations').select('event_id,qty,refunded,payment_status').in('event_id', evs.map(e=>e.id));
+      // a declined card (payment_status 'failed') is not a booking and holds no seat
+      (regs||[]).forEach(r=>{ if(!r.refunded && r.payment_status!=='failed') booked[r.event_id]=(booked[r.event_id]||0)+(r.qty||0); });
     }
     evs.forEach(e=>{ if(!e.date) return;
       (_calData.cls[e.date]=_calData.cls[e.date]||[]).push({ title:e.title, time:e.time||'', kind:e.kind||'class', booked:booked[e.id]||0, capacity:e.capacity||0 });
