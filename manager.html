@@ -4674,10 +4674,22 @@ const regFromRow = (r) => {
     group,
     total: r.total,
     refunded: r.refunded,
+    paymentStatus: r.payment_status || null,
     createdAt: r.created_at,
     userId: r.user_id || null,
   };
 };
+// Label for a booking on the roster, sales report, CSV and receipt. Online
+// checkouts land as 'pending' at $0 until the card clears, so a $0 pending
+// row is a checkout in progress, not a comp.
+const regStatusLabel = (r) =>
+  r.refunded
+    ? "Refunded"
+    : r.paymentStatus === "pending"
+    ? "Checking out"
+    : r.total === 0
+    ? "Comp"
+    : "Paid";
 const regToRow = (reg) => ({
   event_id: reg.eventId,
   code: reg.code,
@@ -4785,7 +4797,12 @@ function App() {
       rows = rows.concat(data);
       if (data.length < PAGE) break;
     }
-    return rows;
+    // A declined card, or a checkout abandoned for 20+ minutes, leaves its
+    // booking row behind as payment_status 'failed'. No money moved and it
+    // holds no seat (ticket_seats_taken() and the ticket site already skip
+    // it), so drop it here too. Otherwise every declined try shows up as a
+    // $0 "Comp" ticket and counts as sold.
+    return rows.filter((r) => r.payment_status !== "failed");
   };
 
   const loadAll = async (asAdmin = false) => {
@@ -5455,7 +5472,7 @@ function exportBookingsCsv(events, regs) {
     .forEach((r) => {
       const ev = evById[r.eventId] || {};
       const b = breakdown(r.total, r.createdAt);
-      const status = r.refunded ? "Refunded" : r.total === 0 ? "Comp" : "Paid";
+      const status = regStatusLabel(r);
       rows.push([
         r.createdAt ? new Date(r.createdAt).toLocaleString() : "",
         ev.title || "",
@@ -7876,7 +7893,7 @@ function AdminReport({ events, regs }) {
                       <td className="r">{money(b.fee)}</td>
                       <td className="r">{money(b.total)}</td>
                       <td>
-                        {r.refunded ? "Refunded" : r.total === 0 ? "Comp" : "Paid"}
+                        {regStatusLabel(r)}
                       </td>
                     </tr>
                   );
@@ -9818,6 +9835,8 @@ function printBookingDoc(reg, ev) {
     .join("");
   const tag = reg.refunded
     ? " · REFUNDED"
+    : reg.paymentStatus === "pending"
+    ? " · CHECKING OUT"
     : reg.total === 0
     ? " · COMP"
     : "";
@@ -10062,7 +10081,12 @@ function AdminDetail({ ev, regs, soldFor, go, onRefund, onUpdate, onAddComp }) {
                   {r.refunded && (
                     <span className="cc-badge-refund">Refunded</span>
                   )}
-                  {!r.refunded && r.total === 0 && (
+                  {!r.refunded && r.paymentStatus === "pending" && (
+                    <span className="cc-badge-comp" style={{ background: "#B7791F" }}>
+                      Checking out
+                    </span>
+                  )}
+                  {!r.refunded && r.paymentStatus !== "pending" && r.total === 0 && (
                     <span className="cc-badge-comp">Comp</span>
                   )}
                 </span>
