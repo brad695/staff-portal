@@ -400,8 +400,9 @@ function loadMonth(y,m){
       (async()=>{ try{
         const { data } = await sb.from('events').select('id,title,date,time,kind,capacity').gte('date',mS).lte('date',mE).ilike('location', LOC);
         const evs=data||[]; const booked={};
-        if(evs.length){ const { data:regs } = await sb.from('registrations').select('event_id,qty,refunded').in('event_id', evs.map(e=>e.id));
-          (regs||[]).forEach(r=>{ if(!r.refunded) booked[r.event_id]=(booked[r.event_id]||0)+(r.qty||0); }); }
+        if(evs.length){ const { data:regs } = await sb.from('registrations').select('event_id,qty,refunded,payment_status').in('event_id', evs.map(e=>e.id));
+          // a declined card (payment_status 'failed') is not a booking and holds no seat
+          (regs||[]).forEach(r=>{ if(!r.refunded && r.payment_status!=='failed') booked[r.event_id]=(booked[r.event_id]||0)+(r.qty||0); }); }
         evs.forEach(e=>{ if(!e.date) return; const t0=tmin(e.time); const b=booked[e.id]||0;
           put(e.date,{ cat:'class', title:e.title, sub:(e.kind==='class'?'Class':'Ticketed event')+(e.capacity?' · '+b+'/'+e.capacity+' booked':''), t0, t1:t0!=null?t0+120:null, soft:true, all:t0==null,
             rows:[['clock',null], ['tag', e.kind==='class'?'Class':'Ticketed event'], e.capacity?['people', b+' of '+e.capacity+' tickets booked']:null] }); });
