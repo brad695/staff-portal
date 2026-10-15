@@ -9134,6 +9134,99 @@ function SeatingRoster({ parties, noTables }) {
   );
 }
 
+// Printable seating roster on its own page (2026-10-15) — same parties and tables as SeatingRoster,
+// nothing from the console around it: class header, one box per party (table on the right), a check
+// box per guest for the door, big type. Opens a new tab and prints it (pop-ups must be allowed).
+function printSeatingRoster(ev, parties) {
+  const noTables = ev.location === "Nashville";
+  const tables = noTables ? null : assignTables(parties);
+  const guests = parties.reduce((n, p) => n + (p.size || 0), 0);
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  const partyName = (p, i) =>
+    p.code
+      ? `Group ${p.code}`
+      : p.size > 1
+      ? `Party ${i + 1}`
+      : (p.members[0] && p.members[0].name) || "Guest";
+  const body = parties.length
+    ? parties
+        .map((p, i) => {
+          const t = tables ? tables[i] : "";
+          const tag = t ? `<span class="table${t === "Unassigned" ? " un" : ""}">${esc(t)}</span>` : "";
+          const one = !p.code && p.size === 1 && p.members[0];
+          if (one) // a party of one: just the guest's line (check box, name, add-ons) and the table
+            return `<section class="party"><div class="top"><span class="solo"><span class="box"></span><span class="name">${esc(one.name || "Guest")}</span>${
+              one.addOns ? `<span class="adds">+ ${esc(one.addOns)}</span>` : ""
+            }</span>${tag}</div></section>`;
+          const rows = p.members
+            .map(
+              (m) =>
+                `<div class="guest"><span class="box"></span><span class="gname">${esc(m.name)}</span>${
+                  m.addOns ? `<span class="adds">+ ${esc(m.addOns)}</span>` : ""
+                }</div>`
+            )
+            .join("");
+          return `<section class="party"><div class="top"><span class="name">${esc(partyName(p, i))}</span>${tag}</div><div class="seats">${plural(p.size, "seat", "seats")}</div>${rows}</section>`;
+        })
+        .join("")
+    : `<p class="empty">No bookings yet for this class.</p>`;
+  const printed = new Date().toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  const html = `<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Roster · ${esc(ev.title)}</title><style>
+  @page{size:letter;margin:12mm;}
+  *{box-sizing:border-box;}
+  body{font-family:Arial,Helvetica,sans-serif;color:#000;background:#fff;margin:0 auto;padding:18px;max-width:780px;}
+  header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;border-bottom:3px solid #000;padding-bottom:10px;margin-bottom:16px;}
+  .shop{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;}
+  h1{font-size:26px;line-height:1.15;margin:4px 0;}
+  .when{font-size:15px;}
+  .count{text-align:right;font-size:14px;line-height:1.45;white-space:nowrap;}
+  .count b{font-size:24px;}
+  .party{border:2px solid #000;border-radius:6px;padding:10px 14px 6px;margin-bottom:12px;break-inside:avoid;page-break-inside:avoid;}
+  .top{display:flex;justify-content:space-between;align-items:center;gap:12px;}
+  .name{font-size:21px;font-weight:700;}
+  .table{font-size:16px;font-weight:700;border:2px solid #000;border-radius:4px;padding:2px 10px;white-space:nowrap;}
+  .table.un{border-style:dashed;}
+  .seats{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#333;margin:3px 0 4px;}
+  .guest{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font-size:18px;padding:7px 0;border-top:1px dotted #999;}
+  .seats + .guest{border-top:0;}
+  .box{width:15px;height:15px;border:1.5px solid #000;border-radius:2px;flex:none;align-self:center;}
+  .gname{font-weight:600;}
+  .solo{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding-bottom:4px;}
+  .solo .box{width:17px;height:17px;}
+  .adds{font-size:15px;color:#333;}
+  .empty{font-size:18px;font-style:italic;text-align:center;margin-top:40px;}
+  footer{margin-top:14px;font-size:11px;color:#555;text-align:right;}
+  @media print{body{padding:0;max-width:none;}}
+</style></head><body>
+<header><div><div class="shop">GREYS ${esc(ev.location || "Memphis")}</div><h1>${esc(ev.title)}</h1>
+<div class="when">${esc(fmtDateLong(ev.date))} · ${esc(fmtTime(ev.time))}</div></div>
+<div class="count"><b>${guests}</b> ${guests === 1 ? "guest" : "guests"}<br>${plural(parties.length, "party", "parties")}</div></header>
+${body}
+<footer>Printed ${esc(printed)}</footer>
+</body></html>`;
+  const w = window.open("", "_blank");
+  if (!w) {
+    window.alert("Allow pop-ups for this site to print the roster.");
+    return;
+  }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => {
+    try {
+      w.print();
+    } catch (e) {}
+  }, 300);
+}
+
 function RegEditor({ reg, ev, onCancel, onSave }) {
   const seed =
     reg.guests && reg.guests.length
@@ -9513,9 +9606,9 @@ function AdminDetail({ ev, regs, soldFor, go, onRefund, onUpdate, onAddComp }) {
       regFilter === "all" ? true : regFilter === "refunded" ? r.refunded : !r.refunded
     )
     .sort((a, b) => (a.refunded ? 1 : 0) - (b.refunded ? 1 : 0));
-  const printRoster = () => {
-    if (typeof window !== "undefined") window.print();
-  };
+  // Print roster (2026-10-15): the roster on its own clean page (printSeatingRoster). window.print()
+  // printed the whole manager console with it — sidebar, phone menu bar, booking cards.
+  const printRoster = () => printSeatingRoster(ev, parties);
   return (
     <div>
       <button className="cc-back cc-no-print" onClick={() => go(ev ? dashFor(ev) : "admin")}>
