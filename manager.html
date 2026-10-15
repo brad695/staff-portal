@@ -772,16 +772,15 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     /* CAT-LOOK (2026-10-09): separation + clear tabs. List page: title + tools row, kind tabs (underline), stage
        filter pills, then the list. Lead modal: header facts as pills, a full-width tab strip, and every pane split
        into boxed sections (.cat-sec) with small uppercase headings — the BEO tab already worked that way. */
-    .cat-pagehead{ display:flex; align-items:flex-start; gap:14px; flex-wrap:wrap; }
-    .cat-pagehead > .cat-pagetitle{ flex:1 1 320px; min-width:0; }
-    .cat-pagehead .hint{ margin-bottom:0; }
-    .cat-tools{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding-top:2px; }
-    .cat-how{ display:inline; }
-    .cat-how summary{ display:inline; cursor:pointer; color:#06273a; font-weight:700; list-style:none; }
-    .cat-how summary::-webkit-details-marker{ display:none; }
-    .cat-how summary::after{ content:' ▾'; font-size:.8em; }
-    .cat-how[open] summary::after{ content:' ▴'; }
-    .cat-how > div{ margin-top:10px; padding:12px 14px; background:#f6f8fa; border:1px solid var(--line); border-radius:10px; line-height:1.55; }
+    /* CAT-CARDS (2026-10-14, Maverick's markup; Calendly's event-type list as the guide): the subtitle is gone —
+       its text lives behind the ? next to the title — and Refresh / Templates / New lead sit right under the title. */
+    .cat-pagehead{ display:block; }
+    .cat-pagehead h2{ margin-bottom:0; }
+    .cat-help{ appearance:none; width:22px; height:22px; padding:0; border-radius:6px; border:1.5px solid #c3cad3; background:#fff; color:#56606d; font-family:inherit; font-size:.74rem; font-weight:800; line-height:1; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+    .cat-help:hover, .cat-help[aria-expanded="true"]{ border-color:#06273a; color:#06273a; background:#f3f6f9; }
+    .cat-tools{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:14px; }
+    .cat-howbox{ margin-top:12px; padding:12px 14px; background:#f6f8fa; border:1px solid var(--line); border-radius:10px; line-height:1.55; font-size:.86rem; color:#3f4854; max-width:880px; }
+    .cat-howbox[hidden]{ display:none; }
     .cat-kinds{ display:flex; gap:2px; border-bottom:2px solid var(--line); margin:16px 0 0; overflow-x:auto; scrollbar-width:none; }
     .cat-kinds::-webkit-scrollbar{ display:none; }
     .cat-kinds .ctab{ appearance:none; background:none; border:0; border-bottom:3px solid transparent; margin-bottom:-2px; padding:11px 14px; font:inherit; font-size:.86rem; font-weight:700; color:var(--sub); cursor:pointer; white-space:nowrap; display:inline-flex; align-items:center; gap:7px; border-radius:8px 8px 0 0; }
@@ -789,14 +788,29 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     .cat-kinds .ctab.on{ color:#06273a; border-bottom-color:#06273a; }
     .cat-kinds .ctab .cnt{ font-size:.68rem; font-weight:800; background:#eef0f3; color:#4a5462; border-radius:999px; padding:1px 7px; min-width:22px; text-align:center; line-height:1.5; }
     .cat-kinds .ctab.on .cnt{ background:#06273a; color:#fff; }
+    .cat-kinds .ctab .kdot{ width:4px; height:14px; border-radius:2px; flex:none; }
     .cat-stages{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; padding:12px 0 14px; }
     .cat-stages .lbl{ font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--sub); margin-right:4px; }
     .cat-stages .chip{ padding:5px 12px; font-size:.76rem; border-radius:999px; }
     .cat-stages .chip b{ font-weight:800; opacity:.65; margin-left:4px; }
     .cat-stages .chip.on b{ opacity:.9; }
     .cat-stages .sep{ width:1px; height:18px; background:var(--line); margin:0 4px; }
-    #catList .rec-row{ padding:14px 16px; }
-    #catList .res-r-meta{ margin-top:3px; }
+    /* CAT-CARDS: every lead is its own card with a colored tab on the left end (--kc = CAT_KINDS color:
+       catering navy, private event purple, experience amber, table request teal). Line 1 name (company),
+       line 2 occasion · date · guests · shop · amount. No type badge, no message preview. */
+    #catList{ display:flex; flex-direction:column; gap:10px; border:0; border-radius:0; box-shadow:none; background:none; overflow:visible; }
+    #catList > .rec-empty{ border:1px dashed var(--line); border-radius:12px; background:#fff; }
+    #catList .rec-row.cat-card{ position:relative; overflow:hidden; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 1px 2px rgba(18,26,38,.04); padding:15px 18px 15px 27px; gap:16px; }
+    #catList .rec-row.cat-card:last-child{ border-bottom:1px solid var(--line); }
+    #catList .rec-row.cat-card::before{ content:''; position:absolute; left:0; top:0; bottom:0; width:7px; background:var(--kc,#06273a); }
+    #catList .rec-row.cat-card:hover{ background:#fbfcfd; border-color:#c9d1da; box-shadow:0 3px 10px rgba(18,26,38,.08); }
+    #catList .cat-main{ flex:1; min-width:0; }
+    #catList .cat-card .res-r-name{ font-size:1rem; line-height:1.3; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #catList .cat-card .res-r-name .co{ font-weight:400; color:#4a5462; }
+    #catList .cat-card.unread .res-r-name{ font-weight:800; }
+    #catList .cat-card .cat-new{ display:inline-block; width:8px; height:8px; border-radius:50%; background:#d97706; margin-right:7px; vertical-align:2px; }
+    #catList .cat-card .cat-sub{ margin-top:4px; font-size:.84rem; color:var(--sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    #catList .cat-card .res-r-time{ min-width:auto; font-size:.84rem; font-weight:700; color:#3f4854; white-space:nowrap; }
     /* lead modal */
     #catModal .cat-mhead, #inqModal .cat-mhead{ display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; padding-bottom:16px; }
     #catModal .cat-mhead h3, #inqModal .cat-mhead h3{ margin:0; font-size:1.18rem; }
@@ -829,23 +843,22 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     #catBeo .beo-head{ margin-top:14px; }
     @media (max-width:640px){
       #catModal .cat-tabbar .chip{ padding:11px 12px; font-size:.82rem; } .cat-sec{ padding:12px 12px 14px; } .cat-kinds .ctab{ padding:10px 11px; font-size:.82rem; }
-      /* list rows: name + details on the first line, time + stage on their own line underneath */
-      #catList .rec-row{ flex-wrap:wrap; gap:6px 10px; padding:12px 14px; }
-      #catList .rec-row > div{ flex:1 1 calc(100% - 24px) !important; min-width:0; }   /* beats the inline flex:1 */
-      #catList .res-r-time{ margin-left:20px; font-size:.78rem; }
-      #catList .rec-row > .pill{ margin-left:auto; }
+      /* cards: name + details on top, time + stage on their own line underneath */
+      #catList .rec-row.cat-card{ flex-wrap:wrap; gap:8px 10px; padding:13px 14px 13px 22px; }
+      #catList .cat-main{ flex:1 1 100%; }
+      #catList .cat-card .res-r-name{ white-space:normal; }
+      #catList .cat-card .cat-sub{ white-space:normal; }
+      #catList .cat-card .res-r-time{ font-size:.78rem; }
+      #catList .cat-card > .pill{ margin-left:auto; }
     }
   </style>
   <!-- Catering leads: HoneyBook-style pipeline — conversation → proposal → e-signed contract → Square invoice -->
   <div id="panel-catering" class="panel">
     <div class="section-card">
       <div class="cat-pagehead">
-        <div class="cat-pagetitle">
-          <h2>💼 Catering Leads</h2>
-          <div class="hint"><strong>Every inquiry lands here</strong> — catering, private events, experiences and Nashville table requests from the inquiry form, plus any you add by hand.
-            <details class="cat-how"><summary>How it works</summary><div>Memphis tables booked on the form go straight into Reservations. Experiences open their own conversation with the held time and booking link; catering and private events get the proposal and invoice. Reply here and it's emailed from info@greyscheese.com; their replies come back in automatically (Gmail sync). Build the <strong>Proposal</strong>, send it, and the customer signs online — that <strong>creates a Square invoice</strong> (deposit now, balance before the event) with the signed agreement attached. No proposal needed? <strong>🧾 Save &amp; send invoice</strong> skips the signature and emails the Square invoice right away. Payment status refreshes from Square every 15 minutes.</div></details></div>
-        </div>
+        <h2>💼 Catering Leads<button type="button" class="cat-help" aria-expanded="false" aria-controls="catHow" title="How it works" onclick="const h=document.getElementById('catHow');h.hidden=!h.hidden;this.setAttribute('aria-expanded',String(!h.hidden));">?</button></h2>
         <div class="cat-tools" id="catTools"></div>
+        <div class="cat-howbox" id="catHow" hidden><strong>Every inquiry lands here</strong> — catering, private events, experiences and Nashville table requests from the inquiry form, plus any you add by hand. Memphis tables booked on the form go straight into Reservations. Experiences open their own conversation with the held time and booking link; catering and private events get the proposal and invoice. Reply here and it's emailed from info@greyscheese.com; their replies come back in automatically (Gmail sync). Build the <strong>Proposal</strong>, send it, and the customer signs online — that <strong>creates a Square invoice</strong> (deposit now, balance before the event) with the signed agreement attached. No proposal needed? <strong>🧾 Save &amp; send invoice</strong> skips the signature and emails the Square invoice right away. Payment status refreshes from Square every 15 minutes.</div>
       </div>
       <div class="cat-kinds" id="catKinds"></div>
       <div class="cat-stages" id="catChips"></div>
@@ -2039,7 +2052,7 @@ function catRender(){
   all.filter(isOpen).forEach(x=>{ kc.all++; kc[x.kind]++; });
   const kd = document.getElementById('catKinds');
   if(kd) kd.innerHTML = [['all','All inquiries'],['catering','Catering'],['event','Private events'],['experience','Experiences'],['table','Table requests']].map(([k,l])=>
-    '<button class="ctab'+(CAT_KIND===k?' on':'')+'" onclick="CAT_KIND=\''+k+'\';catRender()">'+l+'<span class="cnt">'+kc[k]+'</span></button>').join('');
+    '<button class="ctab'+(CAT_KIND===k?' on':'')+'" onclick="CAT_KIND=\''+k+'\';catRender()">'+(CAT_KINDS[k]?'<span class="kdot" style="background:'+CAT_KINDS[k][1]+'"></span>':'')+l+'<span class="cnt">'+kc[k]+'</span></button>').join('');
   const tools = document.getElementById('catTools');
   if(tools && !tools.querySelector('button')) tools.innerHTML = '<button class="btn btn-ghost btn-sm" onclick="catLoad();inqLoad()">↻ Refresh</button><button class="btn btn-gold btn-sm" onclick="catNew()">＋ New lead</button>';
   const mine = all.filter(x=> CAT_KIND==='all' || x.kind===CAT_KIND);
@@ -2050,27 +2063,25 @@ function catRender(){
   const rows = mine.filter(x=> CAT_FILTER==='all' ? true : CAT_FILTER==='open' ? isOpen(x) : x.stage===CAT_FILTER);
   const el = document.getElementById('catList');
   if(!rows.length){ el.innerHTML = '<div class="rec-empty">Nothing here.</div>'; return; }
+  // CAT-CARDS (2026-10-14): one card per lead, colored tab on the left end = its kind (CAT_KINDS). No type badge,
+  // no message preview; guests as words ("35 guests") instead of the 👥 icon.
+  const ppl = n => n ? n+(Number(n)===1?' guest':' guests') : '';
   el.innerHTML = rows.map(x=>{
     const r = x.r, K = CAT_KINDS[x.kind];
-    const tag = '<span style="display:inline-block;font-size:.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:'+K[1]+';border:1px solid '+K[1]+';border-radius:5px;padding:1px 6px;margin-right:6px;vertical-align:1px;">'+K[0]+'</span>';
-    const list = x.inq ? r.inquiry_messages : r.catering_messages;
-    const msgs = (list||[]).filter(m=>m.direction!=='note').sort((a,b)=>a.created_at.localeCompare(b.created_at));
-    const lastMsg = msgs[msgs.length-1];
     let bits, label, open;
     if(x.inq){
-      bits = [r.experience_name||'Not sure yet', r.preferred_date?fmtDisplay(r.preferred_date):'', r.party_size?('👥 '+r.party_size):'', r.location].filter(Boolean).join(' · ');
+      bits = [r.experience_name||'Not sure yet', r.preferred_date?fmtDisplay(r.preferred_date):'', ppl(r.party_size), r.location].filter(Boolean).join(' · ');
       label = INQ_STAGES[r.stage]||r.stage; open = "inqOpen('"+r.id+"')";
     } else {
       const q = (r.catering_quotes||[]).filter(z=>z.status!=='canceled').sort((a,b)=>b.created_at.localeCompare(a.created_at))[0];
-      bits = [r.occasion, r.event_date?fmtDisplay(r.event_date):'', r.guests?('👥 '+r.guests):'', r.location, q?catMoney(q.total_cents):''].filter(Boolean).join(' · ');
+      bits = [r.occasion, r.event_date?fmtDisplay(r.event_date):'', ppl(r.guests), r.location, q?catMoney(q.total_cents):''].filter(Boolean).join(' · ');
       label = CAT_STAGES[r.stage]; open = "catOpen('"+r.id+"')";
     }
     const pill = x.stage==='paid'?'pill-ok':x.stage==='lost'?'pill-bad':x.stage==='new'?'pill-req':'pill-mid';
-    return '<div class="rec-row" data-kind="'+x.kind+'" onclick="'+open+'">'
-      +'<span style="width:10px;height:10px;border-radius:50%;flex:0 0 10px;background:'+(r.unread?'#d97706':'transparent')+'"></span>'
-      +'<div style="flex:1;min-width:0;"><div class="res-r-name">'+tag+esc(r.name)+(r.company?' <span style="font-weight:400;">('+esc(r.company)+')</span>':'')+' <span style="font-weight:400;color:#64748b;">· '+esc(bits)+'</span></div>'
-      +'<div class="res-r-meta" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(lastMsg?(lastMsg.direction==='out'?'You: ':'')+esc(lastMsg.body.slice(0,140)):'')+'</div></div>'
-      +'<span class="res-r-time" style="min-width:auto;">'+esc(inqWhen(r.last_message_at))+'</span>'
+    return '<div class="rec-row cat-card'+(r.unread?' unread':'')+'" data-kind="'+x.kind+'" style="--kc:'+K[1]+'" onclick="'+open+'">'
+      +'<div class="cat-main"><div class="res-r-name">'+(r.unread?'<span class="cat-new" title="New message"></span>':'')+esc(r.name)+(r.company?' <span class="co">('+esc(r.company)+')</span>':'')+'</div>'
+      +(bits?'<div class="cat-sub">'+esc(bits)+'</div>':'')+'</div>'
+      +'<span class="res-r-time">'+esc(inqWhen(r.last_message_at))+'</span>'
       +'<span class="pill '+pill+'">'+esc(label)+'</span></div>';
   }).join('');
 }
