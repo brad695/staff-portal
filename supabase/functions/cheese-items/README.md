@@ -17,6 +17,16 @@ Hardcoded `SQUARE_CATEGORY_IDS` (lookup by name; create only if missing) covers 
 Body overrides: `tax_preset` (`auto|food|standard|wine_dine_in|retail_wine`) or explicit `tax_ids`.
 On **CREATE**, tax_ids are always set from mapping/override (not only when empty).
 
+
+## Inventory tracking (create)
+On add, optional body fields:
+- `track_inventory: true` → sets `item_variation_data.track_inventory` on the Square variation
+- `inventory_qty: { memphis, nashville }` (or Square location ids) → after catalog create, `BatchChangeInventory` PHYSICAL_COUNT / IN_STOCK at Memphis (`LCXWZ0HAQ69RM`) and Nashville (`LJ33VDYHS1JAR`). Blank skips a location; `0` is valid.
+
+Catalog success is kept even if inventory fails; `square_status` stays `synced` and `square_error` carries `Catalog synced; inventory failed: …`.
+
+Manager UI defaults: **Track inventory ON for Wine/Retail, OFF for Cheese**. Wine/Retail form is Square-only (no DateCode printer/hot-buttons/stores framing).
+
 ## Layout
 - `index.ts` — Deno.serve entry (add / update / retry_sync / generate_barcode / locations)
 - `a1.ts` — shared helpers, category/tax maps, `isRetailKind`, DCG field builders

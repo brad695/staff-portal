@@ -136,6 +136,14 @@ export const SQUARE_CATEGORY_IDS: Record<string, string> = {
   "Memphis Retail": "K6GGAWH5QMAFUSTPDPZHYSDW",
 };
 
+/** Square location IDs for inventory counts (Cheese Case starting qty). */
+export const SQUARE_LOC_MEMPHIS = "LCXWZ0HAQ69RM";
+export const SQUARE_LOC_NASHVILLE = "LJ33VDYHS1JAR";
+export const SQUARE_LOCATION_IDS = {
+  memphis: SQUARE_LOC_MEMPHIS,
+  nashville: SQUARE_LOC_NASHVILLE,
+} as const;
+
 export const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -237,7 +245,7 @@ export const dcgBarcodeType = (barcode: string) => {
   if (/^\d{13}$/.test(barcode)) return "TYPE_EAN_13";
   if (/^\d{8}$/.test(barcode)) return "TYPE_EAN_8";
   return "TYPE_CODE_128";
-};
+}
 
 export async function dcgFields(item: Record<string, unknown>) {
   await loadMaps();

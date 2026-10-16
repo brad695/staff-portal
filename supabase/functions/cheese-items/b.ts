@@ -1,4 +1,6 @@
 import {
+  SQUARE_LOC_MEMPHIS,
+  SQUARE_LOC_NASHVILLE,
   VALID_UNITS,
   json,
   supabase,
@@ -11,6 +13,56 @@ import {
   squareBase,
   squareHeaders
 } from "./a2.ts";
+
+
+/** Starting PHYSICAL_COUNT quantities after catalog create. Blank/null skips a location; 0 is valid. */
+export async function setStartingInventory(
+  token: string,
+  variationId: string,
+  qtys: Record<string, unknown> | null | undefined,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!qtys || typeof qtys !== "object") return { ok: true };
+  const occurred_at = new Date().toISOString();
+  const pairs: Array<[string, unknown]> = [
+    [SQUARE_LOC_MEMPHIS, qtys.memphis ?? qtys[SQUARE_LOC_MEMPHIS]],
+    [SQUARE_LOC_NASHVILLE, qtys.nashville ?? qtys[SQUARE_LOC_NASHVILLE]],
+  ];
+  const changes: Record<string, unknown>[] = [];
+  for (const [location_id, raw] of pairs) {
+    if (raw === null || raw === undefined || raw === "") continue;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) continue;
+    changes.push({
+      type: "PHYSICAL_COUNT",
+      physical_count: {
+        catalog_object_id: variationId,
+        location_id,
+        state: "IN_STOCK",
+        quantity: String(n),
+        occurred_at,
+      },
+    });
+  }
+  if (!changes.length) return { ok: true };
+  try {
+    const res = await fetch(`${squareBase()}/v2/inventory/changes/batch-create`, {
+      method: "POST",
+      headers: squareHeaders(token),
+      body: JSON.stringify({
+        idempotency_key: crypto.randomUUID(),
+        changes,
+        ignore_unchanged_counts: false,
+      }),
+    });
+    const textBody = await res.text();
+    if (!res.ok) {
+      return { ok: false, error: `Square inventory ${res.status}: ${textBody.slice(0, 400)}` };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e).slice(0, 400) };
+  }
+}
 
 export async function pushToSquare(item: Record<string, unknown>) {
   const token = Deno.env.get("SQUARE_ACCESS_TOKEN");
@@ -98,10 +150,35 @@ export async function pushToSquare(item: Record<string, unknown>) {
     const text = await res.text();
     if (!res.ok) return { status: "error", error: `Square ${res.status}: ${text.slice(0, 500)}` };
     let squareId: string | undefined;
+    let variationId: string | undefined;
     try {
-      squareId = JSON.parse(text)?.catalog_object?.id;
-    } catch {  }
-    return { status: "synced", square_item_id: squareId ?? (item.square_item_id as string | undefined) };
+      const parsed = JSON.parse(text);
+      squareId = parsed?.catalog_object?.id;
+      variationId = parsed?.catalog_object?.item_data?.variations?.[0]?.id;
+    } catch { /* ignore */ }
+    squareId = squareId ?? (item.square_item_id as string | undefined);
+    variationId = variationId ?? (existingVariation?.id as string | undefined);
+
+    // Catalog succeeded — set starting counts on create when requested. Inventory failure
+    // must not fail the whole create; surface as square_error while keeping status synced.
+    let inventoryWarning: string | undefined;
+    if (!isUpdate && item._track_inventory === true && variationId) {
+      const inv = await setStartingInventory(
+        token,
+        String(variationId),
+        item._inventory_qty as Record<string, unknown> | undefined,
+      );
+      if (!inv.ok) inventoryWarning = inv.error ?? "inventory update failed";
+    }
+
+    return {
+      status: "synced",
+      square_item_id: squareId,
+      square_variation_id: variationId,
+      ...(inventoryWarning
+        ? { error: `Catalog synced; inventory failed: ${inventoryWarning}` }
+        : {}),
+    };
   } catch (e) {
     return { status: "error", error: String(e).slice(0, 500) };
   }
@@ -178,4 +255,3 @@ export async function nextStoreBarcode(): Promise<{ barcode: string; item_number
   while (used.has(n) && n < 99999) n++;
   return { barcode: buildStoreBarcode(n), item_number: n };
 }
-

@@ -1,0 +1,33 @@
+name: apply-cheese-entry-manager-patch
+on:
+  push:
+    branches: [feature/cheese-entry-inventory-v2]
+    paths:
+      - "patches/cheese-entry-inventory.patch"
+      - ".github/workflows/apply-cheese-entry-manager-patch.yml"
+  workflow_dispatch:
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/cheese-entry-inventory-v2
+          fetch-depth: 0
+      - name: Rebuild manager.html from main + inventory patch
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git show origin/main:manager.html > manager.html
+          patch -p1 < patches/cheese-entry-inventory.patch
+          git config user.name "brad695"
+          git config user.email "brad@greyscheese.com"
+          git add manager.html
+          if git diff --cached --quiet; then
+            echo "manager.html already up to date"
+            exit 0
+          fi
+          git commit -m "feat(manager): Cheese Entry inventory + Wine/Retail Square-only settings"
+          git push origin HEAD:feature/cheese-entry-inventory-v2
