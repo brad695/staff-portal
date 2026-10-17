@@ -11680,7 +11680,8 @@ function cpEdit(){
       ${fact('Skipping',m.skipping?esc(m.skipping.label):'')}
       ${fact('Keep it going',keep)}
       ${fact('Email',esc(m.email)+(m.phone?' · '+esc(m.phone):''))}
-      ${fact('Added',esc(m.added_by||'')+(m.created_at?' · '+esc(cpDay(m.created_at)):''))}
+      ${fact('Added',esc(m.added_by==='table22-migration'?'Moved from Table22':m.added_by||'')+(m.created_at?' · '+esc(cpDay(m.created_at)):''))}
+      ${fact('Gift for',giftFact(m.id))}
       ${fact('Note',m.note?esc(m.note):'')}
     </dl>
     <div class="cp-acts"></div>
@@ -11701,7 +11702,8 @@ function cpEdit(){
   if(!m.ended){
     if(m.can_skip)act('Skip '+cpShort(m.can_skip.month),'btn-ghost',e=>run(e.currentTarget,'comp_skip',{},'Skipped '+cpLong(m.can_skip.month)+'.'+(m.open_ended?'':' The last box moved out a month.')));
     if(m.skipping)act('Undo skip ('+cpShort(m.skipping.month)+')','btn-ghost',e=>run(e.currentTarget,'comp_skip',{undo:true},'Skip undone.'));
-    act('Resend welcome email','btn-ghost',e=>run(e.currentTarget,'comp_resend',{},'Welcome email sent to '+m.email+'.'));
+    if(m.added_by!=='table22-migration')act('Resend welcome email','btn-ghost',e=>run(e.currentTarget,'comp_resend',{},'Welcome email sent to '+m.email+'.'));
+    act(GIFTS.by[m.id]?'🎁 Edit gift':'🎁 Make it a gift','btn-ghost',()=>giftEditor(m.id,cpName(m),info,()=>cpReload(m.id)));
     act('End membership','btn-danger',()=>{
       conf.hidden=false;
       conf.innerHTML='';
@@ -11804,6 +11806,49 @@ function giftFact(id){
   return `<b>${esc(giftName(id))}</b> picks up · <a href="mailto:${esc(g.gift_email)}">${esc(g.gift_email)}</a>`+
     (g.gift_note?`<br><i>“${esc(g.gift_note)}”</i>`:'')+
     `<br><small>${g.gift_notified_at?'Gift email sent '+esc(mbDay(g.gift_notified_at)):'Gift email not sent yet'} · <a href="#" data-gift-resend="${esc(id)}">${g.gift_notified_at?'Send it again':'Send it'}</a></small>`;
+}
+/* Gift editor on a member page: who picks up a gift membership (club-gift set / clear). The member row
+   stays the payer; this only changes club_members.gift_*. anchor = the card the form opens under. */
+function giftEditor(id,payer,anchor,reload){
+  const open=anchor.parentNode&&anchor.parentNode.querySelector('[data-gift-ed]');if(open){open.remove();return;}
+  const g=GIFTS.by[id]||null;
+  const box=$(`<div class="card cp-form" data-gift-ed>
+    <h3>${g?'Gift — who picks up':'Make this a gift'}</h3>
+    <p class="muted cp-small" style="margin-top:0">${esc(payer)} pays for and manages the membership. The person here picks up the boxes and gets the newsletter.</p>
+    <div class="cp-grid">
+      <div class="nl-fld"><label class="nl-lbl" for="gf-first">Their first name</label><input id="gf-first" data-g="first_name" maxlength="60"></div>
+      <div class="nl-fld"><label class="nl-lbl" for="gf-last">Last name</label><input id="gf-last" data-g="last_name" maxlength="60"></div>
+      <div class="nl-fld"><label class="nl-lbl" for="gf-email">Their email</label><input id="gf-email" type="email" data-g="email" maxlength="200"></div>
+    </div>
+    <div class="nl-fld"><label class="nl-lbl" for="gf-note">Note from the giver <small class="muted">— optional</small></label><textarea id="gf-note" data-g="note" rows="2" maxlength="500"></textarea></div>
+    <label class="nl-chk"><input type="checkbox" data-g-notify> Email them that it's a gift from ${esc(payer)}</label>
+    <div class="cp-err" data-err role="alert" hidden></div>
+    <div class="cp-btns"><button type="button" class="btn btn-primary" data-save>Save</button>${g?'<button type="button" class="btn btn-ghost" data-clear>It isn’t a gift</button>':''}<button type="button" class="btn btn-ghost" data-cancel>Never mind</button></div>
+  </div>`);
+  const q=s=>box.querySelector(s);
+  if(g){q('[data-g="first_name"]').value=g.gift_first_name||'';q('[data-g="last_name"]').value=g.gift_last_name||'';q('[data-g="email"]').value=g.gift_email||'';q('[data-g="note"]').value=g.gift_note||'';}
+  let busy=false;
+  const done=async msg=>{toast(msg);GIFTS.at=0;await giftLoad(true);reload();};
+  q('[data-cancel]').addEventListener('click',()=>box.remove());
+  q('[data-save]').addEventListener('click',async e=>{
+    const b=e.currentTarget;if(busy)return;
+    const v=k=>q(`[data-g="${k}"]`).value.trim();
+    const first=v('first_name'),email=v('email'),notify=q('[data-g-notify]').checked;
+    if(!first)return cpErr(box,'Add the first name of the person who picks up.');
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))return cpErr(box,'Check their email address.');
+    busy=true;b.disabled=true;cpErr(box,'');
+    try{
+      const x=await ccFnJson('club-gift',{action:'set',id,recipient:{first_name:first,last_name:v('last_name'),email},note:v('note'),notify});
+      await done(notify?(x.emailed?'Saved — and they were emailed.':'Saved, but the email didn’t go out.'):'Saved.');
+    }catch(err){busy=false;b.disabled=false;cpErr(box,err.message);}
+  });
+  const clr=q('[data-clear]');
+  if(clr)clr.addEventListener('click',async e=>{
+    const b=e.currentTarget;if(busy)return;busy=true;b.disabled=true;cpErr(box,'');
+    try{await ccFnJson('club-gift',{action:'clear',id});await done('It’s no longer a gift.');}
+    catch(err){busy=false;b.disabled=false;cpErr(box,err.message);}
+  });
+  anchor.after(box);box.scrollIntoView({block:'nearest'});q('[data-g="first_name"]').focus();
 }
 document.addEventListener('click',async e=>{
   const a=e.target&&e.target.closest&&e.target.closest('[data-gift-resend]');if(!a)return;
@@ -11989,6 +12034,7 @@ function mbDetail(r){
       catch(err){toast(err.message,true);}
       MB.busy=false;b.disabled=false;
     });
+    btn(GIFTS.by[i.id]?'🎁 Edit gift':'🎁 Make it a gift','btn-ghost',()=>giftEditor(i.id,i.name||i.first_name||'The member',card,()=>mbOpen(i.id)));
     btn('Copy link','btn-ghost',async e=>{
       const b=e.currentTarget;if(MB.busy)return;MB.busy=true;b.disabled=true;
       try{
@@ -12042,7 +12088,9 @@ const MB_ACT={join:'Joined online',started:'Billing started in Square',start_fai
   keep_mail:'Sent the “keep it going” email',manage_link:'Asked for a membership link',staff_link:'Shop sent their membership link',staff_update:'Shop changed their details',
   comp_add:'Added by the shop',comp_update:'Shop changed the membership',comp_skip:'Skipped a month',comp_end_now:'Ended by the shop',comp_end_after_month:'Set to end after this month',
   comp_resend:'Shop resent the welcome email',monthly_from_prepaid:'Switched to monthly billing',prepaid_ended:'Ended — last prepaid box',picked_up:'Box picked up',undo_picked_up:'Pickup un-ticked',
-  newsletter_unsub:'Unsubscribed from the newsletter',newsletter_resub:'Resubscribed to the newsletter'};
+  newsletter_unsub:'Unsubscribed from the newsletter',newsletter_resub:'Resubscribed to the newsletter',
+  t22_import:'Moved from Table22',t22_invite:'Sent the Table22 move email',t22_reminder:'Sent the Table22 move reminder',t22_card:'Card came over from Table22',
+  gift:'Made it a gift',gift_set:'Shop set who the gift is for',gift_clear:'Shop removed the gift',gift_email:'Sent the gift email'};
 function mbActLine(l){
   const a=String(l.action||''),d=l.detail||{};
   let what=MB_ACT[a]||(a.endsWith('_failed')?(MB_ACT[a.slice(0,-7)]||a.slice(0,-7))+' — failed':a.replace(/_/g,' '));
