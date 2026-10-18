@@ -996,6 +996,126 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
 .wg-day .wg-ev.none{ color:#9ca3af; font-weight:600; }
 @media(min-width:1000px){ .wg-day .wg-dnum{ font-size:2.6rem; } .wg-day .wg-ev{ font-size:.82rem; } }
 </style>
+<!-- HOME-V9 SIZES: tiles can be resized in Edit tiles. Each .wg carries data-w (1-3 columns; 3 = full width, which is 2 on a phone)
+     and data-h (0 title only, 1 regular, 2 tall, 3 fit all - calendar only), saved with the rest of the layout. The grid runs on
+     thirds of a row so title-only tiles stack. The tile scripts show more when a tile is bigger (window.wgSize).
+     The 7-day calendar (#tile-cal) and online ordering (#tile-oo) are tiles too. -->
+<style id="home-v9-sizes">
+@media screen{
+/* the grid runs on thirds of a row: title only = 1 unit, regular = 3, tall = 6; "fit all" (calendar) = what its week needs (set by the script) */
+.dash{ --wg-row:204px; --wg-gap:12px; --u:calc((var(--wg-row) - 2 * var(--wg-gap)) / 3); grid-auto-rows:minmax(var(--u), auto); }
+.dash .wg[data-h]{ min-height:0; }
+.dash .wg[data-w="1"]{ grid-column:span 1; }
+.dash .wg[data-w="2"]{ grid-column:span 2; }
+.dash .wg[data-w="3"]{ grid-column:1 / -1; }
+.dash .wg[data-h="0"]{ grid-row:span 1; }
+.dash .wg[data-h="1"]{ grid-row:span 3; }
+.dash .wg[data-h="2"]{ grid-row:span 6; }
+
+/* TITLE ONLY: just the tile's top line (its name and chip) */
+.dash .wg:not(.wg-cal)[data-h="0"]{ justify-content:center; gap:0; padding-top:8px; padding-bottom:8px; }
+.dash .wg:not(.wg-cal)[data-h="0"] > :not(.wg-head):not(.wg-ctl):not(.wg-cover):not(.wg-t):not(.wg-chz-n){ display:none !important; }
+.wg-dmini{ display:none; }
+.dash .wg-day[data-h="0"] .wg-dow{ flex:0 1 auto; }
+.dash .wg-day[data-h="0"] .wg-dmini{ display:block; flex:1 1 auto; font-size:.95rem; font-weight:800; letter-spacing:-.2px; color:#111827; }
+.dash .wg.wg-chz[data-h="0"]{ flex-direction:row; align-items:center; justify-content:space-between; gap:10px; }
+.dash .wg-chz[data-h="0"] .wg-t{ flex:0 1 auto; min-width:0; max-width:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dash .wg-chz[data-h="0"] .wg-t br{ display:none; }
+.dash .wg-chz[data-h="0"] .wg-chz-n{ flex:none; margin:0; }
+.dash .wg-chz[data-h="0"] .wg-chz-n b{ font-size:1.25rem; letter-spacing:-.4px; }
+.dash .wg-chz[data-h="0"] .wg-chz-n span{ display:none; }
+
+/* CALENDAR tile: the 7-day card in the grid. Fit all = the whole week; regular / tall scroll inside; title only = folded */
+.dash .wg-cal{ padding:0; gap:0; background:transparent; box-shadow:none !important; overflow:visible; cursor:default; color:inherit; }
+.dash .wg-cal:hover, .dash .wg-cal:active{ transform:none; }
+.dash .wg-cal > .today-card{ margin:0; flex:1 1 auto; min-width:0; box-sizing:border-box; }
+.dash .wg-cal[data-h="1"] > .today-card, .dash .wg-cal[data-h="2"] > .today-card{ position:absolute; inset:0; display:flex; flex-direction:column; overflow:hidden; }
+.dash .wg-cal[data-h="1"] .today-head, .dash .wg-cal[data-h="2"] .today-head, .dash .wg-cal[data-h="1"] .today-all, .dash .wg-cal[data-h="2"] .today-all{ flex:none; }
+.dash .wg-cal[data-h="1"] #todayList, .dash .wg-cal[data-h="2"] #todayList{ flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; }
+.dash .wg-cal[data-w="1"] .today-list .ag-row{ grid-template-columns:1fr; gap:2px; }
+body.home-editing .dash .today-card{ opacity:1; }
+/* the pencil in the top bar opens Edit tiles (and closes it again) */
+body.home-editing #dashEdit{ background:#e0a21c; border-color:#e0a21c; color:#161a1f; }
+
+/* lists spread over more columns when the tile is wider (the tile scripts set data-cols + --cols) */
+.dash .wg-list[data-cols], .dash .wg-evs[data-cols]{ display:grid; grid-template-columns:repeat(var(--cols,1),minmax(0,1fr)); column-gap:14px; row-gap:6px; align-content:start; }
+.dash .wg-stf .wg-list[data-cols]{ row-gap:8px; }
+.dash .wg-evs[data-cols]{ row-gap:5px; }
+
+/* RESYS tall: the next parties under the numbers */
+.wg-next:empty{ display:none; }
+.wg-next .cap{ display:block; grid-column:1 / -1; font-size:.56rem; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--fg2); margin-top:2px; }
+
+/* SCHEDULE: wide shows who's on (even on phones); tall lists one person per line */
+.dash .wg-sch[data-w="2"]:not(.sch-empty) .wg-sub, .dash .wg-sch[data-w="3"]:not(.sch-empty) .wg-sub{ display:-webkit-box; }
+.dash .wg-sch[data-h="2"]:not(.sch-empty) .wg-sub{ display:grid; grid-template-columns:repeat(var(--cols,1),minmax(0,1fr)); gap:4px 14px; -webkit-line-clamp:unset; margin-top:0; }
+.wg-sub .sr{ display:flex; align-items:baseline; gap:6px; min-width:0; }
+.wg-sub .sr b{ flex:1 1 auto; min-width:0; font-weight:700; color:var(--fg); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wg-sub .sr span{ flex:none; }
+
+/* CHEESE ENTRY and TODAY tall: bigger art and numbers */
+.dash .wg-chz[data-h="2"] .wg-greysie{ width:176px; height:176px; top:-4px; right:-16px; }
+.dash .wg-chz[data-h="2"]:not([data-w="1"]) .wg-greysie{ width:232px; height:232px; top:-8px; right:-14px; }
+.dash .wg-chz[data-h="2"] .wg-chz-n b{ font-size:2.8rem; }
+.dash .wg-day[data-h="2"] .wg-dnum{ font-size:3rem; }
+
+@media(max-width:360px){ .dash{ --wg-gap:10px; } }
+@media(min-width:640px){ .dash{ --wg-gap:14px; } }
+@media(min-width:1000px){
+  .dash{ --wg-gap:16px; --wg-row:224px; }
+  .dash .wg-chz[data-h="2"] .wg-greysie{ width:210px; height:210px; top:-6px; right:-20px; }
+  .dash .wg-chz[data-h="2"]:not([data-w="1"]) .wg-greysie{ width:276px; height:276px; top:-10px; right:-10px; }
+  .dash .wg-day[data-h="2"] .wg-dnum{ font-size:3.4rem; }
+}
+
+/* edit mode: the resize handle sits in the bottom right corner */
+.wg-size{ position:absolute; right:8px; bottom:8px; width:38px; height:38px; display:flex; align-items:center; justify-content:center; padding:0; border:0;
+  background:#fff; color:#161a1f; box-shadow:0 0 0 1px rgba(15,23,42,.08), 0 4px 12px -4px rgba(15,23,42,.55); cursor:nwse-resize; touch-action:none; pointer-events:auto; }
+.wg-size i{ font-size:20px; }
+.wg-size:focus-visible{ outline:3px solid #e0a21c; outline-offset:2px; }
+.v8-ghostwrap .wg-size{ display:none; }
+.dash .wg.wg-resizing{ outline:2px solid #e0a21c !important; }
+/* very tall tiles (the calendar's whole week) keep the move handle near the top; title-only tiles are short: the controls sit in a row on the right */
+.dash .wg .wg-grip{ top:min(50%, 102px); }
+.dash .wg[data-h="0"] .wg-grip{ width:46px; height:34px; }
+.dash .wg[data-h="0"] .wg-grip i{ font-size:22px; }
+.dash .wg[data-h="0"] .wg-hide{ top:50%; right:8px; transform:translateY(-50%); }
+.dash .wg[data-h="0"] .wg-size{ top:50%; bottom:auto; right:50px; width:34px; height:34px; transform:translateY(-50%); }
+body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit-user-select:none; user-select:none; }
+
+/* while dragging the corner: a frame shows the size it will snap to */
+.v9-frame{ position:fixed; z-index:90; box-sizing:border-box; display:flex; align-items:center; justify-content:center; pointer-events:none;
+  border:2px dashed #e0a21c; border-radius:18px; background:rgba(224,162,28,.14); transition:width .12s ease, height .12s ease, left .12s ease; }
+.v9-frame.same{ background:rgba(22,26,31,.05); border-color:rgba(22,26,31,.35); }
+.v9-badge{ display:flex; flex-direction:column; align-items:center; gap:1px; padding:7px 12px; border-radius:10px; background:#161a1f; color:#fff; box-shadow:0 10px 24px -10px rgba(15,23,42,.6); white-space:nowrap; }
+.v9-badge b{ font-size:.9rem; font-weight:800; letter-spacing:-.2px; }
+.v9-badge small{ font-size:.72rem; font-weight:700; color:rgba(255,255,255,.72); }
+
+/* tap the corner: width and height, applied as you tap */
+.v9-pre{ display:flex; justify-content:center; padding:2px 0 12px; }
+.v9-dia{ display:grid; grid-template-columns:repeat(var(--c,2),26px); grid-auto-rows:6px; gap:3px; }
+.v9-dia i{ display:block; border-radius:2px; background:#e5e7eb; }
+.v9-dia i.on{ background:#e0a21c; }
+.v9-lbl{ margin:0 0 6px; font-size:.72rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#6b7280; }
+.v9-seg{ display:grid; grid-template-columns:repeat(var(--n,3),minmax(0,1fr)); gap:6px; margin-bottom:14px; }
+.v9-seg button{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; min-width:0; min-height:56px; padding:8px 4px;
+  border:1.5px solid #e7e9ee; background:#fff; color:#161a1f; font:inherit; font-size:.8rem; font-weight:800; line-height:1.15; cursor:pointer; }
+.v9-seg button i{ font-size:19px; color:#6b7280; }
+.v9-seg button:hover{ background:#f7f8fa; }
+.v9-seg button[aria-pressed="true"]{ border-color:#e0a21c; background:#fdf6e3; }
+.v9-seg button[aria-pressed="true"] i{ color:#a16207; }
+.v9-seg button:focus-visible{ outline:3px solid #e0a21c; outline-offset:2px; }
+@media (prefers-reduced-motion:reduce){ .v9-frame{ transition:none; } }
+}
+@media print{
+  .v9-frame{ display:none !important; }
+  /* printing the home page still prints the week, like before the calendar moved into the grid */
+  #view-home .dash{ display:block !important; padding:0; }
+  #view-home .dash > :not(.wg-cal){ display:none !important; }
+  #view-home .dash > .wg-cal{ display:block !important; grid-row:auto !important; }
+  #view-home .dash > .wg-cal > .today-card{ position:static !important; }
+}
+</style>
 </head>
 <body>
 <div class="app">
@@ -1004,6 +1124,7 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
   <div class="loc-bar" id="locBar">
     <button class="loc-tab" data-loc="memphis" onclick="setLoc('memphis')">Memphis</button>
     <button class="loc-tab" data-loc="nashville" onclick="setLoc('nashville')">Nashville</button>
+    <button type="button" class="loc-act" id="dashEdit" title="Edit tiles" aria-label="Edit tiles" aria-pressed="false"><i class="ti ti-pencil" aria-hidden="true"></i></button>
     <a class="loc-act" href="manager.html" title="Manager"><i class="ti ti-layout-dashboard"></i></a>
     <button class="loc-act" onclick="topLogout()" title="Logout"><i class="ti ti-logout"></i></button>
   </div>
@@ -1015,24 +1136,25 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
     <div class="dash" id="dash">
       <button class="wg wg-res" id="tile-resys" style="--i:0" onclick="showView('resys')" aria-label="Reservations" data-tile="resys" data-name="Resys" data-icon="ti-armchair" data-swatch="#1d4ed8" data-ink="#ffffff">
         <i class="ti ti-armchair wg-art" id="wgResArt" aria-hidden="true" hidden></i>
-        <span class="wg-head"><span class="wg-t">Resys</span><span class="wg-chip opt">Today</span></span>
+        <span class="wg-head"><span class="wg-t">Resys</span><span class="wg-chip opt" id="wgResChip">Today</span></span>
         <span class="wg-stats">
           <span class="wg-stat"><i class="ti ti-calendar-check" style="color:#fde68a"></i><span class="k">Booked</span><b id="wgResN">&ndash;</b></span>
           <span class="wg-stat"><i class="ti ti-users" style="color:#a5f3fc"></i><span class="k">Guests</span><b id="wgResG">&ndash;</b></span>
           <span class="wg-stat"><i class="ti ti-clock-hour-7" style="color:#fecdd3"></i><span class="k">Next</span><b id="wgResNext">&ndash;</b></span>
         </span>
+        <span class="wg-list wg-next" id="wgResList"></span>
         <span class="wg-hrs" id="wgResHrs"></span>
         <span class="wg-foot" id="wgResFoot">Loading&hellip;</span>
       </button>
       <button class="wg wg-day" id="tile-day" style="--i:1" onclick="showView('calendar')" aria-label="Today on the calendar" data-tile="day" data-name="Today" data-icon="ti-calendar-event" data-swatch="#ffffff" data-ink="#dc2626">
-        <span class="wg-head"><span class="wg-t wg-dow" id="wgDayDow">Today</span><span class="wg-chip opt" id="wgDayMon" hidden></span></span>
+        <span class="wg-head"><span class="wg-t wg-dow" id="wgDayDow">Today</span><span class="wg-dmini" id="wgDayMini"></span><span class="wg-chip opt" id="wgDayMon" hidden></span></span>
         <span class="wg-dnum" id="wgDayNum"></span>
         <span class="wg-evs" id="wgDayList"></span>
         <span class="wg-foot" id="wgDayFoot">Loading&hellip;</span>
       </button>
       <div class="wg wg-sch" id="tile-myshifts" style="--i:2" data-tile="schedule" data-name="Schedule" data-icon="ti-calendar-week" data-swatch="#e7eeff" data-ink="#3730a3">
         <a class="wg-cover" href="schedule.html" aria-label="Schedule"></a>
-        <span class="wg-head"><span class="wg-t">Schedule</span><span class="wg-chip opt">Today</span></span>
+        <span class="wg-head"><span class="wg-t">Schedule</span><span class="wg-chip opt" id="wgSchChip">Today</span></span>
         <span class="wg-ppl" id="wgSchPpl"></span>
         <span class="wg-big"><b id="wgSchN">&ndash;</b><span id="wgSchLbl">on today</span></span>
         <span class="wg-sub" id="wgSchWho"></span>
@@ -1045,7 +1167,7 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
       <button class="wg wg-chz" id="tile-cheese-entry" style="--i:3" onclick="location.href='manager.html#plu'" aria-label="Cheese Entry" data-tile="cheese" data-name="Cheese Entry" data-icon="ti-cheese" data-swatch="#ff7f52" data-ink="#ffffff">
         <img class="wg-greysie" src="greysie-cheesemonger-sticker.svg" alt="" width="132" height="132">
         <svg class="wg-wave" viewBox="0 0 200 100" preserveAspectRatio="none" aria-hidden="true"><path d="M0 24 C 28 6, 60 30, 98 17 S 162 0, 200 14 L 200 100 L 0 100 Z"/></svg>
-        <span class="wg-t">Cheese<br>Entry</span>
+        <span class="wg-t">Cheese <br>Entry</span>
         <span class="wg-delta" id="wgChzWk"></span>
         <span class="wg-chz-n"><b id="wgChzN">&ndash;</b><span>cheeses</span></span>
         <span class="wg-foot" id="wgChzFoot">Loading&hellip;</span>
@@ -1055,7 +1177,7 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
         <span class="wg-list" id="wgLeadList"></span>
         <span class="wg-foot" id="wgLeadFoot">Loading&hellip;</span>
       </button>
-      <button class="wg wg-stf" id="tile-stuff" style="--i:5" onclick="showView('stuff')" aria-label="Stuff to Know" data-tile="stuff" data-name="Stuff to Know" data-icon="ti-info-circle" data-swatch="#fff3d4" data-ink="#a16207">
+      <button class="wg wg-stf" id="tile-stuff" style="--i:5" onclick="showView('stuff')" aria-label="Stuff to Know" data-tile="stuff" data-size-def="2x1" data-name="Stuff to Know" data-icon="ti-info-circle" data-swatch="#fff3d4" data-ink="#a16207">
         <span class="wg-head"><span class="wg-t">Stuff to Know</span><span class="wg-chip" id="wgStfN" hidden></span></span>
         <span class="wg-list" id="wgStfList"></span>
         <span class="wg-foot" id="wgStfFoot">Loading&hellip;</span>
@@ -1066,30 +1188,42 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
         <span class="wg-list" id="wgChatList"></span>
         <span class="wg-foot" id="wgChatFoot">Channels, DMs and clients</span>
       </button>
+      <!-- ONLINE ORDERING: is orderonline.greyscheese.com taking orders for this shop (filled by the ONLINE-ORDERING script); tap -> the switch in the manager console -->
+      <a class="wg wg-oo" id="tile-oo" href="manager.html#ordering" style="--i:7" aria-label="Online ordering" data-tile="ordering" data-name="Online ordering" data-icon="ti-shopping-bag" data-swatch="#e7f6ec" data-ink="#15803d" data-size-def="3x0">
+        <i class="ti ti-shopping-bag wg-art" aria-hidden="true"></i>
+        <span class="wg-head"><span class="wg-oo-ic"><i class="ti ti-shopping-bag" aria-hidden="true"></i></span><span class="wg-t">Online ordering</span><span class="wg-chip" id="wgOoChip">&hellip;</span></span>
+        <span class="wg-oo-state"><b id="wgOoState">&ndash;</b></span>
+        <span class="wg-sub" id="wgOoSub">Checking&hellip;</span>
+        <span class="wg-foot">Switch in Manager &rsaquo;</span>
+      </a>
+      <!-- CALENDAR: the next 7 days as a tile, a week per ‹ › step. Fit all = the whole week; the chevron folds it to title only (HOME-V8). -->
+      <div class="wg wg-cal" id="tile-cal" style="--i:8" data-tile="calendar" data-name="Calendar" data-icon="ti-calendar" data-swatch="#ffffff" data-ink="#161a1f" data-size-def="3x3" data-full="1">
+        <div class="today-card" id="todayCard">
+          <button type="button" class="today-fold" id="todayFold" aria-expanded="true" aria-controls="todayList" aria-label="Hide calendar" title="Hide calendar"><i class="ti ti-chevron-up" aria-hidden="true"></i></button>
+          <div class="today-head">
+            <div class="today-title"><span id="todayLabel">Today</span><small id="todayDate"></small></div>
+            <button class="cal-nav" onclick="todayStep(-1)" aria-label="Previous week">‹</button>
+            <button class="cal-today" id="todayBtn" onclick="todayStep(0)">Today</button>
+            <button class="cal-nav" onclick="todayStep(1)" aria-label="Next week">›</button>
+          </div>
+          <div id="todayList" class="today-list"><div class="empty"><span class="spin"></span> Loading…</div></div>
+          <button class="today-all" onclick="showView('calendar')">Full calendar →</button>
+        </div>
+      </div>
     </div>
-    <div class="dash-tools" id="dashTools"><button type="button" class="dash-edit" id="dashEdit"><i class="ti ti-pencil" aria-hidden="true"></i>Edit tiles</button></div>
     <div id="homePreview" class="home-preview" style="display:none;"></div>
 
     <div class="notes-banner" id="notesGrid"></div>
 
-    <!-- TODAY: the next 7 days, a week per ‹ › step; the chevron folds it (HOME-V8 remembers open/closed per person) -->
-    <div class="today-card" id="todayCard">
-      <button type="button" class="today-fold" id="todayFold" aria-expanded="true" aria-controls="todayList" aria-label="Hide calendar" title="Hide calendar"><i class="ti ti-chevron-up" aria-hidden="true"></i></button>
-      <div class="today-head">
-        <div class="today-title"><span id="todayLabel">Today</span><small id="todayDate"></small></div>
-        <button class="cal-nav" onclick="todayStep(-1)" aria-label="Previous week">‹</button>
-        <button class="cal-today" id="todayBtn" onclick="todayStep(0)">Today</button>
-        <button class="cal-nav" onclick="todayStep(1)" aria-label="Next week">›</button>
-      </div>
-      <div id="todayList" class="today-list"><div class="empty"><span class="spin"></span> Loading…</div></div>
-      <button class="today-all" onclick="showView('calendar')">Full calendar →</button>
-    </div>
   </div>
-<!-- HOME-V8 LAYOUT: each person's own home. Tile order, hidden tiles and calendar open/closed save to their employee ID
+<!-- HOME-V8 LAYOUT: each person's own home. Tile order, tile sizes, hidden tiles and calendar open/closed save to their employee ID
      (RPCs portal_home_layout_get / portal_home_layout_save -> table portal_home_layouts) and are cached on the device.
-     Edit tiles: drag the handle to move a tile (with a mouse, drag the tile itself), the minus hides it, "+ Add tile" brings it back.
+     Edit tiles: drag the handle to move a tile (with a mouse, drag the tile itself), the minus hides it, "+ Add tile" brings it back,
+     the corner resizes it (drag it, tap it for width + height, or arrow keys on it) down to just its title. Sizes: see HOME-V9 SIZES.
+     The pencil in the top bar (#dashEdit) opens and closes Edit tiles. The calendar and online ordering are tiles like the rest.
      New tile later: put a .wg in #dash with data-tile (key), data-name, data-icon, data-swatch, data-ink, plus
-     data-def="0" hidden  -> starts hidden and is offered under "+ Add tile"   (no data-def -> shows for everyone). -->
+     data-def="0" hidden  -> starts hidden and is offered under "+ Add tile"   (no data-def -> shows for everyone),
+     data-size-def="2x1"  -> its standard size (columns x height 0-2, 3 = fit all for data-full tiles; default 1x1). -->
 <script>
 (function(){
   var dash=document.getElementById('dash'), card=document.getElementById('todayCard');
@@ -1117,9 +1251,45 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
   function shown(){ return tiles().filter(function(el){ return !el.hidden; }); }
   var DEF=tiles().map(key);     // the order in the markup = the standard home
 
+  // ── tile sizes: data-w = columns (1-3; 3 = full width); data-h = 0 title only, 1 regular, 2 tall, 3 fit all (data-full tiles) ──
+  var SZ_RE=/^[1-3]x[0-3]$/, H_NAME=['Title only','Regular','Tall','Fit all'];
+  var MQ3=window.matchMedia ? matchMedia('(min-width:640px)') : null;
+  function gridCols(){ return (MQ3 && MQ3.matches) ? 3 : 2; }            // same breakpoint as the .dash grid
+  function parseSz(v){ return { w:+v.charAt(0), h:+v.charAt(2) }; }
+  function maxH(el){ return el.hasAttribute('data-full') ? 3 : 2; }
+  function okSz(el, v){ return typeof v==='string' && SZ_RE.test(v) && +v.charAt(2)<=maxH(el); }
+  function defSize(el){ var v=el.getAttribute('data-size-def'); return parseSz(okSz(el, v) ? v : '1x1'); }
+  function getSz(el){ var d=defSize(el), w=el.getAttribute('data-w'), h=el.getAttribute('data-h'); return { w:w==null ? d.w : +w, h:h==null ? d.h : +h }; }
+  function wName(w){ var c=gridCols(), e=Math.min(w, c); return e>=c ? 'Full width' : e===1 ? (c===2 ? 'Half width' : '1 column') : '2 columns'; }
+  function szName(w,h){ return H_NAME[h]+', '+wName(w).toLowerCase(); }
+  function sizeLabel(el){
+    var b=$q(':scope > .wg-ctl .wg-size', el); if(!b) return;
+    var s=getSz(el); b.setAttribute('aria-label', 'Resize '+nm(el)+', now '+szName(s.w, s.h)+'. Arrow keys change the size.');
+  }
+  function sizeEvt(el){ sizeLabel(el); try{ el.dispatchEvent(new CustomEvent('wgsize', { bubbles:true })); }catch(e){} }
+  function setSize(el, w, h){
+    w=Math.max(1, Math.min(3, w|0)); h=Math.max(0, Math.min(maxH(el), h|0));
+    var s=getSz(el); if(s.w===w && s.h===h && el.hasAttribute('data-w')) return false;
+    if(h===0 && s.h!==0) el.setAttribute('data-hprev', s.h);       // what "open it back up" goes back to
+    el.setAttribute('data-w', w); el.setAttribute('data-h', h);
+    sizeEvt(el);
+    return true;
+  }
+  // a width picked on this screen -> what gets saved: the width it already shows here stays; full width here = full width everywhere
+  function toW(el, e){ var s=getSz(el), c=gridCols(); return e===Math.min(s.w, c) ? s.w : (e>=c ? 3 : e); }
+  // what the tile scripts read to decide how much to show: w/h as saved, wEff = the columns it really spans on this screen
+  window.wgSize=function(el){ var s=el ? getSz(el) : { w:1, h:1 }, c=gridCols(); return { w:s.w, h:s.h, cols:c, wEff:Math.min(s.w, c) }; };
+  tiles().forEach(function(el){ var d=defSize(el); el.setAttribute('data-w', d.w); el.setAttribute('data-h', d.h); });
+  if(MQ3){ var onCols=function(){ tiles().forEach(sizeEvt); };     // phone <-> 3 columns: the tiles redraw for the new width
+    if(MQ3.addEventListener) MQ3.addEventListener('change', onCols); else if(MQ3.addListener) MQ3.addListener(onCols); }
+
   // ── the layout on screen ↔ a saved layout ──
   function current(){
-    return { v:1, order:shown().map(key), hidden:tiles().filter(function(el){ return el.hidden; }).map(key), cal:calOpen?'open':'closed' };
+    var ct=byKey('calendar'), L={ v:1, order:shown().map(key), hidden:tiles().filter(function(el){ return el.hidden; }).map(key),
+      cal:(ct && getSz(ct).h===0) ? 'closed' : 'open' }, sz={}, any=false;
+    tiles().forEach(function(el){ var s=getSz(el), d=defSize(el); if(s.w!==d.w || s.h!==d.h){ sz[key(el)]=s.w+'x'+s.h; any=true; } });
+    L.size=sz;                     // only the tiles that aren't their standard size ({} = all standard; a save with no "size" key comes from an
+    return L;                      // older page, and the server then keeps the sizes it has)
   }
   function standard(){ return { v:1, order:DEF.filter(function(k){ var el=byKey(k); return el && isDef(el); }), hidden:[], cal:'open' }; }
   // tiles the layout doesn't mention: standard ones show at the end, optional ones stay hidden
@@ -1138,7 +1308,12 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
       want.forEach(function(el){ el.hidden=vis.indexOf(el)<0; el.style.setProperty('--i', Math.max(0, vis.indexOf(el))); dash.insertBefore(el, anchor); });
       if(editing) vis.forEach(decorate);
     }
-    if(L.cal==='open' || L.cal==='closed') setCal(L.cal==='open');
+    var sm=isObj(L.size) ? L.size : {};
+    all.forEach(function(el){
+      var v=sm[key(el)];
+      if(!okSz(el, v) && key(el)==='calendar' && L.cal==='closed') v=defSize(el).w+'x0';     // folded before the calendar was a tile
+      var z=okSz(el, v) ? parseSz(v) : defSize(el); setSize(el, z.w, z.h);
+    });
   }
 
   // ── saved to the employee ID (the device keeps a copy; an edit that never reached the server goes up next time) ──
@@ -1162,7 +1337,7 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
     clearTimeout(saveT); saveT=setTimeout(function(){ save(current()); }, 400);
   }
 
-  // ── calendar card: open by default; the chevron (or the title) folds it. Folded = no loading until it opens again ──
+  // ── calendar tile: the chevron (or the title) folds it to "title only" and opens it back up. Folded = no loading until it opens ──
   function setCal(open){
     calOpen=!!open;
     if(card){
@@ -1183,13 +1358,49 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
   function hookToday(){
     if(todayOrig || typeof window.renderToday!=='function') return;
     todayOrig=window.renderToday;
-    window.renderToday=function(){ if(!calOpen){ calStale=true; foldHead(); return Promise.resolve(); } return todayOrig.apply(this, arguments); };
+    window.renderToday=function(){ if(!calOpen){ calStale=true; foldHead(); return Promise.resolve(); }
+      var r=todayOrig.apply(this, arguments); Promise.resolve(r).then(fitCalSoon, fitCalSoon); return r; };
   }
-  function fold(){ setCal(!calOpen); persist(); }
+  function fold(){
+    var el=byKey('calendar'); if(!el) return;
+    var z=getSz(el);
+    if(z.h!==0) setSize(el, z.w, 0);
+    else setSize(el, z.w, +el.getAttribute('data-hprev') || defSize(el).h || 3);
+    fitCal(); persist();
+  }
   if(card){
     var fb=document.getElementById('todayFold'); if(fb) fb.addEventListener('click', fold);
     var tt=$q('.today-title', card); if(tt) tt.addEventListener('click', fold);
   }
+  // "fit all": the calendar tile is as many grid units tall as its week needs (recounted when the week, its width or the screen change)
+  var calRaf=0;
+  function calNatural(el){
+    var c=el ? $q(':scope > .today-card', el) : null; if(!c) return 0;
+    var kids=c.children, last=null;
+    for(var i=kids.length-1; i>=0; i--){ if(kids[i].getClientRects().length && getComputedStyle(kids[i]).position!=='absolute'){ last=kids[i]; break; } }
+    if(!last) return 0;
+    var cs=getComputedStyle(c);
+    return last.getBoundingClientRect().bottom - c.getBoundingClientRect().top + (parseFloat(cs.paddingBottom)||0) + (parseFloat(cs.borderBottomWidth)||0);
+  }
+  function fitCal(){
+    calRaf=0;
+    var el=byKey('calendar'); if(!el) return;
+    var want='';
+    if(getSz(el).h===3 && !el.hidden){ var m=metrics(), n=calNatural(el); if(n>0) want='span '+Math.max(3, Math.floor((n+m.rgap)/(m.u+m.rgap))); }   // rounded down: the last units stretch to the exact height, no blank strip
+    if(el.style.gridRowEnd!==want) el.style.gridRowEnd=want;
+  }
+  function fitCalSoon(){ if(!calRaf) calRaf=requestAnimationFrame(fitCal); }
+  (function(){
+    var el=byKey('calendar'); if(!el) return;
+    el.addEventListener('wgsize', function(){ setCal(getSz(el).h!==0); fitCal(); });
+    if(window.ResizeObserver && card){
+      var ro=new ResizeObserver(fitCalSoon);
+      [card, $q('.today-head', card), document.getElementById('todayList'), $q('.today-all', card), dash].forEach(function(n){ if(n) ro.observe(n); });
+    }
+    window.addEventListener('resize', fitCalSoon);
+    window.addEventListener('load', fitCalSoon);
+    if(document.fonts && document.fonts.ready) document.fonts.ready.then(fitCalSoon);
+  })();
 
   // ── edit mode ──
   function say(t){
@@ -1200,8 +1411,10 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
     if($q(':scope > .wg-ctl', el)) return;
     var c=document.createElement('span'); c.className='wg-ctl';
     c.innerHTML='<button type="button" class="wg-grip" aria-label="Move '+esc(nm(el))+' (arrow keys move it)"><i class="ti ti-grip-horizontal" aria-hidden="true"></i></button>'
-      +'<button type="button" class="wg-hide" aria-label="Hide '+esc(nm(el))+'" title="Hide"><i class="ti ti-minus" aria-hidden="true"></i></button>';
+      +'<button type="button" class="wg-hide" aria-label="Hide '+esc(nm(el))+'" title="Hide"><i class="ti ti-minus" aria-hidden="true"></i></button>'
+      +'<button type="button" class="wg-size" title="Resize"><i class="ti ti-arrows-diagonal-2" aria-hidden="true"></i></button>';
     el.appendChild(c);
+    sizeLabel(el);
   }
   function undecorate(el){ var c=$q(':scope > .wg-ctl', el); if(c) c.remove(); }
 
@@ -1212,8 +1425,9 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
     var home=document.getElementById('view-home');
     if(home && !home.classList.contains('active') && window.showView) showView('home');
     document.body.classList.add('home-editing'); dash.classList.add('editing');
+    var pen=document.getElementById('dashEdit'); if(pen) pen.setAttribute('aria-pressed', 'true');
     bar=document.createElement('div'); bar.className='home-editbar';
-    bar.innerHTML='<div class="heb-t"><b>Edit your home</b><small>Drag <i class="ti ti-grip-horizontal" aria-hidden="true"></i> to move · <i class="ti ti-minus" aria-hidden="true"></i> to hide</small></div>'
+    bar.innerHTML='<div class="heb-t"><b>Edit your home</b><small><i class="ti ti-grip-horizontal" aria-hidden="true"></i> move · <i class="ti ti-arrows-diagonal-2" aria-hidden="true"></i> resize · <i class="ti ti-minus" aria-hidden="true"></i> hide</small></div>'
       +'<button type="button" class="heb-btn" data-act="reset">Reset</button><button type="button" class="heb-btn heb-done" data-act="done">Done</button>';
     bar.addEventListener('click', function(e){ var b=e.target.closest('[data-act]'); if(!b) return; if(b.getAttribute('data-act')==='done') done(); else reset(); });
     dash.parentNode.insertBefore(bar, dash);
@@ -1224,16 +1438,17 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
     var r=bar.getBoundingClientRect();
     if(r.top<0 || r.top>innerHeight*0.5) window.scrollTo({ top:Math.max(0, scrollY+r.top-10), behavior:reduce?'auto':'smooth' });
     var d=$q('.heb-done', bar); if(d) d.focus({ preventScroll:true });
-    say('Editing your home. Drag a tile by its handle to move it.');
+    say('Editing your home. Drag a tile by its handle to move it, or by its corner to resize it.');
   }
   function done(){
     if(!editing) return;
-    endDrag(true); closeSheet();
+    endDrag(true); rzEnd(true); closeSheet();
     editing=false;
     tiles().forEach(undecorate);
     if(addEl){ addEl.remove(); addEl=null; }
     if(bar){ bar.remove(); bar=null; }
     dash.classList.remove('editing'); document.body.classList.remove('home-editing');
+    var pen=document.getElementById('dashEdit'); if(pen) pen.setAttribute('aria-pressed', 'false');
     shown().forEach(function(el,i){ el.style.setProperty('--i', i); });
     var L=current(); writeCache(L);
     save(L).then(function(ok){ toast(ok ? 'Saved to your employee ID' : 'Saved on this device — it syncs to your ID next time'); });
@@ -1273,10 +1488,15 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
     if(!editing) return;
     if(addEl && addEl.contains(e.target)){ openAdd(); return; }
     e.preventDefault(); e.stopPropagation();
-    var h=e.target.closest('.wg-hide'); if(h) hide(h.closest('.wg'));
+    var h=e.target.closest('.wg-hide'); if(h){ hide(h.closest('.wg')); return; }
+    var z=e.target.closest('.wg-size'); if(z && performance.now()>rzTapBlock) openSize(z.closest('.wg'));
   }, true);
   dash.addEventListener('keydown', function(e){
     if(!editing || !e.target.closest) return;
+    var z=e.target.closest('.wg-size');
+    if(z){ var k={ ArrowLeft:[-1,0], ArrowRight:[1,0], ArrowUp:[0,-1], ArrowDown:[0,1] }[e.key];
+      if(k){ e.preventDefault(); nudge(z.closest('.wg'), k[0], k[1]); }
+      return; }
     var g=e.target.closest('.wg-grip'); if(!g) return;
     var d={ ArrowLeft:-1, ArrowUp:-1, ArrowRight:1, ArrowDown:1 }[e.key];
     if(d){ e.preventDefault(); move(g.closest('.wg'), d); }
@@ -1287,7 +1507,7 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
   dash.addEventListener('pointerdown', function(e){
     if(!editing || drag || (e.pointerType==='mouse' && e.button!==0)) return;
     var t=e.target, el=t.closest('.wg');
-    if(!el || el.parentNode!==dash || !el.hasAttribute('data-tile') || t.closest('.wg-hide')) return;
+    if(!el || el.parentNode!==dash || !el.hasAttribute('data-tile') || t.closest('.wg-hide') || t.closest('.wg-size') || rz) return;
     if(!t.closest('.wg-grip') && e.pointerType!=='mouse') return;
     e.preventDefault();
     drag={ el:el, id:e.pointerId, x0:e.clientX, y0:e.clientY, x:e.clientX, y:e.clientY, on:false, lock:0 };
@@ -1344,6 +1564,121 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
     if(quick || reduce || !g) clean();
     else { var r=d.el.getBoundingClientRect(); g.style.transition='transform .16s ease'; g.style.transform='translate('+r.left+'px,'+r.top+'px)'; setTimeout(clean, 170); }
     var vis=shown(); say(nm(d.el)+', '+(vis.indexOf(d.el)+1)+' of '+vis.length);
+  }
+
+  // ── resize: drag the corner handle (snaps to columns 1-3 and title only / regular / tall); a tap opens width + height; arrow keys too ──
+  var rz=null, rzFrame=null, rzRaf=0, rzTapBlock=0;
+  function metrics(){
+    var cs=getComputedStyle(dash), c=gridCols(), r=dash.getBoundingClientRect();
+    var gap=parseFloat(cs.columnGap)||12, rgap=parseFloat(cs.rowGap)||gap, pl=parseFloat(cs.paddingLeft)||0, pr=parseFloat(cs.paddingRight)||0;
+    var rowH=parseFloat(cs.getPropertyValue('--wg-row'))||204;
+    return { cols:c, gap:gap, rgap:rgap, colW:(r.width-pl-pr-gap*(c-1))/c, rowH:rowH, u:(rowH-2*rgap)/3, left:r.left+pl, right:r.right-pr };
+  }
+  function hPx(el, h, m){            // how tall a height setting is on this screen
+    if(h===0) return m.u;
+    if(h===1) return 3*m.u+2*m.rgap;
+    if(h===2) return 6*m.u+5*m.rgap;
+    return Math.max(calNatural(el), 6*m.u+5*m.rgap);
+  }
+  function resizeTo(el, w, h){
+    var changed=false;
+    flip(function(){ changed=setSize(el, w, h); });
+    if(!changed) return;
+    if(!reduce){ el.classList.remove('wg-new'); void el.offsetWidth; el.classList.add('wg-new'); }
+    var r=el.getBoundingClientRect(), top=bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0;
+    if(r.top<top || r.bottom>innerHeight) window.scrollTo({ top:Math.max(0, scrollY+r.top-top-12), behavior:reduce?'auto':'smooth' });
+    say(nm(el)+': '+szName(w, h));
+  }
+  function nudge(el, dw, dh){
+    var s=getSz(el), c=gridCols(), e0=Math.min(s.w, c), e=Math.max(1, Math.min(c, e0+dw)), h=Math.max(0, Math.min(maxH(el), s.h+dh));
+    if(e===e0 && h===s.h){ say(nm(el)+' is already '+szName(s.w, s.h)); return; }
+    resizeTo(el, toW(el, e), h);
+    var b=$q('.wg-size', el); if(b) b.focus({ preventScroll:true });
+  }
+  dash.addEventListener('pointerdown', function(e){
+    if(!editing || rz || drag || (e.pointerType==='mouse' && e.button!==0)) return;
+    var t=e.target.closest ? e.target.closest('.wg-size') : null, el=t ? t.closest('.wg') : null;
+    if(!el || el.parentNode!==dash) return;
+    e.preventDefault();
+    var s=getSz(el), c=gridCols(), r=el.getBoundingClientRect(), m=metrics();
+    rz={ el:el, id:e.pointerId, x0:e.clientX, y0:e.clientY, x:e.clientX, y:e.clientY, sy0:scrollY, on:false,
+         w0:Math.min(s.w, c), h0:s.h, w:Math.min(s.w, c), h:s.h, bw:r.width, bh:r.height,
+         edge:Math.min(s.w, c)===1 && Math.abs(r.right-m.right)<2 };     // a 1-wide tile at the right edge widens by dragging left
+  });
+  window.addEventListener('pointermove', function(e){
+    if(!rz || e.pointerId!==rz.id) return;
+    rz.x=e.clientX; rz.y=e.clientY;
+    if(!rz.on){ if(Math.abs(rz.x-rz.x0)+Math.abs(rz.y-rz.y0)<6) return; rzLift(); }
+    e.preventDefault();
+    rzShow(); rzEdge();
+  }, { passive:false });
+  window.addEventListener('pointerup', function(e){ if(rz && e.pointerId===rz.id) rzEnd(false); });
+  window.addEventListener('pointercancel', function(e){ if(rz && e.pointerId===rz.id) rzEnd(true); });
+  function rzLift(){
+    rz.on=true;
+    rzFrame=document.createElement('div'); rzFrame.className='v9-frame'; rzFrame.setAttribute('aria-hidden','true');
+    rzFrame.innerHTML='<span class="v9-badge"><b></b><small></small></span>';
+    document.body.appendChild(rzFrame);
+    rz.el.classList.add('wg-resizing'); document.body.classList.add('home-resizing');
+  }
+  function rzShow(){
+    if(!rz || !rz.on || !rzFrame) return;
+    var m=metrics(), r=rz.el.getBoundingClientRect(), dx=rz.x-rz.x0, dy=(rz.y-rz.y0)+(scrollY-rz.sy0);
+    var w=Math.max(1, Math.min(m.cols, Math.round((rz.bw+(rz.edge ? Math.abs(dx) : dx)+m.gap)/(m.colW+m.gap))));
+    var want=rz.bh+dy, h=rz.h0, best=Infinity;           // the nearest height setting to where the corner is
+    for(var k=0; k<=maxH(rz.el); k++){ var d=Math.abs((k===rz.h0 ? rz.bh : hPx(rz.el, k, m))-want); if(d<best){ best=d; h=k; } }
+    rz.w=w; rz.h=h;
+    var fw= w===rz.w0 ? r.width : m.colW*w+m.gap*(w-1);
+    var fh= h===rz.h0 ? r.height : hPx(rz.el, h, m);
+    var st=rzFrame.style;
+    st.left=Math.max(m.left, Math.min(r.left, m.right-fw))+'px'; st.top=r.top+'px'; st.width=fw+'px'; st.height=fh+'px';
+    rzFrame.classList.toggle('same', w===rz.w0 && h===rz.h0);
+    $q('b', rzFrame).textContent=H_NAME[h]; $q('small', rzFrame).textContent=wName(w);
+  }
+  function rzEdge(){
+    cancelAnimationFrame(rzRaf);
+    if(!rz || !rz.on) return;
+    var top=(bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0)+30, bot=innerHeight-60, v=0;
+    if(rz.y>bot) v=Math.min(14, (rz.y-bot)/3+3); else if(rz.y<top) v=-Math.min(14, (top-rz.y)/3+3);
+    if(!v) return;
+    (function step(){ if(!rz || !rz.on) return; window.scrollBy(0, v); rzShow(); rzRaf=requestAnimationFrame(step); })();
+  }
+  function rzEnd(cancel){
+    cancelAnimationFrame(rzRaf);
+    var d=rz; rz=null;
+    if(!d || !d.on) return;               // a tap: the click that follows opens the size menu
+    if(rzFrame){ rzFrame.remove(); rzFrame=null; }
+    d.el.classList.remove('wg-resizing'); document.body.classList.remove('home-resizing');
+    var far=Math.abs(d.x-d.x0)+Math.abs(d.y-d.y0)>16;
+    if(cancel){ rzTapBlock=performance.now()+450; return; }
+    if(d.w===d.w0 && d.h===d.h0){ if(far) rzTapBlock=performance.now()+450; say(nm(d.el)+' stays '+szName(d.w0, d.h0)); return; }   // a shaky tap still opens the menu
+    rzTapBlock=performance.now()+450;     // a real resize: the click that follows doesn't open the menu
+    resizeTo(d.el, toW(d.el, d.w), d.h);
+  }
+  function openSize(el){
+    var c=gridCols();
+    function seg(lbl, attr, items, cur){
+      return '<div class="v9-lbl">'+lbl+'</div><div class="v9-seg" style="--n:'+items.length+'" role="group" aria-label="'+lbl+'">'+items.map(function(it){
+        return '<button type="button" '+attr+'="'+it[0]+'" aria-pressed="'+(it[0]===cur)+'"><i class="ti '+it[2]+'" aria-hidden="true"></i>'+it[1]+'</button>'; }).join('')+'</div>';
+    }
+    function body(){
+      var z=getSz(el), e=Math.min(z.w, c), rows=maxH(el)===3 ? 7 : 6, units=[1,3,6,7][z.h], cells='';
+      for(var r=1; r<=rows; r++) for(var k=1; k<=c; k++) cells+='<i'+(k<=e && r<=units ? ' class="on"' : '')+'></i>';
+      var W=c>=3 ? [[1,'1 column','ti-square'],[2,'2 columns','ti-rectangle'],[3,'Full width','ti-arrows-horizontal']]
+                 : [[1,'Half width','ti-square'],[2,'Full width','ti-arrows-horizontal']];
+      var H=[[0,'Title only','ti-heading'],[1,'Regular','ti-square'],[2,'Tall','ti-rectangle-vertical']];
+      if(maxH(el)===3) H.push([3,'Fit all','ti-arrows-vertical']);
+      return '<div class="v9-pre"><span class="v9-dia" style="--c:'+c+'" aria-hidden="true">'+cells+'</span></div>'+seg('Width', 'data-sw', W, e)+seg('Height', 'data-sh', H, z.h);
+    }
+    var sh=sheet('<div class="v8-h"><b>Size · '+esc(nm(el))+'</b><button type="button" class="v8-x" data-x aria-label="Close"><i class="ti ti-x" aria-hidden="true"></i></button></div>'
+      +'<div class="v9-body">'+body()+'</div><div class="v8-acts"><button type="button" class="v8-btn pri" data-x>Done</button></div>');
+    var on=$q('.v9-seg [aria-pressed="true"]', sh); if(on) on.focus({ preventScroll:true });
+    sh.addEventListener('click', function(e){
+      var b=e.target.closest('[data-sw],[data-sh]'); if(!b || !editing || !document.contains(el)) return;
+      var z=getSz(el), attr=b.hasAttribute('data-sw') ? 'data-sw' : 'data-sh', v=+b.getAttribute(attr);
+      resizeTo(el, attr==='data-sw' ? toW(el, v) : z.w, attr==='data-sh' ? v : z.h);
+      var bd=$q('.v9-body', sh); if(bd){ bd.innerHTML=body(); var nb=$q('['+attr+'="'+v+'"]', bd); if(nb) nb.focus({ preventScroll:true }); }
+    });
   }
 
   // ── sheets: "Add a tile" and the employee-ID sign-in ──
@@ -1412,18 +1747,18 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
     document.body.appendChild(el);
     setTimeout(function(){ el.classList.add('out'); }, 2400); setTimeout(function(){ el.remove(); }, 2800);
   }
-  var eb=document.getElementById('dashEdit'); if(eb) eb.addEventListener('click', edit);
+  var eb=document.getElementById('dashEdit'); if(eb) eb.addEventListener('click', function(){ if(editing) done(); else edit(); });
   window.addEventListener('pagehide', function(){ if(editing){ writeCache(current()); if(emp()) lsSet(pendKey(), '1'); } });
 
   // ── boot: this device's copy right away (before the first paint), then the copy saved to the employee ID ──
   apply(readCache());
   document.addEventListener('DOMContentLoaded', function(){
-    hookToday();
+    hookToday(); fitCalSoon();
     if(!emp()) return;
     if(lsGet(pendKey())){ var c=readCache(); if(c) save(c); return; }
     load().then(function(L){ if(L && !editing){ apply(L); writeCache(current()); } });
   });
-  window.homeLayout={ edit:edit, done:done, current:current, apply:apply };
+  window.homeLayout={ edit:edit, done:done, current:current, apply:apply, resize:resizeTo, fold:fold };
 })();
 </script>
 
@@ -2265,7 +2600,38 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
     setTimeout(done, dur+300);
   }
 
+  // Edit tiles -> resize: how big a tile is (wEff = the columns it spans on this screen, h = rows); bigger tiles show more
+  function size(id){ var el=$(id); return (el && window.wgSize) ? window.wgSize(el) : { w:1, h:1, cols:2, wEff:1 }; }
+  function spread(el, n, always){ if(!el) return; if(n>1 || always){ el.setAttribute('data-cols', n); el.style.setProperty('--cols', n); } else { el.removeAttribute('data-cols'); el.style.removeProperty('--cols'); } }
+  // a list takes another column only when it runs out of rows (so a short list keeps the full width for its text)
+  function colsFor(n, perCol, w){ return Math.max(1, Math.min(w, Math.ceil(n/perCol))); }
+
   // ── RESYS: today's bookings, guests, next seating, requests waiting on approval ──
+  var RES=null;
+  function drawRes(){
+    if(!RES) return;
+    var s=size('tile-resys'), byH=RES.byH, up=RES.up;
+    // guests by hour for the hours still ahead (five per column), lighter square = busier
+    var hrs=Object.keys(byH).map(Number).sort(function(x,y){ return x-y; }).slice(0, 5*s.wEff);
+    var mx=Math.max.apply(null, hrs.map(function(h){ return byH[h]; }).concat([1]));
+    $('wgResHrs').innerHTML = hrs.length ? '<span class="cap">Guests by hour</span><span class="row">'+hrs.map(function(h){
+      return '<span class="hr l'+Math.max(1,Math.ceil(4*byH[h]/mx))+'"><b>'+byH[h]+'</b><i>'+((h%12)||12)+(h>=12?'p':'a')+'</i></span>'; }).join('')+'</span>' : '';
+    // tall: the next parties, one per row (and more columns when it's wide too)
+    var nx=up.slice(0, s.h>1 ? 4*s.wEff : 0), L=$('wgResList');
+    if(L){ spread(L, colsFor(nx.length, 4, s.wEff));
+      L.innerHTML = nx.length ? '<span class="cap">Up next</span>'+nx.map(function(x){
+        var g=x.r.reservee||{}, who=[g.firstName,g.lastName].filter(Boolean).join(' ')||'Guest', t=hm(new Date(x.t));
+        return '<span class="wg-row"><span class="when">'+(/p$/.test(t)?'PM':'AM')+'<b>'+t.slice(0,-1)+'</b></span>'
+          +'<span class="nm"><b>'+esc(who)+'</b><small>Party of '+esc(x.r.details.partySize||'?')+'</small></span></span>'; }).join('') : ''; }
+    var foot;
+    if(RES.pend) foot='<span class="wg-pill"><i class="ti ti-alert-triangle"></i>'+RES.pend+' to approve</span>';
+    else if(nx.length) foot = up.length>nx.length ? '+'+(up.length-nx.length)+' more today →' : 'All reservations →';
+    else if(up.length){ var w=up[0].r.reservee||{}, nm=[w.firstName,w.lastName].filter(Boolean).join(' ')||'Guest';
+      foot=esc(nm)+', party of '+esc(up[0].r.details.partySize||'?'); }
+    else foot = RES.booked ? 'No more seatings today' : 'No bookings yet today';
+    $('wgResFoot').innerHTML=foot;
+    var chip=$('wgResChip'); if(chip) chip.textContent = s.h===0 ? (RES.booked ? RES.booked+' booked' : 'None yet') : 'Today';   // title only: the count
+  }
   async function resys(){
     var now=new Date(), s=new Date(now.getFullYear(),now.getMonth(),now.getDate()), e=new Date(now.getFullYear(),now.getMonth(),now.getDate(),23,59,59);
     var p=new URLSearchParams(); p.set('paging.limit','100'); p.set('startDateFrom',s.toISOString()); p.set('startDateTo',e.toISOString());
@@ -2283,20 +2649,12 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
     $('wgResArt').hidden = booked.length>0;
     $('wgResNext').textContent = up.length ? hm(new Date(up[0].t)) : '—';
     var pend = b ? (b.reservations||[]).filter(function(r){ return r.status==='REQUESTED' && ((r.reservee||{}).lastName||'')!=='(table hold)'; }).length : 0;
-    // guests by hour for the hours still ahead (up to five), lighter square = busier
+    // guests by hour for the hours still ahead; drawRes draws the strip, the next parties and the foot for the tile's size
     var byH={};
     booked.forEach(function(r){ var t=Date.parse(r.details.startDate); if(t<Date.now()-60*60e3) return;
       var h=new Date(t).getHours(); byH[h]=(byH[h]||0)+(Number(r.details.partySize)||0); });
-    var hrs=Object.keys(byH).map(Number).sort(function(x,y){ return x-y; }).slice(0,5);
-    var mx=Math.max.apply(null, hrs.map(function(h){ return byH[h]; }).concat([1]));
-    $('wgResHrs').innerHTML = hrs.length ? '<span class="cap">Guests by hour</span><span class="row">'+hrs.map(function(h){
-      return '<span class="hr l'+Math.max(1,Math.ceil(4*byH[h]/mx))+'"><b>'+byH[h]+'</b><i>'+((h%12)||12)+(h>=12?'p':'a')+'</i></span>'; }).join('')+'</span>' : '';
-    var foot;
-    if(pend) foot='<span class="wg-pill"><i class="ti ti-alert-triangle"></i>'+pend+' to approve</span>';
-    else if(up.length){ var w=up[0].r.reservee||{}, nm=[w.firstName,w.lastName].filter(Boolean).join(' ')||'Guest';
-      foot=esc(nm)+', party of '+esc(up[0].r.details.partySize||'?'); }
-    else foot = booked.length ? 'No more seatings today' : 'No bookings yet today';
-    $('wgResFoot').innerHTML=foot;
+    RES={ byH:byH, up:up, pend:pend, booked:booked.length };
+    drawRes();
     $('tile-resys').setAttribute('aria-label','Reservations: '+booked.length+' booked today, '+guests+' guests'+(pend?', '+pend+' waiting for approval':''));
   }
 
@@ -2306,6 +2664,7 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
   var OPEN=['new','replied','quoted','contract_sent','link_sent'], BOOKED=['signed','invoiced','deposit_paid','paid','booked'];
   var STAGE={ new:'New', replied:'Replied', quoted:'Quoted', contract_sent:'Contract sent', signed:'Signed', invoiced:'Invoiced', deposit_paid:'Deposit paid', paid:'Paid', link_sent:'Link sent', booked:'Booked' };
   function evLbl(d){ if(!d) return { day:'TBD', date:'—' }; var x=new Date(d+'T12:00:00'); return { day:dayLbl(x.getTime()), date:(x.getMonth()+1)+'/'+x.getDate() }; }
+  var LEADS=null, PULSE=null;      // last data drawn, so a resize can redraw without reloading
   async function leads(){
     var rows=null;
     try{
@@ -2332,7 +2691,8 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
     }catch(e){ fail('wgLeadFoot'); }
   }
   function drawLeads(rows){
-    var today=fmt(new Date());
+    LEADS=rows; PULSE=null;
+    var today=fmt(new Date()), sz=size('tile-catering'), pc=sz.h>1 ? 7 : 3;
     var act=rows.filter(function(r){ var up=!r.event_date || r.event_date>=today;
       return (up && (OPEN.indexOf(r.stage)>=0 || BOOKED.indexOf(r.stage)>=0)) || r.unread; });
     act.sort(function(a,b){ return ((b.unread?1:0)-(a.unread?1:0)) || ((OPEN.indexOf(b.stage)>=0?1:0)-(OPEN.indexOf(a.stage)>=0?1:0))
@@ -2341,7 +2701,9 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
     var booked=act.filter(function(r){ return BOOKED.indexOf(r.stage)>=0 && r.event_date && r.event_date>=today; }).length;
     var unread=rows.filter(function(r){ return r.unread; }).length;
     var chip=$('wgLeadChip'); chip.textContent=open+' open'; chip.hidden=!open;
-    $('wgLeadList').innerHTML = act.slice(0,3).map(function(r){ var e=evLbl(r.event_date);
+    var cols=colsFor(act.length, pc, sz.wEff);       // 3 a column (7 when tall), more columns when it's wide
+    spread($('wgLeadList'), cols);
+    $('wgLeadList').innerHTML = act.slice(0,pc*cols).map(function(r){ var e=evLbl(r.event_date);
       var sub=r.unread ? ['<em>new message</em>', r.guests?r.guests+' guests':''].filter(Boolean).join(' · ')
                        : [r.guests?r.guests+' guests':'', STAGE[r.stage]||esc(r.stage)].filter(Boolean).join(' · ');
       return '<span class="wg-row" data-lead="'+esc(r.code||'')+'"><span class="when">'+e.day+'<b>'+e.date+'</b></span>'
@@ -2357,6 +2719,7 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
       ev.preventDefault(); ev.stopImmediatePropagation(); location.href='chat.html#lead='+encodeURIComponent(row.getAttribute('data-lead')); }, true);
   })();
   function drawPulse(p){
+    PULSE=p; LEADS=null; spread($('wgLeadList'), 1);
     var open=Number(p.open)||0, booked=Number(p.booked)||0, unread=Number(p.unread)||0, next=p.next_event ? evLbl(p.next_event) : null;
     $('wgLeadChip').hidden=true;
     $('wgLeadList').innerHTML = '<span class="wg-big"><b>'+open+'</b><span>open lead'+(open===1?'':'s')+'</span></span>'
@@ -2391,7 +2754,7 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
     SH.shifts.forEach(function(s){ var k=kindOf(s);
       if(s.date!==today || (k!=='shift' && k!=='offsite') || !byId[s.employee_id] || seen[s.employee_id]) return;
       seen[s.employee_id]=1; ppl.push({ e:byId[s.employee_id], s:s }); });
-    var fit=Math.max(2, Math.floor((($('wgSchPpl').clientWidth||140)-3)/27)), show=ppl.length>fit ? fit-1 : ppl.length;
+    var sz=size('tile-myshifts'), fit=Math.max(2, Math.floor((($('wgSchPpl').clientWidth||140)-3)/27)), show=ppl.length>fit ? fit-1 : ppl.length;
     $('wgSchPpl').innerHTML = ppl.length
       ? ppl.slice(0,show).map(function(p){ return '<span class="av" style="background:'+PAL[(Number(p.e.id)||0)%PAL.length]+'" title="'+esc(p.e.name)+'">'+esc(inits(p.e.name))+'</span>'; }).join('')
         + (ppl.length>show ? '<span class="av more">+'+(ppl.length-show)+'</span>' : '')
@@ -2399,9 +2762,14 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
     $('tile-myshifts').classList.toggle('sch-empty', !ppl.length);
     setNum($('wgSchN'), ppl.length);
     $('wgSchN').parentNode.hidden = !SH.shifts.length;
-    $('wgSchWho').innerHTML = ppl.length
-      ? ppl.slice(0,3).map(function(p){ return esc(first(p.e.name))+' '+hmT(p.s.start_time)+'–'+hmT(p.s.end_time); }).join(' · ')
-      : (SH.shifts.length ? 'Nobody on the schedule' : 'No shifts posted yet');
+    // tall: one person per line (8 per column); wide: up to 6 names; standard: 3
+    var who=$('wgSchWho'), cols=colsFor(ppl.length, 8, sz.wEff), many=8*cols;
+    spread(who, sz.h>1 ? cols : 1);
+    who.innerHTML = !ppl.length ? (SH.shifts.length ? 'Nobody on the schedule' : 'No shifts posted yet')
+      : sz.h>1 ? ppl.slice(0, ppl.length>many ? many-1 : many).map(function(p){ return '<span class="sr"><b>'+esc(p.e.name)+'</b><span>'+hmT(p.s.start_time)+'–'+hmT(p.s.end_time)+'</span></span>'; }).join('')
+          + (ppl.length>many ? '<span class="sr"><b>+'+(ppl.length-many+1)+' more</b></span>' : '')
+      : ppl.slice(0, sz.wEff>1 ? 6 : 3).map(function(p){ return esc(first(p.e.name))+' '+hmT(p.s.start_time)+'–'+hmT(p.s.end_time); }).join(' · ');
+    var chip=$('wgSchChip'); if(chip) chip.textContent = (sz.h===0 && ppl.length) ? ppl.length+' on today' : 'Today';   // title only: the count
     var foot='', id=(localStorage.getItem('greys_emp_id')||'').trim().toLowerCase(), me=null;
     if(id) SH.emps.forEach(function(e){ if(!me && String(e.login_id||'').trim().toLowerCase()===id) me=e; });
     if(me){
@@ -2435,14 +2803,18 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
     }catch(e){ fail('wgChzFoot'); }
   }
 
-  // ── STUFF TO KNOW: first four titles (re-drawn whenever the page reloads its items) ──
+  // ── STUFF TO KNOW: the first titles — 4 at the standard size, more when it's bigger (re-drawn whenever the page reloads its items) ──
+  var stfReady=false;
   function stuff(){
+    stfReady=true;
     var items=(typeof _info!=='undefined' && _info) ? _info : [];
+    var sz=size('tile-stuff'), pc=sz.h>1 ? 12 : 4, c=sz.wEff, per=pc*c;     // short titles read best side by side: every column the tile has
     var n=$('wgStfN'); n.textContent=items.length; n.hidden=!items.length;
-    $('wgStfList').innerHTML = items.slice(0,4).map(function(x){
+    spread($('wgStfList'), c, true);
+    $('wgStfList').innerHTML = items.slice(0,per).map(function(x){
       return '<span class="wg-row"><i class="ti ti-bookmark"></i><span class="who">'+esc(x.title)+'</span></span>'; }).join('')
       || '<span class="wg-empty"><i class="ti ti-notes"></i>Nothing here yet</span>';
-    $('wgStfFoot').textContent = items.length>4 ? '+'+(items.length-4)+' more →' : (items.length ? 'Tap to read →' : 'Managers add these in the console');
+    $('wgStfFoot').textContent = items.length>per ? '+'+(items.length-per)+' more →' : (items.length ? 'Tap to read →' : 'Managers add these in the console');
   }
 
   // hook the page's own render functions so the tiles follow the same data
@@ -2459,6 +2831,12 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
   setInterval(function(){ if(document.visibilityState==='visible' && $('view-home').classList.contains('active')) refresh(); }, 5*60e3);
   var rz=0; window.addEventListener('resize', function(){ clearTimeout(rz); rz=setTimeout(drawSched, 150); });
+  // Edit tiles -> resize: redraw a tile from what it already loaded
+  function onSize(id, fn){ var el=$(id); if(el) el.addEventListener('wgsize', function(){ try{ fn(); }catch(e){} }); }
+  onSize('tile-resys', drawRes);
+  onSize('tile-catering', function(){ if(LEADS) drawLeads(LEADS); else if(PULSE) drawPulse(PULSE); });
+  onSize('tile-myshifts', drawSched);
+  onSize('tile-stuff', function(){ if(stfReady) stuff(); });
   document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible' && Date.now()-last>2*60e3){ refresh(); cheese(); } });
 })();
 </script>
@@ -2504,95 +2882,45 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
 </script>
-<!-- ONLINE-ORDERING SWITCH (2026-10-10): the bar under the home tiles shows whether orderonline.greyscheese.com is
-     taking orders for this shop. A manager signed in on this device can flip it here; everyone else is sent to the
-     manager console (manager.html#ordering). State: site_content 'online_ordering' { memphis:{paused}, nashville:{paused} },
-     written by the set_online_ordering RPC (managers only) and read by the square-online-order function within ~10 s. -->
-<style id="oo-switch">
-.oo-bar{ display:flex; align-items:center; gap:12px; margin:10px 16px 0; padding:12px 14px; border-radius:14px; background:#fff; border:1px solid #e5e7eb; box-shadow:0 1px 2px rgba(16,24,40,.05); color:#111827; }
-.oo-bar[hidden]{ display:none; }
-.oo-bar .oo-ic{ width:38px; height:38px; flex:none; border-radius:11px; display:grid; place-items:center; font-size:1.25rem; background:#e7f6ec; color:#15803d; }
-.oo-bar .oo-tx{ flex:1; min-width:0; display:flex; flex-direction:column; line-height:1.25; }
-.oo-bar .oo-tx b{ font-size:.95rem; font-weight:700; }
-.oo-bar .oo-tx small{ font-size:.8rem; color:#6b7280; }
-.oo-bar.off{ background:#fef2f2; border-color:#fca5a5; }
-.oo-bar.off .oo-ic{ background:#fee2e2; color:#b91c1c; }
-.oo-bar.off .oo-tx small{ color:#b91c1c; font-weight:600; }
-.oo-sw{ flex:none; position:relative; width:58px; height:34px; border-radius:999px; border:0; padding:0; cursor:pointer; background:#16a34a; transition:background .18s; -webkit-tap-highlight-color:transparent; }
-.oo-sw::after{ content:""; position:absolute; top:3px; left:27px; width:28px; height:28px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3); transition:left .18s; }
-.oo-sw[aria-checked="false"]{ background:#b91c1c; }
-.oo-sw[aria-checked="false"]::after{ left:3px; }
-.oo-sw:disabled{ opacity:.55; cursor:default; }
-.oo-sw:focus-visible{ outline:3px solid #2563eb; outline-offset:2px; }
-@media (min-width:1024px){ .oo-bar{ margin:14px 28px 0; } }
-@media (prefers-reduced-motion:reduce){ .oo-sw, .oo-sw::after{ transition:none; } }
-@media print{ .oo-bar{ display:none !important; } }
+<!-- ONLINE ORDERING TILE (2026-10-18): read-only. Shows whether orderonline.greyscheese.com is taking orders for this shop; the
+     tile (#tile-oo, in the home grid) opens the switch in the manager console (manager.html#ordering). Nobody can flip it from here. -->
+<style id="oo-tile">
+.dash .wg-oo{ --fg:#111827; --fg2:#6b7280; --chip:#dcfce7; background:#fff; text-decoration:none; box-shadow:inset 0 0 0 1px #e5e7eb, 0 12px 24px -18px rgba(15,23,42,.35); }
+.dash .wg-oo .wg-chip{ color:#15803d; }
+.wg-oo-ic{ display:flex; align-items:center; justify-content:center; flex:none; width:30px; height:30px; border-radius:9px; background:#e7f6ec; color:#15803d; font-size:17px; }
+.wg-oo-state{ display:flex; align-items:baseline; gap:6px; margin-top:2px; }
+.wg-oo-state b{ font-size:1.55rem; font-weight:800; letter-spacing:-.6px; line-height:1; color:#15803d; }
+.dash .wg-oo .wg-art{ color:#15803d; opacity:.08; }
+.dash .wg-oo .wg-foot{ color:#0b6aa9; }
+.dash .wg-oo.off{ --chip:#fee2e2; background:#fef2f2; box-shadow:inset 0 0 0 1px #fca5a5, 0 12px 24px -18px rgba(15,23,42,.35); }
+.dash .wg-oo.off .wg-chip, .dash .wg-oo.off .wg-oo-state b, .dash .wg-oo.off .wg-sub{ color:#b91c1c; }
+.dash .wg-oo.off .wg-oo-ic{ background:#fee2e2; color:#b91c1c; }
+.dash .wg-oo.off .wg-art{ color:#b91c1c; }
 </style>
 <script>
 (function(){
-  var dash = document.getElementById('dash');
-  if (!dash || typeof sb === 'undefined' || typeof LOC === 'undefined') return;
+  var tile = document.getElementById('tile-oo');
+  if (!tile || typeof sb === 'undefined' || typeof LOC === 'undefined') return;
   var NAME = LOC === 'nashville' ? 'Nashville' : 'Memphis';
-  var bar = document.createElement('div');
-  bar.className = 'oo-bar'; bar.id = 'ooBar'; bar.hidden = true;
-  bar.innerHTML = '<span class="oo-ic"><i class="ti ti-shopping-bag"></i></span>'
-    + '<span class="oo-tx"><b>Online ordering &middot; ' + NAME + '</b><small id="ooSub">Checking&hellip;</small></span>'
-    + '<button type="button" class="oo-sw" id="ooSw" role="switch" aria-checked="true" aria-label="Online ordering for ' + NAME + '"></button>';
-  dash.insertAdjacentElement('afterend', bar);
-  var sw = document.getElementById('ooSw'), sub = document.getElementById('ooSub');
-  var state = null, busy = false, admin = null;
-
+  var chip = document.getElementById('wgOoChip'), state = document.getElementById('wgOoState'), sub = document.getElementById('wgOoSub');
   function when(iso){
     if (!iso) return '';
     var d = new Date(iso); if (isNaN(d)) return '';
     var t = d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
     return d.toDateString() === new Date().toDateString() ? t : d.toLocaleDateString('en-US', { month:'short', day:'numeric' }) + ', ' + t;
   }
-  function draw(){
-    var s = (state && state[LOC]) || {}, off = s.paused === true;
-    bar.hidden = false;
-    bar.classList.toggle('off', off);
-    sw.setAttribute('aria-checked', off ? 'false' : 'true');
-    sw.disabled = busy;
-    sub.textContent = off ? ('OFF' + (s.at ? ' since ' + when(s.at) : '') + ' — customers can’t order') : 'On — taking orders';
-  }
   async function load(){
     try{
       var r = await sb.from('site_content').select('data').eq('key','online_ordering').maybeSingle();
       if (r.error) throw r.error;
-      state = (r.data && r.data.data) || {};
-      if (!busy) draw();
-    }catch(e){ if (!state){ bar.hidden = false; sub.textContent = 'Couldn’t check — tap to open the manager console'; } }
+      var st = ((r.data && r.data.data) || {})[LOC] || {}, off = st.paused === true;
+      tile.classList.toggle('off', off);
+      chip.textContent = off ? 'Off' : 'On';
+      state.textContent = off ? 'Off' : 'On';
+      sub.textContent = off ? ((st.at ? 'Since ' + when(st.at) : 'Paused') + ' — customers can’t order') : 'Taking orders · ' + NAME;
+      tile.setAttribute('aria-label', 'Online ordering for ' + NAME + ' is ' + (off ? 'off' : 'on') + ' — opens the switch in the manager console');
+    }catch(e){ chip.textContent = '?'; sub.textContent = 'Couldn’t check'; }
   }
-  async function isAdmin(){
-    if (admin === true) return true;
-    try{
-      var ses = (await sb.auth.getSession()).data.session;
-      if (!ses) return false;
-      var a = await sb.rpc('is_app_admin');
-      admin = a.data === true;
-      return admin ? ses : false;
-    }catch(e){ return false; }
-  }
-  sw.addEventListener('click', async function(){
-    if (busy) return;
-    busy = true; draw();
-    var ses = await isAdmin();
-    if (!ses){ location.href = 'manager.html#ordering'; return; }
-    var cur = (state && state[LOC] && state[LOC].paused === true), turnOn = cur;   // paused now → turn it on
-    var who = '';
-    try{ who = ((await sb.auth.getSession()).data.session.user.email) || ''; }catch(e){}
-    try{
-      var r = await sb.rpc('set_online_ordering', { p_shop: LOC, p_on: turnOn, p_by: who });
-      if (r.error) throw r.error;
-      state = r.data || state;
-    }catch(e){
-      busy = false; draw();
-      sub.textContent = 'Couldn’t change it — try the manager console';
-      return;
-    }
-    busy = false; draw();
-  });
   load();
   setInterval(function(){ if (!document.hidden) load(); }, 60000);
   document.addEventListener('visibilitychange', function(){ if (!document.hidden) load(); });
@@ -2605,6 +2933,19 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
 (function(){
   var list=document.getElementById('wgChatList'), foot=document.getElementById('wgChatFoot'), chip=document.getElementById('wgChatN');
   if(!list) return;
+  var tile=document.getElementById('tile-chat'), ITEMS=null;
+  // 3 conversations at the standard size, 12 a column when the tile is tall; another column only when they don't fit (Edit tiles -> resize)
+  function draw(){
+    if(!ITEMS) return;
+    var sz=(window.wgSize && tile) ? window.wgSize(tile) : { h:1, wEff:1 }, pc=sz.h>1 ? 12 : 3;
+    var cols=Math.max(1, Math.min(sz.wEff, Math.ceil(ITEMS.length/pc))), per=pc*cols;
+    var n=ITEMS.reduce(function(a,x){ return a+(x.n||0); },0);
+    chip.hidden=!n; chip.textContent=n+' new';
+    if(cols>1){ list.setAttribute('data-cols', cols); list.style.setProperty('--cols', cols); } else list.removeAttribute('data-cols');
+    list.innerHTML=ITEMS.slice(0,per).map(function(x){ return '<span class="wg-row"><i class="ti '+(x.kind==='channel'?'ti-hash':x.kind==='client'?'ti-phone':'ti-message')+'"></i><span class="who">'+esc(x.name)+'</span><span class="n">'+x.n+'</span></span>'; }).join('');
+    foot.innerHTML=n ? '<b>'+n+'</b> unread' : 'All caught up';
+  }
+  if(tile) tile.addEventListener('wgsize', draw);
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function load(){
     var tok=null; try{ tok=JSON.parse(localStorage.getItem('gc_token')||'null'); }catch(e){}
@@ -2613,10 +2954,7 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
       .then(function(r){ return r.ok ? r.json() : null; })
       .then(function(d){
         if(!d || !Array.isArray(d.items)) return;
-        var n=d.items.reduce(function(a,x){ return a+(x.n||0); },0);
-        chip.hidden=!n; chip.textContent=n+' new';
-        list.innerHTML=d.items.slice(0,3).map(function(x){ return '<span class="wg-row"><i class="ti '+(x.kind==='channel'?'ti-hash':x.kind==='client'?'ti-phone':'ti-message')+'"></i><span class="who">'+esc(x.name)+'</span><span class="n">'+x.n+'</span></span>'; }).join('');
-        foot.innerHTML=n ? '<b>'+n+'</b> unread' : 'All caught up';
+        ITEMS=d.items; draw();
       }).catch(function(){});
   }
   load(); setInterval(load, 60000); document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') load(); });
@@ -2629,13 +2967,13 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
 (function(){
   var $=function(id){ return document.getElementById(id); };
   if(!$('tile-day') || typeof window.renderAgenda!=='function') return;
-  var TMP='wgDayTmp', last=0, CAN=['CANCELLED','CANCELED','DECLINED','NO_SHOW'];
+  var TMP='wgDayTmp', last=0, ITEMS=null, CAN=['CANCELLED','CANCELED','DECLINED','NO_SHOW'];
   var INK={ 't-special':'#047857','t-order':'#047857','t-pickup':'#4338ca','t-delivery':'#a16207','t-event':'#be185d','t-class':'#b45309','t-exp':'#c2410c','t-sched':'#c2410c','t-off':'#b91c1c','t-res':'#1d4ed8' };
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function box(){ var b=$(TMP); if(!b){ b=document.createElement('div'); b.id=TMP; b.hidden=true; document.body.appendChild(b); } return b; }
   function head(){ var d=new Date();
     $('wgDayDow').textContent=d.toLocaleDateString('en-US',{ weekday:'long' });
-    $('wgDayNum').textContent=d.getDate();
+    $('wgDayNum').textContent=d.getDate(); if($('wgDayMini')) $('wgDayMini').textContent=d.getDate();
     $('wgDayMon').textContent=d.toLocaleDateString('en-US',{ month:'short' }); $('wgDayMon').hidden=false; }
   function draw(res){
     head();
@@ -2652,12 +2990,21 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
     var ok=(res||[]).filter(function(x){ return CAN.indexOf(x.status)<0; });
     if(ok.length){ var g=ok.reduce(function(n,x){ return n+(Number(x.party)||0); },0);
       items.push({ k:'t-res', t:ok.length+' reservation'+(ok.length===1?'':'s')+' · '+g+' guest'+(g===1?'':'s') }); }
-    $('wgDayList').innerHTML = items.length
-      ? items.slice(0,3).map(function(x){ return '<span class="wg-ev"><i style="color:'+(INK[x.k]||'#6b7280')+'"></i><span>'+esc(x.t)+'</span></span>'; }).join('')
-      : '<span class="wg-ev none"><span>Nothing on the calendar</span></span>';
-    $('wgDayFoot').textContent = items.length>3 ? '+'+(items.length-3)+' more today →' : 'Full calendar →';
+    ITEMS=items; paint();
     last=Date.now();
   }
+  // 3 lines at the standard size, 12 a column when the tile is tall; another column only when they don't fit (Edit tiles -> resize)
+  function paint(){
+    if(!ITEMS) return;
+    var sz=window.wgSize ? window.wgSize($('tile-day')) : { h:1, wEff:1 }, pc=sz.h>1 ? 12 : 3, L=$('wgDayList');
+    var cols=Math.max(1, Math.min(sz.wEff, Math.ceil(ITEMS.length/pc))), per=pc*cols;
+    if(cols>1){ L.setAttribute('data-cols', cols); L.style.setProperty('--cols', cols); } else L.removeAttribute('data-cols');
+    L.innerHTML = ITEMS.length
+      ? ITEMS.slice(0,per).map(function(x){ return '<span class="wg-ev"><i style="color:'+(INK[x.k]||'#6b7280')+'"></i><span>'+esc(x.t)+'</span></span>'; }).join('')
+      : '<span class="wg-ev none"><span>Nothing on the calendar</span></span>';
+    $('wgDayFoot').textContent = ITEMS.length>per ? '+'+(ITEMS.length-per)+' more today →' : 'Full calendar →';
+  }
+  $('tile-day').addEventListener('wgsize', paint);
   // Today card / full calendar load the month through renderAgenda: pick today's rows out of it
   var _ra=window.renderAgenda;
   window.renderAgenda=function(y,m,tgt,only){
@@ -2665,7 +3012,7 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
     try{ var n=new Date();
       if(y===n.getFullYear() && m===n.getMonth()){
         var today=fmt(n), res=((_calData.res||{})[today]||[]).slice();
-        if(!(tgt && tgt.list===TMP)) _ra(y, m, { list:TMP }, today);
+        if(!(tgt && tgt.list===TMP)){ box(); _ra(y, m, { list:TMP }, today); }    // the hidden box has to exist before today is drawn into it
         draw(res);
       } }catch(e){}
     return r;
