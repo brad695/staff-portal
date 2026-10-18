@@ -606,6 +606,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab" onclick="mtab('scheduling')">Staff Scheduling</div>
     <div class="tab" onclick="mtab('timeoff')">Time Off &amp; Swaps</div>
     <div class="tab" onclick="mtab('announcements')">Announcements</div>
+    <div class="tab" onclick="mtab('ordering')">🛒 Online Ordering <span id="ooTabPill" class="oo-tabpill">OFF</span></div>
     <div class="tab-head">Events &amp; Reservations</div>
     <div class="tab" onclick="mtab('events')">Events</div>
     <div class="tab" onclick="mtab('resys')">Reservations</div>
@@ -634,7 +635,6 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab-head">Catering</div>
     <div class="tab" onclick="mtab('catering')">💼 Catering Leads <span id="catBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
     <div class="tab" onclick="mtab('preorders')">📅 Pre-Orders</div>
-    <div class="tab" onclick="mtab('ordering')">🛒 Online Ordering <span id="ooTabPill" class="oo-tabpill">OFF</span></div>
     <div class="tab-head">Cheese Club</div>
     <div class="tab" onclick="ccTab(this,'members')">Members</div>
     <div class="tab" onclick="ccTab(this,'boxes')">Boxes</div>
@@ -16909,7 +16909,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   window.__iqf = { state: st, load: load, problem: problem };
 })();
 </script>
-<!-- ONLINE-ORDERING SWITCH (2026-10-10): the 🛒 Online Ordering tab (Catering section). One switch per shop for
+<!-- ONLINE-ORDERING SWITCH (2026-10-10): the 🛒 Online Ordering tab (Staff section). One switch per shop for
      orderonline.greyscheese.com. State lives in site_content 'online_ordering' = { memphis:{paused,at,by}, nashville:{…} },
      written only by the set_online_ordering RPC (is_app_admin) and read by the square-online-order edge function
      (re-read every ~10 s). The same switch is on the staff portal home page (index.html). -->
