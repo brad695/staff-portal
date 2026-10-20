@@ -1899,7 +1899,8 @@ async function start(){
   const site=siteId(),who=store.get('login',null);
   if(TOKEN&&!(who&&sameId(who,site))){
     if(!who&&site){ // signed in before chat kept track of whose sign-in it is: remake it from this site's sign-in
-      try{const r=await api('login',{login_id:site});TOKEN=r.token;store.set('token',TOKEN);store.set('login',site);}catch(e){}}
+      try{const r=await api('login',{login_id:site});TOKEN=r.token;store.set('token',TOKEN);store.set('login',site);}
+      catch(e){if(/no employee/i.test(e.message))store.set('login',site);}} // an ID that no longer signs anyone in (it was changed): keep this sign-in rather than retry it on every load
     else{ // the site's sign-in changed since (signed out of the portal, or someone else signed in): not theirs
       try{const sub=await pushSub();if(sub)await quiet('push_unsub',{endpoint:sub.endpoint});}catch(e){}
       forget();}}
