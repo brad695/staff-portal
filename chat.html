@@ -628,10 +628,23 @@ async function api(a,body={}){
   if(!r.ok)throw new Error((d&&d.error)||'Something went wrong. Try again.');
   return d;
 }
+/* Whose sign-in this is. Chat follows the staff sign-in kept on this site (greys_emp_id: the portal's on
+   staff.greyscheese.com, chat's own on chat.greyscheese.com) and remembers which employee ID its token was
+   made for (gc_login), so signing out sticks and a different person signing in never gets the last one's chat. */
+const siteId=()=>{try{return (localStorage.getItem('greys_emp_id')||'').trim()||null;}catch(e){return null;}};
+const sameId=(a,b)=>String(a||'').trim().toLowerCase()===String(b||'').trim().toLowerCase();
+function forget(){TOKEN=null;['token','login','drafts','cur'].forEach(k=>store.set(k,null));try{S.drafts={};}catch(e){}}
+// a call with the current token that can't bounce back into signOut() when that token has died
+const quiet=(a,body={})=>fetch(API,{method:'POST',headers:{'Content-Type':'application/json','x-chat-token':TOKEN||''},body:JSON.stringify({a,...body})}).catch(()=>{});
 async function signOut(user){
-  // signing out on purpose also stops this device's notifications for you
-  if(user===true){try{const sub=await pushSub();if(sub){await api('push_unsub',{endpoint:sub.endpoint}).catch(()=>{});await sub.unsubscribe();}}catch(e){}}
-  TOKEN=null;store.set('token',null);try{RT&&RT.unsubscribe();}catch(e){}location.reload();}
+  if(user===true){
+    // signing out on purpose: this device stops getting your notifications, your phone isn't kept quiet by
+    // this window any more, and the site's staff sign-in goes too, so nobody is signed straight back in
+    try{const sub=await pushSub();if(sub){await quiet('push_unsub',{endpoint:sub.endpoint});await sub.unsubscribe();}}catch(e){}
+    await quiet('profile',{active:false});
+    forget();try{localStorage.removeItem('greys_emp_id');localStorage.removeItem('greys_emp_email');}catch(e){}}
+  else{TOKEN=null;store.set('token',null);} // the server turned the token down: start() makes a fresh one from the site's sign-in
+  try{RT&&RT.unsubscribe();}catch(e){}location.reload();}
 // chat.greyscheese.com/ and staff.greyscheese.com/chat.html both live at /chat.html (the app's home-screen + notification scope)
 if(/^chat\./.test(location.hostname)&&/^\/(index\.html)?$/.test(location.pathname))history.replaceState(null,'','/chat.html'+location.search+location.hash);
 
@@ -1878,13 +1891,20 @@ function showGate(err){
   const f=$('#gateForm');setTimeout(()=>$('#gateId').focus(),0);
   f.onsubmit=async e=>{e.preventDefault();const v=$('#gateId').value.trim();if(!v){$('.err',f).textContent='Enter your employee ID.';return;}
     const b=$('button',f);b.disabled=true;$('.err',f).textContent='';
-    try{const r=await api('login',{login_id:v});TOKEN=r.token;store.set('token',TOKEN);try{localStorage.setItem('greys_emp_id',v);}catch(er){}start();}
+    try{const r=await api('login',{login_id:v});TOKEN=r.token;store.set('token',TOKEN);store.set('login',v);try{localStorage.setItem('greys_emp_id',v);}catch(er){}start();}
     catch(er){$('.err',f).textContent=er.message;b.disabled=false;}};
 }
 async function start(){
   $('#gate').hidden=false;$('#gate').innerHTML='<div class="loading"><div class="spin"></div>Loading Greys Chat…</div>';
-  if(!TOKEN){let portalId=null;try{portalId=localStorage.getItem('greys_emp_id');}catch(e){}
-    if(portalId){try{const r=await api('login',{login_id:portalId});TOKEN=r.token;store.set('token',TOKEN);}catch(e){}}
+  const site=siteId(),who=store.get('login',null);
+  if(TOKEN&&!(who&&sameId(who,site))){
+    if(!who&&site){ // signed in before chat kept track of whose sign-in it is: remake it from this site's sign-in
+      try{const r=await api('login',{login_id:site});TOKEN=r.token;store.set('token',TOKEN);store.set('login',site);}catch(e){}}
+    else{ // the site's sign-in changed since (signed out of the portal, or someone else signed in): not theirs
+      try{const sub=await pushSub();if(sub)await quiet('push_unsub',{endpoint:sub.endpoint});}catch(e){}
+      forget();}}
+  if(!TOKEN){
+    if(site){try{const r=await api('login',{login_id:site});TOKEN=r.token;store.set('token',TOKEN);store.set('login',site);}catch(e){}}
     if(!TOKEN)return showGate();}
   let d;try{d=await api('boot');}catch(e){if(!TOKEN)return showGate();return showGate(e.message);}
   ingest(d);
