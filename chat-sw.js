@@ -5,6 +5,22 @@
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 
+/* TEMPORARY (2026-10-19): report every push this device receives, and whether showing it worked, to the
+   chat-push-diag edge function (Maverick's phone stayed quiet while Google accepted the pushes). Remove
+   with the chat_push_diag table once that's solved. */
+const DIAG = 'https://vdvtrevhqalmjwhjhjug.supabase.co/functions/v1/chat-push-diag';
+async function diag(info) {
+  try {
+    const sub = await self.registration.pushManager.getSubscription();
+    await fetch(DIAG, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind: 'sw', origin: self.location.origin, endpoint: sub ? sub.endpoint : null, info }),
+      signal: AbortSignal.timeout(8000)
+    });
+  } catch (_) {}
+}
+
 self.addEventListener('push', e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (_) { d = { b: e.data ? e.data.text() : '' }; }
@@ -17,15 +33,22 @@ self.addEventListener('push', e => {
       const shown = await self.registration.getNotifications({ tag });
       if (shown.some(n => n.data && n.data.m && n.data.m === d.m)) renotify = false;
     } catch (_) {}
-    await self.registration.showNotification(d.t || 'Greys Chat', {
-      body: d.b || '',
-      tag,
-      renotify,
-      icon: '/icon-192.png',
-      badge: '/chat-badge.png',
-      timestamp: Date.now(),
-      data: { m: d.m || null, c: d.c || null }
-    });
+    let ok = true, err = null;
+    try {
+      await self.registration.showNotification(d.t || 'Greys Chat', {
+        body: d.b || '',
+        tag,
+        renotify,
+        icon: '/icon-192.png',
+        badge: '/chat-badge.png',
+        timestamp: Date.now(),
+        data: { m: d.m || null, c: d.c || null }
+      });
+    } catch (x) { ok = false; err = String(x && x.name ? x.name + ': ' + x.message : x).slice(0, 300); }
+    let showing = null;
+    try { showing = (await self.registration.getNotifications({ tag })).length; } catch (_) {}
+    await diag({ v: 'sw-diag-1', m: d.m || null, tag, ok, err, showing, renotify,
+      perm: (self.Notification && self.Notification.permission) || null, data: !!e.data });
   })());
 });
 
