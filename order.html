@@ -741,8 +741,12 @@ async function signIn(){
   }
 }
 
+/* Lock ends THIS tablet's session only. signOut() with no scope is 'global' and used
+   to sign out every pad and manager console on the shared account. */
+let manualLock = false;
 async function lock(){
-  try{ await sb.auth.signOut(); }catch(e){}
+  manualLock = true;
+  try{ await sb.auth.signOut({ scope: 'local' }); }catch(e){}
   try{ localStorage.removeItem(CACHE_KEY()); }catch(e){}
   S.cart = []; S.groups = [];
   $('#app').classList.add('hide');
@@ -1690,11 +1694,26 @@ function wire(){
 
 /* ── boot ──────────────────────────────────────────────────────── */
 async function start(){
+  manualLock = false;
   $('#lock').classList.add('hide');
   $('#app').classList.remove('hide');
   drawCart();
   await Promise.all([ loadCatalog(false), loadDevices() ]);
 }
+
+/* Signed out from somewhere else — the manager password was changed on another
+   device (Supabase then ends every other session) or Lock in another tab. Show the
+   lock screen now instead of failing on the next order. The cart is kept, so
+   unlocking picks up where the counter left off. */
+sb.auth.onAuthStateChange(function(ev){
+  if(ev !== 'SIGNED_OUT' || manualLock) return;
+  if(!$('#lock').classList.contains('hide')) return;
+  $('#app').classList.add('hide');
+  $('#lock').classList.remove('hide');
+  $('#lock').style.display = '';
+  $('#lockErr').textContent = 'Signed out — enter the manager password (it may have been changed).';
+  setTimeout(()=>{ const el = $('#pw'); if(el) el.focus(); }, 60);
+});
 
 async function boot(){
   wire();

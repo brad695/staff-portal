@@ -585,6 +585,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <a class="head-link" href="https://tickets.greyscheese.com/experiences" target="_blank" rel="noopener">Experiences</a>
     <a class="head-link" href="https://cheeseclub.greyscheese.com" target="_blank" rel="noopener">Cheese Club</a>
     <a class="head-link" href="/manager">Manager</a>
+    <button class="head-link" id="pwBtn" title="Change the manager password" style="background:none;cursor:pointer;font-family:inherit;font-size:0.8rem;" onclick="pwOpen()">Password</button>
     <button class="head-link" id="logoutBtn" style="background:none;cursor:pointer;font-family:inherit;font-size:0.8rem;" onclick="logout()">Logout</button>
   </div>
 </header>
@@ -1771,14 +1772,16 @@ async function enterConsole(session){
     err.className = 'login-err';
     err.textContent = '❌ ' + esc(session.user && session.user.email || 'This email') + ' is not an approved admin.';
     SESSION = null;
-    await sb.auth.signOut();
+    await sb.auth.signOut({ scope:'local' });
     return;
   }
   document.getElementById('loginView').classList.add('hide');
   document.getElementById('consoleView').classList.remove('hide');
   loadAll();
 }
-async function logout(){ SESSION=null; await sb.auth.signOut(); location.reload(); }
+// scope 'local': log out THIS browser only. Plain signOut() is 'global' and signed out
+// every console and order pad on the shared manager account.
+async function logout(){ SESSION=null; await sb.auth.signOut({ scope:'local' }); location.reload(); }
 
 function mtab(name){
   if (name === 'jamlabels') { const f = document.getElementById('jlFrame'); if (f && !f.src) f.src = f.dataset.src; }
@@ -3761,6 +3764,11 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   if(data && data.session){ enterConsole(data.session); }
   else { const el = document.getElementById('loginPass'); if(el) el.focus(); }
   sb.auth.onAuthStateChange((_event, session)=>{
+    // Signed out from somewhere else — the manager password was changed on another
+    // device (Supabase then ends every other session) or Logout in another tab.
+    // Back to the sign-in screen instead of a console whose saves would all fail.
+    // logout() and enterConsole() clear SESSION first, so they never land here.
+    if(_event === 'SIGNED_OUT' && SESSION){ SESSION = null; location.reload(); return; }
     if(session && !SESSION){ enterConsole(session); return; }
     if(session) SESSION = session; // keep the token fresh after auto-refresh
   });
@@ -15207,7 +15215,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     chat:'<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H9l-5 4z"/>',
     bag:'<path d="M5.5 8h13l-1 12h-11z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>',
     flask:'<path d="M9.5 3h5M10.5 3v5.5L5.2 18.2A1.9 1.9 0 0 0 6.9 21h10.2a1.9 1.9 0 0 0 1.7-2.8L13.5 8.5V3"/><path d="M7.6 15h8.8"/>',
-    panel:'<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/>'
+    panel:'<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/>',
+    key:'<circle cx="7.5" cy="15.5" r="3.5"/><path d="M10 13l9.5-9.5M16.5 6.5l2.5 2.5M14 9l2 2"/>'
   };
   const svg = k => '<svg viewBox="0 0 24 24">'+(I[k]||I.dot)+'</svg>';
   const SECT = {
@@ -15239,7 +15248,11 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     search.innerHTML = svg('search')+'<input type="search" placeholder="Search" autocomplete="off">';
     const list = document.createElement('div'); list.className = 'v3-list';
     const foot = document.createElement('div'); foot.className = 'v3-foot';
-    foot.innerHTML = '<button type="button" class="v3-link" id="v3Logout"><span class="ico">'+svg('out')+'</span>Logout</button>';
+    // Password | Logout share one row so the rail is no taller than before
+    foot.classList.add('v3-foot-row');
+    foot.innerHTML = '<button type="button" class="v3-link" id="v3Pw" title="Change the manager password"><span class="ico">'+svg('key')+'</span>Password</button>'
+      + '<button type="button" class="v3-link" id="v3Logout"><span class="ico">'+svg('out')+'</span>Logout</button>';
+    foot.querySelector('#v3Pw').addEventListener('click', ()=>{ if(typeof pwOpen==='function') pwOpen(); });
     Array.from(rail.children).forEach(el=> list.appendChild(el));
     rail.append(brand, search, list, foot);
     foot.querySelector('#v3Logout').addEventListener('click', ()=>{ if(typeof logout==='function') logout(); });
@@ -16988,6 +17001,170 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   // fresh whenever the tab is opened, and every minute while it is showing (someone may flip it from the portal)
   new MutationObserver(function(){ if (panel.classList.contains('active')) load(); }).observe(panel, { attributes:true, attributeFilter:['class'] });
   setInterval(function(){ if (!document.hidden) load(); }, 60000);
+})();
+</script>
+<!-- CHANGE PASSWORD (2026-10-20, Maverick: "change password button in the console").
+     The console signs in as ONE hidden shared account (manager@greyscheese.com), and the
+     same password unlocks the order pads. Opened from "Password" in the sidebar foot
+     (desktop) or the header (phone).
+     - The current password is checked on a throwaway client, so a wrong guess never
+       touches this console's own session.
+     - The change is made from THIS console's session. Supabase's auth server keeps the
+       session that made the change and ends every other one (LogoutAllExceptMe), so
+       order pads and other consoles drop to their sign-in screens within the hour and
+       need the new password. Both pages handle that SIGNED_OUT on their own.
+     - If the project ever turns on "secure password change" (needs a sign-in in the last
+       24h), updateUser answers reauthentication_needed: sign in again with the password
+       just checked and retry. current_password is sent too, for "require current
+       password"; the server ignores it while that setting is off. -->
+<style id="pw-change">
+  body:has(#consoleView.hide) #pwBtn{ display:none; }
+  .pwc-bg{ position:fixed; inset:0; z-index:1000; display:none; align-items:flex-start; justify-content:center;
+    background:rgba(15,23,42,.45); padding:64px 14px 24px; overflow-y:auto; box-sizing:border-box; }
+  .pwc-bg.on{ display:flex; }
+  .pwc-card{ background:#fff; width:400px; max-width:100%; box-sizing:border-box; padding:24px; border-radius:14px;
+    box-shadow:0 12px 40px rgba(15,23,42,.25); color:var(--ink,#161a1f); }
+  .pwc-card h2{ margin:0 0 6px; font-size:1.06rem; letter-spacing:-.2px; }
+  .pwc-note{ margin:0 0 18px; font-size:.82rem; line-height:1.5; color:var(--sub,#67717d); }
+  .pwc-card label.pwc-f{ display:block; margin:0 0 12px; font-size:.72rem; font-weight:700; letter-spacing:.3px; color:var(--sub,#67717d); }
+  .pwc-card label.pwc-f input{ display:block; width:100%; box-sizing:border-box; margin-top:4px; padding:10px 12px;
+    border:1px solid var(--line,#e3e6ea); border-radius:8px; background:#fff; color:var(--ink,#161a1f);
+    font:inherit; font-size:.95rem; font-weight:400; letter-spacing:normal; }
+  .pwc-card label.pwc-f input:focus{ outline:none; border-color:#06273a; box-shadow:0 0 0 3px rgba(6,39,58,.12); }
+  .pwc-show{ display:inline-flex; align-items:center; gap:8px; font-size:.82rem; color:var(--sub,#67717d); cursor:pointer; user-select:none; }
+  .pwc-show input{ width:16px; height:16px; margin:0; }
+  .pwc-msg{ min-height:20px; margin:12px 0; font-size:.84rem; line-height:1.45; color:#b42318; }
+  .pwc-msg.ok{ color:#067647; }
+  .pwc-btns{ display:flex; justify-content:flex-end; gap:10px; }
+  .pwc-btns .btn{ min-width:112px; }
+  .pwc-card [hidden]{ display:none !important; }
+  @media(min-width:821px){
+    .tabs.v3 .v3-foot.v3-foot-row{ display:flex; }
+    .tabs.v3 .v3-foot.v3-foot-row .v3-link{ flex:1 1 0; min-width:0; gap:10px; padding:0 8px 0 22px; white-space:nowrap; }
+    .tabs.v3 .v3-foot.v3-foot-row .v3-link + .v3-link{ padding-left:14px; }
+  }
+  @media(max-width:520px){
+    .pwc-bg{ padding-top:24px; }
+    .pwc-card{ padding:20px 18px; }
+  }
+</style>
+<script>
+(function(){
+  'use strict';
+  var bg = null, busy = false;
+  var FIELDS = ['pwcCur', 'pwcNew', 'pwcNew2'];
+  function $(id){ return document.getElementById(id); }
+  function msg(text, ok){ var m = $('pwcMsg'); m.textContent = text || ''; m.className = 'pwc-msg' + (ok ? ' ok' : ''); }
+
+  function build(){
+    if (bg) return;
+    bg = document.createElement('div');
+    bg.className = 'pwc-bg';
+    bg.id = 'pwcModal';
+    bg.innerHTML =
+        '<form class="pwc-card" id="pwcForm" role="dialog" aria-modal="true" aria-labelledby="pwcTitle" novalidate>'
+      +   '<h2 id="pwcTitle">Change manager password</h2>'
+      +   '<p class="pwc-note">One shared password for the console and the order pads. Every other device signed in with it, order pads included, gets signed out and needs the new one. This browser stays signed in.</p>'
+      +   '<input type="text" name="username" autocomplete="username" value="manager@greyscheese.com" hidden>'
+      +   '<label class="pwc-f">CURRENT PASSWORD<input type="password" id="pwcCur" autocomplete="current-password"></label>'
+      +   '<label class="pwc-f">NEW PASSWORD<input type="password" id="pwcNew" autocomplete="new-password" placeholder="At least 8 characters"></label>'
+      +   '<label class="pwc-f">NEW PASSWORD AGAIN<input type="password" id="pwcNew2" autocomplete="new-password"></label>'
+      +   '<label class="pwc-show"><input type="checkbox" id="pwcShow"> Show passwords</label>'
+      +   '<div class="pwc-msg" id="pwcMsg" role="status" aria-live="polite"></div>'
+      +   '<div class="pwc-btns">'
+      +     '<button type="button" class="btn btn-ghost" id="pwcCancel">Cancel</button>'
+      +     '<button type="submit" class="btn btn-navy" id="pwcGo">Change password</button>'
+      +   '</div>'
+      + '</form>';
+    document.body.appendChild(bg);
+    bg.addEventListener('click', function(e){ if (e.target === bg && !busy) close(); });
+    $('pwcCancel').addEventListener('click', function(){ if (!busy) close(); });
+    $('pwcShow').addEventListener('change', function(){
+      var t = this.checked ? 'text' : 'password';
+      FIELDS.forEach(function(id){ $(id).type = t; });
+    });
+    $('pwcForm').addEventListener('submit', function(e){ e.preventDefault(); change(); });
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'Escape' && bg.classList.contains('on') && !busy) close();
+    });
+  }
+
+  function open(){
+    build();
+    FIELDS.forEach(function(id){ $(id).value = ''; $(id).type = 'password'; });
+    $('pwcShow').checked = false;
+    $('pwcGo').hidden = false; $('pwcGo').disabled = false; $('pwcGo').textContent = 'Change password';
+    $('pwcCancel').textContent = 'Cancel';
+    msg('');
+    bg.classList.add('on');
+    setTimeout(function(){ $('pwcCur').focus(); }, 30);
+  }
+  function close(){
+    if (!bg) return;
+    bg.classList.remove('on');
+    FIELDS.forEach(function(id){ $(id).value = ''; });
+  }
+
+  function niceError(e){
+    var code = e && (e.code || e.error_code);
+    if (code === 'same_password') return 'That’s the current password — pick a new one.';
+    if (code === 'weak_password') return 'Too weak — ' + ((e && e.message) || 'pick a longer one.');
+    if (e && e.status === 429) return 'Too many tries — wait a minute, then try again.';
+    return 'Couldn’t change it: ' + ((e && e.message) || 'unknown error') + '. The old password still works.';
+  }
+
+  async function change(){
+    if (busy) return;
+    var cur = $('pwcCur').value, next = $('pwcNew').value, again = $('pwcNew2').value;
+    if (!cur){ msg('Enter the current password.'); $('pwcCur').focus(); return; }
+    if (next.length < 8){ msg('The new password needs at least 8 characters.'); $('pwcNew').focus(); return; }
+    if (next !== again){ msg('The two new passwords don’t match.'); $('pwcNew2').focus(); return; }
+    if (next === cur){ msg('That’s the current password — pick a new one.'); $('pwcNew').focus(); return; }
+
+    busy = true;
+    var go = $('pwcGo');
+    go.disabled = true; go.textContent = 'Changing…';
+    msg('');
+    try {
+      // 1. check the current password without touching this console's session
+      var check = window.supabase.createClient(SB_URL, SB_KEY, {
+        auth: { persistSession:false, autoRefreshToken:false, detectSessionInUrl:false, storageKey:'greys-pw-check' }
+      });
+      var r1 = await check.auth.signInWithPassword({ email: MANAGER_EMAIL, password: cur });
+      if (r1.error){
+        var st = r1.error.status;
+        msg(st === 400 || st === 401 || r1.error.code === 'invalid_credentials'
+              ? 'The current password is wrong.'
+              : niceError(r1.error));
+        $('pwcCur').focus(); $('pwcCur').select();
+        return;
+      }
+      try { await check.auth.signOut({ scope:'local' }); } catch(_){}
+
+      // 2. change it from this console's own session (the one session Supabase keeps)
+      var r2 = await sb.auth.updateUser({ password: next, current_password: cur });
+      if (r2.error && (r2.error.code === 'reauthentication_needed' || /reauthentication/i.test(r2.error.message || ''))){
+        var again2 = await sb.auth.signInWithPassword({ email: MANAGER_EMAIL, password: cur });
+        if (again2.error) throw again2.error;
+        r2 = await sb.auth.updateUser({ password: next, current_password: cur });
+      }
+      if (r2.error) throw r2.error;
+
+      FIELDS.forEach(function(id){ $(id).value = ''; });
+      msg('✅ Password changed. Other devices, order pads included, are signed out and need the new one.', true);
+      go.hidden = true;
+      $('pwcCancel').textContent = 'Done';
+      $('pwcCancel').focus();
+    } catch (e) {
+      msg(niceError(e));
+    } finally {
+      busy = false;
+      go.disabled = false;
+      if (!go.hidden) go.textContent = 'Change password';
+    }
+  }
+
+  window.pwOpen = open;
 })();
 </script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->

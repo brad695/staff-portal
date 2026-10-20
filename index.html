@@ -1856,7 +1856,7 @@ const sb = window.supabase.createClient(SB_URL, SB_KEY);
 async function topLogout(){
   localStorage.removeItem('greys_emp_id');
   localStorage.removeItem('greys_emp_email');
-  try{ await sb.auth.signOut(); }catch(e){}
+  try{ await sb.auth.signOut({ scope:'local' }); }catch(e){}
   location.reload();
 }
 
