@@ -574,11 +574,11 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <h1>GREYS · Manager Console</h1>
   </div>
   <div class="head-actions">
-    <a class="head-link" href="index.html">Portal</a>
+    <a class="head-link" href="/">Portal</a>
     <a class="head-link" href="https://tickets.greyscheese.com" target="_blank" rel="noopener">Ticket Site</a>
-    <a class="head-link" href="https://tickets.greyscheese.com/experiences.html" target="_blank" rel="noopener">Experiences</a>
+    <a class="head-link" href="https://tickets.greyscheese.com/experiences" target="_blank" rel="noopener">Experiences</a>
     <a class="head-link" href="https://cheeseclub.greyscheese.com" target="_blank" rel="noopener">Cheese Club</a>
-    <a class="head-link" href="manager.html">Manager</a>
+    <a class="head-link" href="/manager">Manager</a>
     <button class="head-link" id="logoutBtn" style="background:none;cursor:pointer;font-family:inherit;font-size:0.8rem;" onclick="logout()">Logout</button>
   </div>
 </header>
@@ -718,7 +718,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="rec-card" style="background:#fff;max-width:720px;width:100%;border-radius:14px;padding:22px;">
       <div class="cat-mhead" style="padding-bottom:0;">
         <div style="flex:1;min-width:0;"><h3 id="inqTitle"></h3><div id="inqMeta" class="hint"></div></div>
-        <div class="cat-mhead-r"><a class="btn btn-ghost btn-sm" id="inqChatLink" href="chat.html" target="_blank" rel="noopener" title="This inquiry's conversation in Greys Chat — texts, emails and notes stay in step with this one">💬 Chat</a><span class="cat-stagelbl">Stage</span><select id="inqStage" class="loc-sel" onchange="inqSetStage(this.value)">
+        <div class="cat-mhead-r"><a class="btn btn-ghost btn-sm" id="inqChatLink" href="/chat" target="_blank" rel="noopener" title="This inquiry's conversation in Greys Chat — texts, emails and notes stay in step with this one">💬 Chat</a><span class="cat-stagelbl">Stage</span><select id="inqStage" class="loc-sel" onchange="inqSetStage(this.value)">
           <option value="new">New</option><option value="replied">Replied</option><option value="link_sent">Booking link sent</option><option value="booked">Booked</option><option value="lost">Lost</option>
         </select>
         <button class="btn btn-ghost btn-sm" onclick="inqClose()">✕</button></div>
@@ -863,7 +863,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="rec-card" style="background:#fff;max-width:900px;width:100%;border-radius:14px;padding:22px;">
       <div class="cat-mhead">
         <div style="flex:1;min-width:220px;"><h3 id="catTitle"></h3><div id="catMeta" class="hint"></div></div>
-        <div class="cat-mhead-r"><a class="btn btn-ghost btn-sm" id="catChatLink" href="chat.html" target="_blank" rel="noopener" title="This lead's conversation in Greys Chat — texts, emails and notes stay in step with this one">💬 Chat</a><span class="cat-stagelbl">Stage</span><select id="catStage" class="loc-sel" onchange="catSetStage(this.value)"></select>
+        <div class="cat-mhead-r"><a class="btn btn-ghost btn-sm" id="catChatLink" href="/chat" target="_blank" rel="noopener" title="This lead's conversation in Greys Chat — texts, emails and notes stay in step with this one">💬 Chat</a><span class="cat-stagelbl">Stage</span><select id="catStage" class="loc-sel" onchange="catSetStage(this.value)"></select>
         <button class="btn btn-ghost btn-sm" onclick="catClose()">✕</button></div>
       </div>
       <div class="cat-tabbar" id="catTabs">
@@ -999,7 +999,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     </div>
     <div class="section-card">
       <h2>🗓️ Weekly Schedule — all locations</h2>
-      <div class="hint">Both schedules for the week below. A shift belongs to the grid you add it on. Click any cell to add a shift; <strong>drag a shift</strong> to another day or employee to copy it there (the original stays put); click one to edit, delete or copy it. Approved time off shows as a red <strong>OFF</strong> badge, and staff availability shows as grey <strong>unavail</strong> / green <strong>★</strong> chips. Edits stay private until you hit <strong>📣 Publish &amp; notify</strong> — that emails everyone whose week changed. Staff open their schedule at <strong>schedule.html</strong> with their employee ID.</div>
+      <div class="hint">Both schedules for the week below. A shift belongs to the grid you add it on. Click any cell to add a shift; <strong>drag a shift</strong> to another day or employee to copy it there (the original stays put); click one to edit, delete or copy it. Approved time off shows as a red <strong>OFF</strong> badge, and staff availability shows as grey <strong>unavail</strong> / green <strong>★</strong> chips. Edits stay private until you hit <strong>📣 Publish &amp; notify</strong> — that emails everyone whose week changed. Staff open their schedule at <strong>staff.greyscheese.com/schedule</strong> with their employee ID.</div>
       <div class="toolbar">
         <button class="btn btn-ghost btn-sm" onclick="sgMove(-1)">‹ Prev</button>
         <strong id="sgLabel" style="min-width:190px;text-align:center;"></strong>
@@ -1457,8 +1457,8 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
        Loaded only when the tab is first opened so it costs nothing otherwise. -->
   <div id="panel-jamlabels" class="panel">
     <div class="section-card jl-card">
-      <h2>🏷️ Jam Labels <a class="jl-open" href="labels.html" target="_blank" rel="noopener">Open full screen ↗</a></h2>
-      <iframe id="jlFrame" class="jl-frame" title="Greys Label Studio" data-src="labels.html"></iframe>
+      <h2>🏷️ Jam Labels <a class="jl-open" href="/labels" target="_blank" rel="noopener">Open full screen ↗</a></h2>
+      <iframe id="jlFrame" class="jl-frame" title="Greys Label Studio" data-src="/labels"></iframe>
     </div>
   </div>
   <div id="panel-campaigns" class="panel">
@@ -1824,7 +1824,7 @@ function loadAll(){ loadKind('items'); loadKind('events'); loadKind('schedules')
    inbound email is wired in — "Log their reply" pastes them into the thread. */
 const INQ_URL = SB_URL + '/functions/v1/inquiries';
 const INQ_STAGES = { new:'New', replied:'Replied', link_sent:'Link sent', booked:'Booked', lost:'Lost' };
-const INQ_SITE = 'https://tickets.greyscheese.com/experiences.html';
+const INQ_SITE = 'https://tickets.greyscheese.com/experiences';
 let INQ_ROWS = [], INQ_FILTER = 'open', INQ_CUR = null;
 const INQ_QUICK = [
   ['Thanks — checking', "Thanks so much for reaching out! Let me check on that and get right back to you."],
@@ -1890,7 +1890,7 @@ async function inqOpen(id){
         ? '<div style="margin-top:4px;color:#92400e;">⏳ Held until '+esc(inqWhen(r.hold_expires_at))+' — sending the booking link restarts the 48 h.</div>'
         : '<div style="margin-top:4px;color:#b91c1c;">Hold expired — the link still works if the time is open.</div>') : '');
   document.getElementById('inqStage').value = r.stage;
-  const icl = document.getElementById('inqChatLink'); if(icl) icl.href = 'chat.html#lead=' + encodeURIComponent(r.code);
+  const icl = document.getElementById('inqChatLink'); if(icl) icl.href = '/chat#lead=' + encodeURIComponent(r.code);
   document.getElementById('inqHideCal').checked = !!r.hide_on_calendar;
   document.getElementById('inqBody').value = '';
   document.getElementById('inqMsg').textContent = '';
@@ -1987,7 +1987,7 @@ async function inqSetStage(v){
    invoice (deposit + balance) with the signed PDF attached. The `catering-invoice-sync` cron refreshes
    payment status every 15 min; "↻ Payment status" does it on demand. */
 const CAT_URL = SB_URL + '/functions/v1/catering';
-const CAT_SITE = 'https://tickets.greyscheese.com/catering.html';
+const CAT_SITE = 'https://tickets.greyscheese.com/catering';
 const CAT_STAGES = { new:'New', replied:'Replied', quoted:'Quoting', contract_sent:'Proposal sent', signed:'Signed', invoiced:'Invoiced', deposit_paid:'Deposit paid', paid:'Paid', lost:'Lost' };
 const CAT_QSTAT = { draft:'Draft', sent:'Sent — waiting for signature', signed:'Signed — invoice pending', invoiced:'Invoiced — deposit due', deposit_paid:'Deposit paid', paid:'Paid in full', canceled:'Canceled' };
 const catQStat = q => q.invoice_only && q.status==='signed' ? 'Invoice pending'
@@ -2095,7 +2095,7 @@ async function catOpen(id){
 function catHead(){
   const r = CAT_CUR;
   document.getElementById('catTitle').textContent = r.name + (r.company ? ' — ' + r.company : '');
-  const cl = document.getElementById('catChatLink'); if(cl) cl.href = 'chat.html#lead=' + encodeURIComponent(r.code);
+  const cl = document.getElementById('catChatLink'); if(cl) cl.href = '/chat#lead=' + encodeURIComponent(r.code);
   const fact = x => x ? '<span class="cat-fact">'+x+'</span>' : '';
   document.getElementById('catMeta').innerHTML = fact('<a href="mailto:'+esc(r.email)+'">'+esc(r.email)+'</a>') + fact(r.phone?esc(r.phone):'')
     + fact(r.event_date?'📅 '+fmtDisplay(r.event_date)+(r.event_time?' · '+catTime(r.event_time):''):'') + fact(r.guests?'👥 '+r.guests:'')
@@ -6617,7 +6617,7 @@ const DASH_TEXT = {
 // The tiles on that page are rows of rb_experience_types. Edit them here the same
 // way classes are edited: title, blurb, picture, price, party size, length.
 // Bookings themselves live in rb_reservations (see the calendar / inquiries).
-const EXP_SITE = "https://tickets.greyscheese.com/experiences.html";
+const EXP_SITE = "https://tickets.greyscheese.com/experiences";
 const expBlank = () => ({ id: null, name: "", description: "", price_cents: 30000, per_person: false,
   duration_min: 90, min_party: 2, max_party: 8, tables_needed: 2, lead_time_min: null, active: true,
   sort_order: 99, image_url: "" });
@@ -14813,25 +14813,25 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     // menu section that opens like the rest. Test copies use the live
     // database: anything saved or booked there is real.
     const LINKS = [
-      ['index.html','home','Staff Portal'],
+      ['/','home','Staff Portal'],
       ['calendar.html','cal','Calendar'],
-      ['chat.html','chat','Greys Chat'],
+      ['/chat','chat','Greys Chat'],
       ['https://tickets.greyscheese.com','ticket','Ticket Site',1],
-      ['https://tickets.greyscheese.com/experiences.html','spark','Experiences Site',1],
+      ['https://tickets.greyscheese.com/experiences','spark','Experiences Site',1],
       ['https://cheeseclub.greyscheese.com','box','Cheese Club',1]
     ];
     // the staging test copies sit in one "Test sites" dropdown inside Links
     const TEST_LINKS = [
       ['https://ticket-rennet.onrender.com','ticket','Ticket Site',1],
-      ['https://ticket-rennet.onrender.com/experiences.html','spark','Experiences',1],
-      ['https://ticket-rennet.onrender.com/order.html','bag','Online Ordering',1],
-      ['https://ticket-rennet.onrender.com/club.html','box','Cheese Club',1],
-      ['https://ticket-rennet.onrender.com/inquiry.html','mega','Inquiry Form',1],
-      ['https://ticket-rennet.onrender.com/catering.html','cheese','Catering',1],
+      ['https://ticket-rennet.onrender.com/experiences','spark','Experiences',1],
+      ['https://ticket-rennet.onrender.com/order','bag','Online Ordering',1],
+      ['https://ticket-rennet.onrender.com/club','box','Cheese Club',1],
+      ['https://ticket-rennet.onrender.com/inquiry','mega','Inquiry Form',1],
+      ['https://ticket-rennet.onrender.com/catering','cheese','Catering',1],
       ['https://greys-staff-portal-staging.onrender.com/','home','Staff Portal',1],
-      ['https://greys-staff-portal-staging.onrender.com/manager.html','panel','Manager',1],
-      ['https://greys-staff-portal-staging.onrender.com/calendar.html','cal','Calendar',1],
-      ['https://greys-staff-portal-staging.onrender.com/chat.html','chat','Greys Chat',1]
+      ['https://greys-staff-portal-staging.onrender.com/manager','panel','Manager',1],
+      ['https://greys-staff-portal-staging.onrender.com/calendar','cal','Calendar',1],
+      ['https://greys-staff-portal-staging.onrender.com/chat','chat','Greys Chat',1]
     ];
     const lkBtn = document.createElement('button');
     lkBtn.type = 'button'; lkBtn.className = 'sect hide-mobile v3-lk';
@@ -16237,7 +16237,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     event: 'Built in: shop, guests, date and time (12–2, 4–7 or other), then name, email, phone and a message. Goes to 💼 Catering Leads tagged Private event, so it can get a proposal and an invoice. The questions below share one "A few details" screen.'
   };
   var STAGING = /staging/i.test(location.hostname);
-  var FORM_SITE = STAGING ? 'https://ticket-rennet.onrender.com/inquiry.html' : 'https://tickets.greyscheese.com/inquiry.html';
+  var FORM_SITE = STAGING ? 'https://ticket-rennet.onrender.com/inquiry' : 'https://tickets.greyscheese.com/inquiry';
   var st = { form: formOf(null), saved: null, type: 'table', loaded: false, dirty: false, frameReady: false };
 
   function h(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }

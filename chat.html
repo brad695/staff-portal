@@ -2,6 +2,29 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script>
+/* One address (Maverick, 2026-10-19): Greys Chat lives at staff.greyscheese.com/chat — no second site, no
+   ".html". chat.greyscheese.com only forwards there: first it cancels that site's notification sign-up on
+   this device (it was a second copy of every notification) and removes its service worker, then it goes to
+   the same spot (#message / #lead=…). The chat app itself never starts on the old site. */
+(function(){
+  if(/^chat\./.test(location.hostname)){
+    var to='https://staff.greyscheese.com/chat'+location.search+location.hash,gone=false;
+    var go=function(){if(!gone){gone=true;location.replace(to);}};
+    setTimeout(go,2500);
+    try{document.documentElement.style.background='#03192a';window.stop();}catch(e){}
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.getRegistrations().then(function(rs){
+        return Promise.all(rs.map(function(r){
+          return r.pushManager.getSubscription().then(function(s){return s&&s.unsubscribe();}).catch(function(){})
+            .then(function(){return r.unregister();}).catch(function(){});}));
+      }).catch(function(){}).then(go);
+    }else go();
+    return;}
+  // old /chat.html links (bookmarks, earlier chat cards and emails) show as /chat
+  if(/\/chat\.html$/.test(location.pathname))history.replaceState(null,'',location.pathname.replace(/\.html$/,'')+location.search+location.hash);
+})();
+</script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#03192a">
 <script>
@@ -654,13 +677,13 @@ async function signOut(user){
     forget();try{localStorage.removeItem('greys_emp_id');localStorage.removeItem('greys_emp_email');}catch(e){}}
   else{TOKEN=null;store.set('token',null);} // the server turned the token down: start() makes a fresh one from the site's sign-in
   try{RT&&RT.unsubscribe();}catch(e){}location.reload();}
-// chat.greyscheese.com/ and staff.greyscheese.com/chat.html both live at /chat.html (the app's home-screen + notification scope)
-if(/^chat\./.test(location.hostname)&&/^\/(index\.html)?$/.test(location.pathname))history.replaceState(null,'','/chat.html'+location.search+location.hash);
 
 /* ---------- notifications on this device ----------
    Real phone/computer notifications (Web Push): chat-sw.js shows them, the chat-notify edge function
    sends them when someone's away from chat. Android + computers: any modern browser. iPhone/iPad:
-   only once Greys Chat is added to the Home Screen and opened from there (iOS 16.4+). */
+   only once Greys Chat is added to the Home Screen and opened from there (iOS 16.4+).
+   The worker's scope stays '/chat.html' although the page is at /chat: it's only the registration's name
+   (no link shows it), and changing it would sign every device up again and double their notifications. */
 const PUSH_SCOPE='/chat.html';
 const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const standalone=()=>navigator.standalone===true||matchMedia('(display-mode: standalone)').matches;
@@ -788,14 +811,13 @@ const users={bot:{name:'Greys Portal',title:'App · staff.greyscheese.com',color
 const STAGE=[['new','New'],['replied','Replied'],['quoted','Quoting'],['contract_sent','Proposal sent'],['signed','Signed'],['invoiced','Invoiced'],['deposit_paid','Deposit paid'],['paid','Paid'],['lost','Lost']];
 const STAGE_L=Object.fromEntries(STAGE);
 const OPEN_ST=['new','replied','quoted','contract_sent'],BOOKED_ST=['signed','invoiced','deposit_paid','paid'];
-const PORTAL_BASE=/^chat\./.test(location.hostname)?'https://staff.greyscheese.com/':'';
-const leadUrl=(code,tab)=>PORTAL_BASE+'manager.html#catering/'+encodeURIComponent(code)+(tab?'/'+tab:'');
+const leadUrl=(code,tab)=>'/manager#catering/'+encodeURIComponent(code)+(tab?'/'+tab:'');
 /* experience inquiries (a client conversation with an inquiry, lead.kind 'exp'): their own stages, the booking link
    the manager console sends (holds restart when it goes out), and the console's inquiry modal */
 const ISTAGE=[['new','New'],['replied','Replied'],['link_sent','Link sent'],['booked','Booked'],['lost','Lost']];
 const ISTAGE_L=Object.fromEntries(ISTAGE);
-const INQ_SITE='https://tickets.greyscheese.com/experiences.html';
-const inqUrl=code=>PORTAL_BASE+'manager.html#inquiries/'+encodeURIComponent(code);
+const INQ_SITE='https://tickets.greyscheese.com/experiences';
+const inqUrl=code=>'/manager#inquiries/'+encodeURIComponent(code);
 const stL=L=>(L.kind==='exp'?ISTAGE_L:STAGE_L)[L.stage]||L.stage;
 const lUrl=L=>L.kind==='exp'?inqUrl(L.code):leadUrl(L.code);
 // the subject chat-api sends with (the same as the catering / inquiries functions), so replies come back here
@@ -1442,7 +1464,7 @@ function renderView(){
     const kchip=(k,l)=>`<button class="chip ${kd===k?'on':''}" data-lkind="${esc(k)}">${esc(l)}</button>`;
     const list=all.filter(c=>f==='all'||leadState(c.lead)===f).sort((a,b)=>f==='closed'||f==='all'?(last(b)?.ts||b.created)-(last(a)?.ts||a.created):(a.lead.date||'9999').localeCompare(b.lead.date||'9999'));
     const chip=(k,l)=>`<button class="chip ${f===k?'on':''}" data-lfil="${k}">${l} ${n(k)}</button>`;
-    main.innerHTML=vhead('Leads',`<a class="btn sm" style="margin-left:auto" href="${esc(PORTAL_BASE+'manager.html#catering')}" target="_blank" rel="noopener">${ic('brief',14)}Manager console</a>`)
+    main.innerHTML=vhead('Leads',`<a class="btn sm" style="margin-left:auto" href="/manager#catering" target="_blank" rel="noopener">${ic('brief',14)}Manager console</a>`)
       +(kinds.length>1?`<div class="v-filters">${kchip('all','All kinds')}${kinds.map(t=>kchip(t,KIND_PL[t]||t)).join('')}</div>`:'')
       +`<div class="v-filters">${chip('open','Open')}${chip('booked','Booked')}${chip('closed','Closed')}${chip('all','All')}</div><div class="v-list">${list.length?list.map(c=>{const L=c.lead,l=last(c),un=unread(c);
         return `<div class="li lead-li" data-go="${c.id}">${av(c.client.u)}<div style="min-width:0"><div class="lt"><span class="lst st-${L.stage}">${esc(stL(L))}</span>${c.client.tag!=='Catering'?`<span class="tagpill">${esc(c.client.tag)}</span>`:''}<span>${L.kind==='exp'&&L.exp&&!L.event?esc(L.exp)+' · ':''}${esc(leadWhen(L))}${L.guests?' · '+L.guests+' guests':''}${L.quote?' · '+money(L.quote.total):''}${L.res&&L.res.pay==='paid'?' · '+money(L.res.total):''}</span></div><div class="ln" style="${un?'':'font-weight:700'}">${esc(c.name)}${L.company?` <span class="lco">${esc(L.company)}</span>`:''}</div><div class="lp" style="color:var(--muted)">${l?(l.u===ME?'You: ':'')+esc(preview(l)):'No messages yet'}</div></div><span class="when">${l?shortWhen(l.ts):''}${un?`<br><span class="badge" style="display:inline-block;margin-top:4px">${un}</span>`:''}</span></div>`;}).join(''):`<div class="empty"><h3>${f==='open'?'No open leads':f==='booked'?'Nothing booked ahead':'Nothing here'}</h3>New catering and experience inquiries show up here and in the sidebar as they come in.</div>`}</div>`;return;
@@ -1737,7 +1759,7 @@ document.addEventListener('click',e=>{
   const lfl=t.closest('[data-lfil]');if(lfl){S.leadFilter=lfl.dataset.lfil;renderMain();return;}
   const lkd=t.closest('[data-lkind]');if(lkd){S.leadKind=lkd.dataset.lkind;renderMain();return;}
   // links to a lead's conversation (the #portal-alerts card) open right here
-  const la=t.closest('a[href*="chat.html#lead="]');if(la){const m=/#lead=([A-Za-z0-9]+)/.exec(la.getAttribute('href')||'');if(m&&leadByCode(m[1])){e.preventDefault();openLead(m[1]);return;}}
+  const la=t.closest('a[href*="/chat#lead="],a[href*="chat.html#lead="]');if(la){const m=/#lead=([A-Za-z0-9]+)/.exec(la.getAttribute('href')||'');if(m&&leadByCode(m[1])){e.preventDefault();openLead(m[1]);return;}}
   const sq=t.closest('[data-sq]');if(sq){S.searchQ=sq.dataset.sq.trim();$('#search').value=S.searchQ;renderMain();return;}
   const md2=t.closest('[data-mode]');if(md2&&!md2.disabled){const c=convos[S.cur];const keep=inputOf('main')?.innerHTML;S.mode[c.id]=md2.dataset.mode;renderMain();if(keep){inputOf('main').innerHTML=keep;updSend('main');}placeEnd(inputOf('main'));return;}
   const fm=t.closest('[data-fmt]');if(fm){e.preventDefault();fmt(fm.dataset.fmt,fm.closest('.comp-wrap'));return;}

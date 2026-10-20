@@ -1125,7 +1125,7 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
     <button class="loc-tab" data-loc="memphis" onclick="setLoc('memphis')">Memphis</button>
     <button class="loc-tab" data-loc="nashville" onclick="setLoc('nashville')">Nashville</button>
     <button type="button" class="loc-act" id="dashEdit" title="Edit tiles" aria-label="Edit tiles" aria-pressed="false"><i class="ti ti-pencil" aria-hidden="true"></i></button>
-    <a class="loc-act" href="manager.html" title="Manager"><i class="ti ti-layout-dashboard"></i></a>
+    <a class="loc-act" href="/manager" title="Manager"><i class="ti ti-layout-dashboard"></i></a>
     <button class="loc-act" onclick="topLogout()" title="Logout"><i class="ti ti-logout"></i></button>
   </div>
   <span id="brandLoc" hidden></span>
@@ -1153,18 +1153,18 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
         <span class="wg-foot" id="wgDayFoot">Loading&hellip;</span>
       </button>
       <div class="wg wg-sch" id="tile-myshifts" style="--i:2" data-tile="schedule" data-name="Schedule" data-icon="ti-calendar-week" data-swatch="#e7eeff" data-ink="#3730a3">
-        <a class="wg-cover" href="schedule.html" aria-label="Schedule"></a>
+        <a class="wg-cover" href="/schedule" aria-label="Schedule"></a>
         <span class="wg-head"><span class="wg-t">Schedule</span><span class="wg-chip opt" id="wgSchChip">Today</span></span>
         <span class="wg-ppl" id="wgSchPpl"></span>
         <span class="wg-big"><b id="wgSchN">&ndash;</b><span id="wgSchLbl">on today</span></span>
         <span class="wg-sub" id="wgSchWho"></span>
         <span class="wg-foot" id="wgSchFoot">Loading&hellip;</span>
         <span class="wg-acts">
-          <a class="wg-btn" href="schedule.html#timeoff"><i class="ti ti-beach"></i>Request off</a>
-          <a class="wg-btn" href="schedule.html#swap"><i class="ti ti-switch-horizontal"></i>Shift swap</a>
+          <a class="wg-btn" href="/schedule#timeoff"><i class="ti ti-beach"></i>Request off</a>
+          <a class="wg-btn" href="/schedule#swap"><i class="ti ti-switch-horizontal"></i>Shift swap</a>
         </span>
       </div>
-      <button class="wg wg-chz" id="tile-cheese-entry" style="--i:3" onclick="location.href='manager.html#plu'" aria-label="Cheese Entry" data-tile="cheese" data-name="Cheese Entry" data-icon="ti-cheese" data-swatch="#ff7f52" data-ink="#ffffff">
+      <button class="wg wg-chz" id="tile-cheese-entry" style="--i:3" onclick="location.href='/manager#plu'" aria-label="Cheese Entry" data-tile="cheese" data-name="Cheese Entry" data-icon="ti-cheese" data-swatch="#ff7f52" data-ink="#ffffff">
         <img class="wg-greysie" src="greysie-cheesemonger-sticker.svg" alt="" width="132" height="132">
         <svg class="wg-wave" viewBox="0 0 200 100" preserveAspectRatio="none" aria-hidden="true"><path d="M0 24 C 28 6, 60 30, 98 17 S 162 0, 200 14 L 200 100 L 0 100 Z"/></svg>
         <span class="wg-t">Cheese <br>Entry</span>
@@ -1172,7 +1172,7 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
         <span class="wg-chz-n"><b id="wgChzN">&ndash;</b><span>cheeses</span></span>
         <span class="wg-foot" id="wgChzFoot">Loading&hellip;</span>
       </button>
-      <button class="wg wg-cat" id="tile-catering" style="--i:4" onclick="location.href='manager.html#catering'" aria-label="Catering leads" data-tile="leads" data-name="Catering Leads" data-icon="ti-briefcase" data-swatch="#0a6e4c" data-ink="#ffffff">
+      <button class="wg wg-cat" id="tile-catering" style="--i:4" onclick="location.href='/manager#catering'" aria-label="Catering leads" data-tile="leads" data-name="Catering Leads" data-icon="ti-briefcase" data-swatch="#0a6e4c" data-ink="#ffffff">
         <span class="wg-head"><span class="wg-t">Catering Leads</span><span class="wg-chip opt" id="wgLeadChip" hidden></span></span>
         <span class="wg-list" id="wgLeadList"></span>
         <span class="wg-foot" id="wgLeadFoot">Loading&hellip;</span>
@@ -1182,14 +1182,14 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
         <span class="wg-list" id="wgStfList"></span>
         <span class="wg-foot" id="wgStfFoot">Loading&hellip;</span>
       </button>
-      <button class="wg wg-chat" id="tile-chat" style="--i:6" onclick="location.href='chat.html'" aria-label="Greys Chat" data-tile="chat" data-name="Chat" data-icon="ti-messages" data-swatch="#06273a" data-ink="#ffffff">
+      <button class="wg wg-chat" id="tile-chat" style="--i:6" onclick="location.href='/chat'" aria-label="Greys Chat" data-tile="chat" data-name="Chat" data-icon="ti-messages" data-swatch="#06273a" data-ink="#ffffff">
         <i class="ti ti-messages wg-art" aria-hidden="true"></i>
         <span class="wg-head"><span class="wg-t">Chat</span><span class="wg-chip" id="wgChatN" hidden></span></span>
         <span class="wg-list" id="wgChatList"></span>
         <span class="wg-foot" id="wgChatFoot">Channels, DMs and clients</span>
       </button>
       <!-- ONLINE ORDERING: is orderonline.greyscheese.com taking orders for this shop (filled by the ONLINE-ORDERING script); tap -> the switch in the manager console -->
-      <a class="wg wg-oo" id="tile-oo" href="manager.html#ordering" style="--i:7" aria-label="Online ordering" data-tile="ordering" data-name="Online ordering" data-icon="ti-shopping-bag" data-swatch="#e7f6ec" data-ink="#15803d" data-size-def="3x0">
+      <a class="wg wg-oo" id="tile-oo" href="/manager#ordering" style="--i:7" aria-label="Online ordering" data-tile="ordering" data-name="Online ordering" data-icon="ti-shopping-bag" data-swatch="#e7f6ec" data-ink="#15803d" data-size-def="3x0">
         <i class="ti ti-shopping-bag wg-art" aria-hidden="true"></i>
         <span class="wg-head"><span class="wg-oo-ic"><i class="ti ti-shopping-bag" aria-hidden="true"></i></span><span class="wg-t">Online ordering</span><span class="wg-chip" id="wgOoChip">&hellip;</span></span>
         <span class="wg-oo-state"><b id="wgOoState">&ndash;</b></span>
@@ -2375,7 +2375,7 @@ function expThreadHtml(x){
     const when=new Date(m.at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
     h+='<div class="xt-m xt-'+esc(m.dir)+'"><div class="xt-w">'+esc(who)+' · '+esc(when)+'</div>'+esc(m.body).replace(/\n/g,'<br>')+'</div>';
   }));
-  return h+'<a class="xt-a" href="manager.html#inquiries" onclick="event.stopPropagation()">Reply in the portal →</a></div>';
+  return h+'<a class="xt-a" href="/manager#inquiries" onclick="event.stopPropagation()">Reply in the portal →</a></div>';
 }
 // ── SQUARE FUTURE ORDERS (mirror kept by the square-orders function) ──
 // Everything with a pickup or delivery date: Square Online / third-party
@@ -2565,7 +2565,7 @@ async function renderToday(){
 function todayStep(n){ _todayOff = n===0 ? 0 : _todayOff+n; renderToday(); }
 function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().getMonth(); _selDay=fmt(new Date()); renderCalendar(); }
 </script>
-<div style="text-align:center;padding:14px 20px 22px;font-size:0.78rem;color:#8fa0ae;">Greys Fine Cheese &amp; Entertaining · <a href="terms.html" style="color:#0b6aa9;text-decoration:none;font-weight:600;">SMS Terms</a> · <a href="privacy.html" style="color:#0b6aa9;text-decoration:none;font-weight:600;">Privacy Policy</a></div>
+<div style="text-align:center;padding:14px 20px 22px;font-size:0.78rem;color:#8fa0ae;">Greys Fine Cheese &amp; Entertaining · <a href="/terms" style="color:#0b6aa9;text-decoration:none;font-weight:600;">SMS Terms</a> · <a href="/privacy" style="color:#0b6aa9;text-decoration:none;font-weight:600;">Privacy Policy</a></div>
 <!-- HOME-V6 WIDGETS: fills the home tiles with live numbers. Read-only, same public key and the same feeds this page already uses
      (portal-api reservations, catering leads, portal_shifts, cheese_items and Stuff to Know).
      Refreshes every 5 minutes while the home screen is open, and when the app comes back to the front. -->
@@ -2716,7 +2716,7 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
   (function(){ var t=$('tile-catering'); if(!t) return;
     t.addEventListener('click', function(ev){ var row=ev.target.closest && ev.target.closest('[data-lead]'); if(!row || !row.getAttribute('data-lead')) return;
       if(t.closest('.dash.editing')) return;
-      ev.preventDefault(); ev.stopImmediatePropagation(); location.href='chat.html#lead='+encodeURIComponent(row.getAttribute('data-lead')); }, true);
+      ev.preventDefault(); ev.stopImmediatePropagation(); location.href='/chat#lead='+encodeURIComponent(row.getAttribute('data-lead')); }, true);
   })();
   function drawPulse(p){
     PULSE=p; LEADS=null; spread($('wgLeadList'), 1);
