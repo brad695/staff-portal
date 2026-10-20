@@ -2948,8 +2948,9 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
   if(tile) tile.addEventListener('wgsize', draw);
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function load(){
-    var tok=null; try{ tok=JSON.parse(localStorage.getItem('gc_token')||'null'); }catch(e){}
-    if(!tok) return;
+    var tok=null, who=null, site=''; try{ tok=JSON.parse(localStorage.getItem('gc_token')||'null'); who=JSON.parse(localStorage.getItem('gc_login')||'null'); site=(localStorage.getItem('greys_emp_id')||'').trim().toLowerCase(); }catch(e){}
+    // only for whoever is signed in on this site: chat's sign-in can belong to someone who has since signed out
+    if(!tok || !site || (who && String(who).trim().toLowerCase()!==site)) return;
     fetch('https://vdvtrevhqalmjwhjhjug.supabase.co/functions/v1/chat-api',{ method:'POST', headers:{ 'Content-Type':'application/json', 'x-chat-token':tok }, body:JSON.stringify({ a:'unread' }) })
       .then(function(r){ return r.ok ? r.json() : null; })
       .then(function(d){
