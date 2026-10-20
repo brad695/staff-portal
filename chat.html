@@ -4,6 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#03192a">
+<script>
+/* Android home-screen app: the phone draws its back/home button bar light grey (#f8f9fa) whatever this page
+   asks for, but took the button colour from this page's dark theme colour, so the buttons came out white on
+   white in chat (Maverick's phone, 2026-10-19; the portal pages, light theme colour, were fine). There, use the
+   same light colour as the portal pages, for the theme and the page canvas, so the buttons draw dark. */
+(function(){try{if(/Android/i.test(navigator.userAgent)&&matchMedia('(display-mode: standalone)').matches){
+  document.querySelector('meta[name="theme-color"]').setAttribute('content','#f8f9fa');
+  document.documentElement.style.background='#f8f9fa';}}catch(e){}})();
+</script>
 <meta name="robots" content="noindex">
 <title>Greys Chat</title>
 <link rel="icon" href="/favicon-32.png">
@@ -674,12 +683,9 @@ async function pushSync(){
     try{if(sub&&sub.options&&sub.options.applicationServerKey&&b64u(sub.options.applicationServerKey)!==S.vapid){await sub.unsubscribe();sub=null;}}catch(e){}
     if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:unb64u(S.vapid)});
     await pushSave(sub);
-  }catch(e){S.pushOn=false;S.pushErr=errStr(e);}finally{renderBanner();pushDiag('sync');}}
+  }catch(e){S.pushOn=false;}finally{renderBanner();}}
 /* from a tap: subscribe() asks for permission itself, so it must start inside the click (iPhone insists) */
 async function pushOn(){
-  try{const r=await pushOn0();pushDiag('on',{sent:r&&r.sent});return r;}
-  catch(e){S.pushErr=errStr(e);pushDiag('on-fail');throw e;}}
-async function pushOn0(){
   if(!pushOK())throw new Error('This browser can\'t show notifications.');
   if(!S.vapid)throw new Error('Notifications aren\'t ready yet. Reload and try again.');
   if(S.swFail)throw new Error('Notifications aren\'t available on this site yet.');
@@ -695,27 +701,6 @@ async function pushOn0(){
   store.set('pushOff',null);await pushSave(sub);renderBanner();
   return api('push_test',{endpoint:sub.endpoint}).catch(()=>({sent:0}));}
 async function pushOff(){store.set('pushOff',true);const sub=await pushSub();if(sub){await api('push_unsub',{endpoint:sub.endpoint}).catch(()=>{});try{await sub.unsubscribe();}catch(e){}}S.pushOn=false;renderBanner();}
-/* TEMPORARY (2026-10-19): this device's notification state goes to the chat-push-diag edge function, for
-   Maverick's two test accounts only, so a phone that stays quiet can be read instead of guessed at.
-   Remove with chat-sw.js's diag() and the chat_push_diag table once that's solved. */
-const DIAG=SB_URL+'/functions/v1/chat-push-diag';
-function errStr(e){return String(e&&e.name?e.name+': '+e.message:(e&&e.message)||e||'').slice(0,300);}
-async function khash(p,a){const n=s=>String(s||'').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-  const h=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(n(p)+'.'+n(a)));
-  return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,16);}
-async function pushDiag(why,extra){
-  try{if(!['13','34'].includes(String(ME)))return;
-    const reg=SWREG||(('serviceWorker' in navigator)?await navigator.serviceWorker.getRegistration(PUSH_SCOPE).catch(()=>null):null);
-    const sw=reg&&(reg.active||reg.waiting||reg.installing);
-    const info={why,me:ME,perm:('Notification' in window)?Notification.permission:'none',pushOK:pushOK(),standalone:standalone(),
-      swFail:!!S.swFail,swState:sw?sw.state:null,swScope:reg?reg.scope:null,pushOff:!!store.get('pushOff',false),pushOn:!!S.pushOn,
-      vapid:!!S.vapid,err:S.pushErr||null,path:location.pathname,vis:document.visibilityState,...(extra||{})};
-    let sub=null;try{sub=reg?await reg.pushManager.getSubscription():null;}catch(e){info.subErr=errStr(e);}
-    if(sub){const j=sub.toJSON();
-      try{info.kh=await khash(j.keys&&j.keys.p256dh,j.keys&&j.keys.auth);}catch(e){}
-      try{info.keyMatch=!!(sub.options&&sub.options.applicationServerKey)&&b64u(sub.options.applicationServerKey)===S.vapid;}catch(e){}}
-    await fetch(DIAG,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'page',origin:location.origin,endpoint:sub?sub.endpoint:null,info})});
-  }catch(e){}}
 /* "I'm here": while a chat window is in front of someone (touched in the last 10 min) their phone stays quiet */
 let lastInput=Date.now(),lastBeat=null;
 const isActive=()=>document.visibilityState==='visible'&&Date.now()-lastInput<10*60000;
@@ -1669,7 +1654,7 @@ function prefs(){const t=store.get('theme','system');
   const redo=()=>{const n=$('#pfN',back);if(n)n.innerHTML=notifPref();};
   back.addEventListener('click',e=>{const b=e.target.closest('[data-th]');if(b){applyTheme(b.dataset.th);$$('[data-th]',back).forEach(x=>x.classList.toggle('on',x===b));}
     const on=e.target.closest('[data-pon]');if(on)busy(on,async()=>{const r=await pushOn();redo();toast(r.sent?'Notifications are on. We sent a test to this device.':'Notifications are on for this device.');});
-    const tst=e.target.closest('[data-ptest]');if(tst)busy(tst,async()=>{const sub=await pushSub();const r=await api('push_test',{endpoint:sub?sub.endpoint:''});pushDiag('test',{sent:r.sent});toast(r.sent?'Test sent. Check your notifications.':'Couldn\'t reach this device. Turn notifications off and on again.');});
+    const tst=e.target.closest('[data-ptest]');if(tst)busy(tst,async()=>{const sub=await pushSub();const r=await api('push_test',{endpoint:sub?sub.endpoint:''});toast(r.sent?'Test sent. Check your notifications.':'Couldn\'t reach this device. Turn notifications off and on again.');});
     const off=e.target.closest('[data-poff]');if(off)busy(off,async()=>{await pushOff();redo();toast('Notifications are off for this device.');});});
   $('#pfS',back).onclick=()=>busy($('#pfS',back),async()=>{const v=$('#pfT',back).value.trim();if(v!==users[ME].title){await api('profile',{title:v});users[ME].title=v;renderAll();}back.remove();});}
 function switcher(){
@@ -1947,7 +1932,7 @@ async function start(){
   if(location.hash)history.replaceState(null,'',location.pathname+location.search);
   connect();
   beat(true);setInterval(()=>beat(),60000);
-  if(pushOK()&&!(isIOS&&!standalone()))swReg().then(pushSync).catch(e=>{S.swFail=true;S.pushErr=errStr(e);renderBanner();pushDiag('swfail');});else{renderBanner();pushDiag('nopush');}
+  if(pushOK()&&!(isIOS&&!standalone()))swReg().then(pushSync).catch(()=>{S.swFail=true;renderBanner();});else renderBanner();
   setInterval(()=>{if(!S._rtOk&&document.visibilityState==='visible')catchUp();},30000);
   setInterval(()=>{if(S.view==='convo'&&S.tab==='messages'&&!S.editing&&!$('#layer').children.length)$$('.tsum .lr').length&&rerenderMsgs();},60000);
 }
