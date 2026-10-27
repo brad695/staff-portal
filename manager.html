@@ -5258,6 +5258,9 @@ function App() {
                   onAddComp={async (arr) => {
                     for (const r of arr) await addReg(r);
                   }}
+                  onFreshRegs={(eventId, fresh) =>
+                    setRegs((prev) => [...prev.filter((r) => r.eventId !== eventId), ...fresh])
+                  }
                 />
               )}
               {view.name === "customers" && (
@@ -9147,7 +9150,11 @@ function SeatingRoster({ parties, noTables }) {
 // box per guest for the door. Opens a new tab and prints it (pop-ups must be allowed).
 // 2026-10-21: condensed onto ONE letter page — compact header, parties flow in 2–4 columns, and every
 // size is in rem so fitRosterToPage() can pick the biggest type that keeps the whole class on one sheet.
-function printSeatingRoster(ev, parties) {
+// 2026-10-27: the margins live inside the page (@page margin 0 + 0.5in padding). Chrome remembers the
+// Margins box from the last print, and on "None" the old 0.4in @page margin vanished, so the sheet printed
+// from the paper's edge and the printer cut off its left side. Now Default, None and Minimum all print
+// clear of the edge. `win` = a tab already opened by the click (AdminDetail's printRoster).
+function printSeatingRoster(ev, parties, win) {
   const noTables = ev.location === "Nashville";
   const tables = noTables ? null : assignTables(parties);
   const guests = parties.reduce((n, p) => n + (p.size || 0), 0);
@@ -9199,12 +9206,12 @@ function printSeatingRoster(ev, parties) {
   const html = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Roster · ${esc(ev.title)}</title><style>
-  @page{size:letter;margin:0.4in;}
+  @page{size:letter;margin:0;}
   *{box-sizing:border-box;}
   html{font-size:14px;}
   body{margin:0;background:#d6d6d6;color:#000;font-family:Arial,Helvetica,sans-serif;}
-  .paper{width:8.5in;min-height:11in;margin:14px auto;padding:0.4in;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.25);}
-  #sheet{width:7.7in;display:flow-root;}
+  .paper{width:8.5in;min-height:11in;margin:14px auto;padding:0.5in;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.25);}
+  #sheet{width:7.5in;display:flow-root;}
   header{display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;border-bottom:2px solid #000;padding-bottom:.35rem;margin-bottom:.55rem;}
   .shop{font-size:.7rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;}
   h1{font-size:1.4rem;line-height:1.15;margin:.1rem 0;}
@@ -9227,7 +9234,7 @@ function printSeatingRoster(ev, parties) {
   .empty{font-size:1.1rem;font-style:italic;text-align:center;margin-top:2.5rem;}
   .bar{position:fixed;top:10px;right:14px;}
   .bar button{font:600 14px Arial,Helvetica,sans-serif;padding:8px 16px;border:0;border-radius:6px;background:#06273a;color:#fff;cursor:pointer;}
-  @media print{body{background:#fff;}.paper{width:auto;min-height:0;margin:0;padding:0;box-shadow:none;}.bar{display:none;}}
+  @media print{body{background:#fff;}.paper{width:auto;min-height:0;margin:0;padding:0.5in;box-shadow:none;-webkit-box-decoration-break:clone;box-decoration-break:clone;}#sheet{width:auto;}.bar{display:none;}}
 </style></head><body>
 <div class="bar"><button onclick="print()">Print</button></div>
 <div class="paper"><div id="sheet">
@@ -9241,11 +9248,12 @@ function printSeatingRoster(ev, parties) {
 <div id="parties">${body}</div>
 </div></div>
 </body></html>`;
-  const w = window.open("", "_blank");
+  const w = win || window.open("", "_blank");
   if (!w) {
     window.alert("Allow pop-ups for this site to print the roster.");
     return;
   }
+  if (w.closed) return; // closed while the bookings were loading
   w.document.open();
   w.document.write(html);
   w.document.close();
@@ -9279,7 +9287,7 @@ function fitRosterToPage(doc) {
   const list = doc.getElementById("parties");
   if (!sheet || !list) return;
   const root = doc.documentElement;
-  const PAGE_H = (11 - 2 * 0.4) * 96 * 0.96; // letter height less the 0.4in margins, in CSS px, with slack
+  const PAGE_H = (11 - 2 * 0.5) * 96 * 0.96; // letter height less the 0.5in margins inside the page, in CSS px, with slack
   const MAX = 14;
   const MIN = 8;
   const fits = (cols, px) => {
@@ -9665,7 +9673,7 @@ function printBookingDoc(reg, ev) {
   }, 300);
 }
 
-function AdminDetail({ ev, regs, soldFor, go, onRefund, onUpdate, onAddComp }) {
+function AdminDetail({ ev, regs, soldFor, go, onRefund, onUpdate, onAddComp, onFreshRegs }) {
   const [editId, setEditId] = useState(null);
   // Roster starts collapsed — open it with the drop button when needed.
   const [rosterOpen, setRosterOpen] = useState(false);
@@ -9690,7 +9698,42 @@ function AdminDetail({ ev, regs, soldFor, go, onRefund, onUpdate, onAddComp }) {
     .sort((a, b) => (a.refunded ? 1 : 0) - (b.refunded ? 1 : 0));
   // Print roster (2026-10-15): the roster on its own clean page (printSeatingRoster). window.print()
   // printed the whole manager console with it — sidebar, phone menu bar, booking cards.
-  const printRoster = () => printSeatingRoster(ev, parties);
+  // 2026-10-27: this back office loads bookings once, when it opens, so a console left open for days
+  // printed an old list (no new bookings, no add-ons fixed since). Print now opens the tab first — still
+  // inside the click, so pop-up blockers allow it — then re-reads this class's bookings, prints those, and
+  // refreshes this page with them. If the database can't be reached it prints what's on screen.
+  const printRoster = async () => {
+    const w = window.open("", "_blank");
+    if (!w) {
+      window.alert("Allow pop-ups for this site to print the roster.");
+      return;
+    }
+    try {
+      w.document.open();
+      w.document.write(
+        '<!doctype html><title>Roster</title><p style="font:16px Arial,Helvetica,sans-serif;margin:48px">Loading the latest bookings…</p>'
+      );
+      w.document.close();
+    } catch (e) {}
+    let list = parties;
+    if (db) {
+      try {
+        const { data, error } = await db
+          .from("registrations")
+          .select("*")
+          .eq("event_id", ev.id)
+          .order("created_at")
+          .order("id");
+        if (!error && Array.isArray(data)) {
+          // same rules as the rest of the console: a declined/abandoned card try holds no seat, refunds are off
+          const fresh = data.filter((r) => r.payment_status !== "failed").map(regFromRow);
+          list = rosterParties(fresh.filter((r) => !r.refunded));
+          if (onFreshRegs) onFreshRegs(ev.id, fresh);
+        }
+      } catch (e) {}
+    }
+    printSeatingRoster(ev, list, w);
+  };
   return (
     <div>
       <button className="cc-back cc-no-print" onClick={() => go(ev ? dashFor(ev) : "admin")}>
