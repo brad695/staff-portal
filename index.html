@@ -147,9 +147,6 @@
     .res-main{ flex:1; min-width:0; }
     .res-name{ font-weight:700; font-size:0.98rem; }
     .res-meta{ font-size:0.78rem; color:var(--sub); margin-top:2px; }
-    .res-contact{ display:flex; flex-wrap:wrap; gap:3px 14px; margin-top:4px; font-size:0.78rem; }
-    .res-contact a{ color:var(--accent); text-decoration:none; font-weight:600; word-break:break-all; }
-    .res-note{ font-size:0.78rem; color:var(--sub); margin-top:4px; font-style:italic; }
     .res-badge{ font-size:0.62rem; font-weight:800; text-transform:uppercase; padding:4px 9px; border-radius:20px; white-space:nowrap; }
     .b-ok{ background:var(--mint); color:var(--mint-i); }
     .b-cancel{ background:rgba(224,104,91,0.18); color:#f0897c; }
@@ -427,7 +424,7 @@ body, .app{ background:var(--bg); color:var(--ink); }
 .fg input:focus, .fg select:focus{ outline:none; border-color:var(--accent);
   box-shadow:0 0 0 3px var(--accent-soft); }
 .pv-title i, .pv-all, .pv-day, .c-day, .info-card .il, .info-card .iv a,
-.res-contact a, .req{ color:var(--accent); }
+.req{ color:var(--accent); }
 @keyframes flash{ 0%,100%{ box-shadow:var(--shadow);} 25%{ box-shadow:0 0 0 3px var(--accent-soft), var(--shadow);} }
 </style>
 <!-- HOME-V4: location bar at the very top, 6 compact tiles, today's calendar on the home page -->
@@ -553,7 +550,7 @@ html, body, .app{ background:#000; color:var(--ink); }
 .botbar .home-btn{ box-shadow:0 0 0 6px #000, 0 10px 30px rgba(224,162,28,.25); }
 .field input, .field select, .field textarea, .fg input, .fg select{ background:#0a0a0a; border:1px solid var(--line2); color:var(--ink); }
 .field input:focus, .field select:focus, .field textarea:focus, .fg input:focus, .fg select:focus{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
-.pv-title i, .pv-all, .pv-day, .c-day, .info-card .il, .info-card .iv a, .res-contact a, .req{ color:var(--accent); }
+.pv-title i, .pv-all, .pv-day, .c-day, .info-card .il, .info-card .iv a, .req{ color:var(--accent); }
 .spin{ border-color:#262626; border-top-color:var(--accent); }
 @keyframes flash{ 0%,100%{ box-shadow:none;} 25%{ box-shadow:0 0 0 3px var(--accent-soft);} }
 
@@ -854,7 +851,7 @@ body > div[style*="text-align:center"]{ background:#fff; }
 .spin{ border-color:#e5e7eb; border-top-color:var(--accent); }
 .botbar .home-btn{ box-shadow:0 0 0 6px #fff, 0 8px 20px rgba(224,162,28,.35); }
 /* gold text is too pale on white: links and day labels use a deeper gold */
-.pv-title i, .pv-all, .pv-day, .c-day, .info-card .il, .info-card .iv a, .res-contact a, .req, .today-all, .today-title #todayLabel{ color:#a16207; }
+.pv-title i, .pv-all, .pv-day, .c-day, .info-card .il, .info-card .iv a, .req, .today-all, .today-title #todayLabel{ color:#a16207; }
 .today-all:hover{ color:#854d0e; }
 
 /* agenda tags: the darker inks the Today card already uses */
@@ -999,7 +996,7 @@ body.home-editing #notesGrid, body.home-editing .today-card{ opacity:.4; pointer
 <!-- HOME-V9 SIZES: tiles can be resized in Edit tiles. Each .wg carries data-w (1-3 columns; 3 = full width, which is 2 on a phone)
      and data-h (0 title only, 1 regular, 2 tall, 3 fit all - calendar only), saved with the rest of the layout. The grid runs on
      thirds of a row so title-only tiles stack. The tile scripts show more when a tile is bigger (window.wgSize).
-     The 7-day calendar (#tile-cal) and online ordering (#tile-oo) are tiles too. -->
+     The 7-day calendar (#tile-cal) is a tile too. -->
 <style id="home-v9-sizes">
 @media screen{
 /* the grid runs on thirds of a row: title only = 1 unit, regular = 3, tall = 6; "fit all" (calendar) = what its week needs (set by the script) */
@@ -1188,16 +1185,8 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
         <span class="wg-list" id="wgChatList"></span>
         <span class="wg-foot" id="wgChatFoot">Channels, DMs and clients</span>
       </button>
-      <!-- ONLINE ORDERING: is orderonline.greyscheese.com taking orders for this shop (filled by the ONLINE-ORDERING script); tap -> the switch in the manager console -->
-      <a class="wg wg-oo" id="tile-oo" href="/manager#ordering" style="--i:7" aria-label="Online ordering" data-tile="ordering" data-name="Online ordering" data-icon="ti-shopping-bag" data-swatch="#e7f6ec" data-ink="#15803d" data-size-def="3x0">
-        <i class="ti ti-shopping-bag wg-art" aria-hidden="true"></i>
-        <span class="wg-head"><span class="wg-oo-ic"><i class="ti ti-shopping-bag" aria-hidden="true"></i></span><span class="wg-t">Online ordering</span><span class="wg-chip" id="wgOoChip">&hellip;</span></span>
-        <span class="wg-oo-state"><b id="wgOoState">&ndash;</b></span>
-        <span class="wg-sub" id="wgOoSub">Checking&hellip;</span>
-        <span class="wg-foot">Switch in Manager &rsaquo;</span>
-      </a>
       <!-- CALENDAR: the next 7 days as a tile, a week per ‹ › step. Fit all = the whole week; the chevron folds it to title only (HOME-V8). -->
-      <div class="wg wg-cal" id="tile-cal" style="--i:8" data-tile="calendar" data-name="Calendar" data-icon="ti-calendar" data-swatch="#ffffff" data-ink="#161a1f" data-size-def="3x3" data-full="1">
+      <div class="wg wg-cal" id="tile-cal" style="--i:7" data-tile="calendar" data-name="Calendar" data-icon="ti-calendar" data-swatch="#ffffff" data-ink="#161a1f" data-size-def="3x3" data-full="1">
         <div class="today-card" id="todayCard">
           <button type="button" class="today-fold" id="todayFold" aria-expanded="true" aria-controls="todayList" aria-label="Hide calendar" title="Hide calendar"><i class="ti ti-chevron-up" aria-hidden="true"></i></button>
           <div class="today-head">
@@ -1220,7 +1209,7 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
      (RPCs portal_home_layout_get / portal_home_layout_save -> table portal_home_layouts) and are cached on the device.
      Edit tiles: drag the handle to move a tile (with a mouse, drag the tile itself), the minus hides it, "+ Add tile" brings it back,
      the corner resizes it (drag it, tap it for width + height, or arrow keys on it) down to just its title. Sizes: see HOME-V9 SIZES.
-     The pencil in the top bar (#dashEdit) opens and closes Edit tiles. The calendar and online ordering are tiles like the rest.
+     The pencil in the top bar (#dashEdit) opens and closes Edit tiles. The calendar is a tile like the rest.
      New tile later: put a .wg in #dash with data-tile (key), data-name, data-icon, data-swatch, data-ink, plus
      data-def="0" hidden  -> starts hidden and is offered under "+ Add tile"   (no data-def -> shows for everyone),
      data-size-def="2x1"  -> its standard size (columns x height 0-2, 3 = fit all for data-full tiles; default 1x1). -->
@@ -2194,6 +2183,8 @@ async function resDecide(id, approve, btn){
   }
 }
 // Shared card markup so the main list and the grouped lists render identically.
+// Guest privacy: name, time and party size only — the edge function no longer
+// sends phone, email or the guest's team message.
 function resCardHTML(r){
   const cancel=['CANCELLED','CANCELED','DECLINED','NO_SHOW'];
   const det=r.details||{}, who=r.reservee||{};
@@ -2202,15 +2193,8 @@ function resCardHTML(r){
   const dd=dt?dt.toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
   const name=[who.firstName,who.lastName].filter(Boolean).join(' ')||'Guest';
   const party=det.partySize||'?';
-  const phone=who.phone||'';
-  const email=who.email||'';
   const srcMap={ ONLINE:'Online', OFFLINE:'Staff-entered', WALK_IN:'Walk-in', UNKNOWN:'' };
   const src=srcMap[r.source]!==undefined?srcMap[r.source]:(r.source||'');
-  const note=r.teamMessage||det.teamMessage||'';
-  const contact=[
-    phone?`<a href="tel:${esc(phone)}">📞 ${esc(phone)}</a>`:'',
-    email?`<a href="mailto:${esc(email)}">✉️ ${esc(email)}</a>`:''
-  ].filter(Boolean).join('');
   const st=r.status||'UNKNOWN'; const isCancel=cancel.includes(st);
   const isReq=st==='REQUESTED';
   const bcls=isCancel?'b-cancel':(isReq?'b-req':(st==='RESERVED'||st==='SEATED'||st==='FINISHED'?'b-ok':'b-other'));
@@ -2225,8 +2209,6 @@ function resCardHTML(r){
       <div class="res-main">
         <div class="res-name">${esc(name)}</div>
         <div class="res-meta">👥 Party of ${esc(party)}${src?' · '+esc(src):''}</div>
-        ${contact?`<div class="res-contact">${contact}</div>`:''}
-        ${note?`<div class="res-note">"${esc(note)}"</div>`:''}
       </div>
       <span class="res-badge ${bcls}">${isReq?'NEEDS APPROVAL':st.replace(/_/g,' ')}</span>
       ${actions}
@@ -2880,50 +2862,6 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
     if (hashKey()) route();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
-})();
-</script>
-<!-- ONLINE ORDERING TILE (2026-10-18): read-only. Shows whether orderonline.greyscheese.com is taking orders for this shop; the
-     tile (#tile-oo, in the home grid) opens the switch in the manager console (manager.html#ordering). Nobody can flip it from here. -->
-<style id="oo-tile">
-.dash .wg-oo{ --fg:#111827; --fg2:#6b7280; --chip:#dcfce7; background:#fff; text-decoration:none; box-shadow:inset 0 0 0 1px #e5e7eb, 0 12px 24px -18px rgba(15,23,42,.35); }
-.dash .wg-oo .wg-chip{ color:#15803d; }
-.wg-oo-ic{ display:flex; align-items:center; justify-content:center; flex:none; width:30px; height:30px; border-radius:9px; background:#e7f6ec; color:#15803d; font-size:17px; }
-.wg-oo-state{ display:flex; align-items:baseline; gap:6px; margin-top:2px; }
-.wg-oo-state b{ font-size:1.55rem; font-weight:800; letter-spacing:-.6px; line-height:1; color:#15803d; }
-.dash .wg-oo .wg-art{ color:#15803d; opacity:.08; }
-.dash .wg-oo .wg-foot{ color:#0b6aa9; }
-.dash .wg-oo.off{ --chip:#fee2e2; background:#fef2f2; box-shadow:inset 0 0 0 1px #fca5a5, 0 12px 24px -18px rgba(15,23,42,.35); }
-.dash .wg-oo.off .wg-chip, .dash .wg-oo.off .wg-oo-state b, .dash .wg-oo.off .wg-sub{ color:#b91c1c; }
-.dash .wg-oo.off .wg-oo-ic{ background:#fee2e2; color:#b91c1c; }
-.dash .wg-oo.off .wg-art{ color:#b91c1c; }
-</style>
-<script>
-(function(){
-  var tile = document.getElementById('tile-oo');
-  if (!tile || typeof sb === 'undefined' || typeof LOC === 'undefined') return;
-  var NAME = LOC === 'nashville' ? 'Nashville' : 'Memphis';
-  var chip = document.getElementById('wgOoChip'), state = document.getElementById('wgOoState'), sub = document.getElementById('wgOoSub');
-  function when(iso){
-    if (!iso) return '';
-    var d = new Date(iso); if (isNaN(d)) return '';
-    var t = d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-    return d.toDateString() === new Date().toDateString() ? t : d.toLocaleDateString('en-US', { month:'short', day:'numeric' }) + ', ' + t;
-  }
-  async function load(){
-    try{
-      var r = await sb.from('site_content').select('data').eq('key','online_ordering').maybeSingle();
-      if (r.error) throw r.error;
-      var st = ((r.data && r.data.data) || {})[LOC] || {}, off = st.paused === true;
-      tile.classList.toggle('off', off);
-      chip.textContent = off ? 'Off' : 'On';
-      state.textContent = off ? 'Off' : 'On';
-      sub.textContent = off ? ((st.at ? 'Since ' + when(st.at) : 'Paused') + ' — customers can’t order') : 'Taking orders · ' + NAME;
-      tile.setAttribute('aria-label', 'Online ordering for ' + NAME + ' is ' + (off ? 'off' : 'on') + ' — opens the switch in the manager console');
-    }catch(e){ chip.textContent = '?'; sub.textContent = 'Couldn’t check'; }
-  }
-  load();
-  setInterval(function(){ if (!document.hidden) load(); }, 60000);
-  document.addEventListener('visibilitychange', function(){ if (!document.hidden) load(); });
 })();
 </script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->

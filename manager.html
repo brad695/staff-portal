@@ -1105,10 +1105,12 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
         <div class="rf"><label>Date</label><input type="date" id="rmDate"></div>
         <div class="rf"><label>Time</label><input type="time" id="rmTime" step="900"></div>
         <div class="rf"><label>Party size</label><input type="number" id="rmParty" min="1" max="99" value="2"></div>
-        <div class="rf"><label>Phone *</label><input type="tel" id="rmPhone" placeholder="e.g. 9015551234"></div>
+        <!-- contact fields are for taking a NEW booking; resOpen() hides them,
+             since an existing guest's phone/email stay in Wix and aren't shown here -->
+        <div class="rf" id="rmPhoneRow"><label>Phone *</label><input type="tel" id="rmPhone" placeholder="e.g. 9015551234"></div>
         <div class="rf"><label>First name *</label><input type="text" id="rmFirst"></div>
         <div class="rf"><label>Last name</label><input type="text" id="rmLast"></div>
-        <div class="rf full"><label>Email</label><input type="email" id="rmEmail" placeholder="optional — Wix emails the confirmation here"></div>
+        <div class="rf full" id="rmEmailRow"><label>Email</label><input type="email" id="rmEmail" placeholder="optional — Wix emails the confirmation here"></div>
       </div>
       <div class="login-err" id="resErr"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -2609,6 +2611,8 @@ function resPill(st){
   if(st==='RESERVED') return '<span class="pill pill-ok">reserved</span>';
   return '<span class="pill pill-mid">'+esc((st||'').replace(/_/g,' ').toLowerCase())+'</span>';
 }
+// Guest privacy: name, time and party size only — the reservations feed no
+// longer carries the guest's phone, email or notes.
 function renderResys(){
   const el = document.getElementById('resList');
   const want = document.getElementById('resStatus').value;
@@ -2627,11 +2631,10 @@ function renderResys(){
     if(day !== lastDay){ html += '<div class="res-day">'+esc(day)+'</div>'; lastDay = day; }
     const tm = dt ? dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '—';
     const name = [who.firstName,who.lastName].filter(Boolean).join(' ') || 'Guest';
-    const contact = [who.phone,who.email].filter(Boolean).join(' · ');
     html += '<div class="rec-row res-row'+(cancel.includes(r.status)?' cancelled':'')+'" onclick="resOpen(\''+esc(r.id)+'\')">'
       +'<span class="res-r-time">'+esc(tm)+'</span>'
       +'<div style="flex:1;min-width:0;"><div class="res-r-name">'+esc(name)+'</div>'
-      +'<div class="res-r-meta">👥 '+esc(det.partySize||'?')+(contact?' · '+esc(contact):'')+'</div></div>'
+      +'<div class="res-r-meta">👥 '+esc(det.partySize||'?')+'</div></div>'
       +resPill(r.status)+'</div>';
   });
   el.innerHTML = html;
@@ -2649,8 +2652,15 @@ function resNew(){
   document.getElementById('rmTime').value = '18:00';
   document.getElementById('rmParty').value = 2;
   ['rmFirst','rmLast','rmPhone','rmEmail'].forEach(id=>document.getElementById(id).value='');
+  resContactRows(true);
   document.getElementById('resCancelBtn').style.display = 'none';
   resShowModal();
+}
+// Phone + email are only collected when a booking is created here. They're
+// hidden when editing: the portal never receives the guest's contact details.
+function resContactRows(show){
+  document.getElementById('rmPhoneRow').style.display = show ? '' : 'none';
+  document.getElementById('rmEmailRow').style.display = show ? '' : 'none';
 }
 function resOpen(id){
   const r = RES_ROWS.find(x=>x.id===id); if(!r) return;
@@ -2665,8 +2675,9 @@ function resOpen(id){
   document.getElementById('rmParty').value = det.partySize || 2;
   document.getElementById('rmFirst').value = who.firstName || '';
   document.getElementById('rmLast').value = who.lastName || '';
-  document.getElementById('rmPhone').value = who.phone || '';
-  document.getElementById('rmEmail').value = who.email || '';
+  document.getElementById('rmPhone').value = '';
+  document.getElementById('rmEmail').value = '';
+  resContactRows(false);
   document.getElementById('resSaveBtn').style.display = done ? 'none' : '';
   document.getElementById('resCancelBtn').style.display = done ? 'none' : '';
   resShowModal();
@@ -2679,14 +2690,19 @@ async function resSave(){
   const phone = document.getElementById('rmPhone').value.trim();
   if(!d || !t){ err.textContent = 'Date and time are required.'; return; }
   if(!party || party < 1){ err.textContent = 'Party size is required.'; return; }
-  if(!first || !phone){ err.textContent = 'Guest first name and phone are required.'; return; }
+  if(!first){ err.textContent = 'Guest first name is required.'; return; }
+  if(!RES_EDIT && !phone){ err.textContent = 'Guest phone is required.'; return; }
   const start = new Date(d+'T'+t+':00').toISOString(); // local wall-clock → instant
+  // contact fields are only sent when they were typed in (new bookings); on an
+  // edit they're left out so Wix keeps the phone/email it already has
   const payload = {
     start, party,
     first_name: first,
-    last_name: document.getElementById('rmLast').value.trim(),
-    phone, email: document.getElementById('rmEmail').value.trim()
+    last_name: document.getElementById('rmLast').value.trim()
   };
+  if(phone) payload.phone = phone;
+  const email = document.getElementById('rmEmail').value.trim();
+  if(email) payload.email = email;
   const btn = document.getElementById('resSaveBtn'); btn.disabled = true;
   let r;
   if(RES_EDIT) r = await fn('update-reservation', { id: RES_EDIT.id, ...payload });
@@ -2706,9 +2722,9 @@ async function resCancelCurrent(){
   const who = RES_EDIT.reservee||{};
   if(!confirm('Cancel this reservation for '+([who.firstName,who.lastName].filter(Boolean).join(' ')||'this guest')+'? The guest will be notified.')) return;
   const btn = document.getElementById('resCancelBtn'); btn.disabled = true;
-  // include the guest's phone — Wix's cancel endpoint demands it, and its
-  // single-reservation lookup doesn't always return it server-side
-  const r = await fn('cancel-reservation', { id: RES_EDIT.id, phone: who.phone || document.getElementById('rmPhone').value.trim() });
+  // Wix's cancel endpoint demands the guest's phone; portal-api looks it up
+  // itself (the portal is never sent contact details).
+  const r = await fn('cancel-reservation', { id: RES_EDIT.id });
   btn.disabled = false;
   const err = document.getElementById('resErr');
   if(!r.ok){ err.textContent = '❌ '+(r.data.error || 'Could not cancel. Try again.'); return; }
@@ -17045,7 +17061,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 <!-- ONLINE-ORDERING SWITCH (2026-10-10): the 🛒 Online Ordering tab (Staff section). One switch per shop for
      orderonline.greyscheese.com. State lives in site_content 'online_ordering' = { memphis:{paused,at,by}, nashville:{…} },
      written only by the set_online_ordering RPC (is_app_admin) and read by the square-online-order edge function
-     (re-read every ~10 s). The same switch is on the staff portal home page (index.html). -->
+     (re-read every ~10 s). This console is the only place the switch lives. -->
 <style id="oo-switch">
 .oo-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
 .oo-card{ display:flex; align-items:center; gap:16px; padding:20px; border-radius:14px; border:1px solid var(--line,#e5e7eb); background:#f6fbf7; }
