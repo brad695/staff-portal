@@ -1232,6 +1232,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     #panel-plu .pill.error{ background:#fbeae8; color:var(--wax); }
     #panel-plu .mode{ display:inline-block; font-size:0.66rem; color:var(--sub); white-space:nowrap; }
     #panel-plu .mode b{ font-weight:700; color:var(--ink); }
+    #panel-plu .mode.neg{ color:var(--wax); font-weight:700; }
     #panel-plu a.sqlink{ display:inline-block; font-size:0.66rem; color:#2b6cb0; text-decoration:none; }
     #panel-plu a.sqlink:hover{ text-decoration:underline; }
     #panel-plu .stack{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; }
@@ -1395,6 +1396,10 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
           <label class="fld"><span id="pf_pplLabel">Price per lb ($)</span>
             <input id="pf_ppl" type="number" step="0.01" min="0" inputmode="decimal" placeholder="24.99" />
           </label>
+          <label class="fld"><span id="pf_costLabel">Cost per lb ($)</span>
+            <input id="pf_cost" type="number" step="any" min="0" inputmode="decimal" placeholder="12.50" />
+            <span class="fnote" id="pf_costNote"></span>
+          </label>
           <label class="fld">Unit of Measure
             <select id="pf_unit"></select>
             <span class="fnote" id="pf_unitNote"></span>
@@ -1454,9 +1459,9 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       <div class="bulk-wrap">
         <table class="bulk">
           <thead>
-            <tr><th>PLU</th><th>Kind</th><th>Name</th><th>Marketing</th><th>Category</th><th>Price</th><th>Per unit</th><th>Unit</th><th>Barcode</th><th>DateCodeGenie</th><th>Square</th><th></th></tr>
+            <tr><th>PLU</th><th>Kind</th><th>Name</th><th>Marketing</th><th>Category</th><th>Price</th><th>Per unit</th><th>Cost</th><th>Unit</th><th>Barcode</th><th>DateCodeGenie</th><th>Square</th><th></th></tr>
           </thead>
-          <tbody id="pluBody"><tr><td colspan="12" class="empty-row">Loading…</td></tr></tbody>
+          <tbody id="pluBody"><tr><td colspan="13" class="empty-row">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -12880,6 +12885,9 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
    Cheese: DateCodeGenie + Square. Wine/Retail: Square only (item_kind=retail).
    Writes go through the cheese-items edge function (service role); reads come
    straight from the table under the signed-in manager's session.
+   Exception: cost. The edge fn doesn't know that column, so the tab writes
+   cheese_items.cost directly (RLS: is_app_admin; it's the only column the
+   browser may update). Cost is portal-only — never sent to Square or DCG.
    ═══════════════════════════════════════════════════════════════════════ */
 (function(){
   const PLU_FN = SB_URL + '/functions/v1/cheese-items';
@@ -13002,6 +13010,62 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     if (hasPlu(i.price) && Number(i.price) > 0)
       return { key:'fixed', unit, label:'fixed', hint:'Fixed price, sold in whole units' };
     return { key:'var', unit, label:'variable', hint:'No price in Square — the cashier keys the amount' };
+  }
+
+  /* ---------- cost ---------- */
+  // Cost is per whatever the register sells by, same rule as priceMode():
+  // per lb/oz/g/kg when sold by weight, each otherwise.
+  const TAX_IN_CATS = new Set(['Wine','Wine GLS','Wine BTL']); // dine-in wine is priced tax-in
+  const TAX_IN_RATE = 1.2475;                                   // 9.75% sales + 15% LBD, both inclusive
+  function costPer(i){
+    const unit = unitOf(i);
+    if (unit === 'EA') return 'each';
+    if (!(Number(i.price_per_lb) > 0) && Number(i.price) > 0) return 'each';
+    return UNIT_WORD[unit];
+  }
+  const costMoney = (v) => '$' + Number(v).toFixed(4).replace(/0{1,2}$/, '');
+  // Gross margin on the price Square charges; tax-in wine is measured on the price before tax.
+  function marginPct(i, taxIn){
+    if (!hasPlu(i.cost)) return null;
+    const cost = Number(i.cost), pm = priceMode(i);
+    let sell = pm.key === 'weight' ? Number(i.price_per_lb) : pm.key === 'fixed' ? Number(i.price) : NaN;
+    if (!Number.isFinite(cost) || !(sell > 0)) return null;
+    if (taxIn) sell = sell / TAX_IN_RATE;
+    return Math.round((sell - cost) / sell * 100);
+  }
+  function costCell(i){
+    if (!hasPlu(i.cost)) return '<span class="none">—</span>';
+    const per = costPer(i), m = marginPct(i, TAX_IN_CATS.has(i.category));
+    return '<div class="stack"><span>'+costMoney(i.cost)+'<span class="none">/'+(per === 'each' ? 'ea' : esc(per))+'</span></span>'+
+      (m === null ? '' : '<span class="mode'+(m < 0 ? ' neg' : '')+'">'+m+'% margin</span>')+'</div>';
+  }
+  // Blank → null; otherwise a number 0 or more, or undefined when it isn't one.
+  function readCost(raw){
+    const s = String(raw ?? '').trim();
+    if (s === '') return null;
+    const n = Number(s);
+    return Number.isFinite(n) && n >= 0 ? n : undefined;
+  }
+  // The edge fn doesn't know cost — managers write it straight to the row (RLS: is_app_admin).
+  // RLS turns a refused update into "0 rows", not an error — so ask for the row back.
+  async function saveCost(id, cost){
+    const { data, error } = await sb.from('cheese_items').update({ cost }).eq('id', id).select('id');
+    if (error) return error.message;
+    return (data && data.length) ? null : 'this login can\'t change costs';
+  }
+  // Did the edit row change anything besides cost? A cost-only edit skips the DCG/Square re-push.
+  function touchesSync(cur, b){
+    const t = (v) => String(v ?? '').trim();
+    const n = (v) => (v === null || v === undefined || v === '') ? null : Number(v);
+    return t(b.name) !== t(cur.name)
+      || (t(b.marketing_name) || null) !== (t(cur.marketing_name) || null)
+      || n(b.price) !== n(cur.price)
+      || n(b.price_per_lb) !== n(cur.price_per_lb)
+      || t(b.unit_of_measure).toUpperCase() !== t(cur.unit_of_measure).toUpperCase()
+      || (t(b.barcode) || null) !== (t(cur.barcode) || null)
+      || (t(b.category) || null) !== (t(cur.category) || null)
+      || (t(b.printer_profile) || null) !== (t(cur.printer_profile) || null)
+      || (b.hot_buttons !== false) !== (cur.hot_buttons !== false);
   }
 
   const STATUS = {
@@ -13174,6 +13238,21 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     // which price field wins.
     const draft = { price: $('pf_price').value, price_per_lb: $('pf_ppl').value, unit_of_measure: unit };
     const pm = priceMode(draft);
+
+    // Cost: the label follows how the register sells it; the note shows the margin.
+    const costDraft = { ...draft, cost: $('pf_cost').value };
+    const per = costPer(costDraft);
+    $('pf_costLabel').textContent = per === 'each' ? 'Cost each ($)' : 'Cost per ' + per + ' ($)';
+    const preset = ($('pf_tax') && $('pf_tax').value) || 'auto';
+    const taxIn = entryKind === 'retail' &&
+      (preset === 'wine_dine_in' || (preset === 'auto' && TAX_IN_CATS.has($('pf_category').value)));
+    const cv = readCost(costDraft.cost), mg = cv == null ? null : marginPct(costDraft, taxIn);
+    const costNote = $('pf_costNote');
+    costNote.className = 'fnote' + (cv === undefined || (mg !== null && mg < 0) ? ' bad' : '');
+    costNote.textContent = cv === null ? 'Optional — what we pay (portal only)'
+      : cv === undefined ? 'Cost must be 0 or more'
+      : mg === null ? 'Add a price to see the margin'
+      : mg + '% margin' + (taxIn ? ' (before tax-in)' : '');
     const amt = pm.key === 'weight' ? Number(draft.price_per_lb) : pm.key === 'fixed' ? Number(draft.price) : null;
     const sqName = $('pf_marketing').value.trim() || $('pf_name').value.trim();
     const bits = ['Goes to Square as <b>' + (sqName ? esc(sqName) : '…') + '</b>'];
@@ -13199,7 +13278,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
 
     const body = $('pluBody');
     if (!filtered.length){
-      body.innerHTML = '<tr><td colspan="12" class="empty-row">'+(items.length?'No matches.':'No items yet.')+'</td></tr>';
+      body.innerHTML = '<tr><td colspan="13" class="empty-row">'+(items.length?'No matches.':'No items yet.')+'</td></tr>';
       return;
     }
 
@@ -13222,6 +13301,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
           '<td data-l="Category"><select id="pe_category">'+optionsHtml(catList2, i.category||'Cheese')+'</select></td>'+
           '<td data-l="Price">'+inp('pe_price',i.price,'Price','number')+'</td>'+
           '<td data-l="Per lb">'+inp('pe_ppl',i.price_per_lb,'Per lb','number')+'</td>'+
+          '<td data-l="Cost">'+inp('pe_cost',i.cost,'Cost '+(costPer(i)==='each'?'each':'per '+costPer(i)),'number')+'</td>'+
           '<td data-l="Unit"><select id="pe_unit">'+optionsHtml(UNITS, u)+'</select></td>'+
           '<td data-l="Barcode">'+inp('pe_barcode',i.barcode,'Barcode')+'</td>'+
           '<td data-l="Printer"><select id="pe_printer">'+optionsHtml(profList, i.printer_profile||'Greys Cheese Label')+'</select></td>'+
@@ -13252,6 +13332,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
         '<td data-l="Category">'+(i.category?esc(i.category):'—')+'</td>'+
         '<td data-l="Price">'+money(i.price)+'</td>'+
         '<td data-l="Per lb">'+money(i.price_per_lb)+'</td>'+
+        '<td data-l="Cost">'+costCell(i)+'</td>'+
         '<td data-l="Unit">'+esc(unitOf(i))+'</td>'+
         '<td class="mono" data-l="Barcode">'+(i.barcode?esc(i.barcode):'—')+'</td>'+
         '<td data-l="DateCodeGenie">'+dcgPill+'</td>'+
@@ -13274,6 +13355,8 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
       setNotice('err','Barcode ' + mode.barcode + ' is already on another item.'); return;
     }
     if (entryKind !== 'retail' && !chosenLocations().length){ setNotice('err','Pick at least one store.'); return; }
+    const cost = readCost($('pf_cost').value);
+    if (cost === undefined){ setNotice('err','Cost must be 0 or more.'); $('pf_cost').focus(); return; }
 
     const btn = $('pluSubmit');
     btn.disabled = true; btn.textContent = 'Saving…';
@@ -13306,12 +13389,15 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
         return st === 'synced' ? label + ' ✓'
           : st === 'error' ? label + ' failed (' + (err||'error') + ')' : label + ' not sent (key not set up)';
       };
-      const worst = [it.dcg_status, it.square_status].includes('error') ? 'err'
+      const costErr = cost === null ? null : await saveCost(it.id, cost);
+      let worst = [it.dcg_status, it.square_status].includes('error') ? 'err'
         : (!retailSaved && [it.dcg_status, it.square_status].includes('skipped')) ? 'warn'
         : (retailSaved && it.square_status === 'skipped') ? 'warn' : 'ok';
+      if (costErr && worst === 'ok') worst = 'warn';
       setNotice(worst, 'Saved ' + it.name + ' as ' + (hasPlu(it.plu) ? 'PLU ' + pad5(it.plu) : 'barcode ' + it.barcode) + '. ' +
-        part('DateCodeGenie', it.dcg_status, it.dcg_error) + ' · ' + part('Square', it.square_status, it.square_error));
-      ['pf_name','pf_marketing','pf_price','pf_ppl','pf_barcode','pf_plu'].forEach(id => $(id).value = '');
+        part('DateCodeGenie', it.dcg_status, it.dcg_error) + ' · ' + part('Square', it.square_status, it.square_error) +
+        (cost === null ? '' : costErr ? ' · cost not saved (' + costErr + ')' : ' · cost ' + costMoney(cost) + ' ✓'));
+      ['pf_name','pf_marketing','pf_price','pf_ppl','pf_cost','pf_barcode','pf_plu'].forEach(id => $(id).value = '');
       $('pf_unit').value = retail ? 'EA' : DEFAULT_UNIT;
       $('pf_locMem').checked = true; $('pf_locNash').checked = true;
       overridePlu = false; $('pf_plu').disabled = true; $('pf_pluToggle').textContent = 'override';
@@ -13352,7 +13438,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     renderForm();
   });
 
-  ['pf_barcode','pf_plu','pf_name','pf_marketing','pf_price','pf_ppl'].forEach(id =>
+  ['pf_barcode','pf_plu','pf_name','pf_marketing','pf_price','pf_ppl','pf_cost'].forEach(id =>
     $(id).addEventListener('input', renderForm));
   ['pf_unit','pf_locMem','pf_locNash'].forEach(id =>
     $(id).addEventListener('change', renderForm));
@@ -13388,7 +13474,11 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     if (ds.save){
       btn.disabled = true; btn.textContent = 'Saving…';
       try {
-        const res = await fetch(PLU_FN, { method:'POST', headers:authHeaders(), body: JSON.stringify({
+        const cur = items.find(x => x.id === ds.save) || {};
+        const cost = readCost($('pe_cost').value);
+        if (cost === undefined) throw new Error('cost must be 0 or more');
+        const costChanged = cost !== (hasPlu(cur.cost) ? Number(cur.cost) : null);
+        const upd = {
           action:'update', id:ds.save,
           name: $('pe_name').value,
           marketing_name: $('pe_marketing').value,
@@ -13399,16 +13489,32 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
           category: $('pe_category').value,
           printer_profile: $('pe_printer').value,
           hot_buttons: $('pe_hot').checked
-        })});
-        const data = await res.json();
-        if (!res.ok || data.error) throw new Error(data.error || 'HTTP ' + res.status);
-        const it = data.item;
-        const part = (label, st, err) => st === 'synced' ? label + ' ✓'
-          : st === 'error' ? label + ' failed (' + (err||'error') + ')' : label + ' not updated (' + (err||'not set up') + ')';
-        setNotice([it.dcg_status,it.square_status].includes('error') ? 'err'
-          : [it.dcg_status,it.square_status].includes('skipped') ? 'warn' : 'ok',
-          'Updated ' + it.name + ' (' + (hasPlu(it.plu) ? 'PLU ' + pad5(it.plu) : 'barcode ' + it.barcode) + '). ' +
-          part('DateCodeGenie', it.dcg_status, it.dcg_error) + ' · ' + part('Square', it.square_status, it.square_error));
+        };
+        // Only the cost changed? Save it and skip the DateCodeGenie/Square re-push.
+        const pushSync = !costChanged || touchesSync(cur, upd);
+        let it = cur, data = null;
+        if (pushSync){
+          const res = await fetch(PLU_FN, { method:'POST', headers:authHeaders(), body: JSON.stringify(upd) });
+          data = await res.json();
+          if (!res.ok || data.error) throw new Error(data.error || 'HTTP ' + res.status);
+          it = data.item;
+        }
+        const costErr = costChanged ? await saveCost(ds.save, cost) : null;
+        if (costErr && !pushSync) throw new Error('cost not saved — ' + costErr);
+        const costMsg = !costChanged ? '' : costErr ? 'cost not saved (' + costErr + ')'
+          : cost === null ? 'cost cleared' : 'cost ' + costMoney(cost) + ' ✓';
+        const where = 'Updated ' + it.name + ' (' + (hasPlu(it.plu) ? 'PLU ' + pad5(it.plu) : 'barcode ' + it.barcode) + ').';
+        if (!pushSync) setNotice('ok', where + ' ' + costMsg.charAt(0).toUpperCase() + costMsg.slice(1) + '.');
+        else {
+          const part = (label, st, err) => st === 'synced' ? label + ' ✓'
+            : st === 'error' ? label + ' failed (' + (err||'error') + ')' : label + ' not updated (' + (err||'not set up') + ')';
+          let lvl = [it.dcg_status,it.square_status].includes('error') ? 'err'
+            : [it.dcg_status,it.square_status].includes('skipped') ? 'warn' : 'ok';
+          if (costErr && lvl === 'ok') lvl = 'warn';
+          setNotice(lvl, where + ' ' +
+            part('DateCodeGenie', it.dcg_status, it.dcg_error) + ' · ' + part('Square', it.square_status, it.square_error) +
+            (costMsg ? ' · ' + costMsg : ''));
+        }
         editingId = null; await load();
       } catch(err){
         setNotice('err','Update failed: ' + err.message);
@@ -13467,8 +13573,9 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
       return a.plu - b.plu;
     });
     const rows = [
-      ['PLU','Kind','Name','Marketing Name','Price','Price per unit','Unit','Barcode','Category','Printer Profile','Hot Buttons','DCG Status','Square Status','Square Pricing','Square Item ID'],
-      ...sorted.map(i => [pad5(i.plu), kindLabel(i), i.name, i.marketing_name||'', i.price ?? '', i.price_per_lb ?? '', unitOf(i),
+      ['PLU','Kind','Name','Marketing Name','Price','Price per unit','Cost','Cost per','Unit','Barcode','Category','Printer Profile','Hot Buttons','DCG Status','Square Status','Square Pricing','Square Item ID'],
+      ...sorted.map(i => [pad5(i.plu), kindLabel(i), i.name, i.marketing_name||'', i.price ?? '', i.price_per_lb ?? '',
+        i.cost ?? '', hasPlu(i.cost) ? costPer(i) : '', unitOf(i),
         i.barcode||'', i.category||'', i.printer_profile||'', i.hot_buttons !== false ? 'x':'',
         i.dcg_status, i.square_status, priceMode(i).label, i.square_item_id||''])
     ];
