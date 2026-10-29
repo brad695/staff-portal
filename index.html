@@ -2305,17 +2305,19 @@ function spanDays(startDate,endDate,mS,mE,cb){ let d=new Date((startDate<mS?mS:s
 async function loadCalClasses(mS,mE){
   _calData.cls={};
   try{
-    const { data } = await sb.from('events').select('id,title,date,time,kind,capacity')
+    const { data } = await sb.from('events').select('id,title,date,time,kind,capacity,party_size')
       .gte('date',mS).lte('date',mE).ilike('location', LOC).order('date');
     const evs = data||[];
     const booked = {};
     if(evs.length){
-      const { data: regs } = await sb.from('registrations').select('event_id,qty,refunded,payment_status').in('event_id', evs.map(e=>e.id));
-      // a declined card (payment_status 'failed') is not a booking and holds no seat
-      (regs||[]).forEach(r=>{ if(!r.refunded && r.payment_status!=='failed') booked[r.event_id]=(booked[r.event_id]||0)+(r.qty||0); });
+      // Counts come from portal_class_booked(): registrations is manager-only and staff
+      // devices aren't signed in as the manager, so reading it here always counted 0.
+      // Paid / comp / imported only - refunds and declined cards hold no seat.
+      const { data: cnt } = await sb.rpc('portal_class_booked', { p_ids: evs.map(e=>e.id) });
+      (cnt||[]).forEach(r=>{ booked[r.event_id]=Number(r.booked)||0; });
     }
     evs.forEach(e=>{ if(!e.date) return;
-      (_calData.cls[e.date]=_calData.cls[e.date]||[]).push({ title:e.title, time:e.time||'', kind:e.kind||'class', booked:booked[e.id]||0, capacity:e.capacity||0 });
+      (_calData.cls[e.date]=_calData.cls[e.date]||[]).push({ title:e.title, time:e.time||'', kind:e.kind||'class', booked:booked[e.id]||0, capacity:e.capacity||0, party:e.party_size||1 });
     });
     Object.values(_calData.cls).forEach(a=>a.sort((x,y)=>(x.time||'').localeCompare(y.time||'')));
   }catch(e){ _calData.cls={}; }
@@ -2469,8 +2471,10 @@ function renderAgenda(y,m,tgt,only){
       ['Through', (e.endDate&&e.endDate!==date)?fmtDisplay(e.endDate):''],
       ['Runs', (e.repeat&&e.repeat!=='none')?repeatLabel(e.repeat):'']
     ])));
-    cls.forEach(c=>rows+=agRow('t-class', c.kind==='class'?'Class':'Ticketed',
-      (c.time?fmtTime(c.time)+' · ':'')+esc(c.title)+(c.capacity?' · 🎟 '+c.booked+'/'+c.capacity+' booked':'')));
+    // Mahjong sells whole tables: show tables, not seats (capacity is stored in seats)
+    cls.forEach(c=>{ const ps=c.party>1?c.party:1;
+      const cnt=!c.capacity?'':ps>1?' · 🎟 '+Math.ceil(c.booked/ps)+'/'+Math.floor(c.capacity/ps)+' tables booked':' · 🎟 '+c.booked+'/'+c.capacity+' booked';
+      rows+=agRow('t-class', c.kind==='class'?'Class':'Ticketed', (c.time?fmtTime(c.time)+' · ':'')+esc(c.title)+cnt); });
     exp.forEach(x=>{ const hold=x.status==='pending';
       const hu=hold&&x.hold_expires_at?new Date(x.hold_expires_at).toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
       rows+=agRow('t-exp', hold?'On hold':'Experience',
