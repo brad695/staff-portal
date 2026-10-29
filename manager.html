@@ -1310,6 +1310,24 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     #panel-campaigns .emc-toast.show{ transform:translate(-50%,0); }
     #panel-campaigns .emc-toast.err{ background:var(--wax); }
 
+    #panel-campaigns .emc-sg{ display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap;
+      border:1px solid #f0d99c; background:#fdf6e3; color:#5c4300; border-radius:var(--r); padding:12px 16px;
+      font-size:0.86rem; line-height:1.5; margin:0 0 14px; }
+    #panel-campaigns .emc-sg > div{ flex:1; min-width:240px; }
+    #panel-campaigns .emc-sg b{ display:block; }
+    #panel-campaigns .emc-sg.block{ border-color:#f0d6cf; background:#fdf3f1; color:#8a2318; }
+    #panel-campaigns .emc-tgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:16px; margin-top:6px; }
+    #panel-campaigns .emc-tcard{ border:1px solid var(--line); border-radius:10px; background:#fff; padding:10px;
+      display:flex; flex-direction:column; gap:10px; min-width:0; }
+    #panel-campaigns .emc-tthumb{ display:block; width:100%; padding:0; border:0; background:none; cursor:pointer; border-radius:7px; }
+    #panel-campaigns .emc-tthumb:hover .eb-thumb,#panel-campaigns .emc-tthumb:focus-visible .eb-thumb{ box-shadow:0 0 0 2px var(--cheddar); }
+    #panel-campaigns .emc-tname{ font-weight:700; font-size:0.92rem; line-height:1.3; overflow-wrap:anywhere; }
+    #panel-campaigns .emc-tsub{ font-size:0.8rem; color:var(--sub); line-height:1.35; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #panel-campaigns .emc-tmeta{ font-size:0.72rem; color:var(--sub); margin-top:3px; }
+    #panel-campaigns .emc-tact{ display:flex; gap:6px; margin-top:auto; }
+    #panel-campaigns .emc-tact .btn{ flex:1; padding-left:6px; padding-right:6px; }
+    #panel-campaigns .emc-segnote{ font-size:0.78rem; color:var(--sub); margin-top:6px; line-height:1.45; }
+
     @media (max-width:900px){
       #panel-campaigns .emc-editor{ grid-template-columns:1fr; }
       #panel-campaigns .emc-preview{ height:420px; }
@@ -1467,7 +1485,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       <div class="emc-top">
         <div>
           <h2>✉️ Email Campaigns</h2>
-          <div class="hint" style="margin-bottom:0;">Saved templates, one contact list, single or A/B sends through Amazon SES — with per-variant results.</div>
+          <div class="hint" style="margin-bottom:0;">Design emails, choose who gets them, and send single or A/B campaigns through SendGrid, with results for each version.</div>
         </div>
         <div class="chips" id="emcNav">
           <button type="button" class="chip on" data-v="campaigns">Campaigns</button>
@@ -1619,6 +1637,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/email-builder.js?v=1"></script>
 <script>
 const SB_URL = 'https://vdvtrevhqalmjwhjhjug.supabase.co';
 const SB_KEY = 'sb_publishable_LnlevWReed7K8cFk_f_Mxg_UywktQ5_';
@@ -13055,12 +13074,14 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
    vanilla pattern, same as the Cheese Club and Cheese Case tabs.
    Reads/writes go through the signed-in manager's `sb` session (em_* RLS
    allows authenticated); sending goes through the send-campaign-batch
-   edge function, which holds the SES credentials.
+   edge function, which holds the SendGrid key. Templates are built in the
+   visual editor in /email-builder.js (window.EmailBuilder); older templates
+   written as raw HTML still open in the code editor.
    ═══════════════════════════════════════════════════════════════════════ */
 (function(){
   const EMC_FN   = SB_URL + '/functions/v1/send-campaign-batch';
   const FROM_DEF = 'GREYS Fine Cheeses <hello@greyscheese.com>';
-  const BATCH_UI = 150;
+  const BATCH_UI = 500;
 
   let view = 'campaigns';          // campaigns | templates | contacts
   let booted = false;
@@ -13094,6 +13115,80 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     if (/em_\w+.*(does not exist|schema cache)/i.test(m))
       return 'The campaign tables are not in this Supabase project yet — run the campaign schema migration.';
     return m;
+  }
+
+  /* ---------- audiences (em_contact_segments.segment) ---------- */
+  const SEGMENTS = [
+    ['all', 'Everyone subscribed'],
+    ['customers-12mo', 'Ticket buyers from the last 12 months'],
+    ['customers-older', 'Ticket buyers from before that'],
+    ['wix-standard', 'Website sign-ups'],
+    ['wix-legacy', 'Website sign-ups at AOL, Hotmail and other older providers'],
+  ];
+  const segLabel = (k) => (SEGMENTS.find(s => s[0] === (k || 'all')) || SEGMENTS[0])[1];
+  let segCounts = null;
+  async function loadSegCounts(){
+    if (segCounts) return segCounts;
+    const res = await Promise.all(SEGMENTS.map(([k]) => {
+      const q = sb.from('em_contact_segments').select('id', { count:'exact', head:true }).eq('subscribed', true);
+      return k === 'all' ? q : q.eq('segment', k);
+    }));
+    const out = {};
+    SEGMENTS.forEach(([k], i) => { out[k] = res[i].error ? null : (res[i].count || 0); });
+    segCounts = out;
+    return out;
+  }
+  function segOptions(sel){
+    return SEGMENTS.map(([k, l]) => `<option value="${k}"${k === (sel || 'all') ? ' selected' : ''}>${esc2(l)}`
+      + `${segCounts && segCounts[k] != null ? ' (' + num(segCounts[k]) + ')' : ''}</option>`).join('');
+  }
+
+  /* ---------- SendGrid account check, shown above the campaign list ---------- */
+  const SG_FN = SB_URL + '/functions/v1/sendgrid-setup';
+  let sgStatus = null, sgPending = null;
+  function loadSg(force){
+    if (sgStatus && !force) return Promise.resolve(sgStatus);
+    if (!sgPending) sgPending = fetch(SG_FN, { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'status' }) })
+      .then(r => r.json()).catch(() => null)
+      .then(j => { sgPending = null; sgStatus = j && j.ok ? j : null; return sgStatus; });
+    return sgPending;
+  }
+  const sgNoSends = (st) => !!(st && st.credits && typeof st.credits.remain === 'number' && st.credits.remain <= 0);
+  async function paintSg(force){
+    const st = await loadSg(force);
+    const box = $('emcSg');
+    if (!box) return;
+    if (!st) { box.innerHTML = ''; return; }
+    const notes = [];
+    if (!st.key_set || !st.key_works) {
+      notes.push('<div class="emc-sg block"><div><b>SendGrid is not connected.</b>'
+        + (st.key_set ? 'SendGrid turned down the API key. Make a new key in SendGrid and update the SENDGRID_API_KEY secret in Supabase.'
+                      : 'Add the SENDGRID_API_KEY secret in Supabase.') + '</div></div>');
+    } else {
+      if (sgNoSends(st)) notes.push('<div class="emc-sg block"><div><b>Campaigns can’t send yet.</b>'
+        + (st.account && st.account.type === 'free' ? 'SendGrid’s free trial has ended, so the account has no sends left. '
+                                                    : 'The SendGrid account has no sends left this month. ')
+        + 'Essentials 50K ($19.95 a month) covers a weekly email to the whole list. After you upgrade, launch or resume as usual.</div>'
+        + '<a class="btn btn-ghost btn-sm" href="https://app.sendgrid.com/settings/billing" target="_blank" rel="noopener">Open SendGrid billing</a></div>');
+      const hooks = Array.isArray(st.webhooks) && st.webhooks.some(w => w.ours && w.enabled);
+      const dom = Array.isArray(st.domains) && st.domains.some(d => d.domain === 'greyscheese.com' && d.valid && d.default);
+      if (!hooks || !dom) notes.push('<div class="emc-sg"><div><b>Turn on tracking.</b>One click tells SendGrid to report deliveries, opens, clicks, '
+        + 'bounces and unsubscribes back to this page, and signs every email as greyscheese.com.</div>'
+        + '<button type="button" class="btn btn-ghost btn-sm" id="emcSgGo">Turn on tracking</button></div>');
+    }
+    box.innerHTML = notes.join('');
+    if ($('emcSgGo')) $('emcSgGo').onclick = async () => {
+      if (!window.confirm('Turn on tracking?\n\nThis adds a webhook to your SendGrid account that reports deliveries, opens, clicks, '
+        + 'bounces and unsubscribes to the portal, and makes greyscheese.com the default sending domain.')) return;
+      $('emcSgGo').disabled = true; $('emcSgGo').textContent = 'Turning on…';
+      try {
+        const r = await fetch(SG_FN, { method:'POST', headers: authHeaders(), body: JSON.stringify({ action:'finish', confirm:true }) });
+        const j = await r.json().catch(() => ({}));
+        if (!j.ok) throw new Error((j.webhook && j.webhook.error) || (j.domain && j.domain.error) || j.error || ('HTTP ' + r.status));
+        toast('Tracking is on.');
+      } catch (e) { toast('Could not turn on tracking: ' + (e.message || e), true); }
+      paintSg(true);
+    };
   }
 
   /* ---------- data ---------- */
@@ -13133,7 +13228,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   }
 
   function setView(v){
-    view = v; openCampaign = null; draft = null; editTpl = null;
+    view = v; openCampaign = null; draft = null; editTpl = null; segCounts = null;
     document.querySelectorAll('#emcNav .chip').forEach(c => c.classList.toggle('on', c.dataset.v === v));
     render();
   }
@@ -13158,6 +13253,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       </div>`).join('');
 
     box.innerHTML = `
+      <div id="emcSg"></div>
       <div class="section-card">
         <div class="toolbar">
           <h2 style="margin:0;">Campaigns</h2>
@@ -13169,7 +13265,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 
     $('emcNew').onclick = () => {
       if (!templates.length) return toast('Create a template first — Templates tab.', true);
-      draft = { name:'', mode:'single', from_address:FROM_DEF, template_a:'', template_b:'', subject_a:'', subject_b:'' };
+      draft = { name:'', mode:'single', from_address:FROM_DEF, template_a:'', template_b:'', subject_a:'', subject_b:'', segment:'all' };
       render();
     };
     box.querySelectorAll('[data-open]').forEach(n => n.onclick = (ev) => {
@@ -13177,6 +13273,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       openCampaign = campaigns.find(c => c.id === n.dataset.open);
       render();
     });
+    paintSg();
   }
 
   function tplOptions(sel){
@@ -13205,6 +13302,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
               <label class="rec-radio${ab ? '' : ' on'}" data-mode="single"><input type="radio" name="emcmode" />Single email</label>
               <label class="rec-radio${ab ? ' on' : ''}" data-mode="ab"><input type="radio" name="emcmode" />A/B test (50/50)</label>
             </div></div>
+          <div class="rf full"><label>Who gets this</label>
+            <select id="emc_seg">${segOptions(draft.segment)}</select>
+            <div class="emc-segnote">A new SendGrid account earns trust with inboxes as people open. Start with the people most likely to open, like recent ticket buyers, and widen the list over a few sends.</div></div>
           <div class="rf"><label>${ab ? 'Version A template' : 'Template'}</label>
             <select id="emc_ta">${tplOptions(draft.template_a)}</select></div>
           <div class="rf"><label>${ab ? 'Subject A' : 'Subject'}</label>
@@ -13236,7 +13336,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       if ($('emc_tb')) draft.template_b = $('emc_tb').value;
       if ($('emc_sb')) draft.subject_b = $('emc_sb').value.trim();
       testTo = $('emc_test').value.trim();
+      draft.segment = $('emc_seg').value || 'all';
     };
+    if (!segCounts) loadSegCounts().then(() => { const s = $('emc_seg'); if (s) s.innerHTML = segOptions(s.value); }).catch(() => {});
     box.querySelectorAll('[data-mode]').forEach(n => n.onclick = () => {
       grab(); draft.mode = n.dataset.mode; render();
     });
@@ -13254,7 +13356,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
         template_a: draft.template_a,
         template_b: draft.mode === 'ab' ? draft.template_b : null,
         subject_a: draft.subject_a || tplById(draft.template_a)?.subject || '',
-        subject_b: draft.mode === 'ab' ? (draft.subject_b || tplById(draft.template_b)?.subject || '') : null
+        subject_b: draft.mode === 'ab' ? (draft.subject_b || tplById(draft.template_b)?.subject || '') : null,
+        segment: draft.segment || 'all'
       };
       const { data, error } = await sb.from('em_campaigns').insert(row).select().single();
       if (error) return toast(dbErr(error), true);
@@ -13283,8 +13386,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     const camp = openCampaign;
     const { data: s } = await sb.from('em_campaign_stats').select('*').eq('campaign_id', camp.id);
     const stats = (s || []).sort((a, b) => String(a.variant).localeCompare(String(b.variant)));
-    const total = stats.reduce((a, r) => a + r.sent + r.failed + r.queued, 0);
-    const done  = stats.reduce((a, r) => a + r.sent + r.failed, 0);
+    const total = stats.reduce((a, r) => a + r.sent + r.failed + r.queued + (r.skipped || 0), 0);
+    const done  = stats.reduce((a, r) => a + r.sent + r.failed + (r.skipped || 0), 0);
     const p     = total ? Math.round((done / total) * 100) : 0;
 
     const cards = stats.map(r => `
@@ -13292,9 +13395,13 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
         <h3>${camp.mode === 'ab' ? 'Version ' + esc2(r.variant) : 'Results'}</h3>
         <table>
           <tr><td>Sent</td><td>${num(r.sent)}</td></tr>
-          <tr><td>Opens</td><td>${num(r.opens)} <span class="emc-rate">${pct(r.opens, r.sent)}</span></td></tr>
-          <tr><td>Clicks</td><td>${num(r.clicks)} <span class="emc-rate">${pct(r.clicks, r.sent)}</span></td></tr>
+          <tr><td>Delivered</td><td>${num(r.delivered)} <span class="emc-rate">${pct(r.delivered, r.sent)}</span></td></tr>
+          <tr><td>Opens</td><td>${num(r.opens)} <span class="emc-rate">${pct(r.opens, r.delivered || r.sent)}</span></td></tr>
+          <tr><td>Clicks</td><td>${num(r.clicks)} <span class="emc-rate">${pct(r.clicks, r.delivered || r.sent)}</span></td></tr>
           <tr><td>Bounces</td><td>${num(r.bounces)}</td></tr>
+          <tr><td>Unsubscribed</td><td>${num(r.unsubscribes)}</td></tr>
+          <tr><td>Spam reports</td><td>${num(r.complaints)}</td></tr>
+          <tr><td>Skipped, already opted out</td><td>${num(r.skipped)}</td></tr>
           <tr><td>Failed</td><td>${num(r.failed)}</td></tr>
           <tr><td>Still queued</td><td>${num(r.queued)}</td></tr>
         </table>
@@ -13308,14 +13415,14 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
           <span class="pill emc-st-${esc2(camp.status)}">${esc2(camp.status)}</span>
         </div>
         <h2 style="margin-top:6px;">${esc2(camp.name)}</h2>
-        <div class="hint">${camp.mode === 'ab' ? 'A/B test — contacts are split 50/50 by a hash of their email, so the split is stable.' : 'Single email to every subscribed contact.'}
-          From ${esc2(camp.from_address || FROM_DEF)}.</div>
+        <div class="hint">${camp.mode === 'ab' ? 'A/B test — contacts are split 50/50 by a hash of their email, so the split is stable.' : 'Single email.'}
+          Going to: ${esc2(segLabel(camp.segment))}. From ${esc2(camp.from_address || FROM_DEF)}.</div>
         ${camp.status === 'draft' ? `
-          <div class="emc-warn">This has not been sent. Launch queues every subscribed contact — there is no undo.</div>
+          <div class="emc-warn">This has not been sent. Launch queues everyone in “${esc2(segLabel(camp.segment))}” who is still subscribed — there is no undo.</div>
           <div class="row-actions"><button class="btn btn-gold" id="emcLaunch">Launch campaign</button></div>` : ''}
         ${camp.status === 'sending' ? `
           <div class="emc-bar"><div style="width:${p}%"></div></div>
-          <div class="hint" style="margin:6px 0 0;">${num(done)} / ${num(total)} sent (${p}%) — batches of ${BATCH_UI}, about 11 emails a second.</div>
+          <div class="hint" style="margin:6px 0 0;">${num(done)} / ${num(total)} sent (${p}%) — batches of ${BATCH_UI}.</div>
           <div class="row-actions">
             <button class="btn btn-gold" id="emcResume"${sending ? ' disabled' : ''}>${sending ? 'Sending…' : 'Resume sending'}</button>
             <span class="save-msg" style="color:var(--sub);font-weight:400;">Keep this tab open while it sends. If it stops, Resume picks up exactly where it left off — nobody gets a duplicate.</span>
@@ -13331,9 +13438,14 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     if ($('emcRefresh')) $('emcRefresh').onclick = render;
     if ($('emcResume'))  $('emcResume').onclick = runBatches;
     if ($('emcLaunch'))  $('emcLaunch').onclick = async () => {
-      const { count } = await sb.from('em_contacts').select('id', { count:'exact', head:true }).eq('subscribed', true);
-      if (!count) return toast('No subscribed contacts yet — import some on the Contacts tab.', true);
-      if (!window.confirm('Send "' + camp.name + '" to ' + num(count) + ' subscribed contacts?\n\nThis cannot be undone.')) return;
+      const st = await loadSg(true);
+      if (sgNoSends(st)) return toast('SendGrid has no sends left on this account. Upgrade the plan first (see the note on the Campaigns list).', true);
+      let cq = sb.from('em_contact_segments').select('id', { count:'exact', head:true }).eq('subscribed', true);
+      if (camp.segment && camp.segment !== 'all') cq = cq.eq('segment', camp.segment);
+      const { count, error: cErr } = await cq;
+      if (cErr) return toast(dbErr(cErr), true);
+      if (!count) return toast('Nobody in that list is subscribed yet — import contacts on the Contacts tab.', true);
+      if (!window.confirm('Send "' + camp.name + '" to ' + num(count) + ' people (' + segLabel(camp.segment) + ')?\n\nThis cannot be undone.')) return;
       const { error } = await sb.rpc('em_launch_campaign', { p_campaign: camp.id });
       if (error) return toast(dbErr(error), true);
       await render();
@@ -13383,39 +13495,126 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   async function renderTemplates(box){
     if (editTpl) return renderTplEditor(box);
     await loadTemplates();
-    const rows = templates.map(t => `
-      <div class="rec-row" data-tpl="${esc2(t.id)}">
-        <div class="rec-main">
-          <div class="rec-title">${esc2(t.name)}</div>
-          <div class="rec-meta">${esc2(t.subject || 'no default subject')}</div>
+    const EB = window.EmailBuilder;
+    const day = (d) => d ? new Date(d).toLocaleDateString([], { month:'short', day:'numeric' }) : '';
+    const cards = templates.map(t => `
+      <div class="emc-tcard">
+        <button type="button" class="emc-tthumb" data-edit="${esc2(t.id)}" aria-label="Edit ${esc2(t.name)}">${EB ? EB.thumb(t.html) : ''}</button>
+        <div>
+          <div class="emc-tname">${esc2(t.name)}</div>
+          <div class="emc-tsub">${esc2(t.subject || 'No subject yet')}</div>
+          <div class="emc-tmeta">${t.design ? 'Visual editor' : 'HTML code'}${t.updated_at ? ', edited ' + esc2(day(t.updated_at)) : ''}</div>
         </div>
-        <div class="rec-actions"><button class="btn btn-ghost btn-sm" data-tpl="${esc2(t.id)}">Edit</button></div>
+        <div class="emc-tact">
+          <button type="button" class="btn btn-ghost btn-sm" data-edit="${esc2(t.id)}">Edit</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-dup="${esc2(t.id)}" aria-label="Copy ${esc2(t.name)}">Copy</button>
+          <button type="button" class="btn btn-ghost btn-sm" data-del="${esc2(t.id)}" aria-label="Delete ${esc2(t.name)}">Delete</button>
+        </div>
       </div>`).join('');
 
     box.innerHTML = `
       <div class="section-card">
         <div class="toolbar">
-          <h2 style="margin:0;">Saved templates</h2>
+          <h2 style="margin:0;">Templates</h2>
           <div class="spacer"></div>
-          ${(!templates.length && STARTERS.length) ? '<button class="btn btn-ghost btn-sm" id="emcSeed">Load starter templates</button>' : ''}
           <button class="btn btn-gold" id="emcNewTpl">＋ New template</button>
         </div>
-        <div class="rec-list">${rows || '<div class="rec-empty">No templates yet — create one, or load the two cheeseboard starters.</div>'}</div>
+        ${templates.length ? '<div class="emc-tgrid">' + cards + '</div>'
+          : '<div class="rec-empty">No templates yet. Press New template and pick a starting point.</div>'}
       </div>`;
+    if (EB) requestAnimationFrame(() => EB.fitThumbs(box));
 
-    $('emcNewTpl').onclick = () => { editTpl = { name:'', subject:'', html:'' }; render(); };
-    if ($('emcSeed')) $('emcSeed').onclick = async () => {
-      $('emcSeed').disabled = true;
-      const { error } = await sb.from('em_templates').insert(STARTERS.map(s => ({ name:s.name, subject:s.subject, html:s.html })));
-      if (error) { toast(dbErr(error), true); $('emcSeed').disabled = false; return; }
-      toast('Loaded ' + STARTERS.length + ' starter templates.');
-      render();
-    };
-    box.querySelectorAll('[data-tpl]').forEach(n => n.onclick = (ev) => {
-      ev.stopPropagation();
-      editTpl = { ...templates.find(t => t.id === n.dataset.tpl) };
-      render();
+    $('emcNewTpl').onclick = newTemplate;
+    const pick = (id) => templates.find(t => t.id === id);
+    box.querySelectorAll('[data-edit]').forEach(n => n.onclick = () => editTemplate(pick(n.dataset.edit)));
+    box.querySelectorAll('[data-dup]').forEach(n => n.onclick = () => dupTemplate(pick(n.dataset.dup)));
+    box.querySelectorAll('[data-del]').forEach(n => n.onclick = () => delTemplate(pick(n.dataset.del)));
+  }
+
+  function newTemplate(){
+    if (!window.EmailBuilder) return toast('The email editor did not load. Refresh the page and try again.', true);
+    window.EmailBuilder.pickStarter().then(k => { if (k) openBuilder(null, k); });
+  }
+  function editTemplate(t){
+    if (!t) return;
+    if (t.design && window.EmailBuilder) return openBuilder(t);
+    editTpl = { ...t };
+    render();
+  }
+  async function dupTemplate(t){
+    if (!t) return;
+    const { error } = await sb.from('em_templates').insert({
+      name: t.name + ' (copy)', subject: t.subject || '', html: t.html || '', design: t.design || null,
+      preheader: t.preheader || '', updated_at: new Date().toISOString() });
+    if (error) return toast(dbErr(error), true);
+    toast('Copied "' + t.name + '".');
+    render();
+  }
+  async function delTemplate(t){
+    if (!t) return;
+    if (!window.confirm('Delete "' + t.name + '"? Campaigns already sent keep their results.')) return;
+    const { error } = await sb.from('em_templates').delete().eq('id', t.id);
+    if (error) return toast(dbErr(error), true);
+    toast('Template deleted.');
+    render();
+  }
+
+  /* The visual editor. It hands back compiled email HTML plus its block design; both are saved. */
+  function openBuilder(t, starter, over){
+    const o = over || {};
+    window.EmailBuilder.open({
+      id: t ? t.id : null,
+      name: t ? t.name : o.name,
+      subject: t ? (t.subject || '') : o.subject,
+      preheader: t ? (t.preheader || '') : '',
+      design: t ? t.design : null,
+      starter: starter,
+      userEmail: (SESSION && SESSION.user && SESSION.user.email) || '',
+      onSave: builderSave,
+      onClose: () => { if (view === 'templates') render(); },
+      uploadImage: builderUpload,
+      listImages: builderImages,
+      importImage: (u) => window.emcHostImage(u, 'email-assets', 'email-editor'),
+      sendTest: builderTest,
     });
+  }
+  async function builderSave(r){
+    const row = { name: r.name, subject: r.subject, preheader: r.preheader, design: r.design, html: r.html,
+                  updated_at: new Date().toISOString() };
+    const { data, error } = r.id
+      ? await sb.from('em_templates').update(row).eq('id', r.id).select('id').single()
+      : await sb.from('em_templates').insert(row).select('id').single();
+    if (error) throw new Error(dbErr(error));
+    return data;
+  }
+  async function builderUpload(blob){
+    const t = blob.type || 'image/jpeg';
+    const ext = /png/.test(t) ? 'png' : /gif/.test(t) ? 'gif' : /webp/.test(t) ? 'webp' : 'jpg';
+    const path = 'eb/' + new Date().toISOString().slice(0, 10) + '-' + Math.random().toString(36).slice(2, 10) + '.' + ext;
+    const up = await sb.storage.from('email-assets').upload(path, blob, { contentType: t, upsert: false, cacheControl: '31536000' });
+    if (up.error) throw new Error('Upload failed: ' + up.error.message);
+    return sb.storage.from('email-assets').getPublicUrl(path).data.publicUrl;
+  }
+  async function builderImages(){
+    const B = sb.storage.from('email-assets');
+    const out = [];
+    const walk = async (prefix, depth) => {
+      const { data, error } = await B.list(prefix, { limit: 200, sortBy: { column: 'created_at', order: 'desc' } });
+      if (error) throw new Error(error.message);
+      for (const it of data || []) {
+        const path = prefix ? prefix + '/' + it.name : it.name;
+        if (!it.id) { if (depth < 2) await walk(path, depth + 1); continue; }
+        if (/\.(jpe?g|png|gif|webp)$/i.test(it.name)) out.push({ url: B.getPublicUrl(path).data.publicUrl, name: it.name, at: it.created_at || '' });
+      }
+    };
+    await walk('', 0);
+    return out.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  }
+  async function builderTest(m){
+    const r = await fetch(EMC_FN, { method:'POST', headers: authHeaders(),
+      body: JSON.stringify({ test_to: m.to, html: m.html, subject: m.subject, from_address: FROM_DEF }) });
+    const j = await r.json().catch(() => ({}));
+    if (!j.ok) throw new Error(j.error || ('Send failed (HTTP ' + r.status + ')'));
   }
 
   function renderTplEditor(box){
@@ -13424,6 +13623,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
         <div class="toolbar">
           <button class="btn btn-ghost btn-sm" id="emcBack">← All templates</button>
           <div class="spacer"></div>
+          ${editTpl.id ? '<button class="btn btn-ghost btn-sm" id="emcToVisual">Make a visual version</button>' : ''}
           ${editTpl.id ? '<button class="btn btn-wax btn-sm" id="emcDelTpl">Delete</button>' : ''}
         </div>
         <div class="emc-editor">
@@ -13507,6 +13707,15 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     };
 
     $('emcBack').onclick = $('emcCancelTpl').onclick = () => { editTpl = null; render(); };
+    if ($('emcToVisual')) $('emcToVisual').onclick = () => {
+      if (!window.EmailBuilder) return toast('The email editor did not load. Refresh the page and try again.', true);
+      const base = editTpl;
+      window.EmailBuilder.pickStarter().then(k => {
+        if (!k) return;
+        editTpl = null;
+        openBuilder(null, k, { name: base.name + ' (visual)', subject: base.subject || '' });
+      });
+    };
     if ($('emcDelTpl')) $('emcDelTpl').onclick = async () => {
       if (!window.confirm('Delete "' + editTpl.name + '"? Campaigns already sent keep their results.')) return;
       const { error } = await sb.from('em_templates').delete().eq('id', editTpl.id);
@@ -13601,6 +13810,11 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     if (booted) return;
     booted = true;
     document.querySelectorAll('#emcNav .chip').forEach(c => c.onclick = () => setView(c.dataset.v));
+    let rt;
+    window.addEventListener('resize', () => {
+      clearTimeout(rt);
+      rt = setTimeout(() => { if (view === 'templates' && window.EmailBuilder) window.EmailBuilder.fitThumbs(el()); }, 150);
+    });
     render();
   };
 })();
