@@ -16698,7 +16698,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
         "key": "table",
         "on": true,
         "label": "Reserve a table",
-        "sub": "Lunch, dinner or a glass of wine, for up to 5",
+        "sub": "Lunch, dinner or a glass of wine, for up to 6",
         "title": "Reserve a table",
         "lede": "Book a table in Memphis, or request one in Nashville.",
         "msg_label": "Anything we should know?",
@@ -16711,7 +16711,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
         "label": "Book a Dine In Experience",
         "sub": "Fondue, raclette, tastings and more",
         "title": "Ask about an experience",
-        "lede": "Pick an experience, then a date and a time. We hold it for 48 hours while we answer you.",
+        "lede": "Pick an experience and a date. We'll check it and get right back to you.",
         "msg_label": "Your question",
         "msg_hint": "Extras, a surprise, timing — anything else we should know",
         "questions": [
@@ -16787,9 +16787,24 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
             "required": true,
             "on": true,
             "options": [
-              "Big party (6 or more)",
+              "Big party (7 or more)",
               "Private event / buyout",
               "Workshop or class for my group",
+              "Not sure yet"
+            ]
+          },
+          {
+            "id": "budget",
+            "label": "Do you have a budget in mind?",
+            "hint": "",
+            "kind": "one",
+            "required": false,
+            "on": true,
+            "options": [
+              "Under $500",
+              "$500 – $1,000",
+              "$1,000 – $2,500",
+              "Over $2,500",
               "Not sure yet"
             ]
           },
@@ -16871,10 +16886,10 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   var KEY = 'inquiry_form';
   var KIND_NAMES = { one:'Buttons — pick one', many:'Buttons — pick any', text:'Short typed answer', long:'Long typed answer' };
   var BUILT_IN = {
-    table: 'Built in: which shop, guests (1 to 5), date and time, then name, email, phone and a note. Memphis books the table on the spot (it lands in Wix reservations and they get a confirmation email). Nashville sends a request to 💼 Catering Leads tagged Table request. Questions you add here show on a "A few details" screen.',
-    experience: 'Built in: which experience (and tasting), shop, guests, date and time (held 48 h in Memphis), the address for Raclette at Home, then name, email, phone and a message. Shows in 💼 Catering Leads tagged Experience. The questions below share one "A few details" screen.',
+    table: 'Built in: which shop, guests (1 to 6), date and time, then name, email, phone and a note. Memphis books the table on the spot (it lands in Wix reservations and they get a confirmation email). Nashville sends a request to 💼 Catering Leads tagged Table request. Questions you add here show on a "A few details" screen.',
+    experience: 'Built in: which experience (and tasting), shop, guests and the date they would like — a date request, nothing is booked or held (since 2026-10-30) — the address for Raclette at Home, then name, email, phone and a message. Shows in 💼 Catering Leads tagged Experience. The questions below share one "A few details" screen.',
     catering: 'Built in: shop and pickup / delivery / on site / off site (plus the address), then guests, date and time, then the interest buttons (Greysing Table, Charcuterie board, Private event, Sandwiches / box lunches), name, email, phone and a message. Goes to 💼 Catering Leads. The questions below show under the date on the second screen.',
-    event: 'Built in: shop, guests, date and time (12–2, 4–7 or other), then name, email, phone and a message. Goes to 💼 Catering Leads tagged Private event, so it can get a proposal and an invoice. The questions below share one "A few details" screen.'
+    event: 'Built in: shop, guests, date and a start time (12:00 to 7:00), then name, email, phone and a message. Goes to 💼 Catering Leads tagged Private event, so it can get a proposal and an invoice. The questions below share one "A few details" screen.'
   };
   var STAGING = /staging/i.test(location.hostname);
   var FORM_SITE = STAGING ? 'https://ticket-rennet.onrender.com/inquiry' : 'https://tickets.greyscheese.com/inquiry';
@@ -16896,7 +16911,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   function draw(){
     var root = $('iqfEdit'); if(!root) return;
     var f = st.form, t = cur(), ti = f.types.indexOf(t), o = [];
-    o.push('<div class="iqf-box"><h3>Opening question</h3><div class="hint">The first screen, over the photo, before they pick a kind of inquiry. Skipped when only one kind is switched on.</div><div class="iqf-grid">'
+    o.push('<div class="iqf-box"><h3>Opening question</h3><div class="hint">The first screen. Greysie asks it in her speech bubble, before they pick a kind of inquiry. Skipped when only one kind is switched on.</div><div class="iqf-grid">'
       + text('Page heading','heading',f.heading,{max:80})
       + text('The question','ask',f.ask,{max:80})
       + text('Intro line','lede',f.lede,{full:true,area:true,max:300}) + '</div></div>');
@@ -16928,7 +16943,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
         + text('Question','q.'+i+'.label',q.label,{max:120})
         + '<div><label class="f">Answer type</label><select data-p="q.'+i+'.kind">'
         + FORM_KINDS.map(function(k){ return '<option value="'+k+'"'+(q.kind===k?' selected':'')+'>'+KIND_NAMES[k]+'</option>'; }).join('') + '</select></div>'
-        + (btn ? '<div class="iqf-full"><label class="f">Choices — one per line</label><textarea data-p="q.'+i+'.options" style="min-height:'+Math.max(64, 22*(q.options.length+1)+18)+'px">'+h(q.options.join('\n'))+'</textarea></div>' : '')
+        + (btn ? '<div class="iqf-full"><label class="f">Choices — one per line (a choice starting “Something else” or “Other” opens a box to type in)</label><textarea data-p="q.'+i+'.options" style="min-height:'+Math.max(64, 22*(q.options.length+1)+18)+'px">'+h(q.options.join('\n'))+'</textarea></div>' : '')
         + text('Helper line under the question (optional)','q.'+i+'.hint',q.hint,{full:true,max:300})
         + '</div><div class="iqf-row">'
         + '<label class="iqf-check"><input type="checkbox" data-p="q.'+i+'.required"'+(q.required?' checked':'')+'> Required</label>'
