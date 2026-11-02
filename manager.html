@@ -672,7 +672,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
   <div id="panel-events" class="panel">
     <div class="section-card">
       <h2>🎉 Events</h2>
-      <div class="hint">Manual events shown on the staff portal — private parties, buyouts, happenings that don't sell tickets. "Block during event" closes Wix online reservations from <strong>1 hr before the start time until the end time</strong> at that location; "Block all day" closes the whole date. Ticketed classes &amp; events live under <strong>Tickets &amp; Classes</strong>.</div>
+      <div class="hint">Manual events shown on the staff portal — private parties, buyouts, happenings that don't sell tickets. "Block during event" closes Wix online reservations from <strong>the hours you set before the start time (1 hr unless you change it) until the end time</strong> at that location; "Block all day" closes the whole date. Ticketed classes &amp; events live under <strong>Tickets &amp; Classes</strong>.</div>
       <div class="toolbar">
         <div class="chips" id="evChips"></div>
         <div class="spacer"></div>
@@ -1740,7 +1740,7 @@ async function thRenderPicker(el, opts){
       +'<b>'+esc(t.name)+'</b><span>'+(busy ? 'taken · '+esc(t.busy[0].who) : t.seatsMax+' seats')+'</span></label>';
   }).join('') + '</div>';
   const free = tables.filter(t=>!(t.busy||[]).length).length;
-  html += '<div class="th-note">'+free+' of '+tables.length+' tables free for this time'+(r.data.unassigned ? ' · '+r.data.unassigned+' booking(s) with no table assigned yet' : '')+'. Held from 1½ hrs before start to 1 hr after the end.</div>';
+  html += '<div class="th-note">'+free+' of '+tables.length+' tables free for this time'+(r.data.unassigned ? ' · '+r.data.unassigned+' booking(s) with no table assigned yet' : '')+'. Held '+esc(thFmtTime(opts.start))+' – '+esc(thFmtTime(opts.end))+'.</div>';
   if(r.data.mode && r.data.mode !== 'ON'){
     html += '<div class="th-note th-bad">⚠️ This location\'s Wix is set to <b>in-house table assignment</b>, so online bookings are not checked against tables. The hold shows on your floor, but to stop online guests too, turn on Table Management in Wix (Settings → Table Reservations → Tables) or use “Block during event”.</div>';
   }
@@ -2837,6 +2837,8 @@ const SCHEMA = {
         names:{ live:'Show on the staff portal', archived:'📦 Archived (hidden)' }},
       {k:'blockScope', label:'🚫 Wix reservations', type:'radio', full:true, options:['none','window','day','tables'],
         names:{ none:'Do not block', window:'Block during event', day:'Block all day', tables:'🍽 Block tables' }},
+      {k:'blockBefore', label:'⏱ Hours before the event to start blocking', type:'number', ph:'1', attrs:'step="0.5" min="0" max="24" inputmode="decimal"',
+        showIf:v=>v.blockScope==='window' || v.blockScope==='tables'},
       {k:'blockGuests', label:'Guests (Wix picks the tables)', type:'number', ph:'e.g. 12', showIf:v=>v.blockScope==='tables'},
       {k:'blockTables', label:'…or pick the exact tables', type:'tables', full:true, showIf:v=>v.blockScope==='tables'},
       {k:'body', label:'Details', type:'textarea', full:true, ph:'Details shown on the portal'}
@@ -2849,11 +2851,14 @@ const SCHEMA = {
       : (r.blockScope==='window' && (!r.time || !r.blockTo)) ? 'To block during the event, set the start and end times.'
       : (r.blockScope==='tables' && (!r.time || !r.blockTo)) ? 'To block tables, set the start and end times.'
       : (r.blockScope==='tables' && !r.blockTables && !(Number(r.blockGuests)>0)) ? 'Pick the tables to hold, or enter a guest count.'
+      : ((r.blockScope==='window' || r.blockScope==='tables') && String(r.blockBefore==null?'':r.blockBefore).trim()!==''
+          && !(Number(r.blockBefore)>=0 && Number(r.blockBefore)<=24)) ? 'Hours before the event must be a number from 0 to 24.'
       : '',
     map:r=>({ id:r.id, type:'event', title:r.title, date:r.date||'', time:(r.time||'').slice(0,5), endDate:r.end_date||'',
       repeat:r.repeat||'none', repeatUntil:r.repeat_until||'', body:r.body||'', location:r.location||'memphis',
       blockScope:r.block_scope||'none', blockTo:(r.block_to||'').slice(0,5), status:r.status||'none',
       blockTables:(r.block_tables||[]).join(','), blockGuests:r.block_guests||'',
+      blockBefore:r.block_before_min!=null ? String(+(r.block_before_min/60).toFixed(2)) : '',
       archived:r.archived===true?'archived':'live' }),
     rowTitle:r=>r.title,
     rowTags:r=>'<span class="tag tag-event">event</span>'
@@ -2869,8 +2874,8 @@ const SCHEMA = {
       if(r.time) bits.push('🕐 '+r.time+(r.blockTo?'–'+r.blockTo:''));
       if(r.repeat && r.repeat!=='none') bits.push('↻ '+r.repeat+(r.repeatUntil?' until '+fmtDisplay(r.repeatUntil):''));
       if(r.blockScope==='day') bits.push('🚫 Wix blocked all day');
-      else if(r.blockScope==='window') bits.push('🚫 Wix blocked during event');
-      else if(r.blockScope==='tables') bits.push('🍽 Wix tables held'+(r.blockGuests?' for '+esc(r.blockGuests)+' guests':''));
+      else if(r.blockScope==='window') bits.push('🚫 Wix blocked during event, '+blockBeforeLabel(staffBeforeMin(r)));
+      else if(r.blockScope==='tables') bits.push('🍽 Wix tables held'+(r.blockGuests?' for '+esc(r.blockGuests)+' guests':'')+', '+blockBeforeLabel(staffBeforeMin(r)));
       if(r.body) bits.push(esc(r.body.length>100 ? r.body.slice(0,100)+'…' : r.body));
       return bits.join(' &nbsp;·&nbsp; ');
     },
@@ -3038,7 +3043,7 @@ function openRec(kind, row){
     } else if(f.type==='textarea'){
       input = '<textarea id="rec-f-'+f.k+'"'+(f.ph?' placeholder="'+esc(f.ph)+'"':'')+'>'+esc(v)+'</textarea>';
     } else {
-      input = '<input type="'+f.type+'" id="rec-f-'+f.k+'" value="'+esc(v)+'"'+(f.ph?' placeholder="'+esc(f.ph)+'"':'')+'>';
+      input = '<input type="'+f.type+'" id="rec-f-'+f.k+'" value="'+esc(v)+'"'+(f.ph?' placeholder="'+esc(f.ph)+'"':'')+(f.attrs?' '+f.attrs:'')+'>';
     }
     return '<div class="rf'+(f.full?' full':'')+'" id="rec-w-'+f.k+'"><label>'+f.label+'</label>'+input+'</div>';
   }).join('');
@@ -3046,10 +3051,13 @@ function openRec(kind, row){
   // only when blocking a window, "Repeat until" only when repeating)
   document.querySelectorAll('#recFields select, #recFields input').forEach(el=>{
     el.addEventListener('change', recApplyVisibility);
-    if(kind==='events' && ['rec-f-date','rec-f-time','rec-f-blockTo','rec-f-location'].includes(el.id)){
+    if(kind==='events' && ['rec-f-date','rec-f-time','rec-f-blockTo','rec-f-location','rec-f-blockBefore'].includes(el.id)){
       el.addEventListener('change', ()=>{ const l=document.querySelector('#rec-f-blockTables .th-list'); if(l && l.dataset.loaded) thRecLoad(); });
     }
   });
+  // ⏱ "hours before": a saved value stays put; otherwise the box follows the chosen block's default until typed in
+  const hb = kind==='events' ? document.getElementById('rec-f-blockBefore') : null;
+  if(hb){ if(hb.value!=='') hb.dataset.touched='1'; hb.addEventListener('input', ()=>{ hb.dataset.touched='1'; }); }
   recApplyVisibility();
   document.getElementById('recDelBtn').style.display = row?'inline-block':'none';
   document.getElementById('recModal').style.display='flex';
@@ -3082,6 +3090,14 @@ function recApplyVisibility(){
   if(!REC_CTX) return;
   const S = SCHEMA[REC_CTX.kind];
   const vals = recFieldVals();
+  // ⏱ until someone types an amount, "hours before" shows the default for the chosen block (1 hr during / 1.5 hr tables)
+  if(REC_CTX.kind==='events'){
+    const hb = document.getElementById('rec-f-blockBefore');
+    if(hb && !hb.dataset.touched && (vals.blockScope==='window' || vals.blockScope==='tables')){
+      hb.value = String(staffBeforeMin({ blockScope: vals.blockScope })/60);
+      vals.blockBefore = hb.value;
+    }
+  }
   S.fields.forEach(f=>{
     if(!f.showIf) return;
     const wrap = document.getElementById('rec-w-'+f.k);
@@ -3098,14 +3114,29 @@ function recApplyVisibility(){
     if(list && !list.dataset.loaded && !list.dataset.tried && vals.date && vals.time && vals.blockTo){ list.dataset.tried='1'; thRecLoad(); }
   }
 }
-// table holds run 1.5 hr before start → 1 hr after the end (next day if it wraps)
+// table holds run 1.5 hr before start (or the event's own "hours before") → 1 hr after the end (next day if it wraps)
 const TH_BEFORE_MIN = 90, TH_AFTER_MIN = 60;
+// "Block during event" closes online reservations 1 hr before the start unless the event says otherwise
+const WIX_BEFORE_MIN = 60;
+// ⏱ minutes before the start that a staff event's Wix block / table hold begins:
+// its own "hours before" if set, else the default for its block type (2026-11-02)
+function staffBeforeMin(v){
+  const h = String(v && v.blockBefore!=null ? v.blockBefore : '').trim(), n = Number(h);
+  if(h!=='' && isFinite(n) && n>=0) return Math.min(1440, Math.round(n*60));
+  return v && v.blockScope==='tables' ? TH_BEFORE_MIN : WIX_BEFORE_MIN;
+}
+function blockBeforeLabel(min){
+  min = Math.max(0, Math.round(Number(min)||0));
+  if(!min) return 'from the start';
+  const h = +(min/60).toFixed(2);
+  return 'from '+(min<60 ? min+' min' : h+' hr'+(h===1?'':'s'))+' before';
+}
 // hold window for staff events
 function thStaffWindow(v){
   if(!v.date || !v.time || !v.blockTo) return null;
   const s0 = new Date(v.date+'T'+v.time+':00');
   let e0 = new Date(v.date+'T'+v.blockTo+':00'); if(e0 <= s0) e0 = new Date(e0.getTime() + 86400000);
-  const start = new Date(s0.getTime() - TH_BEFORE_MIN*60000), end = new Date(e0.getTime() + TH_AFTER_MIN*60000);
+  const start = new Date(s0.getTime() - staffBeforeMin({ blockScope:'tables', blockBefore:v.blockBefore })*60000), end = new Date(e0.getTime() + TH_AFTER_MIN*60000);
   if(isNaN(start.getTime()) || isNaN(end.getTime())) return null;
   return { start:start.toISOString(), end:end.toISOString() };
 }
@@ -3146,6 +3177,15 @@ async function recSave(){
       if(error){ document.getElementById('recErr').textContent = '❌ Saved, but "On the schedule" didn’t: '+error.message; if(!wasId) REC_CTX.id = empId; return; }
     }
   }
+  if(kind==='events'){
+    // ⏱ hours before the event that the Wix block starts (2026-11-02) — portal-api's item row doesn't carry it
+    const evId = wasId || (r.data && r.data.id) || null;
+    const mins = (payload.blockScope==='window' || payload.blockScope==='tables') ? staffBeforeMin(payload) : null;
+    if(evId){
+      const { error } = await sb.rpc('portal_item_set_block_before', { p_id: evId, p_min: mins });
+      if(error){ document.getElementById('recErr').textContent = '❌ Saved, but "hours before" didn’t: '+error.message; if(!wasId) REC_CTX.id = evId; return; }
+    }
+  }
   recClose();
   msg(kind, '✅ Saved.', false);
   await loadKind(kind);
@@ -3161,14 +3201,14 @@ async function recSave(){
       // portal-api stores block_scope 'tables' only after table-holds confirms the hold,
       // so sync from what was just typed, not from the reloaded row
       await staffEventSyncBlock(Object.assign({}, rec, { blockScope: payload.blockScope,
-        blockTables: payload.blockTables, blockGuests: payload.blockGuests }), prevRow);
+        blockTables: payload.blockTables, blockGuests: payload.blockGuests, blockBefore: payload.blockBefore }), prevRow);
       if(payload.blockScope==='tables' || (prevRow && prevRow.blockScope==='tables')) await loadKind('events');
     }
   }
 }
 
 /* Wix block sync for staff-portal events: comment key "[EVT-P:<portal_items id>]".
-   window = start time − 1 hr → "block until" (next day if it wraps midnight);
+   window = start time − the event's "hours before" (default 1 hr) → "block until" (next day if it wraps midnight);
    day = local midnight → midnight. Repeating events only block the base date. */
 async function staffEventSyncBlock(rec, prevRow){
   try{
@@ -3181,7 +3221,7 @@ async function staffEventSyncBlock(rec, prevRow){
         end = new Date(start.getTime() + 86400000);
       } else {
         start = new Date(rec.date+'T'+rec.time+':00');
-        start = new Date(start.getTime() - 3600000); // 1 hr setup buffer
+        start = new Date(start.getTime() - staffBeforeMin(rec)*60000); // ⏱ the event's hours before (default 1 hr)
         end = new Date(rec.date+'T'+rec.blockTo+':00');
         if(end <= start) end = new Date(end.getTime() + 86400000); // wraps past midnight
       }
@@ -4481,11 +4521,13 @@ const eventFromRow = (r) => ({
   // "event_tabled" (tables: class-style grouping capped at party size).
   kind: r.kind || (r.party_size > 1 ? "event_tabled" : "class"),
   location: r.location || "Memphis",
-  // Wix online-reservation block: 'none' | 'window' (1hr before → end) | 'day' (whole date)
+  // Wix online-reservation block: 'none' | 'window' (hours before → end) | 'day' (whole date)
   blockScope: r.block_scope || (r.block_resys ? "window" : "none"),
   // 'tables' scope: Wix table ids to hold, or a guest count Wix seats itself
   blockTables: r.block_tables || [],
   blockGuests: r.block_guests || null,
+  // ⏱ minutes before the start that the block / table hold begins (null = 1 hr window, 1.5 hr tables)
+  blockBeforeMin: r.block_before_min == null ? null : Number(r.block_before_min),
   archived: !!r.archived, // hidden from the dashboard's default views
   // Artwork shown on the ticket site's class card. Always a hosted copy in the
   // social-assets bucket — a raw Canva export URL dies within hours.
@@ -4495,20 +4537,20 @@ const eventFromRow = (r) => ({
   featured: r.featured === true,
 });
 // "Block tables" picker for ticketed events: shows the Wix floor for the
-// event window (1 hr before start → end) and lets the manager tick tables,
+// hold window ("hours before" the start → 1 hr after the end) and lets the manager tick tables,
 // or type a guest count and let Wix choose. Holds are made on Save.
-function TableHoldPicker({ location, date, time, durationMin, eventId, value, onChange, guests, onGuests }) {
+function TableHoldPicker({ location, date, time, durationMin, beforeMin, eventId, value, onChange, guests, onGuests }) {
   const box = useRef(null);
   const [msg, setMsg] = useState("");
   const load = () => {
     if (!date || !time) { setMsg("Set the date and start time first."); return; }
     setMsg("");
-    const w = thTableWindow({ date, time, durationMin });
+    const w = thTableWindow({ date, time, durationMin, blockBeforeMin: beforeMin });
     if (!w || typeof thRenderPicker !== "function") return;
     thRenderPicker(box.current, { location, start: w.start, end: w.end, source: "event", sourceId: eventId,
       selected: value || [], onChange: (ids) => onChange(ids) });
   };
-  useEffect(() => { load(); /* reload when the time or shop changes */ }, [location, date, time, durationMin]);
+  useEffect(() => { load(); /* reload when the time, shop or hours before change */ }, [location, date, time, durationMin, beforeMin]);
   return (
     <div style={{ margin: "6px 0 12px" }}>
       <label className="cc-label">Guests (Wix picks the tables)</label>
@@ -4539,17 +4581,31 @@ const eventToRow = (ev) => ({
   block_resys: ev.blockScope === "window" || ev.blockScope === "day", // kept in sync for older rows/queries
   block_tables: ev.blockScope === "tables" ? (ev.blockTables || []) : [],
   block_guests: ev.blockScope === "tables" && Number(ev.blockGuests) > 0 ? Number(ev.blockGuests) : null,
+  block_before_min: ev.blockScope === "window" || ev.blockScope === "tables" ? cleanBeforeMin(ev.blockBeforeMin) : null,
   archived: !!ev.archived,
   image_url: ev.imageUrl || null,
   featured: ev.featured === true,
 });
 // ── Wix online-reservation blocks (via the console's portal-api helper) ──
 // When an event has a blockScope, close the Wix reservation widget for the
-// event window (1 hr before start → end) or the whole day, at the event's
+// event window (the event's "hours before" the start, default 1 hr → end) or the whole day, at the event's
 // location. Uses the
 // global fn() + WIX_LOCS from the console shell. Comment convention
 // "[EVT:<id>] Title" lets edits replace and deletes remove their own block.
-const WIX_BLOCK_BUFFER_MIN = 60;
+const WIX_BLOCK_BUFFER_MIN = 60; // default "hours before" for Block during the event
+const TABLE_HOLD_BEFORE_MIN = 90; // default "hours before" for Block tables (TH_BEFORE_MIN in the shell)
+// ⏱ a stored "minutes before" value, or null when it isn't a usable number (2026-11-02)
+const cleanBeforeMin = (m) => {
+  if (m === null || m === undefined || String(m).trim() === "") return null;
+  const n = Math.round(Number(m));
+  return Number.isFinite(n) ? Math.max(0, Math.min(1440, n)) : null;
+};
+// minutes before the start that the block / hold begins: the event's own setting, else the default for the block type
+const blockBeforeMinFor = (ev, scope) => {
+  const m = cleanBeforeMin(ev && ev.blockBeforeMin);
+  if (m != null) return m;
+  return (scope || (ev && ev.blockScope)) === "tables" ? TABLE_HOLD_BEFORE_MIN : WIX_BLOCK_BUFFER_MIN;
+};
 const wixLocIdFor = (loc) => {
   try { return WIX_LOCS[String(loc || "").trim().toLowerCase()] || null; } catch (_) { return null; }
 };
@@ -4564,17 +4620,17 @@ const wixBlockWindow = (ev) => {
   if (!ev.time) return null;
   const start = new Date(ev.date + "T" + ev.time + ":00");
   if (isNaN(start.getTime())) return null;
-  const from = new Date(start.getTime() - WIX_BLOCK_BUFFER_MIN * 60000);
+  const from = new Date(start.getTime() - blockBeforeMinFor(ev, "window") * 60000);
   const to = new Date(start.getTime() + (Number(ev.durationMin) || 120) * 60000);
   return { start: from.toISOString(), end: to.toISOString() };
 };
-// table holds: 1.5 hr before start → 1 hr after the end (TH_BEFORE_MIN / TH_AFTER_MIN in the shell)
+// table holds: the event's "hours before" (default 1.5 hr) before start → 1 hr after the end (TH_AFTER_MIN in the shell)
 const thTableWindow = (ev) => {
   if (!ev || !ev.date || !ev.time) return null;
   const s0 = new Date(ev.date + "T" + ev.time + ":00");
   if (isNaN(s0.getTime())) return null;
   const e0 = new Date(s0.getTime() + (Number(ev.durationMin) || 120) * 60000);
-  return { start: new Date(s0.getTime() - 90 * 60000).toISOString(), end: new Date(e0.getTime() + 60 * 60000).toISOString() };
+  return { start: new Date(s0.getTime() - blockBeforeMinFor(ev, "tables") * 60000).toISOString(), end: new Date(e0.getTime() + 60 * 60000).toISOString() };
 };
 const syncWixBlock = async (ev, prev) => {
   try {
@@ -8848,6 +8904,17 @@ function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
   );
   const [blockTables, setBlockTables] = useState(ev?.blockTables || []);
   const [blockGuests, setBlockGuests] = useState(ev?.blockGuests ? String(ev.blockGuests) : "");
+  // ⏱ hours before the start that the block / table hold begins. null = not typed yet, so the box
+  // shows the default for the chosen block (1 hr during, 1.5 hr tables). Saved as minutes.
+  const [blockBefore, setBlockBefore] = useState(
+    ev && cleanBeforeMin(ev.blockBeforeMin) != null ? String(+(cleanBeforeMin(ev.blockBeforeMin) / 60).toFixed(2)) : null
+  );
+  const blockBeforeShown = blockBefore != null ? blockBefore : String(blockBeforeMinFor(null, blockScope) / 60);
+  const blockBeforeNum = Number(blockBeforeShown);
+  const blockBeforeBlank = String(blockBeforeShown).trim() === "";
+  const blockBeforeOk = blockBeforeBlank || (Number.isFinite(blockBeforeNum) && blockBeforeNum >= 0 && blockBeforeNum <= 24);
+  const blockBeforeMin = !blockBeforeBlank && blockBeforeOk ? Math.round(blockBeforeNum * 60) : blockBeforeMinFor(null, blockScope);
+  const hrsTxt = (m) => +(m / 60).toFixed(2) + (m === 60 ? " hr" : " hrs");
   const [err, setErr] = useState("");
   // Class artwork. imageUrl is always a hosted URL; imageIn is whatever the
   // user pasted (usually a Canva share/export link) before it's imported.
@@ -8982,6 +9049,10 @@ function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
       setErr("Block tables: pick the tables to hold, or enter a guest count.");
       return;
     }
+    if ((blockScope === "window" || blockScope === "tables") && !blockBeforeOk) {
+      setErr("Hours before the start must be a number from 0 to 24.");
+      return;
+    }
     const base = {
       title: title.trim(),
       blurb: blurb.trim(),
@@ -8999,6 +9070,7 @@ function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
       blockScope,
       blockTables: blockScope === "tables" ? blockTables : [],
       blockGuests: blockScope === "tables" && Number(blockGuests) > 0 ? Number(blockGuests) : null,
+      blockBeforeMin: blockScope === "window" || blockScope === "tables" ? blockBeforeMin : null,
       archived: ev ? !!ev.archived : false,
       imageUrl,
     };
@@ -9054,16 +9126,38 @@ function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
         onChange={(e) => setBlockScope(e.target.value)}
       >
         <option value="none">Keep taking online reservations (no block)</option>
-        <option value="window">🚫 Block during the {noun} only (1 hr before start → end)</option>
+        <option value="window">🚫 Block during the {noun} only ({hrsTxt(blockScope === "window" ? blockBeforeMin : WIX_BLOCK_BUFFER_MIN)} before start → end)</option>
         <option value="day">🚫 Block the whole day — entire restaurant, midnight to midnight</option>
         <option value="tables">🍽 Block tables only — book them in Wix like a reservation, rest of the room stays open</option>
       </select>
+      {(blockScope === "window" || blockScope === "tables") && (
+        <div className="cc-block-before">
+          <label className="cc-label">⏱ Hours before the {noun} to start blocking</label>
+          <input
+            className="cc-input"
+            type="number"
+            min="0"
+            max="24"
+            step="0.5"
+            inputMode="decimal"
+            value={blockBeforeShown}
+            onChange={(e) => setBlockBefore(e.target.value)}
+            onBlur={() => { if (blockBefore != null && String(blockBefore).trim() === "") setBlockBefore(null); }}
+          />
+          <p className="cc-hint">
+            {blockScope === "tables"
+              ? "Tables are held from this many hours before the start until 1 hr after the end."
+              : "Online reservations close this many hours before the start and open again when it ends."}
+          </p>
+        </div>
+      )}
       {blockScope === "tables" && (
         <TableHoldPicker
           location={location}
           date={dates.find(Boolean) || ""}
           time={time}
           durationMin={Number(duration) || 90}
+          beforeMin={blockBeforeMin}
           eventId={ev ? ev.id : ""}
           value={blockTables}
           onChange={setBlockTables}
