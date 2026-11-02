@@ -24,6 +24,15 @@
 //   my-hours {login_id} — PUBLIC (staff portal "My Hours" tile, 2026-11-01): that employee's Square clock-ins for this
 //          week and last week (Square workweek = Monday 00:00 Chicago), today, and the open timecard if they're on the clock.
 //          Same trust level as the rest of the portal: the employee ID is the key. Hours only — never wages.
+//   TIME FIXES (2026-11-02): staff ask from My Hours to fix a clock-in (wrong times / forgot to clock out) or add a missed
+//          shift; a manager approves in manager.html (Staff → Time Off & Swaps) and the times are written into Square.
+//     fix-request {login_id, timecard_id? | date, start "HH:MM", end "HH:MM", note, job?, location_id?} — PUBLIC (employee ID)
+//       still_on: true (open clock-in only) = move just the clock-in; the clock-out stays whatever Square has at approval
+//     fix-cancel {login_id, id} — PUBLIC, their own pending ask
+//     fix-list {status:"pending"|"all"} · fix-decide {id, approve, note, dry?} — managers (is_app_admin) / service
+//     fix-selftest — service only: create → edit → read → delete a timecard in the Square SANDBOX (checks the write shapes)
+//     Table public.portal_time_fixes (service-role only). Only this week and last week; never in the future; ≤ 16 h;
+//     breaks must stay inside the new times; no overlap with their other clock-ins. Decisions text + email the employee.
 // Deploy with verify_jwt = FALSE — Square posts here with no Supabase JWT. Auth is done in code.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -45,6 +54,10 @@ const SUB_NAME = "square_team_webhook_id";
 const LABOR_VERSION = "2025-05-21"; // Timecards API (Square renamed Shifts → Timecards); falls back to the old Shifts search
 const TZ = "America/Chicago";       // both shops
 const LOC_NAME: Record<string, string> = { LCXWZ0HAQ69RM: "Memphis", LJ33VDYHS1JAR: "Nashville" };
+const LOC_ID: Record<string, string> = { memphis: "LCXWZ0HAQ69RM", nashville: "LJ33VDYHS1JAR" };
+const SANDBOX_TOKEN = Deno.env.get("SQUARE_EXP_SANDBOX_ACCESS_TOKEN") ?? "";
+const SANDBOX_LOCATION = Deno.env.get("SQUARE_EXP_SANDBOX_LOCATION_ID") ?? "";
+type Env = "production" | "sandbox";
 
 class PublicError extends Error {
   status: number;
@@ -114,12 +127,14 @@ async function setSecret(name: string, value: string) {
 }
 
 // ---------- Square ----------
-async function sq(path: string, init: RequestInit = {}, version = SQUARE_VERSION) {
-  if (!SQUARE_TOKEN) throw new Error("Square access token is not set");
-  const res = await fetch(SQUARE_BASE + path, {
+const sq = (path: string, init: RequestInit = {}, version = SQUARE_VERSION) => sqx("production", path, init, version);
+async function sqx(env: Env, path: string, init: RequestInit = {}, version = SQUARE_VERSION) {
+  const token = env === "sandbox" ? SANDBOX_TOKEN : SQUARE_TOKEN;
+  if (!token) throw new Error(`Square ${env} access token is not set`);
+  const res = await fetch((env === "sandbox" ? "https://connect.squareupsandbox.com" : SQUARE_BASE) + path, {
     ...init,
     signal: AbortSignal.timeout(20_000),
-    headers: { Authorization: "Bearer " + SQUARE_TOKEN, "Content-Type": "application/json", "Square-Version": version },
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json", "Square-Version": version },
   });
   const data: any = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -387,7 +402,7 @@ const partsFmt = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hourCycle: "h2
 function offsetMin(d: Date) {
   const p = partsFmt.formatToParts(d);
   const g = (t: string) => Number(p.find((x) => x.type === t)?.value ?? 0);
-  return (Date.UTC(g("year"), g("month") - 1, g("day"), g("hour"), g("minute"), g("second")) - d.getTime()) / 60000;
+  return Math.round((Date.UTC(g("year"), g("month") - 1, g("day"), g("hour"), g("minute"), g("second")) - d.getTime()) / 60000);   // whole minutes (a time with milliseconds would leave a fraction)
 }
 function midnight(day: string) {           // 00:00 in Chicago on YYYY-MM-DD
   const [y, m, d] = day.split("-").map(Number);
@@ -412,19 +427,45 @@ async function searchCards(tmId: string, fromIso: string): Promise<{ cards: any[
   }
 }
 
-async function myHours(b: any) {
+// the active employee behind an employee ID (+ their Square team member, if linked)
+async function empByLogin(b: any) {
   const login = low(b?.login_id);
   if (!login || login.length > 40) throw new PublicError("Sign in with your employee ID.", 400);
-  const { data: rows, error } = await admin.from("portal_employees").select("id,name,login_id").eq("active", true);
+  const { data: rows, error } = await admin.from("portal_employees").select("id,name,login_id,location").eq("active", true);
   if (error) throw new Error(error.message);
   const hits = (rows ?? []).filter((r: any) => low(r.login_id) === login);
   if (hits.length !== 1) throw new PublicError("No active employee with that ID.", 404);
   const emp = hits[0];
   const { data: link } = await admin.from("square_team_links").select("team_member_id").eq("employee_id", emp.id).maybeSingle();
-  if (!link?.team_member_id) return { ok: true, linked: false, name: emp.name };
+  return { emp, tm: link?.team_member_id ? String(link.team_member_id) : "" };
+}
+async function teamMember(env: Env, tmId: string) {
+  const d = await sqx(env, `/v2/team-members/${encodeURIComponent(tmId)}`);
+  const m = d.team_member ?? null;
+  if (m && !m.wage_setting) {
+    try { m.wage_setting = (await sqx(env, `/v2/team-members/${encodeURIComponent(tmId)}/wage-setting`)).wage_setting; } catch (_) { /* no jobs */ }
+  }
+  return m;
+}
+function jobsOf(m: any): { title: string; job_id: string | null; rate: any }[] {
+  return (m?.wage_setting?.job_assignments ?? []).map((j: any) => ({ title: tidy(j.job_title), job_id: j.job_id ?? null, rate: j.hourly_rate ?? null })).filter((j: any) => j.title);
+}
+function locsOf(m: any): string[] {
+  if (m?.assigned_locations?.assignment_type === "ALL_CURRENT_AND_FUTURE_LOCATIONS") return Object.keys(LOC_NAME);
+  return (m?.assigned_locations?.location_ids ?? []).filter((id: string) => LOC_NAME[id]);
+}
+
+async function myHours(b: any) {
+  const { emp, tm } = await empByLogin(b);
+  if (!tm) return { ok: true, linked: false, name: emp.name };
 
   const now = new Date(), today = ymd(now), thisWk = weekStart(today), lastWk = addDays(thisWk, -7);
-  const { cards, src } = await searchCards(String(link.team_member_id), midnight(lastWk).toISOString());
+  const [{ cards, src }, m, fx] = await Promise.all([
+    searchCards(tm, midnight(lastWk).toISOString()),
+    teamMember("production", tm).catch(() => null),
+    admin.from("portal_time_fixes").select("id,timecard_id,kind,work_date,req_start,req_end,orig_start,orig_end,job_title,location_id,note,status,manager_note,square_error,created_at,decided_at")
+      .eq("employee_id", emp.id).neq("status", "cancelled").gte("work_date", lastWk).order("created_at", { ascending: false }).limit(40),
+  ]);
   const weeks = [
     { start: thisWk, end: addDays(thisWk, 6), min: 0, days: [] as any[] },
     { start: lastWk, end: addDays(lastWk, 6), min: 0, days: [] as any[] },
@@ -450,12 +491,260 @@ async function myHours(b: any) {
     let d = wk.days.find((x: any) => x.date === day);
     if (!d) wk.days.push(d = { date: day, min: 0, cards: [] });
     const job = tidy(c.wage?.title), loc = LOC_NAME[c.location_id] ?? "";
-    d.cards.push({ in: c.start_at, out: isOpen ? null : c.end_at, min, job, loc, open: isOpen, on_break: onBreak });
+    d.cards.push({ id: c.id, in: c.start_at, out: isOpen ? null : c.end_at, min, job, loc, open: isOpen, on_break: onBreak });
     d.min += min; wk.min += min;
     if (day === today) todayMin += min;
     if (isOpen) open = { start_at: c.start_at, job, loc, on_break: onBreak, min };
   }
-  return { ok: true, linked: true, name: emp.name, now: now.toISOString(), today, today_min: todayMin, week_min: weeks[0].min, last_week_min: weeks[1].min, open, weeks, src };
+  const jobs = jobsOf(m).map((j) => j.title);
+  const locs = (m ? locsOf(m) : []).map((id) => ({ id, name: LOC_NAME[id] }));
+  return { ok: true, linked: true, name: emp.name, now: now.toISOString(), today, today_min: todayMin, week_min: weeks[0].min, last_week_min: weeks[1].min, open, weeks,
+    jobs, locs, fixes: fx.data ?? [], src };
+}
+
+// ---------- time fixes ----------
+const clockFmt = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" });
+const clock = (d: Date) => clockFmt.format(d).replace(" AM", "a").replace(" PM", "p");
+const dayFmt = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
+const dayLabel = (day: string) => dayFmt.format(new Date(day + "T12:00:00Z"));
+function localAt(day: string, hhmm: string) {   // a Chicago wall-clock time on YYYY-MM-DD → the instant
+  const [y, m, d] = day.split("-").map(Number), [hh, mi] = hhmm.split(":").map(Number);
+  let t = Date.UTC(y, m - 1, d, hh, mi);
+  for (let i = 0; i < 2; i++) t = Date.UTC(y, m - 1, d, hh, mi) - offsetMin(new Date(t)) * 60000;
+  return new Date(t);
+}
+function rfc(d: Date) {                          // RFC 3339 with the Chicago offset, the way Square writes them
+  const off = offsetMin(d), a = Math.abs(off);
+  return new Date(d.getTime() + off * 60000).toISOString().slice(0, 19) + (off < 0 ? "-" : "+")
+    + String(Math.floor(a / 60)).padStart(2, "0") + ":" + String(a % 60).padStart(2, "0");
+}
+function hhmm(v: unknown) {
+  const s = tidy(v);
+  if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(s)) throw new PublicError("Pick a clock-in and a clock-out time.", 400);
+  return s.padStart(5, "0");
+}
+
+async function fixRequest(b: any) {
+  const { emp, tm } = await empByLogin(b);
+  if (!tm) throw new PublicError("You’re not linked to Square yet — ask a manager.", 409);
+  const now = new Date(), today = ymd(now), lastWk = addDays(weekStart(today), -7);
+  const tcId = tidy(b.timecard_id), note = tidy(b.note).slice(0, 300);
+  let day = tidy(b.date), orig: any = null, loc = "", job = "";
+  if (tcId) {
+    orig = (await sqx("production", `/v2/labor/timecards/${encodeURIComponent(tcId)}`, {}, LABOR_VERSION)).timecard;
+    if (!orig || String(orig.team_member_id) !== tm) throw new PublicError("That clock-in isn’t yours.", 403);
+    day = ymd(new Date(orig.start_at)); loc = String(orig.location_id ?? ""); job = tidy(orig.wage?.title);
+  } else {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new PublicError("Pick the day you worked.", 400);
+    const m = await teamMember("production", tm);
+    const locs = m ? locsOf(m) : [];
+    loc = locs.includes(tidy(b.location_id)) ? tidy(b.location_id) : (locs[0] ?? LOC_ID[emp.location] ?? "");
+    const jobs = jobsOf(m);
+    job = jobs.some((j) => j.title === tidy(b.job)) ? tidy(b.job) : (jobs[0]?.title ?? "");
+    if (!loc) throw new PublicError("Couldn’t tell which shop — ask a manager.", 409);
+  }
+  if (day < lastWk || day > today) throw new PublicError("You can fix this week and last week.", 400);
+  // still on the clock: only the clock-in moves (open clock-ins only)
+  const stillOn = b.still_on === true || b.still_on === "true";
+  if (stillOn && (!orig || orig.end_at)) throw new PublicError("That clock-in already has a clock-out — put in the clock-out time.", 409);
+  const start = localAt(day, hhmm(b.start));
+  let end: Date | null = null;
+  if (stillOn) {
+    if (start.getTime() > now.getTime() + 5 * 60000) throw new PublicError("The clock-in can’t be later than now.", 400);
+    if (now.getTime() - start.getTime() > 16 * 3600000) throw new PublicError("That’s over 16 hours — check the times.", 400);
+  } else {
+    end = localAt(day, hhmm(b.end));
+    if (end <= start) end = new Date(end.getTime() + 86400000);        // clocked out after midnight
+    if (end.getTime() - start.getTime() > 16 * 3600000) throw new PublicError("That’s over 16 hours — check the times.", 400);
+    if (end.getTime() > now.getTime() + 5 * 60000) throw new PublicError("The clock-out can’t be later than now.", 400);
+  }
+  for (const br of orig?.breaks ?? []) {                               // Square refuses breaks outside the shift
+    const bs = new Date(br?.start_at);
+    if (stillOn) {
+      if (bs < start) throw new PublicError(`That clock-in has a break at ${clock(bs)} — the new clock-in has to be before it.`, 400);
+      continue;
+    }
+    if (!br?.end_at) throw new PublicError("You’re on a break on that clock-in — end the break first.", 409);
+    const be = new Date(br.end_at);
+    if (bs < start || be > end!) throw new PublicError(`That clock-in has a break ${clock(bs)}–${clock(be)} — the new times have to cover it.`, 400);
+  }
+  const until = end ?? now;
+  const { cards } = await searchCards(tm, midnight(addDays(day, -1)).toISOString());
+  for (const c of cards) {
+    if (c.id === tcId || !c.start_at) continue;
+    const cs = new Date(c.start_at), ce = c.end_at ? new Date(c.end_at) : now;
+    if (cs < until && ce > start) throw new PublicError(`That overlaps your clock-in at ${clock(cs)} on ${dayLabel(ymd(cs))}.`, 409);
+  }
+  const row = {
+    employee_id: emp.id, team_member_id: tm, timecard_id: tcId || null, kind: tcId ? "edit" : "add", location_id: loc, work_date: day,
+    orig_start: orig?.start_at ?? null, orig_end: orig?.end_at ?? null, req_start: start.toISOString(), req_end: end ? end.toISOString() : null,
+    job_title: job, note, status: "pending", square_error: null, updated_at: nowIso(),
+  };
+  if (tcId) {                                                          // one pending ask per clock-in: asking again replaces it
+    const { data: ex } = await admin.from("portal_time_fixes").select("id").eq("timecard_id", tcId).eq("status", "pending").maybeSingle();
+    if (ex) {
+      const { error } = await admin.from("portal_time_fixes").update(row).eq("id", ex.id);
+      if (error) throw new Error(error.message);
+      return { ok: true, id: ex.id, replaced: true };
+    }
+  }
+  const { data, error } = await admin.from("portal_time_fixes").insert(row).select("id").single();
+  if (error) throw new Error(error.message);
+  return { ok: true, id: data.id };
+}
+
+async function fixCancel(b: any) {
+  const { emp } = await empByLogin(b);
+  const { data, error } = await admin.from("portal_time_fixes").update({ status: "cancelled", updated_at: nowIso() })
+    .eq("id", Number(b.id)).eq("employee_id", emp.id).eq("status", "pending").select("id");
+  if (error) throw new Error(error.message);
+  if (!(data ?? []).length) throw new PublicError("That request isn’t pending anymore.", 409);
+  return { ok: true };
+}
+
+async function fixList(b: any) {
+  const all = b?.status === "all";
+  let q = admin.from("portal_time_fixes").select("*").neq("status", "cancelled").order("created_at", { ascending: false }).limit(all ? 80 : 60);
+  if (!all) q = q.eq("status", "pending");
+  const [{ data, error }, pend] = await Promise.all([q, admin.from("portal_time_fixes").select("id", { count: "exact", head: true }).eq("status", "pending")]);
+  if (error) throw new Error(error.message);
+  const ids = [...new Set((data ?? []).map((r: any) => r.employee_id))];
+  const { data: emps } = ids.length ? await admin.from("portal_employees").select("id,name").in("id", ids) : { data: [] as any[] };
+  const nm = new Map((emps ?? []).map((e: any) => [e.id, e.name]));
+  return { ok: true, pending: pend.count ?? 0, rows: (data ?? []).map((r: any) => ({ ...r, name: nm.get(r.employee_id) ?? "(removed)", shop: LOC_NAME[r.location_id] ?? "" })) };
+}
+
+// write an approved fix into Square (env lets the self-test run the same code in the sandbox)
+async function applyFix(env: Env, r: any, dry = false) {
+  const start = rfc(new Date(r.req_start)), startMs = +new Date(r.req_start);
+  if (r.kind === "edit") {
+    const path = `/v2/labor/timecards/${encodeURIComponent(r.timecard_id)}`;
+    const cur = (await sqx(env, path, {}, LABOR_VERSION)).timecard;
+    if (!cur) throw new Error("that timecard isn’t in Square anymore");
+    // a clock-in-only fix (req_end null) keeps whatever clock-out Square has now — none if they're still on the clock
+    const endAt: string | null = r.req_end ? rfc(new Date(r.req_end)) : (cur.end_at ?? null);
+    const endMs = endAt ? +new Date(endAt) : null;
+    if (endMs !== null && endMs <= startMs) throw new Error("the clock-out in Square is before the new clock-in");
+    for (const br of cur.breaks ?? []) {
+      if (+new Date(br?.start_at) < startMs) throw new Error("a break falls outside the new times");
+      if (!br?.end_at) { if (endMs !== null) throw new Error("a break is still open on that timecard"); continue; }
+      if (endMs !== null && +new Date(br.end_at) > endMs) throw new Error("a break falls outside the new times");
+    }
+    const tc: any = { location_id: cur.location_id, team_member_id: cur.team_member_id, start_at: start, status: endAt ? "CLOSED" : "OPEN", version: cur.version };
+    if (endAt) tc.end_at = endAt;
+    if (cur.wage) tc.wage = cur.wage;
+    if (cur.breaks?.length) tc.breaks = cur.breaks;
+    if (cur.declared_cash_tip_money) tc.declared_cash_tip_money = cur.declared_cash_tip_money;
+    if (dry) return { dry: true, method: "PUT", path, body: { timecard: tc } };
+    const u = (await sqx(env, path, { method: "PUT", body: JSON.stringify({ timecard: tc }) }, LABOR_VERSION)).timecard;
+    return { timecard_id: u?.id ?? r.timecard_id, start_at: u?.start_at, end_at: u?.end_at };
+  }
+  if (!r.req_end) throw new Error("a missed shift needs a clock-out");
+  const end = rfc(new Date(r.req_end));
+  const m = await teamMember(env, r.team_member_id);
+  const jobs = jobsOf(m), j = jobs.find((x) => x.title === r.job_title) ?? jobs[0];
+  const tc: any = { location_id: r.location_id, team_member_id: r.team_member_id, start_at: start, end_at: end, status: "CLOSED" };
+  if (j) tc.wage = { title: j.title, ...(j.job_id ? { job_id: j.job_id } : {}), ...(j.rate ? { hourly_rate: j.rate } : {}) };
+  const body = { idempotency_key: `greys-timefix-${r.id}`, timecard: tc };
+  if (dry) return { dry: true, method: "POST", path: "/v2/labor/timecards", body };
+  const c = (await sqx(env, "/v2/labor/timecards", { method: "POST", body: JSON.stringify(body) }, LABOR_VERSION)).timecard;
+  return { timecard_id: c?.id ?? null, start_at: c?.start_at, end_at: c?.end_at };
+}
+
+// tell the employee (same channels as time-off decisions: text if they get texts, and email)
+async function notifyFix(r: any, approved: boolean, mnote: string) {
+  try {
+    const { data: c } = await admin.from("portal_employee_contacts").select("email,phone,sms_opt_in").eq("employee_id", r.employee_id).maybeSingle();
+    const when = r.req_end ? `${dayLabel(r.work_date)} ${clock(new Date(r.req_start))}–${clock(new Date(r.req_end))}`
+      : `${dayLabel(r.work_date)} (clock-in ${clock(new Date(r.req_start))})`;
+    const word = approved ? "approved — it’s in Square now" : "declined";
+    const phone = e164(c?.phone);
+    const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "", tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "", from = Deno.env.get("TWILIO_FROM") ?? "";
+    if (phone && c?.sms_opt_in !== false && sid && tok && from) {
+      const text = `GREYS: your time fix for ${when} was ${word}.${mnote ? " " + mnote : ""}`.slice(0, 600);
+      const params = new URLSearchParams({ To: phone, Body: text });
+      if (/^MG[0-9a-fA-F]{32}$/.test(from)) params.set("MessagingServiceSid", from); else params.set("From", from);
+      let ok = false, err = "";
+      try {
+        const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+          method: "POST", headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" }, body: params.toString(),
+        });
+        ok = res.ok; if (!ok) err = String(res.status);
+      } catch (e) { err = errMsg(e); }
+      await admin.from("portal_sms_log").insert({ employee_id: r.employee_id, kind: "timefix", ref: String(r.id), to_phone: phone, body: text, ok, error: err }).then(() => {}, () => {});
+    }
+    if (c?.email) {
+      const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE}` },
+        body: JSON.stringify({ from: Deno.env.get("PORTAL_MAIL_FROM") ?? "GREYS Schedule <info@greyscheese.com>", to: c.email,
+          subject: `Time fix ${approved ? "approved" : "declined"}`,
+          html: `<p>Your time fix for <strong>${esc(when)}</strong> was <strong>${approved ? "approved" : "declined"}</strong>${approved ? " and is in Square now" : ""}.</p>`
+            + (mnote ? `<p>${esc(mnote)}</p>` : "") + `<p style="color:#888;font-size:12px">GREYS staff portal — this is an automated message.</p>` }),
+      }).catch(() => {});
+    }
+  } catch (_) { /* a missed notice never blocks the decision */ }
+}
+
+async function fixDecide(b: any, who: string) {
+  const id = Number(b?.id), approve = b?.approve === true || b?.approve === "true", dry = b?.dry === true, mnote = tidy(b?.note).slice(0, 300);
+  const { data: r } = await admin.from("portal_time_fixes").select("*").eq("id", id).maybeSingle();
+  if (!r) throw new PublicError("That request is gone.", 404);
+  if (r.status !== "pending") throw new PublicError(`That request was already ${r.status}.`, 409);
+  if (!approve) {
+    if (dry) return { ok: true, dry: true, status: "declined" };
+    const { data: done, error } = await admin.from("portal_time_fixes").update({ status: "declined", decided_by: who, decided_at: nowIso(), manager_note: mnote, updated_at: nowIso() })
+      .eq("id", id).eq("status", "pending").select("id");
+    if (error) throw new Error(error.message);
+    if (done?.length) await notifyFix(r, false, mnote);
+    return { ok: true, status: "declined" };
+  }
+  let res: any;
+  try { res = await applyFix("production", r, dry); }
+  catch (e) {
+    if (!dry) await admin.from("portal_time_fixes").update({ square_error: errMsg(e).slice(0, 500), updated_at: nowIso() }).eq("id", id);
+    throw new PublicError("Square didn’t take it: " + errMsg(e), 502);
+  }
+  if (dry) return { ok: true, ...res };
+  await admin.from("portal_time_fixes").update({ status: "approved", decided_by: who, decided_at: nowIso(), manager_note: mnote,
+    square_timecard_id: res.timecard_id, square_error: null, updated_at: nowIso() }).eq("id", id);
+  await notifyFix(r, true, mnote);
+  return { ok: true, status: "approved", timecard_id: res.timecard_id, start_at: res.start_at, end_at: res.end_at };
+}
+
+// the Square write shapes, end to end, in the SANDBOX: add a missed shift → fix its times → read back → delete
+async function fixSelftest() {
+  const env: Env = "sandbox";
+  const tms = (await sqx(env, "/v2/team-members/search", { method: "POST", body: JSON.stringify({ limit: 20, query: { filter: { status: "ACTIVE" } } }) })).team_members ?? [];
+  const tm = tms.find((m: any) => !m.is_owner) ?? tms[0];
+  if (!tm) throw new Error("no sandbox team member");
+  const loc = SANDBOX_LOCATION || (await sqx(env, "/v2/locations")).locations?.[0]?.id;
+  const day = addDays(ymd(new Date()), -2), steps: any[] = [];
+  const r: any = { id: "selftest-" + Date.now(), kind: "add", team_member_id: tm.id, location_id: loc, job_title: "",
+    req_start: localAt(day, "09:00").toISOString(), req_end: localAt(day, "12:00").toISOString() };
+  const add = await applyFix(env, r); steps.push({ add });
+  try {
+    const edit = await applyFix(env, { ...r, kind: "edit", timecard_id: add.timecard_id, req_start: localAt(day, "09:30").toISOString(), req_end: localAt(day, "13:15").toISOString() });
+    steps.push({ edit });
+    const back = (await sqx(env, `/v2/labor/timecards/${encodeURIComponent(add.timecard_id)}`, {}, LABOR_VERSION)).timecard;
+    steps.push({ readback: { start_at: back?.start_at, end_at: back?.end_at, status: back?.status, version: back?.version } });
+  } finally {
+    if (add?.timecard_id) { await sqx(env, `/v2/labor/timecards/${encodeURIComponent(add.timecard_id)}`, { method: "DELETE" }, LABOR_VERSION); steps.push({ deleted: add.timecard_id }); }
+  }
+  // still on the clock: open a timecard → move only its clock-in (stays OPEN, no clock-out) → read back → delete
+  const t0 = Date.now() - 3 * 3600000;
+  const open = (await sqx(env, "/v2/labor/timecards", { method: "POST", body: JSON.stringify({ idempotency_key: "greys-selftest-open-" + Date.now(),
+    timecard: { location_id: loc, team_member_id: tm.id, start_at: rfc(new Date(t0)) } }) }, LABOR_VERSION)).timecard;
+  steps.push({ open: { id: open?.id, status: open?.status, start_at: open?.start_at } });
+  try {
+    const moved = await applyFix(env, { id: "selftest-open", kind: "edit", timecard_id: open.id, req_start: new Date(t0 - 3600000).toISOString(), req_end: null });
+    steps.push({ moved });
+    const back = (await sqx(env, `/v2/labor/timecards/${encodeURIComponent(open.id)}`, {}, LABOR_VERSION)).timecard;
+    steps.push({ readback_open: { start_at: back?.start_at, end_at: back?.end_at ?? null, status: back?.status, version: back?.version } });
+  } finally {
+    if (open?.id) { await sqx(env, `/v2/labor/timecards/${encodeURIComponent(open.id)}`, { method: "DELETE" }, LABOR_VERSION); steps.push({ deleted: open.id }); }
+  }
+  return { ok: true, team_member: tm.id, location: loc, day, steps };
 }
 
 // ---------- auth ----------
@@ -470,7 +759,9 @@ async function who(req: Request, b: any): Promise<string | null> {
   if (tok === SERVICE) return "service";
   const user = createClient(SUPABASE_URL, ANON || SERVICE, { global: { headers: { Authorization: "Bearer " + tok } }, auth: { persistSession: false } });
   const { data, error } = await user.rpc("is_app_admin");
-  return !error && data === true ? "manager" : null;
+  if (error || data !== true) return null;
+  const { data: u } = await admin.auth.getUser(tok);
+  return tidy(u?.user?.email) || "manager";
 }
 
 async function status() {
@@ -506,6 +797,8 @@ Deno.serve(async (req) => {
 
     // staff portal "My Hours" tile — keyed by the employee ID, like the rest of the portal
     if (b.action === "my-hours") return json(req, await myHours(b));
+    if (b.action === "fix-request") return json(req, await fixRequest(b));
+    if (b.action === "fix-cancel") return json(req, await fixCancel(b));
 
     const caller = await who(req, b);
     if (!caller) return json(req, { error: "not allowed" }, 401);
@@ -513,6 +806,12 @@ Deno.serve(async (req) => {
     const dry = b.dry === true || b.dry === "true";
 
     if (action === "status") return json(req, { ok: true, ...(await status()) });
+    if (action === "fix-list") return json(req, await fixList(b));
+    if (action === "fix-decide") return json(req, await fixDecide(b, caller));
+    if (action === "fix-selftest") {
+      if (caller !== "service" && caller !== "cron") return json(req, { error: "not allowed" }, 401);
+      return json(req, await fixSelftest());
+    }
     if (action === "setup") {
       const report = await reconcile("setup", dry);
       let webhook: any = { skipped: dry };
