@@ -969,7 +969,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
   <div id="panel-timeoff" class="panel">
     <div class="section-card" id="tfCard">
       <h2>⏱️ Time Card Fixes <span id="tfCount" class="pill pill-req" style="display:none;margin-left:6px;"></span></h2>
-      <div class="hint">Staff ask from <strong>My Hours</strong> on the portal home — a clock-in with the wrong times, a missed clock-out, or a shift they forgot to clock in for. <strong>Approve</strong> writes the new times straight into Square; Decline leaves Square alone. Either way they get a text/email.</div>
+      <div class="hint">Staff ask from <strong>My Hours</strong> on the portal home — wrong times on a clock-in, a missed clock-in or clock-out, or a whole shift they never clocked. <strong>Approve</strong> writes it straight into Square; Decline leaves Square alone. Either way they get a text/email.</div>
       <div class="tf-head">
         <div class="chips" id="tfChips"><button type="button" class="chip on" data-all="0" onclick="tfShow(false)">Waiting</button><button type="button" class="chip" data-all="1" onclick="tfShow(true)">All recent</button></div>
         <div class="spacer"></div>
@@ -1909,17 +1909,21 @@ async function tf(action, payload){
 function tfT(iso){ return iso ? new Date(iso).toLocaleTimeString('en-US',{ hour:'numeric', minute:'2-digit', timeZone:'America/Chicago' }).replace(' AM','a').replace(' PM','p') : ''; }
 function tfSpan(a, b){ const m = Math.max(0, Math.round((new Date(b) - new Date(a)) / 60000)); return Math.floor(m/60)+'h'+(m%60 ? ' '+(m%60)+'m' : ''); }
 function tfDay(d){ return new Date(d+'T12:00:00').toLocaleDateString('en-US',{ weekday:'short', month:'short', day:'numeric' }); }
+function tfTag(r){   // what kind of ask, at a glance
+  if(r.kind==='add') return r.req_end ? 'Missed punch' : 'Missed clock-in';
+  return (!r.orig_end && r.req_end) ? 'Missed clock-out' : '';
+}
 function tfRow(r){
   const pending = r.status==='pending', busy = !!TF_BUSY[r.id];
   const was = r.kind==='add' ? '<span class="tf-was">No clock-in in Square</span>'
     : '<span class="tf-was">Square: '+tfT(r.orig_start)+' – '+(r.orig_end ? tfT(r.orig_end) : 'no clock-out')+'</span>';
   const badge = r.status==='approved' ? 'badge-approved' : r.status==='declined' ? 'badge-denied' : 'badge-pending';
   return '<div class="to-item tf-item"><div class="to-info">'
-    +'<div class="to-name">'+esc(r.name)+(r.shop ? ' · '+esc(r.shop) : '')+(r.kind==='add' ? ' <span class="tf-tag">Missed shift</span>' : '')+'</div>'
+    +'<div class="to-name">'+esc(r.name)+(r.shop ? ' · '+esc(r.shop) : '')+(tfTag(r) ? ' <span class="tf-tag">'+tfTag(r)+'</span>' : '')+'</div>'
     +'<div class="to-meta">'+tfDay(r.work_date)+(r.job_title ? ' · '+esc(r.job_title) : '')+'</div>'
     +'<div class="tf-times">'+was+'<span class="tf-arrow">→</span><span class="tf-ask">Asked: '
       +(r.req_end ? '<b>'+tfT(r.req_start)+' – '+tfT(r.req_end)+'</b> · '+tfSpan(r.req_start, r.req_end)
-        : 'clock-in <b>'+tfT(r.req_start)+'</b> · was still on the clock (clock-out stays as Square has it)')+'</span></div>'
+        : 'clock-in <b>'+tfT(r.req_start)+'</b> · still on the clock'+(r.kind==='add' ? ' (Square opens a clock-in; they clock out as usual)' : ' (clock-out stays as Square has it)'))+'</span></div>'
     +(r.note ? '<div class="to-reason">"'+esc(r.note)+'"</div>' : '')
     +(pending && r.square_error ? '<div class="tf-err">Square said: '+esc(r.square_error)+'</div>' : '')
     +(!pending && r.decided_at ? '<div class="to-meta">'+(r.status==='approved' ? 'Approved — in Square' : 'Declined')+(r.decided_by ? ' by '+esc(r.decided_by) : '')
@@ -1954,6 +1958,7 @@ async function tfDecide(id, approve){
   let note = '';
   if(approve){
     if(!confirm(r.req_end ? 'Write '+tfDay(r.work_date)+' '+tfT(r.req_start)+' – '+tfT(r.req_end)+' into Square for '+r.name+'?'
+      : r.kind==='add' ? 'Clock '+r.name+' in at '+tfT(r.req_start)+' on '+tfDay(r.work_date)+' in Square? They stay on the clock and clock out as usual.'
       : 'Move '+r.name+'’s clock-in on '+tfDay(r.work_date)+' to '+tfT(r.req_start)+' in Square? Their clock-out stays as Square has it.')) return;
   } else {
     note = prompt('Decline '+first+'’s fix. Note to send them (optional):', '');
