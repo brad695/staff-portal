@@ -572,6 +572,17 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
   .chip, .loc-chip, .loc-tab, .po-qtab, .po-subtab, .rec-radio, .seg, .seg button,
   .back-btn, .home-btn, .icon-btn, .wk-btn, .sw-btn, .btn-mini { border-radius: 8px !important; }
 </style>
+<!-- TIME FIXES (2026-11-02): staff fix requests from My Hours; approving writes the times into Square (square-team-sync fix-decide) -->
+<style id="timefix-css">
+.tf-head{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+.tf-times{ display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; margin-top:4px; font-size:.84rem; }
+.tf-was{ color:var(--sub); }
+.tf-arrow{ color:var(--sub); }
+.tf-ask b{ font-weight:800; }
+.tf-tag{ display:inline-block; margin-left:4px; padding:2px 7px; border-radius:6px; background:#e0f2fe; color:#075985; font-size:.68rem; font-weight:800; vertical-align:1px; }
+.tf-err{ margin-top:6px; padding:6px 9px; border-radius:8px; background:#fef2f2; color:#b91c1c; font-size:.78rem; font-weight:700; }
+.tf-item .btn[disabled]{ opacity:.55; cursor:default; }
+</style>
 </head>
 <body>
 
@@ -606,7 +617,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab-head">Staff</div>
     <div class="tab active" onclick="mtab('content')">Notes · Specials · Info</div>
     <div class="tab" onclick="mtab('scheduling')">Staff Scheduling</div>
-    <div class="tab" onclick="mtab('timeoff')">Time Off &amp; Swaps</div>
+    <div class="tab" onclick="mtab('timeoff')">Time Off &amp; Swaps <span id="tfBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
     <div class="tab" onclick="mtab('announcements')">Announcements</div>
     <div class="tab" onclick="mtab('ordering')">🛒 Online Ordering <span id="ooTabPill" class="oo-tabpill">OFF</span></div>
     <div class="tab-head">Events &amp; Reservations</div>
@@ -962,6 +973,16 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
 
   <!-- TIME OFF & SWAPS (combined page: requests · calendar entries · shift swaps) -->
   <div id="panel-timeoff" class="panel">
+    <div class="section-card" id="tfCard">
+      <h2>⏱️ Time Card Fixes <span id="tfCount" class="pill pill-req" style="display:none;margin-left:6px;"></span></h2>
+      <div class="hint">Staff ask from <strong>My Hours</strong> on the portal home — wrong times on a clock-in, a missed clock-in or clock-out, or a whole shift they never clocked. <strong>Approve</strong> writes it straight into Square; Decline leaves Square alone. Either way they get a text/email.</div>
+      <div class="tf-head">
+        <div class="chips" id="tfChips"><button type="button" class="chip on" data-all="0" onclick="tfShow(false)">Waiting</button><button type="button" class="chip" data-all="1" onclick="tfShow(true)">All recent</button></div>
+        <div class="spacer"></div>
+        <button class="btn btn-ghost btn-sm" onclick="tfLoad()">↻ Refresh</button>
+      </div>
+      <div id="tfList"><div class="to-empty">Loading…</div></div>
+    </div>
     <div class="section-card">
       <h2>🗓️ Time-Off Requests</h2>
       <div class="hint">Approve, deny, or delete. Approved requests appear on the staff schedule and calendar.</div>
@@ -1827,7 +1848,91 @@ async function catOpenByCode(code, view){
 }
 window.addEventListener('hashchange', openHashTab);
 
-function loadAll(){ loadKind('items'); loadKind('events'); loadKind('schedules'); loadKind('employees'); sgLoad(); loadTimeOff(); loadSwaps(); loadAnnouncements(); resInit(); inqLoad(); catLoad(); if(window.tkInit)tkInit(); if(window.ccInit)ccInit(); if(window.pluInit)pluInit(); if(window.emcInit)emcInit(); if(window.socInit)socInit(); if(window.poInit)poInit(); openHashTab(); }
+/* TIME CARD FIXES (2026-11-02) — staff ask from My Hours (index.html); this lists them and approves/declines through the
+   square-team-sync edge function (fix-list / fix-decide, manager session). Approve = the new times are written into Square
+   (UpdateTimecard, or CreateTimecard for a missed shift); the employee gets a text/email either way. */
+const TF_URL = SB_URL + '/functions/v1/square-team-sync';
+let TF_ROWS = [], TF_ALL = false, TF_BUSY = {};
+async function tf(action, payload){
+  let token = SB_KEY;
+  try{ const { data } = await sb.auth.getSession(); if(data && data.session){ SESSION = data.session; token = data.session.access_token; } else if(SESSION) token = SESSION.access_token; }
+  catch(_){ if(SESSION) token = SESSION.access_token; }
+  try{
+    const res = await fetch(TF_URL + '?action=' + encodeURIComponent(action), {
+      method:'POST', headers:{ 'Content-Type':'application/json', 'apikey':SB_KEY, 'Authorization':'Bearer '+token },
+      body: JSON.stringify(Object.assign({ action }, payload || {}))
+    });
+    let data={}; try{ data=await res.json(); }catch(_){}
+    return { ok:res.ok && data.ok!==false, status:res.status, data };
+  }catch(e){ return { ok:false, status:0, data:{ error:String(e && e.message || e) } }; }
+}
+function tfT(iso){ return iso ? new Date(iso).toLocaleTimeString('en-US',{ hour:'numeric', minute:'2-digit', timeZone:'America/Chicago' }).replace(' AM','a').replace(' PM','p') : ''; }
+function tfSpan(a, b){ const m = Math.max(0, Math.round((new Date(b) - new Date(a)) / 60000)); return Math.floor(m/60)+'h'+(m%60 ? ' '+(m%60)+'m' : ''); }
+function tfDay(d){ return new Date(d+'T12:00:00').toLocaleDateString('en-US',{ weekday:'short', month:'short', day:'numeric' }); }
+function tfTag(r){   // what kind of ask, at a glance
+  if(r.kind==='add') return r.req_end ? 'Missed punch' : 'Missed clock-in';
+  return (!r.orig_end && r.req_end) ? 'Missed clock-out' : '';
+}
+function tfRow(r){
+  const pending = r.status==='pending', busy = !!TF_BUSY[r.id];
+  const was = r.kind==='add' ? '<span class="tf-was">No clock-in in Square</span>'
+    : '<span class="tf-was">Square: '+tfT(r.orig_start)+' – '+(r.orig_end ? tfT(r.orig_end) : 'no clock-out')+'</span>';
+  const badge = r.status==='approved' ? 'badge-approved' : r.status==='declined' ? 'badge-denied' : 'badge-pending';
+  return '<div class="to-item tf-item"><div class="to-info">'
+    +'<div class="to-name">'+esc(r.name)+(r.shop ? ' · '+esc(r.shop) : '')+(tfTag(r) ? ' <span class="tf-tag">'+tfTag(r)+'</span>' : '')+'</div>'
+    +'<div class="to-meta">'+tfDay(r.work_date)+(r.job_title ? ' · '+esc(r.job_title) : '')+'</div>'
+    +'<div class="tf-times">'+was+'<span class="tf-arrow">→</span><span class="tf-ask">Asked: '
+      +(r.req_end ? '<b>'+tfT(r.req_start)+' – '+tfT(r.req_end)+'</b> · '+tfSpan(r.req_start, r.req_end)
+        : 'clock-in <b>'+tfT(r.req_start)+'</b> · still on the clock'+(r.kind==='add' ? ' (Square opens a clock-in; they clock out as usual)' : ' (clock-out stays as Square has it)'))+'</span></div>'
+    +(r.note ? '<div class="to-reason">"'+esc(r.note)+'"</div>' : '')
+    +(pending && r.square_error ? '<div class="tf-err">Square said: '+esc(r.square_error)+'</div>' : '')
+    +(!pending && r.decided_at ? '<div class="to-meta">'+(r.status==='approved' ? 'Approved — in Square' : 'Declined')+(r.decided_by ? ' by '+esc(r.decided_by) : '')
+        +' · '+new Date(r.decided_at).toLocaleString('en-US',{ month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })+(r.manager_note ? ' — '+esc(r.manager_note) : '')+'</div>' : '')
+    +'</div><div class="to-right"><span class="badge '+badge+'">'+(pending ? 'waiting' : r.status)+'</span>'
+    +(pending ? '<div style="display:flex;gap:6px;"><button class="btn btn-gold btn-sm"'+(busy?' disabled':'')+' onclick="tfDecide('+r.id+',true)">'+(busy ? 'Saving…' : 'Approve → Square')+'</button>'
+        +'<button class="btn btn-wax btn-sm"'+(busy?' disabled':'')+' onclick="tfDecide('+r.id+',false)">Decline</button></div>' : '')
+    +'</div></div>';
+}
+function tfRender(){
+  const el = document.getElementById('tfList'); if(!el) return;
+  el.innerHTML = TF_ROWS.length ? TF_ROWS.map(tfRow).join('')
+    : '<div class="to-empty">'+(TF_ALL ? 'No time fixes yet.' : 'Nothing waiting. Staff ask from My Hours on the portal home.')+'</div>';
+}
+async function tfLoad(){
+  const el = document.getElementById('tfList'); if(!el || !SESSION) return;
+  const res = await tf('fix-list', { status: TF_ALL ? 'all' : 'pending' });
+  if(!res.ok){ el.innerHTML = '<div class="to-empty">❌ Could not load time fixes'+(res.data && res.data.error ? ' — '+esc(res.data.error) : '')+'.</div>'; return; }
+  TF_ROWS = res.data.rows || [];
+  const n = res.data.pending || 0;
+  ['tfBadge','tfCount'].forEach(id=>{ const b=document.getElementById(id); if(b){ b.textContent=n; b.style.display=n ? 'inline-block' : 'none'; } });
+  tfRender();
+}
+function tfShow(all){
+  TF_ALL = all;
+  document.querySelectorAll('#tfChips .chip').forEach(c=>c.classList.toggle('on', (c.dataset.all==='1')===all));
+  tfLoad();
+}
+async function tfDecide(id, approve){
+  const r = TF_ROWS.find(x=>x.id===id); if(!r || TF_BUSY[id]) return;
+  const first = String(r.name||'').split(' ')[0] || 'them';
+  let note = '';
+  if(approve){
+    if(!confirm(r.req_end ? 'Write '+tfDay(r.work_date)+' '+tfT(r.req_start)+' – '+tfT(r.req_end)+' into Square for '+r.name+'?'
+      : r.kind==='add' ? 'Clock '+r.name+' in at '+tfT(r.req_start)+' on '+tfDay(r.work_date)+' in Square? They stay on the clock and clock out as usual.'
+      : 'Move '+r.name+'’s clock-in on '+tfDay(r.work_date)+' to '+tfT(r.req_start)+' in Square? Their clock-out stays as Square has it.')) return;
+  } else {
+    note = prompt('Decline '+first+'’s fix. Note to send them (optional):', '');
+    if(note===null) return;
+  }
+  TF_BUSY[id] = true; tfRender();
+  const res = await tf('fix-decide', { id, approve, note });
+  delete TF_BUSY[id];
+  if(!res.ok) alert((res.data && res.data.error) || 'That didn’t go through — try again.');
+  await tfLoad();
+}
+setInterval(()=>{ if(SESSION && document.visibilityState==='visible') tfLoad(); }, 2*60e3);
+
+function loadAll(){ loadKind('items'); loadKind('events'); loadKind('schedules'); loadKind('employees'); sgLoad(); loadTimeOff(); loadSwaps(); tfLoad(); loadAnnouncements(); resInit(); inqLoad(); catLoad(); if(window.tkInit)tkInit(); if(window.ccInit)ccInit(); if(window.pluInit)pluInit(); if(window.emcInit)emcInit(); if(window.socInit)socInit(); if(window.poInit)poInit(); openHashTab(); }
 
 /* ---- Experience inquiries (HoneyBook-style) ----
    Tables: inquiries (one per customer question) + inquiry_messages (in / out / note),
