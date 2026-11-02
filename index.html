@@ -1113,6 +1113,49 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
   #view-home .dash > .wg-cal > .today-card{ position:static !important; }
 }
 </style>
+<!-- MY HOURS TILE (2026-11-01): the signed-in employee's Square clock-ins. Markup = #tile-hours in #dash, script = MY HOURS block at the end. -->
+<style id="hours-tile">
+@media screen{
+/* MY HOURS — mint card; a pulsing green dot while they're on the clock */
+.dash .wg-hrs{ --fg:#052e1f; --fg2:#3d6b58; --chip:rgba(5,46,31,.08); background:#e6f6ee; box-shadow:inset 0 0 0 1px #cdebdc, 0 12px 24px -18px rgba(15,23,42,.35); }
+.dash .wg-hrs .wg-cover{ -webkit-appearance:none; appearance:none; background:transparent; border:0; padding:0; margin:0; cursor:pointer; font:inherit; }
+.dash .wg-hrs .wg-big b{ color:#047857; }
+.wg-hrs-now{ display:flex; align-items:center; gap:7px; min-width:0; padding-left:1px; font-size:.78rem; font-weight:800; color:#047857; white-space:nowrap; }
+.wg-hrs-now[hidden]{ display:none; }
+.wg-hrs .dot, .hrs-live .dot{ display:inline-block; flex:none; width:8px; height:8px; border-radius:50%; background:#16a34a; animation:hrsPulse 1.8s ease-out infinite; }
+.dash .wg-hrs.hrs-break .wg-hrs-now, .hrs-live.brk{ color:#b45309; }
+.wg-hrs.hrs-break .dot, .hrs-live.brk .dot{ background:#f59e0b; animation:none; }
+@keyframes hrsPulse{ 0%{ box-shadow:0 0 0 0 rgba(22,163,74,.5); } 70%{ box-shadow:0 0 0 7px rgba(22,163,74,0); } 100%{ box-shadow:0 0 0 0 rgba(22,163,74,0); } }
+.dash .wg-hrs.hrs-on .wg-head .wg-chip{ background:#16a34a; color:#fff; }
+.dash .wg-hrs.hrs-break .wg-head .wg-chip{ background:#f59e0b; color:#3b2300; }
+.wg-hrs .wg-sub b{ color:var(--fg); font-weight:800; }
+.wg-hrs-days{ display:none; }
+.dash .wg-hrs[data-h="2"] .wg-hrs-days:not(:empty){ display:grid; gap:5px; align-content:start; max-width:420px; }
+.wg-hrs-days .r{ display:flex; justify-content:space-between; gap:8px; min-width:0; font-size:.8rem; font-weight:600; color:var(--fg2); }
+.wg-hrs-days .r b{ color:var(--fg); font-weight:800; }
+.wg-hrs-days .r.td span{ color:#047857; font-weight:800; }
+/* the day-by-day sheet (same sheet as Edit tiles) */
+.hrs-seg{ display:flex; gap:4px; padding:3px; margin:0 0 12px; border-radius:10px; background:#f3f4f6; }
+.hrs-seg button{ flex:1; min-height:38px; border:0; border-radius:8px; background:transparent; font:inherit; font-size:.86rem; font-weight:800; color:#4b5563; cursor:pointer; }
+.hrs-seg button[aria-pressed="true"]{ background:#fff; color:#161a1f; box-shadow:0 1px 3px rgba(0,0,0,.12); }
+.hrs-seg button:focus-visible{ outline:3px solid #e0a21c; outline-offset:1px; }
+.hrs-tot{ display:flex; align-items:center; gap:10px; margin:0 0 10px; }
+.hrs-tot b{ font-size:2.1rem; font-weight:800; letter-spacing:-.8px; line-height:1; color:#047857; }
+.hrs-tot span{ font-size:.8rem; font-weight:700; line-height:1.35; color:#6b7280; }
+.hrs-live{ display:flex; align-items:center; gap:7px; margin:0 0 10px; padding:8px 10px; border-radius:10px; background:#ecfdf5; color:#047857; font-size:.84rem; font-weight:800; }
+.hrs-live.brk{ background:#fffbeb; }
+.hrs-day{ padding:8px 0; border-top:1px solid #eef0f3; }
+.hrs-day .hd{ display:flex; justify-content:space-between; gap:8px; margin-bottom:2px; font-size:.9rem; font-weight:800; color:#161a1f; }
+.hrs-day.today .hd span{ color:#047857; }
+.hrs-card{ display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:baseline; gap:8px; padding:2px 0; font-size:.82rem; color:#4b5563; }
+.hrs-card .t{ font-weight:700; color:#161a1f; white-space:nowrap; }
+.hrs-card .j{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.74rem; }
+.hrs-card b{ font-weight:800; color:#161a1f; }
+.hrs-none{ margin:6px 0 10px; font-size:.86rem; color:#6b7280; }
+.hrs-src{ margin:8px 0 10px; font-size:.74rem; line-height:1.4; color:#9ca3af; }
+@media (prefers-reduced-motion:reduce){ .wg-hrs .dot, .hrs-live .dot{ animation:none; } }
+}
+</style>
 </head>
 <body>
 <div class="app">
@@ -1160,6 +1203,16 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
           <a class="wg-btn" href="/schedule#timeoff"><i class="ti ti-beach"></i>Request off</a>
           <a class="wg-btn" href="/schedule#swap"><i class="ti ti-switch-horizontal"></i>Shift swap</a>
         </span>
+      </div>
+      <!-- MY HOURS: this person's Square clock-ins (filled by the MY HOURS script); tap -> the week day by day -->
+      <div class="wg wg-hrs" id="tile-hours" style="--i:3" data-tile="hours" data-name="My Hours" data-icon="ti-clock-hour-4" data-swatch="#e6f6ee" data-ink="#047857">
+        <button type="button" class="wg-cover" id="wgHrsOpen" aria-label="My hours"></button>
+        <span class="wg-head"><span class="wg-t">My Hours</span><span class="wg-chip" id="wgHrsChip">This week</span></span>
+        <span class="wg-big" id="wgHrsBig" hidden><b id="wgHrsN">&ndash;</b><span>hrs this week</span></span>
+        <span class="wg-hrs-now" id="wgHrsNow" hidden></span>
+        <span class="wg-sub" id="wgHrsSub"></span>
+        <span class="wg-hrs-days" id="wgHrsDays"></span>
+        <span class="wg-foot" id="wgHrsFoot">Loading&hellip;</span>
       </div>
       <button class="wg wg-chz" id="tile-cheese-entry" style="--i:3" onclick="location.href='/manager#plu'" aria-label="Cheese Entry" data-tile="cheese" data-name="Cheese Entry" data-icon="ti-cheese" data-swatch="#ff7f52" data-ink="#ffffff">
         <img class="wg-greysie" src="greysie-cheesemonger-sticker.svg" alt="" width="132" height="132">
@@ -1705,9 +1758,10 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
     });
   }
   function likeLit(s){ return String(s).replace(/([\\%_])/g, '\\$1'); }   // literal match for ilike (same as schedule.html)
-  function signIn(next){
-    var s=sheet('<div class="v8-h"><b>Sign in to edit your tiles</b><button type="button" class="v8-x" data-x aria-label="Close"><i class="ti ti-x" aria-hidden="true"></i></button></div>'
-      +'<p class="v8-p">Your tiles save to your employee ID, so they follow you to any phone or iPad.</p>'
+  function signIn(next, opts){
+    opts=opts||{};
+    var s=sheet('<div class="v8-h"><b>'+esc(opts.title||'Sign in to edit your tiles')+'</b><button type="button" class="v8-x" data-x aria-label="Close"><i class="ti ti-x" aria-hidden="true"></i></button></div>'
+      +'<p class="v8-p">'+esc(opts.blurb||'Your tiles save to your employee ID, so they follow you to any phone or iPad.')+'</p>'
       +'<input class="v8-in" type="text" placeholder="Your employee ID" aria-label="Your employee ID" autocomplete="off" autocapitalize="off" spellcheck="false">'
       +'<div class="v8-err" role="alert"></div>'
       +'<div class="v8-acts"><button type="button" class="v8-btn" data-x>Cancel</button><button type="button" class="v8-btn pri" data-go>Sign in</button></div>');
@@ -1731,6 +1785,9 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
     go.addEventListener('click', run);
     inp.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); run(); } });
   }
+  // the My Hours tile opens the same sheet and the same sign-in (layouts still load for the new ID)
+  window.homeSignIn=function(next, opts){ signIn(typeof next==='function' ? next : function(){}, opts); };
+  window.homeSheet=sheet;
   function toast(t){
     var el=document.createElement('div'); el.className='v8-toast'; el.setAttribute('role','status'); el.textContent=t;
     document.body.appendChild(el);
@@ -2965,6 +3022,138 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
   setTimeout(function(){ if(!last) load(); }, 2500);                 // Today card folded or still loading
   setInterval(function(){ if(document.visibilityState==='visible' && Date.now()-last>5*60e3) load(); }, 60e3);
   document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible' && Date.now()-last>2*60e3) load(); });
+})();
+</script>
+<!-- MY HOURS TILE (2026-11-01): this employee's clock-ins from Square, via the square-team-sync edge function (action
+     my-hours, keyed by the employee ID saved on this device - greys_emp_id, the same one Schedule and Edit tiles use).
+     Shows this week (Square's workweek, Mon-Sun), today, last week, and "On the clock since ..." with a running count.
+     Tap -> the week day by day (this week / last week). Hours only; wages never leave Square. -->
+<script>
+(function(){
+  var tile=document.getElementById('tile-hours');
+  if(!tile || typeof SB_URL==='undefined') return;
+  var FN=SB_URL+'/functions/v1/square-team-sync';
+  var $=function(id){ return document.getElementById(id); };
+  var D=null, at=0, who='', busy=false, last=0, wkIdx=0, sh=null, err='';
+  function emp(){ try{ return (localStorage.getItem('greys_emp_id')||'').trim(); }catch(e){ return ''; } }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); }
+  function hm(min){ min=Math.max(0, Math.round(min)); var h=Math.floor(min/60), m=min%60; return h ? h+'h'+(m ? ' '+m+'m' : '') : m+'m'; }
+  function dec(min){ return (Math.max(0, Math.round(min/6))/10).toFixed(1); }
+  function tm(v){ var d=new Date(v); if(isNaN(d)) return ''; var h=d.getHours(), m=d.getMinutes(), ap=h>=12?'p':'a'; h=(h%12)||12; return h+(m ? ':'+String(m).padStart(2,'0') : '')+ap; }
+  function day(ymd, withDate){ var p=String(ymd).split('-'), d=new Date(+p[0], +p[1]-1, +p[2], 12);
+    return d.toLocaleDateString('en-US', withDate ? { weekday:'short', month:'short', day:'numeric' } : { weekday:'short' }); }
+  function md(ymd){ var p=String(ymd).split('-'); return new Date(+p[0], +p[1]-1, +p[2], 12).toLocaleDateString('en-US', { month:'short', day:'numeric' }); }
+  function sz(){ return window.wgSize ? window.wgSize(tile) : { w:1, h:1, wEff:1 }; }
+  // minutes on the clock since the numbers came back (the open timecard keeps counting; an unpaid break doesn't)
+  function live(){ return (D && D.open && !D.open.on_break) ? Math.max(0, (Date.now()-at)/60000) : 0; }
+  function running(c){ return c.open && !c.on_break; }
+
+  function draw(){
+    var chip=$('wgHrsChip'), big=$('wgHrsBig'), now=$('wgHrsNow'), sub=$('wgHrsSub'), days=$('wgHrsDays'), foot=$('wgHrsFoot'), s=sz();
+    tile.classList.remove('hrs-on','hrs-break');
+    days.innerHTML=''; chip.hidden=false;
+    if(!emp()){
+      big.hidden=true; now.hidden=true; chip.textContent='Sign in';
+      sub.textContent='Sign in with your employee ID to see the hours you’ve clocked in Square.';
+      foot.innerHTML='Sign in &rarr;'; return;
+    }
+    if(!D){
+      big.hidden=true; now.hidden=true; chip.hidden=true;
+      sub.textContent=err; foot.innerHTML= err ? (/ID/.test(err) ? 'Sign in &rarr;' : 'Tap to try again') : 'Loading&hellip;'; return;
+    }
+    if(!D.linked){
+      big.hidden=true; now.hidden=true; chip.hidden=true;
+      sub.textContent='You’re not linked to a Square team member yet — ask a manager.'; foot.textContent=D.name||''; return;
+    }
+    var add=live(), wk=D.week_min+add;
+    big.hidden=false; $('wgHrsN').textContent=dec(wk); chip.hidden=false;
+    if(D.open){
+      tile.classList.add(D.open.on_break ? 'hrs-break' : 'hrs-on');
+      now.hidden=false; now.innerHTML='<i class="dot" aria-hidden="true"></i>'+(D.open.on_break ? 'On break · in ' : 'Clocked in ')+tm(D.open.start_at);
+    } else now.hidden=true;
+    if(s.h===0) chip.textContent=dec(wk)+'h';                     // title only: the week's hours (green while on the clock)
+    else if(D.open) chip.textContent=D.open.on_break ? 'Break' : 'On';
+    else chip.hidden=true;
+    sub.innerHTML='Today <b>'+hm(D.today_min+add)+'</b> · Last week <b>'+hm(D.last_week_min)+'</b>';
+    if(s.h>1){
+      var W=D.weeks[0]||{ days:[] };
+      days.innerHTML=W.days.map(function(d){ var m=d.min+(d.cards.some(running) ? add : 0);
+        return '<span class="r'+(d.date===D.today?' td':'')+'"><span>'+(d.date===D.today ? 'Today' : esc(day(d.date)))+'</span><b>'+hm(m)+'</b></span>'; }).join('')
+        || '<span class="r"><span>No clock-ins yet this week</span></span>';
+    }
+    foot.innerHTML='Day by day &rarr;';
+  }
+
+  function sheetHTML(){
+    var W=D.weeks[wkIdx]||{ days:[], min:0, start:'', end:'' }, add=wkIdx===0 ? live() : 0;
+    var rows=W.days.slice().reverse().map(function(d){
+      var cards=d.cards.map(function(c){
+        return '<div class="hrs-card"><span class="t">'+tm(c.in)+' – '+(c.out ? tm(c.out) : (c.on_break ? 'on break' : 'now'))+'</span>'
+          +'<span class="j">'+esc([c.job, c.loc].filter(Boolean).join(' · '))+'</span>'+(d.cards.length>1 ? '<b>'+hm(c.min+(running(c) ? add : 0))+'</b>' : '<span></span>')+'</div>'; }).join('');
+      return '<div class="hrs-day'+(d.date===D.today ? ' today' : '')+'"><div class="hd"><span>'+(d.date===D.today ? 'Today' : esc(day(d.date, true)))+'</span><b>'+hm(d.min+(d.cards.some(running) ? add : 0))+'</b></div>'+cards+'</div>';
+    }).join('') || '<p class="hrs-none">No clock-ins '+(wkIdx===0 ? 'yet this week' : 'last week')+'.</p>';
+    return '<div class="v8-h"><b>My hours'+(D.name ? ' · '+esc(String(D.name).split(' ')[0]) : '')+'</b><button type="button" class="v8-x" data-x aria-label="Close"><i class="ti ti-x" aria-hidden="true"></i></button></div>'
+      +'<div class="hrs-seg" role="group" aria-label="Which week"><button type="button" data-wk="0" aria-pressed="'+(wkIdx===0)+'">This week</button><button type="button" data-wk="1" aria-pressed="'+(wkIdx===1)+'">Last week</button></div>'
+      +'<div class="hrs-tot"><b>'+dec(W.min+add)+'</b><span>hours · '+hm(W.min+add)+'<br>'+(W.start ? esc(md(W.start))+' – '+esc(md(W.end)) : '')+'</span></div>'
+      +(wkIdx===0 && D.open ? '<div class="hrs-live'+(D.open.on_break ? ' brk' : '')+'"><i class="dot" aria-hidden="true"></i>'+(D.open.on_break ? 'On break' : 'On the clock')+' since '+tm(D.open.start_at)+'</div>' : '')
+      +'<div class="hrs-days">'+rows+'</div>'
+      +'<p class="hrs-src">From your Square clock-ins · updated '+tm(at)+'. Unpaid breaks don’t count.</p>'
+      +'<div class="v8-acts"><button type="button" class="v8-btn" data-refresh>Refresh</button><button type="button" class="v8-btn pri" data-x>Done</button></div>';
+  }
+  function drawSheet(){
+    if(!sh || !document.contains(sh)){ sh=null; return; }
+    var c=sh.querySelector('.v8-card'); if(!c || !D || !D.linked) return;
+    var st=c.scrollTop, f=document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('data-wk');
+    c.innerHTML=sheetHTML(); c.scrollTop=st;
+    var b=f!=null ? c.querySelector('[data-wk="'+f+'"]') : null; if(b) b.focus({ preventScroll:true });
+  }
+  function openSheet(){
+    if(!window.homeSheet || !D || !D.linked) return;
+    wkIdx=0; sh=window.homeSheet(sheetHTML());
+    sh.addEventListener('click', function(e){
+      var b=e.target.closest('[data-wk]'); if(b){ wkIdx=+b.getAttribute('data-wk'); drawSheet(); return; }
+      if(e.target.closest('[data-refresh]')) load(true);
+    });
+  }
+  function signIn(){
+    if(window.homeSignIn) window.homeSignIn(function(){ load(true); }, { title:'Sign in to see your hours',
+      blurb:'Enter your employee ID. Your hours come from your Square clock-ins, and your tiles save to the same ID.' });
+    else location.href='/schedule';
+  }
+
+  async function load(force){
+    var id=emp();
+    if(!id){ D=null; who=''; err=''; draw(); return; }
+    if(busy || (!force && id===who && Date.now()-last<60e3)) return;
+    busy=true; last=Date.now();
+    if(id!==who){ D=null; err=''; draw(); }
+    try{
+      var r=await fetch(FN, { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ action:'my-hours', login_id:id }) });
+      var j=await r.json().catch(function(){ return {}; });
+      if(emp()!==id) return;                                   // signed in as someone else meanwhile
+      if(!r.ok || !j.ok){
+        if(id!==who || r.status===404 || !D){ D=null; err= r.status===404 ? 'That employee ID isn’t active here — sign in again.' : 'Couldn’t reach Square right now.'; }
+        who=id; draw(); return;
+      }
+      D=j; at=Date.now(); who=id; err=''; draw(); drawSheet();
+    }catch(e){ if(emp()===id && !D){ who=id; err='Couldn’t reach Square right now.'; draw(); } }
+    finally{ busy=false; }
+  }
+
+  $('wgHrsOpen').addEventListener('click', function(){
+    if(document.body.classList.contains('home-editing')) return;
+    if(!emp() || (!D && /ID/.test(err))) return signIn();
+    if(!D){ load(true); return; }
+    openSheet();
+  });
+  tile.addEventListener('wgsize', function(){ try{ draw(); }catch(e){} });
+  function homeOn(){ var v=$('view-home'); return !v || v.classList.contains('active'); }
+  setInterval(function(){ if(document.visibilityState==='visible' && D && D.open){ draw(); drawSheet(); } }, 30e3);   // the running count
+  setInterval(function(){ if(document.visibilityState==='visible' && homeOn()) load(); }, 5*60e3);
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible' && Date.now()-last>2*60e3) load(); });
+  window.addEventListener('resize', function(){ if(emp()!==who) load(true); });          // Edit tiles' sign-in fires a resize
+  window.addEventListener('storage', function(e){ if(e.key==='greys_emp_id') load(true); });
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', function(){ load(true); }); else load(true);
 })();
 </script>
 </body>
