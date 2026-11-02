@@ -626,6 +626,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab-head">Marketing</div>
     <div class="tab" onclick="mtab('campaigns')">✉️ Email Campaigns</div>
     <div class="tab" onclick="mtab('social')">📣 Social Posts</div>
+    <div class="tab" onclick="mtab('greysie')">🤖 Ask Greysie</div>
     <div class="tab-head">Catering</div>
     <div class="tab" onclick="mtab('catering')">💼 Catering Leads <span id="catBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
     <div class="tab" onclick="mtab('preorders')">📅 Pre-Orders</div>
@@ -1499,6 +1500,35 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
   </div>
 
   <!-- ═══ MARKETING — SOCIAL POSTS (Zapier → Instagram / Facebook) ═══ -->
+  <!-- ASK GREYSIE (2026-11-02): the customer chat bubble on the GREYS websites — its knowledge base (site_content
+       'assistant_kb'), a test box and recent questions (assistant_chats). Script: ASK GREYSIE, near the end. -->
+  <div id="panel-greysie" class="panel">
+    <div class="section-card">
+      <h2>🤖 Ask Greysie <span class="gy-status" id="gyStatus">Checking…</span></h2>
+      <div class="hint">Greysie is the chat bubble customers see on the GREYS websites. It answers from the <strong>knowledge base</strong> below, plus live info it looks up on its own: upcoming classes and seats left, the online-ordering menus and prices, experiences and Cheese Club prices. Edit the knowledge base when hours, specials or policies change — Greysie uses the new text within a minute.</div>
+      <div class="gy-bar">
+        <button class="btn btn-gold" id="gySave" type="button">Save</button>
+        <button class="btn btn-ghost" id="gyUndo" type="button">Undo changes</button>
+        <button class="btn btn-ghost" id="gyDownload" type="button">Download .md</button>
+        <span class="gy-msg" id="gyMsg" role="status"></span>
+      </div>
+      <div class="gy-grid">
+        <div class="gy-kb">
+          <label class="gy-cap" for="gyText">Knowledge base <span class="hint" id="gyMeta" style="margin:0;font-weight:400;"></span></label>
+          <textarea id="gyText" class="gy-text" spellcheck="true" placeholder="Loading…"></textarea>
+        </div>
+        <div class="gy-side">
+          <div class="gy-cap">Try it</div>
+          <div class="gy-try">
+            <div class="gy-log" id="gyLog"><div class="hint" style="margin:0;">Ask a question the way a customer would. Saved changes are used within a minute.</div></div>
+            <form id="gyAsk" class="gy-ask"><input id="gyQ" type="text" maxlength="500" placeholder="e.g. Are you open Sunday in Nashville?" autocomplete="off"><button class="btn btn-gold" type="submit">Ask</button></form>
+          </div>
+          <div class="gy-cap" id="gyRecentCap" style="display:none;">Recent customer questions</div>
+          <div class="gy-recent" id="gyRecent"></div>
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="panel-social" class="panel">
     <div class="section-card">
       <div class="emc-top">
@@ -17132,6 +17162,133 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   }
 
   window.pwOpen = open;
+})();
+</script>
+<!-- ASK GREYSIE (2026-11-02): manager tab for the website chat assistant (greys-assistant edge function).
+     Knowledge base = site_content 'assistant_kb' {text} (admin write, the function reads it with the service role).
+     "Try it" calls the function like the bubble does. Recent questions come from assistant_chats when that table exists. -->
+<style id="greysie-tab">
+.gy-status{ font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:999px; background:#eef2f5; color:#334155; }
+.gy-status.ok{ background:#e7f6ec; color:#166534; } .gy-status.bad{ background:#fdecea; color:#991b1b; }
+.gy-bar{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:0 0 16px; }
+.gy-msg{ font-size:.9rem; font-weight:600; } .gy-msg.ok{ color:#166534; } .gy-msg.bad{ color:#b91c1c; }
+.gy-grid{ display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:20px; align-items:start; }
+@media (max-width:1100px){ .gy-grid{ grid-template-columns:1fr; } }
+.gy-cap{ display:block; font-weight:700; font-size:.9rem; margin:0 0 8px; }
+.gy-text{ width:100%; min-height:640px; box-sizing:border-box; font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; padding:14px; border:1px solid var(--line,#e5e7eb); border-radius:12px; resize:vertical; background:#fbfaf7; color:#0f172a; }
+.gy-try{ border:1px solid var(--line,#e5e7eb); border-radius:14px; overflow:hidden; margin-bottom:20px; background:#fff; }
+.gy-log{ max-height:420px; min-height:160px; overflow-y:auto; padding:14px; background:#fbf6ec; display:flex; flex-direction:column; gap:8px; }
+.gy-m{ max-width:90%; padding:9px 12px; border-radius:14px; font-size:.92rem; line-height:1.45; white-space:pre-wrap; word-wrap:break-word; }
+.gy-m.q{ align-self:flex-end; background:#06273a; color:#fff; } .gy-m.a{ align-self:flex-start; background:#fff; border:1px solid #efe6d3; }
+.gy-m.e{ align-self:flex-start; background:#fdecea; color:#991b1b; }
+.gy-ask{ display:flex; gap:8px; padding:10px; border-top:1px solid var(--line,#e5e7eb); }
+.gy-ask input{ flex:1; min-width:0; padding:10px 12px; border:1px solid var(--line,#e5e7eb); border-radius:10px; font-size:15px; }
+.gy-recent{ display:flex; flex-direction:column; gap:8px; max-height:520px; overflow-y:auto; }
+.gy-r{ border:1px solid var(--line,#e5e7eb); border-radius:12px; padding:10px 12px; background:#fff; font-size:.88rem; }
+.gy-r b{ display:block; margin-bottom:4px; } .gy-r .gy-when{ color:#64748b; font-size:.78rem; margin-top:6px; }
+.gy-r.err{ border-color:#fca5a5; background:#fef6f6; }
+</style>
+<script>
+(function(){
+  var FN = 'https://vdvtrevhqalmjwhjhjug.supabase.co/functions/v1/greys-assistant';
+  var KEY = 'assistant_kb';
+  var st = { loaded:false, saved:'', dirty:false, sid:'staff-' + Date.now().toString(36), msgs:[] };
+  function $(id){ return document.getElementById(id); }
+  function msg(t, cls){ var m = $('gyMsg'); if(!m) return; m.textContent = t || ''; m.className = 'gy-msg' + (cls ? ' ' + cls : ''); }
+  function meta(updated, who){
+    var t = $('gyText').value;
+    $('gyMeta').textContent = '— ' + t.length.toLocaleString() + ' characters' + (updated ? ' · last saved ' + new Date(updated).toLocaleString() + (who ? ' by ' + who : '') : '');
+  }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  async function status(){
+    var el = $('gyStatus');
+    try{
+      var r = await fetch(FN + '?action=health', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+      var j = await r.json();
+      if(j && j.ok && j.configured){ el.textContent = 'On · ' + j.model; el.className = 'gy-status ok'; }
+      else if(j && j.ok){ el.textContent = 'Not switched on — add the ANTHROPIC_API_KEY secret in Supabase'; el.className = 'gy-status bad'; }
+      else throw new Error();
+    }catch(_){ el.textContent = 'Can’t reach Greysie'; el.className = 'gy-status bad'; }
+  }
+  async function load(){
+    msg('');
+    try{
+      var r = await sb.from('site_content').select('data,updated_at,updated_by').eq('key', KEY).maybeSingle();
+      if(r.error) throw r.error;
+      st.saved = r.data && r.data.data ? String(r.data.data.text || '') : '';
+      $('gyText').value = st.saved;
+      $('gyText').placeholder = 'The knowledge base is empty — Greysie will only use the live info.';
+      meta(r.data && r.data.updated_at, r.data && r.data.updated_by);
+    }catch(e){ msg('Could not load the knowledge base: ' + (e.message || e), 'bad'); }
+    st.loaded = true; st.dirty = false;
+    recent();
+  }
+  async function save(){
+    var text = $('gyText').value.replace(/\r\n/g, '\n');
+    if(text.trim().length < 200 && !confirm('The knowledge base is almost empty. Save it anyway?')) return;
+    var who = '';
+    try{ var s = await sb.auth.getSession(); who = (s.data && s.data.session && s.data.session.user && s.data.session.user.email) || ''; }catch(_){}
+    msg('Saving…', '');
+    var now = new Date().toISOString();
+    var r = await sb.from('site_content').upsert({ key: KEY, data: { text: text }, updated_at: now, updated_by: who || null });
+    if(r.error){ msg('Not saved: ' + r.error.message, 'bad'); return; }
+    st.saved = text; st.dirty = false; meta(now, who);
+    msg('Saved — Greysie uses it within a minute.', 'ok');
+  }
+  function undo(){
+    if(st.dirty && !confirm('Throw away your unsaved changes?')) return;
+    $('gyText').value = st.saved; st.dirty = false; meta(); msg('');
+  }
+  function download(){
+    var blob = new Blob([$('gyText').value], { type:'text/markdown' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'greysie-knowledge-base.md';
+    document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+  function bubble(cls, text){
+    var log = $('gyLog'); var d = document.createElement('div'); d.className = 'gy-m ' + cls; d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; return d;
+  }
+  async function ask(e){
+    e.preventDefault();
+    var q = $('gyQ').value.trim(); if(!q) return;
+    if(st.dirty) msg('You have unsaved changes — Greysie is answering from the saved knowledge base.', 'bad');
+    $('gyQ').value = ''; bubble('q', q);
+    st.msgs.push({ role:'user', content:q });
+    var wait = bubble('a', '…');
+    try{
+      var r = await fetch(FN, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ messages: st.msgs.slice(-12), page: location.origin + '/manager.html', sid: st.sid }) });
+      var j = await r.json();
+      if(j && j.ok){ wait.textContent = j.reply; st.msgs.push({ role:'assistant', content:j.reply }); }
+      else { wait.className = 'gy-m e'; wait.textContent = (j && j.error) || 'No answer.'; st.msgs.pop(); }
+    }catch(err){ wait.className = 'gy-m e'; wait.textContent = 'Could not reach Greysie.'; st.msgs.pop(); }
+  }
+  async function recent(){
+    try{
+      var r = await sb.from('assistant_chats').select('created_at,question,reply,error,site').order('created_at', { ascending:false }).limit(40);
+      if(r.error) return; // the log table isn't set up yet
+      $('gyRecentCap').style.display = '';
+      var rows = r.data || [];
+      $('gyRecent').innerHTML = rows.length ? rows.map(function(x){
+        return '<div class="gy-r' + (x.error ? ' err' : '') + '"><b>' + esc(x.question) + '</b>' +
+          (x.reply ? esc(x.reply.length > 400 ? x.reply.slice(0, 400) + '…' : x.reply) : '<em>' + esc(x.error || '') + '</em>') +
+          '<div class="gy-when">' + new Date(x.created_at).toLocaleString() + (x.site ? ' · ' + esc(x.site) : '') + '</div></div>';
+      }).join('') : '<div class="hint">No questions yet.</div>';
+    }catch(_){}
+  }
+  function init(){
+    if(!$('gyText')) return;
+    $('gySave').addEventListener('click', save);
+    $('gyUndo').addEventListener('click', undo);
+    $('gyDownload').addEventListener('click', download);
+    $('gyAsk').addEventListener('submit', ask);
+    $('gyText').addEventListener('input', function(){ st.dirty = $('gyText').value !== st.saved; meta(); });
+    var _mtab = window.mtab;
+    window.mtab = function(name){
+      _mtab.apply(this, arguments);
+      if(name === 'greysie'){ if(!st.loaded) load(); else recent(); status(); }
+    };
+    window.addEventListener('beforeunload', function(e){ if(st.dirty){ e.preventDefault(); e.returnValue = ''; } });
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
 </script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
