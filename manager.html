@@ -871,7 +871,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       <div class="cat-pagehead">
         <h2>💼 Catering Leads<button type="button" class="cat-help" aria-expanded="false" aria-controls="catHow" title="How it works" onclick="const h=document.getElementById('catHow');h.hidden=!h.hidden;this.setAttribute('aria-expanded',String(!h.hidden));">?</button></h2>
         <div class="cat-tools" id="catTools"></div>
-        <div class="cat-howbox" id="catHow" hidden><strong>Every inquiry lands here</strong> — catering, private events, experiences and Nashville table requests from the inquiry form, plus any you add by hand. Memphis tables booked on the form go straight into Reservations. Experiences open their own conversation with the held time and booking link; catering and private events get the proposal and invoice. Reply here and it's emailed from info@greyscheese.com; their replies come back in automatically (Gmail sync). Build the <strong>Proposal</strong>, send it, and the customer signs online — that <strong>creates a Square invoice</strong> (deposit now, balance before the event) with the signed agreement attached. No proposal needed? <strong>🧾 Save &amp; send invoice</strong> skips the signature and emails the Square invoice right away. Payment status refreshes from Square every 15 minutes.</div>
+        <div class="cat-howbox" id="catHow" hidden><strong>Every inquiry lands here</strong> — catering, private events and experiences from the inquiry form, plus any you add by hand. Memphis and Nashville tables booked on the form go straight into Reservations. Experiences open their own conversation with the held time and booking link; catering and private events get the proposal and invoice. Reply here and it's emailed from info@greyscheese.com; their replies come back in automatically (Gmail sync). Build the <strong>Proposal</strong>, send it, and the customer signs online — that <strong>creates a Square invoice</strong> (deposit now, balance before the event) with the signed agreement attached. No proposal needed? <strong>🧾 Save &amp; send invoice</strong> skips the signature and emails the Square invoice right away. Payment status refreshes from Square every 15 minutes.</div>
       </div>
       <div class="cat-kinds" id="catKinds"></div>
       <div class="cat-stages" id="catChips"></div>
@@ -937,7 +937,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
   <div id="panel-resys" class="panel">
     <div class="section-card">
       <h2>🗓️ Reservations</h2>
-      <div class="hint">Live from Wix. <strong>Add</strong> a phone-in or walk-in booking (created confirmed — the guest gets Wix's confirmation if you enter contact info), or <strong>click a reservation</strong> to change its time, party size, guest info, or cancel it. Requests still get approved or declined on the staff page.</div>
+      <div class="hint">Live from Wix. <strong>Add</strong> a phone-in or walk-in booking (created confirmed — the guest gets Wix's confirmation if you enter contact info), or <strong>click a reservation</strong> to change its time, party size, guest info, or cancel it.</div>
       <div class="toolbar">
         <select class="loc-sel" id="resLoc" onchange="loadResys()"><option value="memphis">Memphis</option><option value="nashville">Nashville</option></select>
         <div class="rf"><label>From</label><input type="date" id="resFrom" onchange="loadResys()"></div>
@@ -2669,8 +2669,8 @@ function blkRender(){
   const el = document.getElementById('blkList');
   if(!BLK_ROWS.length){ el.innerHTML = '<div class="rec-empty">No blocked dates for this location.</div>'; return; }
   el.innerHTML = BLK_ROWS.map((p,i)=>{
-    const fromEvent = /^\[EVT:/.test(p.comment||'');
-    const label = (p.comment||'').replace(/^\[EVT:[^\]]*\]\s*/,'').replace(/^\[MANUAL\]\s*/,'') || 'Blocked';
+    const fromEvent = /^\[EVT(-P)?:/.test(p.comment||''); // [EVT:<class/ticketed event>] or [EVT-P:<staff event>]
+    const label = (p.comment||'').replace(/^\[EVT(-P)?:[^\]]*\]\s*/,'').replace(/^\[MANUAL\]\s*/,'') || 'Blocked';
     return '<div class="rec-row">'
       +'<span class="res-r-time">'+blkFmt(p.startDate)+' → '+blkFmt(p.endDate)+'</span>'
       +'<div style="flex:1;min-width:0;"><div class="res-r-name">'+esc(label)+'</div></div>'
@@ -16911,7 +16911,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
         "label": "Reserve a table",
         "sub": "Lunch, dinner or a glass of wine, for up to 6",
         "title": "Reserve a table",
-        "lede": "Book a table in Memphis, or request one in Nashville.",
+        "lede": "Book a table in Memphis or Nashville.",
         "msg_label": "Anything we should know?",
         "msg_hint": "A birthday, a high chair, an allergy, where you'd like to sit",
         "questions": []
@@ -17097,7 +17097,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   var KEY = 'inquiry_form';
   var KIND_NAMES = { one:'Buttons — pick one', many:'Buttons — pick any', text:'Short typed answer', long:'Long typed answer' };
   var BUILT_IN = {
-    table: 'Built in: which shop, guests (1 to 6), date and time, then name, email, phone and a note. Memphis books the table on the spot (it lands in Wix reservations and they get a confirmation email). Nashville sends a request to 💼 Catering Leads tagged Table request. Questions you add here show on a "A few details" screen.',
+    table: 'Built in: which shop, guests (1 to 6), date and time, then name, email, phone and a note. Memphis and Nashville book the table on the spot (it lands in Wix reservations and they get a confirmation email). Questions you add here show on a "A few details" screen.',
     experience: 'Built in: which experience (and tasting), shop, guests and the date they would like — a date request, nothing is booked or held (since 2026-10-30) — the address for Raclette at Home, then name, email, phone and a message. Shows in 💼 Catering Leads tagged Experience. The questions below share one "A few details" screen.',
     catering: 'Built in: shop and pickup / delivery / on site / off site (plus the address), then guests, date and time, then the interest buttons (Greysing Table, Charcuterie board, Private event, Sandwiches / box lunches), name, email, phone and a message. Goes to 💼 Catering Leads. The questions below show under the date on the second screen.',
     event: 'Built in: shop, guests, date and a start time (12:00 to 7:00), then name, email, phone and a message. Goes to 💼 Catering Leads tagged Private event, so it can get a proposal and an invoice. The questions below share one "A few details" screen.'
