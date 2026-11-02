@@ -542,8 +542,9 @@ async function loadWeek(){
     sb.from('portal_shifts').select('*').in('location', GROUP).gte('date', from).lte('date', to).order('start_time'),
     sb.from('portal_time_off').select('*').in('location', GROUP).eq('status','approved').lte('start_date', to)
   ]);
-  EMPLOYEES = emps.data||[];
   SHIFTS = shifts.data||[];
+  // off-schedule staff (owners/admins: on_schedule = false) aren't rows or swap choices, unless they have a shift this week
+  EMPLOYEES = (emps.data||[]).filter(e => e.on_schedule!==false || SHIFTS.some(s => s.employee_id===e.id));
   TIMEOFF = (toff.data||[]).filter(r => (r.end_date||r.start_date) >= from);
   render();
 }
