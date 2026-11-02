@@ -1,6 +1,8 @@
 -- 2026-11-02 — Time card fixes (applied live via migrations `portal_time_fixes` and `portal_time_fixes_still_on`).
 -- Staff ask from the My Hours tile (index.html): fix a clock-in's times, set a missed clock-out, move just the
--- clock-in while still on the clock (req_end null), or add a missed shift. A manager approves in manager.html
+-- clock-in while still on the clock (req_end null), or add a missed punch for a day: clock-in + clock-out, or (today)
+-- a clock-in only while still on the clock (kind 'add', req_end null — approving opens a timecard, or moves the
+-- clock-in back if they clocked in late after asking; migration `portal_time_fixes_missed_clock_in`). A manager approves in manager.html
 -- (Staff → Time Off & Swaps → Time Card Fixes) and square-team-sync (fix-decide) writes the times into Square:
 -- UpdateTimecard for an edit, CreateTimecard for a missed shift. Decline leaves Square alone. The employee gets a
 -- text (Twilio, portal_sms_log kind 'timefix') and an email either way. Edge function: supabase/functions/square-team-sync.
@@ -18,7 +20,7 @@ create table if not exists public.portal_time_fixes (
   orig_start     timestamptz,                            -- what Square had when they asked (edit only)
   orig_end       timestamptz,
   req_start      timestamptz not null,
-  req_end        timestamptz,                            -- null = clock-in change only (still on the clock)
+  req_end        timestamptz,                            -- null = still on the clock (edit: move only the clock-in; add: a missed clock-in today)
   job_title      text   not null default '',
   note           text   not null default '',
   status         text   not null default 'pending' check (status in ('pending','approved','declined','cancelled')),
@@ -31,19 +33,18 @@ create table if not exists public.portal_time_fixes (
   updated_at     timestamptz not null default now(),
   check (req_end > req_start)
 );
-alter table public.portal_time_fixes add constraint portal_time_fixes_add_has_end check (req_end is not null or kind = 'edit');
 create index if not exists portal_time_fixes_status_idx on public.portal_time_fixes (status, created_at desc);
 create index if not exists portal_time_fixes_emp_idx on public.portal_time_fixes (employee_id, created_at desc);
 create unique index if not exists portal_time_fixes_one_pending on public.portal_time_fixes (timecard_id) where status = 'pending' and timecard_id is not null;
 comment on table public.portal_time_fixes is
   'Time card fix requests (staff portal My Hours -> manager console Time Off & Swaps). Approving writes the times into Square via square-team-sync. Service-role only.';
 comment on column public.portal_time_fixes.req_end is
-  'null = clock-in change only (they were still on the clock): the clock-out stays whatever Square has when it is approved';
+  'null = still on the clock: edit = move only the clock-in (the clock-out stays whatever Square has at approval); add = a missed clock-in today (approving opens a timecard)';
 alter table public.portal_time_fixes enable row level security;
 revoke all on public.portal_time_fixes from anon, authenticated;
 
--- Check the Square write shapes end to end in the Square SANDBOX (add → edit → read back → delete, then an open
--- clock-in → move only its clock-in → read back → delete):
+-- Check the Square write shapes end to end in the Square SANDBOX (add → edit → read back → delete, then a missed
+-- clock-in → OPEN timecard → an earlier missed clock-in moves it back → read back → delete):
 --   select net.http_post(url := 'https://vdvtrevhqalmjwhjhjug.supabase.co/functions/v1/square-team-sync',
 --     body := jsonb_build_object('action','fix-selftest','secret',(select value from app_secrets where name='cc_cron_secret')),
 --     headers := jsonb_build_object('Content-Type','application/json'), timeout_milliseconds := 60000);

@@ -27,7 +27,9 @@
 //   TIME FIXES (2026-11-02): staff ask from My Hours to fix a clock-in (wrong times / forgot to clock out) or add a missed
 //          shift; a manager approves in manager.html (Staff → Time Off & Swaps) and the times are written into Square.
 //     fix-request {login_id, timecard_id? | date, start "HH:MM", end "HH:MM", note, job?, location_id?} — PUBLIC (employee ID)
-//       still_on: true (open clock-in only) = move just the clock-in; the clock-out stays whatever Square has at approval
+//       still_on: true = still on the clock: with timecard_id (an open clock-in) move just its clock-in — the clock-out stays
+//       whatever Square has at approval; without (today only) = a missed clock-in — approving opens a timecard, or moves the
+//       clock-in back if they clocked in late after asking
 //     fix-cancel {login_id, id} — PUBLIC, their own pending ask
 //     fix-list {status:"pending"|"all"} · fix-decide {id, approve, note, dry?} — managers (is_app_admin) / service
 //     fix-selftest — service only: create → edit → read → delete a timecard in the Square SANDBOX (checks the write shapes)
@@ -416,13 +418,13 @@ function weekStart(day: string) {          // Square workweek config: starts MON
   return addDays(day, -((new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7));
 }
 
-async function searchCards(tmId: string, fromIso: string): Promise<{ cards: any[]; src: string }> {
+async function searchCards(tmId: string, fromIso: string, env: Env = "production"): Promise<{ cards: any[]; src: string }> {
   const body = JSON.stringify({ query: { filter: { team_member_ids: [tmId], start: { start_at: fromIso } }, sort: { field: "START_AT", order: "ASC" } }, limit: 200 });
   try {
-    const d = await sq("/v2/labor/timecards/search", { method: "POST", body }, LABOR_VERSION);
+    const d = await sqx(env, "/v2/labor/timecards/search", { method: "POST", body }, LABOR_VERSION);
     return { cards: d.timecards ?? [], src: "timecards" };
   } catch (_) {
-    const d = await sq("/v2/labor/shifts/search", { method: "POST", body });
+    const d = await sqx(env, "/v2/labor/shifts/search", { method: "POST", body });
     return { cards: d.shifts ?? [], src: "shifts" };
   }
 }
@@ -544,9 +546,10 @@ async function fixRequest(b: any) {
     if (!loc) throw new PublicError("Couldn’t tell which shop — ask a manager.", 409);
   }
   if (day < lastWk || day > today) throw new PublicError("You can fix this week and last week.", 400);
-  // still on the clock: only the clock-in moves (open clock-ins only)
+  // still on the clock: an open clock-in → only its clock-in moves; no clock-in at all (today) → a missed clock-in
   const stillOn = b.still_on === true || b.still_on === "true";
-  if (stillOn && (!orig || orig.end_at)) throw new PublicError("That clock-in already has a clock-out — put in the clock-out time.", 409);
+  if (stillOn && orig?.end_at) throw new PublicError("That clock-in already has a clock-out — put in the clock-out time.", 409);
+  if (stillOn && !orig && day !== today) throw new PublicError("“Still on the clock” is only for today — put in the clock-out time.", 400);
   const start = localAt(day, hhmm(b.start));
   let end: Date | null = null;
   if (stillOn) {
@@ -573,6 +576,7 @@ async function fixRequest(b: any) {
   for (const c of cards) {
     if (c.id === tcId || !c.start_at) continue;
     const cs = new Date(c.start_at), ce = c.end_at ? new Date(c.end_at) : now;
+    if (stillOn && !tcId && !c.end_at) throw new PublicError(`You’re already on the clock since ${clock(cs)} — tap Fix on that clock-in to change it.`, 409);
     if (cs < until && ce > start) throw new PublicError(`That overlaps your clock-in at ${clock(cs)} on ${dayLabel(ymd(cs))}.`, 409);
   }
   const row = {
@@ -639,11 +643,24 @@ async function applyFix(env: Env, r: any, dry = false) {
     const u = (await sqx(env, path, { method: "PUT", body: JSON.stringify({ timecard: tc }) }, LABOR_VERSION)).timecard;
     return { timecard_id: u?.id ?? r.timecard_id, start_at: u?.start_at, end_at: u?.end_at };
   }
-  if (!r.req_end) throw new Error("a missed shift needs a clock-out");
-  const end = rfc(new Date(r.req_end));
+  if (!r.req_end) {
+    // a missed clock-in, still on the clock: if they clocked in late after asking, move that clock-in back;
+    // otherwise open a timecard (Square allows one open timecard per person)
+    const { cards } = await searchCards(r.team_member_id, new Date(startMs - 86400000).toISOString(), env);
+    const open = cards.find((c: any) => c.start_at && !c.end_at);
+    if (open) {
+      if (+new Date(open.start_at) >= startMs) return await applyFix(env, { ...r, kind: "edit", timecard_id: open.id, req_end: null }, dry);
+      throw new Error(`they’re already clocked in since ${clock(new Date(open.start_at))}`);
+    }
+    const clash = cards.find((c: any) => c.start_at && c.end_at && +new Date(c.end_at) > startMs);
+    if (clash) throw new Error(`they have a clock-in at ${clock(new Date(clash.start_at))} after that time — decline and ask them to fix that one`);
+    if (Date.now() - startMs > 16 * 3600000) throw new Error("that was over 16 hours ago and they’re not on the clock now — decline and ask them to put in the clock-out time");
+  }
+  const end = r.req_end ? rfc(new Date(r.req_end)) : null;
   const m = await teamMember(env, r.team_member_id);
   const jobs = jobsOf(m), j = jobs.find((x) => x.title === r.job_title) ?? jobs[0];
-  const tc: any = { location_id: r.location_id, team_member_id: r.team_member_id, start_at: start, end_at: end, status: "CLOSED" };
+  const tc: any = { location_id: r.location_id, team_member_id: r.team_member_id, start_at: start, status: end ? "CLOSED" : "OPEN" };
+  if (end) tc.end_at = end;
   if (j) tc.wage = { title: j.title, ...(j.job_id ? { job_id: j.job_id } : {}), ...(j.rate ? { hourly_rate: j.rate } : {}) };
   const body = { idempotency_key: `greys-timefix-${r.id}`, timecard: tc };
   if (dry) return { dry: true, method: "POST", path: "/v2/labor/timecards", body };
@@ -731,18 +748,22 @@ async function fixSelftest() {
   } finally {
     if (add?.timecard_id) { await sqx(env, `/v2/labor/timecards/${encodeURIComponent(add.timecard_id)}`, { method: "DELETE" }, LABOR_VERSION); steps.push({ deleted: add.timecard_id }); }
   }
-  // still on the clock: open a timecard → move only its clock-in (stays OPEN, no clock-out) → read back → delete
-  const t0 = Date.now() - 3 * 3600000;
-  const open = (await sqx(env, "/v2/labor/timecards", { method: "POST", body: JSON.stringify({ idempotency_key: "greys-selftest-open-" + Date.now(),
-    timecard: { location_id: loc, team_member_id: tm.id, start_at: rfc(new Date(t0)) } }) }, LABOR_VERSION)).timecard;
-  steps.push({ open: { id: open?.id, status: open?.status, start_at: open?.start_at } });
+  // still on the clock: a missed clock-in opens a timecard (OPEN, no clock-out) → read back → a second, earlier missed
+  // clock-in moves that open clock-in back (the "clocked in late after asking" path = a clock-in-only edit) → read back → delete
+  const t0 = Math.floor((Date.now() - 3 * 3600000) / 60000) * 60000;
+  const addOpen = await applyFix(env, { id: "selftest-open-" + Date.now(), kind: "add", team_member_id: tm.id, location_id: loc, job_title: "",
+    req_start: new Date(t0).toISOString(), req_end: null });
+  steps.push({ add_open: addOpen });
   try {
-    const moved = await applyFix(env, { id: "selftest-open", kind: "edit", timecard_id: open.id, req_start: new Date(t0 - 3600000).toISOString(), req_end: null });
-    steps.push({ moved });
-    const back = (await sqx(env, `/v2/labor/timecards/${encodeURIComponent(open.id)}`, {}, LABOR_VERSION)).timecard;
-    steps.push({ readback_open: { start_at: back?.start_at, end_at: back?.end_at ?? null, status: back?.status, version: back?.version } });
+    let back = (await sqx(env, `/v2/labor/timecards/${encodeURIComponent(addOpen.timecard_id)}`, {}, LABOR_VERSION)).timecard;
+    steps.push({ readback_open: { start_at: back?.start_at, end_at: back?.end_at ?? null, status: back?.status } });
+    const moved = await applyFix(env, { id: "selftest-merge-" + Date.now(), kind: "add", team_member_id: tm.id, location_id: loc, job_title: "",
+      req_start: new Date(t0 - 3600000).toISOString(), req_end: null });
+    steps.push({ moved_back: moved });
+    back = (await sqx(env, `/v2/labor/timecards/${encodeURIComponent(addOpen.timecard_id)}`, {}, LABOR_VERSION)).timecard;
+    steps.push({ readback_moved: { start_at: back?.start_at, end_at: back?.end_at ?? null, status: back?.status, version: back?.version } });
   } finally {
-    if (open?.id) { await sqx(env, `/v2/labor/timecards/${encodeURIComponent(open.id)}`, { method: "DELETE" }, LABOR_VERSION); steps.push({ deleted: open.id }); }
+    if (addOpen?.timecard_id) { await sqx(env, `/v2/labor/timecards/${encodeURIComponent(addOpen.timecard_id)}`, { method: "DELETE" }, LABOR_VERSION); steps.push({ deleted: addOpen.timecard_id }); }
   }
   return { ok: true, team_member: tm.id, location: loc, day, steps };
 }
