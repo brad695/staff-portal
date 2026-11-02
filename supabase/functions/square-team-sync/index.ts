@@ -9,8 +9,10 @@
 //     status is mirrored, so a manager flipping someone in the portal is never fought by the next run.
 //   • People in both keep the PORTAL's name, role, location and contacts — Square never overwrites them.
 //   • Scheduling is NOT linked ("staff only for now").
-//   • Square-only people present at setup (2026-11-01: Kurt McGurt, Jacqueline Mau/owner) were NOT added —
-//     their link rows are dismissed. A dismissed person is added later only if Square deactivates and
+//   • A Square Owner or Admin job (or the account owner) comes in OFF the schedule (portal_employees.on_schedule = false):
+//     in the portal for sign-in, Greys Chat and staff emails, but not on the schedule grids. Managers flip it in Employees.
+//   • Square-only people present at setup were not auto-added; Maverick then had Kurt McGurt and Jacqueline Mau (owner)
+//     added by hand, off the schedule (2026-11-01). A dismissed person is added later only if Square deactivates and
 //     reactivates them (a rehire). Same for someone deleted from the portal after being linked.
 //
 // Triggers
@@ -19,6 +21,9 @@
 //   • a manager session (is_app_admin) or the service role → any action
 // Actions: setup (one-time: link existing staff + create the webhook subscription) · sync · status
 //          add {dry:true} to setup/sync to preview without writing.
+//   my-hours {login_id} — PUBLIC (staff portal "My Hours" tile, 2026-11-01): that employee's Square clock-ins for this
+//          week and last week (Square workweek = Monday 00:00 Chicago), today, and the open timecard if they're on the clock.
+//          Same trust level as the rest of the portal: the employee ID is the key. Hours only — never wages.
 // Deploy with verify_jwt = FALSE — Square posts here with no Supabase JWT. Auth is done in code.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -37,6 +42,9 @@ const LOC: Record<string, string> = { LCXWZ0HAQ69RM: "memphis", LJ33VDYHS1JAR: "
 const DEFAULT_LOC = "memphis";
 const KEY_NAME = "square_team_webhook_key";
 const SUB_NAME = "square_team_webhook_id";
+const LABOR_VERSION = "2025-05-21"; // Timecards API (Square renamed Shifts → Timecards); falls back to the old Shifts search
+const TZ = "America/Chicago";       // both shops
+const LOC_NAME: Record<string, string> = { LCXWZ0HAQ69RM: "Memphis", LJ33VDYHS1JAR: "Nashville" };
 
 class PublicError extends Error {
   status: number;
@@ -106,12 +114,12 @@ async function setSecret(name: string, value: string) {
 }
 
 // ---------- Square ----------
-async function sq(path: string, init: RequestInit = {}) {
+async function sq(path: string, init: RequestInit = {}, version = SQUARE_VERSION) {
   if (!SQUARE_TOKEN) throw new Error("Square access token is not set");
   const res = await fetch(SQUARE_BASE + path, {
     ...init,
     signal: AbortSignal.timeout(20_000),
-    headers: { Authorization: "Bearer " + SQUARE_TOKEN, "Content-Type": "application/json", "Square-Version": SQUARE_VERSION },
+    headers: { Authorization: "Bearer " + SQUARE_TOKEN, "Content-Type": "application/json", "Square-Version": version },
   });
   const data: any = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -304,7 +312,8 @@ async function reconcile(mode: "setup" | "sync", dry: boolean): Promise<Report> 
           try { role = tidy((await sq(`/v2/team-members/${encodeURIComponent(m.id)}/wage-setting`))?.wage_setting?.job_assignments?.[0]?.job_title); } catch (_) { /* role stays blank */ }
         }
         const login = pickLogin(m, used);
-        const row = { name: name.slice(0, 120), login_id: login, role: role.slice(0, 60), location: locOf(m), active: true };
+        const offSched = !!m.is_owner || /^(owner|admin)$/i.test(role);     // owners and admins: chat + emails, not the schedule
+        const row = { name: name.slice(0, 120), login_id: login, role: role.slice(0, 60), location: locOf(m), active: true, on_schedule: !offSched };
         const { data, error } = await admin.from("portal_employees").insert(row).select("id").single();
         if (error) throw new Error(error.message);
         const id = Number(data.id);
@@ -319,7 +328,7 @@ async function reconcile(mode: "setup" | "sync", dry: boolean): Promise<Report> 
         }).eq("team_member_id", m.id);
         if (lerr) throw new Error(lerr.message);
         taken.add(id);
-        r.created.push(`${row.name} (${row.location}, ${row.role || "no role"}, login ${login || "none — set one"})`);
+        r.created.push(`${row.name} (${row.location}, ${row.role || "no role"}, login ${login || "none — set one"}${offSched ? ", off the schedule" : ""})`);
       } catch (e) {
         await admin.from("square_team_links").update({ match_rule: "", updated_at: nowIso() })
           .eq("team_member_id", m.id).eq("match_rule", "creating:" + runId);
@@ -370,6 +379,85 @@ async function ensureWebhook() {
   return { ok: true, subscription_id: sub?.id ?? null, enabled: sub?.enabled ?? true, events: sub?.event_types ?? EVENT_TYPES };
 }
 
+// ---------- my hours (staff portal tile) ----------
+// Chicago wall-clock dates, DST-safe (Square stamps each timecard with its own offset; days are the shop's days)
+const ymdFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
+const ymd = (d: Date) => ymdFmt.format(d);
+const partsFmt = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+function offsetMin(d: Date) {
+  const p = partsFmt.formatToParts(d);
+  const g = (t: string) => Number(p.find((x) => x.type === t)?.value ?? 0);
+  return (Date.UTC(g("year"), g("month") - 1, g("day"), g("hour"), g("minute"), g("second")) - d.getTime()) / 60000;
+}
+function midnight(day: string) {           // 00:00 in Chicago on YYYY-MM-DD
+  const [y, m, d] = day.split("-").map(Number);
+  let t = Date.UTC(y, m - 1, d);
+  for (let i = 0; i < 2; i++) t = Date.UTC(y, m - 1, d) - offsetMin(new Date(t)) * 60000;
+  return new Date(t);
+}
+function addDays(day: string, n: number) { const [y, m, d] = day.split("-").map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); }
+function weekStart(day: string) {          // Square workweek config: starts MON 00:00
+  const [y, m, d] = day.split("-").map(Number);
+  return addDays(day, -((new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7));
+}
+
+async function searchCards(tmId: string, fromIso: string): Promise<{ cards: any[]; src: string }> {
+  const body = JSON.stringify({ query: { filter: { team_member_ids: [tmId], start: { start_at: fromIso } }, sort: { field: "START_AT", order: "ASC" } }, limit: 200 });
+  try {
+    const d = await sq("/v2/labor/timecards/search", { method: "POST", body }, LABOR_VERSION);
+    return { cards: d.timecards ?? [], src: "timecards" };
+  } catch (_) {
+    const d = await sq("/v2/labor/shifts/search", { method: "POST", body });
+    return { cards: d.shifts ?? [], src: "shifts" };
+  }
+}
+
+async function myHours(b: any) {
+  const login = low(b?.login_id);
+  if (!login || login.length > 40) throw new PublicError("Sign in with your employee ID.", 400);
+  const { data: rows, error } = await admin.from("portal_employees").select("id,name,login_id").eq("active", true);
+  if (error) throw new Error(error.message);
+  const hits = (rows ?? []).filter((r: any) => low(r.login_id) === login);
+  if (hits.length !== 1) throw new PublicError("No active employee with that ID.", 404);
+  const emp = hits[0];
+  const { data: link } = await admin.from("square_team_links").select("team_member_id").eq("employee_id", emp.id).maybeSingle();
+  if (!link?.team_member_id) return { ok: true, linked: false, name: emp.name };
+
+  const now = new Date(), today = ymd(now), thisWk = weekStart(today), lastWk = addDays(thisWk, -7);
+  const { cards, src } = await searchCards(String(link.team_member_id), midnight(lastWk).toISOString());
+  const weeks = [
+    { start: thisWk, end: addDays(thisWk, 6), min: 0, days: [] as any[] },
+    { start: lastWk, end: addDays(lastWk, 6), min: 0, days: [] as any[] },
+  ];
+  let open: any = null, todayMin = 0;
+  for (const c of cards) {
+    const st = new Date(c.start_at);
+    if (!c.start_at || isNaN(+st)) continue;
+    const isOpen = !c.end_at;
+    const en = isOpen ? now : new Date(c.end_at);
+    let ms = en.getTime() - st.getTime(), onBreak = false;
+    for (const br of c.breaks ?? []) {           // unpaid breaks don't count; paid ones do
+      if (br?.is_paid) continue;
+      const bs = new Date(br?.start_at);
+      if (isNaN(+bs)) continue;
+      const be = br.end_at ? new Date(br.end_at) : now;
+      if (!br.end_at && isOpen) onBreak = true;
+      ms -= Math.max(0, Math.min(be.getTime(), en.getTime()) - Math.max(bs.getTime(), st.getTime()));
+    }
+    const min = Math.max(0, Math.round(ms / 60000)), day = ymd(st);
+    const wk = weeks.find((w) => day >= w.start && day <= w.end);
+    if (!wk) continue;
+    let d = wk.days.find((x: any) => x.date === day);
+    if (!d) wk.days.push(d = { date: day, min: 0, cards: [] });
+    const job = tidy(c.wage?.title), loc = LOC_NAME[c.location_id] ?? "";
+    d.cards.push({ in: c.start_at, out: isOpen ? null : c.end_at, min, job, loc, open: isOpen, on_break: onBreak });
+    d.min += min; wk.min += min;
+    if (day === today) todayMin += min;
+    if (isOpen) open = { start_at: c.start_at, job, loc, on_break: onBreak, min };
+  }
+  return { ok: true, linked: true, name: emp.name, now: now.toISOString(), today, today_min: todayMin, week_min: weeks[0].min, last_week_min: weeks[1].min, open, weeks, src };
+}
+
 // ---------- auth ----------
 async function who(req: Request, b: any): Promise<string | null> {
   const sec = tidy(b?.secret);
@@ -415,6 +503,9 @@ Deno.serve(async (req) => {
       console.log("webhook", b.type, b.data?.id ?? "", JSON.stringify(r));
       return json(req, { ok: true, created: r.created.length, deactivated: r.deactivated.length, reactivated: r.reactivated.length, errors: r.errors.length });
     }
+
+    // staff portal "My Hours" tile — keyed by the employee ID, like the rest of the portal
+    if (b.action === "my-hours") return json(req, await myHours(b));
 
     const caller = await who(req, b);
     if (!caller) return json(req, { error: "not allowed" }, 401);
