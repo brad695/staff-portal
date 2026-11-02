@@ -2917,13 +2917,15 @@ const SCHEMA = {
       {k:'contact_phone', label:'Mobile (for texts — clear to stop them)', type:'text', ph:'901-555-1234'},
       {k:'role', label:'Role', type:'text', ph:'Server / Kitchen / Bar'},
       {k:'active', label:'Status', type:'select', options:['active','inactive']},
+      {k:'on_schedule', label:'On the schedule', type:'select', options:['yes','no'], names:{ yes:'Yes', no:'No — sign-in, chat & emails only' }},
       {k:'location', label:'Location', type:'select', options:['memphis','nashville'], names:LOC_LABELS}
     ],
-    defaults:{ active:'active' },
+    defaults:{ active:'active', on_schedule:'yes' },
     valid:r=> !r.name ? 'A name is required.' : '',
-    map:r=>({ id:r.id, name:r.name, login_id:r.login_id||'', contact_email:r.contact_email||'', contact_phone:r.contact_phone||'', role:r.role||'', active:(r.active===false||r.active==='inactive')?'inactive':'active', location:r.location||'memphis' }),
+    map:r=>({ id:r.id, name:r.name, login_id:r.login_id||'', contact_email:r.contact_email||'', contact_phone:r.contact_phone||'', role:r.role||'', active:(r.active===false||r.active==='inactive')?'inactive':'active', on_schedule:r.on_schedule===false?'no':'yes', location:r.location||'memphis' }),
     rowTitle:r=>r.name,
-    rowTags:r=> r.active==='inactive' ? '<span class="tag tag-off2">inactive</span>' : '',
+    rowTags:r=> (r.active==='inactive' ? '<span class="tag tag-off2">inactive</span>' : '')
+      + (r.on_schedule==='no' ? '<span class="tag tag-off2">not on schedule</span>' : ''),
     rowMeta:r=>{
       const bits=[];
       bits.push(r.login_id ? 'ID: <strong>'+esc(r.login_id)+'</strong>' : '<span style="color:var(--wax);">no login ID yet</span>');
@@ -3135,6 +3137,15 @@ async function recSave(){
   if(wasId){ payload.id = wasId; r = await fn(S.updateAction, payload); }
   else { r = await fn(S.addAction, payload); }
   if(!r.ok){ document.getElementById('recErr').textContent = '❌ '+(r.data.error||'Save failed'); return; }
+  if(kind==='employees' && ('on_schedule' in payload)){
+    // OFF-SCHEDULE STAFF (2026-11-01): owners/admins stay in sign-in, chat and emails but off the schedule grids
+    const empId = wasId || (r.data && r.data.id) || null, want = payload.on_schedule!=='no';
+    const had = prevRow ? prevRow.on_schedule!=='no' : true;
+    if(empId && want!==had){
+      const { error } = await sb.rpc('portal_employee_set_schedule', { p_id: empId, p_on: want });
+      if(error){ document.getElementById('recErr').textContent = '❌ Saved, but "On the schedule" didn’t: '+error.message; if(!wasId) REC_CTX.id = empId; return; }
+    }
+  }
   recClose();
   msg(kind, '✅ Saved.', false);
   await loadKind(kind);
@@ -3335,7 +3346,8 @@ async function sgLoad(){
       sb.from('portal_publishes').select('*').eq('week_start',from).order('published_at',{ascending:false})
     ]);
     LOC_KEYS.forEach(l=>{
-      const locEmps = (emps.data||[]).filter(e=>LOC_GROUPS[l].includes(e.location));
+      const locEmps = (emps.data||[]).filter(e=>LOC_GROUPS[l].includes(e.location)
+        && (e.on_schedule!==false || (shifts.data||[]).some(s=>s.employee_id===e.id)));   // off-schedule staff (owners/admins) stay off
       const empIds = locEmps.map(e=>e.id);
       SG[l] = {
         emps: locEmps,
