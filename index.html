@@ -1156,37 +1156,41 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
 @media (prefers-reduced-motion:reduce){ .wg-hrs .dot, .hrs-live .dot{ animation:none; } }
 }
 </style>
-<!-- TIME FIXES (2026-11-02): in the My Hours sheet, "Fix" on each clock-in and "+ Add a missed punch" on each day; a manager approves into Square -->
+<!-- TIME FIXES (2026-11-02): My Hours sheet — "Edit time" on each day: check the clock-in / clock-out, send a change; a manager approves into Square -->
 <style id="hours-fix">
 @media screen{
-.hrs-card{ grid-template-columns:auto minmax(0,1fr) auto auto; }
 .hrs-card.ask .t, .hrs-card.ask .j{ color:#6b7280; font-style:italic; }
 .hrs-card .t.miss{ color:#b45309; }
-.hrs-fix{ min-height:30px; padding:0 11px; border:1px solid #d9dce3; border-radius:8px; background:#fff; color:#374151; font:inherit; font-size:.74rem; font-weight:800; white-space:nowrap; cursor:pointer; }
-.hrs-fix.miss{ border-color:#f5c78a; background:#fffbeb; color:#92400e; }
-.hrs-fix:active{ transform:scale(.96); }
 .hrs-fx{ display:flex; align-items:center; gap:8px; margin:3px 0 4px; padding:6px 9px; border-radius:8px; font-size:.76rem; font-weight:700; line-height:1.3; }
 .hrs-fx span{ min-width:0; }
 .hrs-fx.pend{ background:#fffbeb; color:#92400e; }
 .hrs-fx.no{ background:#fef2f2; color:#b91c1c; }
 .hrs-fx.ok{ background:#ecfdf5; color:#047857; }
 .hrs-fx button{ margin-left:auto; flex:none; border:0; padding:4px 2px; background:transparent; color:inherit; font:inherit; font-weight:800; text-decoration:underline; cursor:pointer; }
-.hrs-punch{ display:inline-flex; align-items:center; min-height:36px; margin:0 0 -6px; padding:0 2px; border:0; background:none; color:#047857; font:inherit; font-size:.8rem; font-weight:800; cursor:pointer; }
-.hrs-punch:active{ opacity:.65; }
+.hrs-edit{ display:inline-flex; align-items:center; gap:5px; min-height:36px; margin:0 0 -6px; padding:0 2px; border:0; background:none; color:#047857; font:inherit; font-size:.8rem; font-weight:800; cursor:pointer; }
+.hrs-edit .ti{ font-size:1rem; }
+.hrs-edit:active{ opacity:.65; }
 .hrs-day .hd .none{ font-size:.78rem; font-weight:600; color:#9ca3af; }
 .hrs-day.hrs-blank .hd > span:first-child{ color:#6b7280; }
 .hrs-msg{ margin:0 0 10px; padding:8px 10px; border-radius:10px; background:#ecfdf5; color:#047857; font-size:.84rem; font-weight:800; line-height:1.35; }
-.hrs-form .was{ margin:0 0 12px; font-size:.86rem; line-height:1.45; color:#6b7280; }
+.hrs-form .was{ margin:0 0 12px; font-size:.84rem; line-height:1.45; color:#6b7280; }
 .hrs-form .was b{ color:#161a1f; }
+.hrs-row{ margin:0 0 10px; padding:10px 12px 2px; border:1px solid #e5e7eb; border-radius:12px; background:#fafafa; }
+.hrs-row.sent{ opacity:.7; }
+.hrs-row .rh{ margin:0 0 8px; font-size:.8rem; line-height:1.4; color:#6b7280; }
+.hrs-row .rh b{ color:#161a1f; }
+.hrs-row .rm{ float:right; border:0; padding:0 2px; background:none; color:#b91c1c; font:inherit; font-size:.76rem; font-weight:800; text-decoration:underline; cursor:pointer; }
+.hrs-row .hint{ margin:-4px 0 8px; font-size:.76rem; color:#6b7280; }
+.hrs-row .hrs-fx{ margin:0 0 8px; }
+.hrs-addrow{ display:block; width:100%; min-height:44px; margin:0 0 12px; border:1.5px dashed #a7d8bf; border-radius:10px; background:#f3fbf6; color:#047857; font:inherit; font-size:.86rem; font-weight:800; cursor:pointer; }
 .hrs-form label{ display:block; margin:0 0 4px; font-size:.78rem; font-weight:800; color:#4b5563; }
 .hrs-form .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
 .hrs-form .fld{ margin-bottom:10px; }
 .hrs-form input, .hrs-form select, .hrs-form textarea{ display:block; width:100%; box-sizing:border-box; min-height:46px; padding:8px 10px; border:1px solid #d9dce3; border-radius:10px; font:inherit; font-size:1rem; color:#161a1f; background:#fff; }
+.hrs-form input:disabled{ background:#f3f4f6; color:#6b7280; }
 .hrs-form textarea{ min-height:72px; resize:vertical; }
 .hrs-form input:focus, .hrs-form select:focus, .hrs-form textarea:focus{ outline:3px solid rgba(224,162,28,.45); border-color:#e0a21c; }
-.hrs-form label.hrs-still{ display:flex; align-items:center; gap:10px; min-height:44px; margin:-4px 0 8px; font-size:.9rem; font-weight:700; color:#374151; cursor:pointer; }
-.hrs-form .hrs-still input{ display:inline-block; flex:none; width:22px; height:22px; min-height:0; margin:0; padding:0; accent-color:#047857; }
-.hrs-fix:focus-visible, .hrs-punch:focus-visible, .hrs-fx button:focus-visible{ outline:3px solid #e0a21c; outline-offset:2px; }
+.hrs-edit:focus-visible, .hrs-addrow:focus-visible, .hrs-fx button:focus-visible, .hrs-row .rm:focus-visible{ outline:3px solid #e0a21c; outline-offset:2px; }
 .v8-h b[tabindex]:focus{ outline:none; }
 }
 </style>
@@ -3119,11 +3123,12 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
     foot.innerHTML= pend ? pend+(pend>1 ? ' fixes' : ' fix')+' waiting on a manager &rarr;' : 'Day by day &rarr;';
   }
 
-  // ── the sheet: the week day by day + TIME FIXES (2026-11-02). Every clock-in has "Fix" (wrong times, forgot to clock
-  //    out, or still on the clock and only the clock-in is wrong); every day has "+ Add a missed punch" (forgot to clock in:
-  //    a clock-in and a clock-out, or, today, just the clock-in while still on the clock). A manager approves in the manager
-  //    console (Staff → Time Off & Swaps → Time Card Fixes) and it goes straight into Square. ──
-  var FX=null, fxMsg='', view='';                     // FX = the form that's open (null = the list)
+  // ── the sheet: the week day by day + TIME FIXES (2026-11-02). Check my time, send an edit: every day has "Edit time"
+  //    → that day's clock-ins with their clock-in AND clock-out (as Square has them; blank when one is missing). Change
+  //    what's wrong (clocked in late, forgot to clock out), add a clock-in that never happened, send it to a manager.
+  //    A blank clock-out = still on the clock (today only). A manager approves in the manager console (Staff → Time Off
+  //    & Swaps → Time Card Fixes) and it goes straight into Square. ──
+  var FX=null, fxMsg='', view='';                     // FX = the day being edited (null = the list)
   function pad(n){ return String(n).padStart(2,'0'); }
   function hhmmOf(v){ var d=new Date(v); return isNaN(d) ? '' : pad(d.getHours())+':'+pad(d.getMinutes()); }
   function addDay(ymd){ var p=String(ymd).split('-'); return new Date(Date.UTC(+p[0], +p[1]-1, +p[2]+1)).toISOString().slice(0,10); }
@@ -3133,41 +3138,39 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
   function stale(c){ return !c.out && Date.now()-new Date(c.in).getTime() > 16*3600e3; }   // open far too long = a forgotten clock-out
   function fxNote(f){
     if(!f) return '';
-    if(f.status==='pending') return '<div class="hrs-fx pend"><span>Fix sent: '+(f.req_end ? tm(f.req_start)+' – '+tm(f.req_end) : 'clock-in '+tm(f.req_start))+' · waiting on a manager</span><button type="button" data-cancel="'+f.id+'">Cancel</button></div>';
-    if(f.status==='declined') return '<div class="hrs-fx no"><span>Fix declined'+(f.manager_note ? ': '+esc(f.manager_note) : '')+'</span></div>';
+    if(f.status==='pending') return '<div class="hrs-fx pend"><span>Change sent: '+(f.req_end ? tm(f.req_start)+' – '+tm(f.req_end) : 'clock-in '+tm(f.req_start))+' · waiting on a manager</span><button type="button" data-cancel="'+f.id+'">Cancel</button></div>';
+    if(f.status==='declined') return '<div class="hrs-fx no"><span>Change declined'+(f.manager_note ? ': '+esc(f.manager_note) : '')+'</span></div>';
     if(f.status==='approved') return '<div class="hrs-fx ok"><span>Fixed ✓</span></div>';
     return '';
   }
   function weekDays(){ var W=D.weeks[wkIdx]||{}, out=[], d=W.start; for(var i=0; i<7 && d && d<=D.today; i++){ out.push(d); d=addDay(d); } return out; }
   function dayOf(ds){ var hit=null; (D.weeks||[]).forEach(function(w){ w.days.forEach(function(d){ if(d.date===ds) hit=d; }); }); return hit; }
-  function findCard(id){ var hit=null; (D.weeks||[]).forEach(function(w){ w.days.forEach(function(d){ d.cards.forEach(function(c){ if(!hit && c.id===id) hit={ card:c, date:d.date }; }); }); }); return hit; }
   function dayName(ds){ return ds===D.today ? 'Today' : esc(day(ds, true)); }
+  function asksOn(ds){ return fixes().filter(function(f){ return f.kind==='add' && f.status!=='approved' && f.work_date===ds; }); }
   function listHTML(){
     var W=D.weeks[wkIdx]||{ days:[], min:0, start:'', end:'' }, add=wkIdx===0 ? live() : 0;
-    // missed punches they asked for sit on their day until a manager decides (once approved they're real clock-ins)
-    var asks=fixes().filter(function(f){ return f.kind==='add' && f.status!=='approved' && f.work_date>=W.start && f.work_date<=W.end; });
-    // every day of the week so far, newest first — a day with no clock-ins can still get a missed punch
+    // every day of the week so far, newest first — a day with no clock-ins can still get its time added
     var byDate={}, dates=weekDays();
     W.days.forEach(function(d){ byDate[d.date]=d; if(dates.indexOf(d.date)<0) dates.push(d.date); });
-    asks.forEach(function(f){ if(dates.indexOf(f.work_date)<0) dates.push(f.work_date); });
+    fixes().forEach(function(f){ if(f.kind==='add' && f.work_date>=W.start && f.work_date<=W.end && dates.indexOf(f.work_date)<0) dates.push(f.work_date); });
     dates.sort(); dates.reverse();
     var rows=dates.map(function(ds){
       var d=byDate[ds]||{ date:ds, min:0, cards:[] };
       var cards=d.cards.map(function(c){
         var miss=stale(c);
         return '<div class="hrs-card"><span class="t'+(miss ? ' miss' : '')+'">'+tm(c.in)+' – '+(c.out ? tm(c.out) : miss ? 'no clock-out' : (c.on_break ? 'on break' : 'now'))+'</span>'
-          +'<span class="j">'+esc([c.job, c.loc].filter(Boolean).join(' · '))+'</span>'+(d.cards.length>1 ? '<b>'+hm(c.min+(running(c) ? add : 0))+'</b>' : '<span></span>')
-          +'<button type="button" class="hrs-fix'+(miss ? ' miss' : '')+'" data-fix="'+esc(c.id)+'" aria-label="'+(miss ? 'Add the clock-out for' : 'Fix')+' the '+esc(tm(c.in))+' clock-in">'+(miss ? 'Add clock-out' : 'Fix')+'</button></div>'
+          +'<span class="j">'+esc([c.job, c.loc].filter(Boolean).join(' · '))+'</span>'+(d.cards.length>1 ? '<b>'+hm(c.min+(running(c) ? add : 0))+'</b>' : '<span></span>')+'</div>'
           +fxNote(fixFor(c.id)); }).join('');
-      var mine=asks.filter(function(f){ return f.work_date===ds; }).map(function(f){
-        return '<div class="hrs-card ask"><span class="t">'+tm(f.req_start)+' – '+(f.req_end ? tm(f.req_end) : 'now')+'</span><span class="j">'+(f.req_end ? 'Missed punch' : 'Missed clock-in')+(f.job_title ? ' · '+esc(f.job_title) : '')+'</span><span></span><span></span></div>'
+      // clock-ins they asked to add sit on their day until a manager decides (once approved they're real clock-ins)
+      var mine=asksOn(ds).map(function(f){
+        return '<div class="hrs-card ask"><span class="t">'+tm(f.req_start)+' – '+(f.req_end ? tm(f.req_end) : 'now')+'</span><span class="j">Added'+(f.job_title ? ' · '+esc(f.job_title) : '')+'</span><span></span></div>'
           +(f.status==='pending' ? '<div class="hrs-fx pend"><span>Waiting on a manager</span><button type="button" data-cancel="'+f.id+'">Cancel</button></div>'
             : '<div class="hrs-fx no"><span>Declined'+(f.manager_note ? ': '+esc(f.manager_note) : '')+'</span></div>'); }).join('');
       var empty=!cards && !mine;
       return '<div class="hrs-day'+(ds===D.today ? ' today' : '')+(empty ? ' hrs-blank' : '')+'"><div class="hd"><span>'+dayName(ds)+'</span>'
         +(d.cards.length ? '<b>'+hm(d.min+(d.cards.some(running) ? add : 0))+'</b>' : empty ? '<span class="none">No clock-ins</span>' : '<b></b>')+'</div>'
         +cards+mine
-        +'<button type="button" class="hrs-punch" data-addfix="'+ds+'">+ Add a missed punch</button></div>';
+        +'<button type="button" class="hrs-edit" data-edit="'+ds+'"><i class="ti ti-pencil" aria-hidden="true"></i>'+(d.cards.length ? 'Edit time' : 'Add time')+'</button></div>';
     }).join('') || '<p class="hrs-none">No clock-ins '+(wkIdx===0 ? 'yet this week' : 'last week')+'.</p>';
     return '<div class="v8-h"><b>My hours'+(D.name ? ' · '+esc(String(D.name).split(' ')[0]) : '')+'</b><button type="button" class="v8-x" data-x aria-label="Close"><i class="ti ti-x" aria-hidden="true"></i></button></div>'
       +(fxMsg ? '<div class="hrs-msg" role="status">'+esc(fxMsg)+'</div>' : '')
@@ -3175,37 +3178,58 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
       +'<div class="hrs-tot"><b>'+dec(W.min+add)+'</b><span>hours · '+hm(W.min+add)+'<br>'+(W.start ? esc(md(W.start))+' – '+esc(md(W.end)) : '')+'</span></div>'
       +(wkIdx===0 && D.open ? '<div class="hrs-live'+(D.open.on_break ? ' brk' : '')+'"><i class="dot" aria-hidden="true"></i>'+(D.open.on_break ? 'On break' : 'On the clock')+' since '+tm(D.open.start_at)+'</div>' : '')
       +'<div class="hrs-days">'+rows+'</div>'
-      +'<p class="hrs-src">From your Square clock-ins · updated '+tm(at)+'. Unpaid breaks don’t count. Wrong time or a missed punch? Tap <b>Fix</b> or <b>+ Add a missed punch</b> — a manager approves it into Square.</p>'
+      +'<p class="hrs-src">From your Square clock-ins · updated '+tm(at)+'. Unpaid breaks don’t count. Time wrong or a punch missed? Tap <b>Edit time</b> — a manager approves it into Square.</p>'
       +'<div class="v8-acts"><button type="button" class="v8-btn" data-refresh>Refresh</button><button type="button" class="v8-btn pri" data-x>Done</button></div>';
   }
+
+  // ── the day editor: one row per clock-in (clocked in / clocked out) + rows for clock-ins that never happened ──
+  function newRow(){ return { kind:'add', s0:'', e0:'', start:'', end:'', job:(D.jobs||[])[0]||'', loc:((D.locs||[])[0]||{}).id||'' }; }
+  function rowsFor(ds){
+    var d=dayOf(ds), rows=[];
+    (d ? d.cards : []).forEach(function(c){
+      var p=fixFor(c.id); if(p && p.status!=='pending') p=null;      // a change already waiting: start from what they asked
+      var s0=hhmmOf(p ? p.req_start : c.in), e0= p ? (p.req_end ? hhmmOf(p.req_end) : '') : (c.out ? hhmmOf(c.out) : '');
+      rows.push({ kind:'edit', card:c, pend:p, s0:s0, e0:e0, start:s0, end:e0 });
+    });
+    if(!rows.length) rows.push(newRow());
+    return rows;
+  }
+  function blankOk(r){ return r.kind==='edit' ? (!r.card.out && !stale(r.card)) : (FX.date===D.today && !D.open); }   // may the clock-out stay blank (still here)?
+  function rowHTML(r, i){
+    var jobs=D.jobs||[], locs=D.locs||[], n=FX.rows.length, c=r.card, head;
+    if(r.kind==='edit') head='<b>'+(n>1 ? 'Clock-in '+(i+1) : 'Your clock-in')+'</b> · Square has '+tm(c.in)+' – '+(c.out ? tm(c.out) : 'no clock-out')
+      +((c.job||c.loc) ? '<br>'+esc([c.job, c.loc].filter(Boolean).join(' · ')) : '');
+    else head='<b>'+(n>1 ? 'Clock-in '+(i+1)+' — new' : 'Your time')+'</b> · nothing in Square'+(r.sent ? '' : '<button type="button" class="rm" data-rm="'+i+'" aria-label="Remove this clock-in">Remove</button>');
+    var dis=r.sent ? ' disabled' : '';
+    return '<div class="hrs-row'+(r.sent ? ' sent' : '')+'"><div class="rh">'+head+'</div>'
+      +(r.sent ? '<div class="hrs-fx ok"><span>Sent ✓</span></div>' : r.pend ? '<div class="hrs-fx pend"><span>Waiting on a manager — change it and send again to update it</span></div>' : '')
+      +'<div class="row2"><div><label for="hrsIn'+i+'">Clocked in</label><input id="hrsIn'+i+'" type="time" data-r="'+i+'" data-k="start" value="'+esc(r.start)+'"'+dis+'></div>'
+      +'<div><label for="hrsOut'+i+'">Clocked out</label><input id="hrsOut'+i+'" type="time" data-r="'+i+'" data-k="end" value="'+esc(r.end)+'"'+dis+'></div></div>'
+      +(!r.sent && blankOk(r) ? '<p class="hint">Still here? Leave the clock-out blank.</p>' : '')
+      +(r.kind==='add' && !r.sent ? (jobs.length>1 ? '<div class="fld"><label for="hrsJob'+i+'">Job</label><select id="hrsJob'+i+'" data-r="'+i+'" data-k="job">'+jobs.map(function(j){ return '<option'+(r.job===j ? ' selected' : '')+'>'+esc(j)+'</option>'; }).join('')+'</select></div>' : '')
+        +(locs.length>1 ? '<div class="fld"><label for="hrsLoc'+i+'">Shop</label><select id="hrsLoc'+i+'" data-r="'+i+'" data-k="loc">'+locs.map(function(l){ return '<option value="'+esc(l.id)+'"'+(r.loc===l.id ? ' selected' : '')+'>'+esc(l.name)+'</option>'; }).join('')+'</select></div>' : '') : '')
+      +'</div>';
+  }
   function formHTML(){
-    var f=FX, v=f.vals||{}, edit=f.mode==='edit', c=f.card||{}, jobs=D.jobs||[], locs=D.locs||[], miss=edit && stale(c);
-    // still on the clock: an open clock-in → move just its clock-in; a missed punch today with nothing open → just the clock-in
-    var canStill= edit ? (!c.out && !miss) : (f.date===D.today && !D.open);
-    var still=canStill && (v.still!=null ? !!v.still : (edit ? f.date===D.today : true));
-    var top;
-    if(edit) top='<p class="was">'+dayName(f.date)+((c.job||c.loc) ? ' · '+esc([c.job, c.loc].filter(Boolean).join(' · ')) : '')+'<br>Square has: <b>'+tm(c.in)+' – '+(c.out ? tm(c.out) : 'no clock-out')+'</b></p>';
-    else {
-      var dd=dayOf(f.date), have=dd && dd.cards.length ? dd.cards.map(function(x){ return tm(x.in)+' – '+(x.out ? tm(x.out) : 'now'); }).join(', ') : '';
-      top='<p class="was">'+dayName(f.date)+'<br>'+(have ? 'Already in Square: <b>'+have+'</b>' : 'No clock-ins in Square for this day.')+'</p>';
-    }
-    var extra = edit ? '' :
-      (jobs.length>1 ? '<div class="fld"><label for="hrsFxJob">Job</label><select id="hrsFxJob" data-f="job">'+jobs.map(function(j){ return '<option'+(v.job===j ? ' selected' : '')+'>'+esc(j)+'</option>'; }).join('')+'</select></div>' : '')
-      +(locs.length>1 ? '<div class="fld"><label for="hrsFxLoc">Shop</label><select id="hrsFxLoc" data-f="location_id">'+locs.map(function(l){ return '<option value="'+esc(l.id)+'"'+(v.location_id===l.id ? ' selected' : '')+'>'+esc(l.name)+'</option>'; }).join('')+'</select></div>' : '');
-    var ph = still ? (edit ? 'e.g. I got here at 8 but clocked in late' : 'e.g. forgot to clock in when I got here')
-      : edit ? (miss || !c.out ? 'e.g. forgot to clock out' : 'e.g. clocked out late by mistake') : 'e.g. forgot to clock back in after lunch';
-    return '<div class="v8-h"><b tabindex="-1">'+(edit ? (miss ? 'Add your clock-out' : 'Fix a clock-in') : 'Add a missed punch')+'</b><button type="button" class="v8-x" data-x aria-label="Close"><i class="ti ti-x" aria-hidden="true"></i></button></div>'
-      +'<div class="hrs-form">'+top
-      +(canStill ? '<label class="hrs-still"><input type="checkbox" data-f="still"'+(still ? ' checked' : '')+'> I’m still on the clock</label>' : '')
-      +'<div class="row2"><div><label for="hrsFxIn">Clocked in</label><input id="hrsFxIn" type="time" data-f="start" value="'+esc(v.start!=null ? v.start : (edit ? hhmmOf(c.in) : ''))+'"></div>'
-      +(still ? '' : '<div><label for="hrsFxOut">Clocked out</label><input id="hrsFxOut" type="time" data-f="end" value="'+esc(v.end!=null ? v.end : (edit && c.out ? hhmmOf(c.out) : ''))+'"></div>')+'</div>'
-      +extra
-      +'<div class="fld"><label for="hrsFxNote">What happened?</label><textarea id="hrsFxNote" data-f="note" maxlength="300" placeholder="'+ph+'">'+esc(v.note||'')+'</textarea></div>'
+    var f=FX, waiting=asksOn(f.date).filter(function(x){ return x.status==='pending'; });
+    return '<div class="v8-h"><b tabindex="-1">Edit my time · '+dayName(f.date)+'</b><button type="button" class="v8-x" data-x aria-label="Close"><i class="ti ti-x" aria-hidden="true"></i></button></div>'
+      +'<div class="hrs-form"><p class="was">Check your times and change what’s wrong — clocked in late, forgot to clock out, or a clock-in that never happened. A manager approves it into Square.</p>'
+      +(waiting.length ? '<p class="was">Already waiting on a manager: <b>'+waiting.map(function(x){ return tm(x.req_start)+' – '+(x.req_end ? tm(x.req_end) : 'now'); }).join(', ')+'</b></p>' : '')
+      +f.rows.map(rowHTML).join('')
+      +(f.rows.filter(function(r){ return r.kind==='add'; }).length<3 ? '<button type="button" class="hrs-addrow" data-addrow>+ Add a clock-in that’s missing</button>' : '')
+      +'<div class="fld"><label for="hrsFxNote">What happened?</label><textarea id="hrsFxNote" data-k="note" maxlength="300" placeholder="e.g. clocked in late — I got here at 8">'+esc(f.note||'')+'</textarea></div>'
       +'<div class="v8-err" role="alert">'+esc(f.err||'')+'</div>'
       +'<div class="v8-acts"><button type="button" class="v8-btn" data-back>Back</button><button type="button" class="v8-btn pri" data-send'+(f.busy ? ' disabled' : '')+'>'+(f.busy ? 'Sending…' : 'Send to a manager')+'</button></div></div>';
   }
   function sheetHTML(){ return FX ? formHTML() : listHTML(); }
-  function vals(){ var o={}; if(sh) [].forEach.call(sh.querySelectorAll('[data-f]'), function(el){ o[el.getAttribute('data-f')]= el.type==='checkbox' ? el.checked : el.value; }); return o; }
+  function readForm(){
+    if(!sh || !FX) return;
+    [].forEach.call(sh.querySelectorAll('[data-k]'), function(el){
+      var k=el.getAttribute('data-k'), i=el.getAttribute('data-r');
+      if(i==null){ FX[k]=el.value; return; }
+      var r=FX.rows[+i]; if(r && !r.sent) r[k]=el.value;
+    });
+  }
   function drawSheet(force){
     if(!sh || !document.contains(sh)){ sh=null; FX=null; return; }
     if(FX && !force) return;                                    // never redraw under someone typing
@@ -3221,25 +3245,46 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
   }
   async function send(){
     if(!FX || FX.busy) return;
-    var v=vals(), f=FX, edit=f.mode==='edit', still=v.still===true; f.vals=v; f.err='';
-    if(!v.start || (!still && !v.end)){ f.err= still ? 'Pick when you clocked in.' : 'Pick when you clocked in and when you clocked out.'; drawSheet(true); return; }
-    var body={ action:'fix-request', login_id:emp(), start:v.start, note:v.note||'' };
-    if(still) body.still_on=true; else body.end=v.end;
-    if(edit) body.timecard_id=f.card.id;
-    else { body.date=f.date; if(v.job) body.job=v.job; if(v.location_id) body.location_id=v.location_id; }
+    var f=FX; readForm(); f.err='';
+    var todo=[], open=0;
+    for(var i=0; i<f.rows.length; i++){
+      var r=f.rows[i], lab=f.rows.length>1 ? 'Clock-in '+(i+1)+': ' : '';
+      if(r.sent) continue;
+      if(r.kind==='add' && !r.start && !r.end) continue;                // an empty new row
+      if(r.kind==='edit' && r.start===r.s0 && r.end===r.e0) continue;   // nothing changed
+      if(!r.start){ f.err=lab+'Put in when you clocked in.'; break; }
+      if(!r.end){
+        if(!blankOk(r)){ f.err=lab+'Put in when you clocked out.'; break; }
+        if(++open>1){ f.err='Only one clock-in can still be open — put in the other clock-out.'; break; }
+      }
+      todo.push(i);
+    }
+    if(!f.err && !todo.length) f.err='Nothing changed — change a time first.';
+    if(f.err){ drawSheet(true); return; }
     f.busy=true; drawSheet(true);
-    try{
-      var r=await post(body);
-      if(!r.ok){ if(FX===f){ f.busy=false; f.err=r.j.error||'That didn’t send — try again.'; drawSheet(true); } return; }
+    var sent=0;
+    for(var k=0; k<todo.length; k++){
+      var j=todo[k], row=f.rows[j], body={ action:'fix-request', login_id:emp(), start:row.start, note:f.note||'' }, res;
+      if(row.end) body.end=row.end; else body.still_on=true;
+      if(row.kind==='edit') body.timecard_id=row.card.id;
+      else { body.date=f.date; if(row.job) body.job=row.job; if(row.loc) body.location_id=row.loc; }
+      try{ res=await post(body); }catch(ex){ res={ ok:false, j:{ error:'No connection — try again.' } }; }
+      if(!res.ok){
+        f.busy=false; f.err=(f.rows.length>1 ? 'Clock-in '+(j+1)+': ' : '')+(res.j.error||'That didn’t send — try again.');
+        if(FX===f) drawSheet(true);
+        if(sent){ draw(); load(true); }
+        return;
+      }
+      row.sent=true; sent++;
       // show it right away (the next load brings the server's copy)
-      var s=wall(f.date, v.start), e=still ? null : wall(f.date, v.end); if(e && e<=s) e=new Date(e.getTime()+864e5);
-      var rec={ id:r.j.id, timecard_id: edit ? f.card.id : null, kind: edit ? 'edit' : 'add', work_date:f.date, req_start:s.toISOString(), req_end: e ? e.toISOString() : null,
-        job_title: edit ? (f.card.job||'') : (v.job || (D.jobs||[])[0] || ''), status:'pending', manager_note:'' };
-      if(D) D.fixes=[rec].concat(fixes().filter(function(x){ return x.id!==rec.id && !(edit && x.status==='pending' && x.timecard_id===rec.timecard_id); }));
-      if(FX===f) FX=null;
-      fxMsg='Sent — a manager will look at it. You’ll get a text or email when it’s decided.';
-      draw(); drawSheet(true); load(true);
-    }catch(ex){ if(FX===f){ f.busy=false; f.err='No connection — try again.'; drawSheet(true); } }
+      var s=wall(f.date, row.start), e=row.end ? wall(f.date, row.end) : null; if(e && e<=s) e=new Date(e.getTime()+864e5);
+      var rec={ id:res.j.id, timecard_id: row.kind==='edit' ? row.card.id : null, kind:row.kind, work_date:f.date, req_start:s.toISOString(), req_end: e ? e.toISOString() : null,
+        job_title: row.kind==='edit' ? (row.card.job||'') : (row.job||''), status:'pending', manager_note:'' };
+      if(D) D.fixes=[rec].concat(fixes().filter(function(x){ return x.id!==rec.id && !(row.kind==='edit' && x.status==='pending' && x.timecard_id===rec.timecard_id); }));
+    }
+    if(FX===f) FX=null;
+    fxMsg='Sent'+(sent>1 ? ' ('+sent+' changes)' : '')+' — a manager will look at it. You’ll get a text or email when it’s decided.';
+    draw(); drawSheet(true); load(true);
   }
   async function cancelFix(id){
     if(!confirm('Cancel this request?')) return;
@@ -3256,19 +3301,15 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
     wkIdx=0; FX=null; fxMsg=''; view='list'; sh=window.homeSheet(sheetHTML());
     sh.addEventListener('click', function(e){
       var b=e.target.closest('[data-wk]'); if(b){ wkIdx=+b.getAttribute('data-wk'); fxMsg=''; drawSheet(true); return; }
-      var fx=e.target.closest('[data-fix]');
-      if(fx){ var hit=findCard(fx.getAttribute('data-fix')); if(hit){ FX={ mode:'edit', card:hit.card, date:hit.date }; fxMsg=''; drawSheet(true); focusTitle(); } return; }
-      var ad=e.target.closest('[data-addfix]');
-      if(ad){ FX={ mode:'add', date:ad.getAttribute('data-addfix') }; fxMsg=''; drawSheet(true); focusTitle(); return; }
+      var ed=e.target.closest('[data-edit]');
+      if(ed){ var ds=ed.getAttribute('data-edit'); FX={ date:ds, rows:[], note:'' }; FX.rows=rowsFor(ds); fxMsg=''; drawSheet(true); focusTitle(); return; }
+      if(e.target.closest('[data-addrow]')){ readForm(); FX.rows.push(newRow()); drawSheet(true); var ins=sh.querySelectorAll('.hrs-row input[data-k="start"]'); if(ins.length) try{ ins[ins.length-1].scrollIntoView({ block:'nearest' }); }catch(_){} return; }
+      var rm=e.target.closest('[data-rm]');
+      if(rm){ readForm(); FX.rows.splice(+rm.getAttribute('data-rm'), 1); if(!FX.rows.length) FX.rows.push(newRow()); drawSheet(true); return; }
       if(e.target.closest('[data-back]')){ FX=null; drawSheet(true); return; }
       if(e.target.closest('[data-send]')){ send(); return; }
       var cx=e.target.closest('[data-cancel]'); if(cx){ cancelFix(+cx.getAttribute('data-cancel')); return; }
       if(e.target.closest('[data-refresh]')) load(true);
-    });
-    sh.addEventListener('change', function(e){             // "still on the clock" shows / hides the clock-out
-      if(!FX || !e.target.matches || !e.target.matches('[data-f="still"]')) return;
-      FX.vals=vals(); drawSheet(true);
-      var el=sh.querySelector('[data-f="still"]'); if(el) try{ el.focus({ preventScroll:true }); }catch(_){}
     });
   }
   function signIn(){
