@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#06273a">
+<title>BEO</title>
+<link rel="icon" href="favicon.ico">
+<!--
+  BEO viewer (2026-11-03). The calendar's "Open BEO PDF" link opens this page in a new tab:
+  beo.html?u=<the signed beo_pdf link from square-orders' feed>. The page asks the beo-pdf
+  function for the PDF itself ({"as":"pdf"}) and draws it with PDF.js, so it shows the same
+  on every phone — Android Chrome can't show a PDF in a tab on its own and downloads it
+  instead, and opening a tab first then filling it from the calendar page stalled there.
+  Save = the real PDF file; Print = the browser's print of these pages.
+-->
+<style>
+  :root { --navy:#06273a; --ink:#0f172a; --bg:#e5e7eb; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; }
+  body { background:var(--bg); color:var(--ink); font:15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .bar { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:8px;
+         padding:10px 12px; padding-top:max(10px, env(safe-area-inset-top)); background:var(--navy); color:#fff; }
+  .bar h1 { flex:1; min-width:0; margin:0; font-size:16px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .bar button { appearance:none; border:0; border-radius:8px; padding:8px 12px; font:600 14px/1 system-ui, sans-serif;
+                background:#fff; color:var(--navy); cursor:pointer; }
+  .bar button.ghost { background:transparent; color:#fff; border:1px solid rgba(255,255,255,.55); }
+  .bar button.x { padding:8px 10px; }
+  .bar button[hidden] { display:none; }
+  #msg { padding:48px 16px; text-align:center; font-weight:600; color:var(--navy); }
+  #msg.err { color:#b91c1c; }
+  #pages { display:flex; flex-direction:column; align-items:center; gap:12px; padding:12px; }
+  #pages canvas { display:block; width:100%; max-width:850px; height:auto; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); }
+  @media print {
+    @page { margin:0; }
+    .bar, #msg { display:none !important; }
+    body { background:#fff; }
+    #pages { padding:0; gap:0; }
+    #pages canvas { max-width:none; box-shadow:none; break-after:page; page-break-after:always; }
+  }
+</style>
+</head>
+<body>
+<div class="bar">
+  <button class="ghost x" id="close" title="Close" aria-label="Close">✕</button>
+  <h1 id="title">BEO</h1>
+  <button id="save" hidden>⬇ Save</button>
+  <button class="ghost" id="print" hidden>Print</button>
+</div>
+<div id="msg">Opening the BEO…</div>
+<div id="pages"></div>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script>
+(function(){
+  var SB_URL = 'https://vdvtrevhqalmjwhjhjug.supabase.co';
+  var SB_KEY = 'sb_publishable_LnlevWReed7K8cFk_f_Mxg_UywktQ5_';
+  var WORKER = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  var $ = function(id){ return document.getElementById(id); };
+  var msg = $('msg');
+  function say(text, err){ msg.textContent = text; msg.className = err ? 'err' : ''; msg.style.display = ''; }
+
+  // ✕ closes the tab the calendar opened; if the browser won't, go to the portal
+  $('close').onclick = function(){ window.close(); setTimeout(function(){ location.href = '/'; }, 300); };
+
+  var link = new URLSearchParams(location.search).get('u') || '';
+  if (link.indexOf(SB_URL + '/functions/v1/beo-pdf?') !== 0) { say('That BEO link is incomplete — open it again from the calendar.', true); return; }
+  var code = new URL(link).searchParams.get('c') || '';
+  document.title = 'BEO #' + code;
+  $('title').textContent = 'BEO #' + code;
+
+  fetch(link, { method:'POST', headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer ' + SB_KEY }, body:JSON.stringify({ as:'pdf' }) })
+    .then(function(r){
+      var type = r.headers.get('content-type') || '';
+      if (r.ok && type.indexOf('application/pdf') === 0) {
+        return r.arrayBuffer().then(function(buf){ return { buf:buf, rev:r.headers.get('x-beo-rev') || '' }; });
+      }
+      return r.json().catch(function(){ return {}; }).then(function(j){ throw new Error(j.error || ('Couldn’t open the BEO (error ' + r.status + ').')); });
+    })
+    .then(function(res){
+      var name = 'BEO-' + code + (res.rev ? '-rev' + res.rev : '') + '.pdf';
+      var file = URL.createObjectURL(new Blob([res.buf], { type:'application/pdf' }));
+      var save = $('save');
+      save.hidden = false;
+      save.onclick = function(){ var a = document.createElement('a'); a.href = file; a.download = name; document.body.appendChild(a); a.click(); a.remove(); };
+      if (!window.pdfjsLib) { say('Couldn’t show the BEO here — tap Save to open the PDF.', true); return; }
+      pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER;
+      return pdfjsLib.getDocument({ data:new Uint8Array(res.buf) }).promise.then(function(pdf){
+        var box = $('pages'), chain = Promise.resolve();
+        var cssW = Math.min(850, Math.max(280, box.clientWidth - 24));
+        var dpr = Math.min(3, Math.max(2, window.devicePixelRatio || 1));
+        for (var i = 1; i <= pdf.numPages; i++) (function(n){
+          chain = chain.then(function(){ return pdf.getPage(n); }).then(function(page){
+            var vp = page.getViewport({ scale: cssW / page.getViewport({ scale:1 }).width * dpr });
+            var c = document.createElement('canvas');
+            c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+            c.setAttribute('aria-label', 'BEO page ' + n);
+            box.appendChild(c);
+            if (n === 1) msg.style.display = 'none';
+            return page.render({ canvasContext:c.getContext('2d'), viewport:vp }).promise;
+          });
+        })(i);
+        return chain.then(function(){ var p = $('print'); p.hidden = false; p.onclick = function(){ window.print(); }; });
+      });
+    })
+    .catch(function(e){ say((e && e.message) || 'Couldn’t open the BEO.', true); });
+})();
+</script>
+</body>
+</html>

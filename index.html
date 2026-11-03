@@ -2497,21 +2497,6 @@ async function loadCalOrders(mS,mE){
     Object.values(_calData.ord).forEach(a=>a.sort((x,y)=>Date.parse(x.at)-Date.parse(y.at)));
   }catch(e){ _calData.ord={}; }
 }
-// BEO tiles: the beo-pdf function builds the PDF from the saved BEO and answers with a
-// short-lived signed link, so it opens as a plain PDF (not the manager site). The tab is
-// opened on the tap itself so pop-up blockers let it through.
-function openBeoPdf(el, ev){
-  if(ev){ ev.preventDefault(); ev.stopPropagation(); }
-  const u = el.getAttribute('data-beo'); if(!u) return false;
-  let w = null; try{ w = window.open('', '_blank'); }catch(e){}
-  const say = (m, err) => { try{ w.document.body.innerHTML = '<p style="font:600 16px system-ui,sans-serif;padding:24px;color:'+(err?'#b91c1c':'#06273a')+'">'+esc(m)+'</p>'; }catch(e){} };
-  if(w){ try{ w.document.write('<!doctype html><title>BEO</title><meta name="viewport" content="width=device-width,initial-scale=1"><body></body>'); w.document.close(); }catch(e){} say('Building the BEO PDF…'); }
-  fetch(u, { method:'POST', headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_KEY }, body:'{}' })
-    .then(r => r.json().catch(() => ({})).then(j => { if(!r.ok || !j.url) throw new Error(j.error || ('Could not open the BEO PDF (error '+r.status+').')); return j.url; }))
-    .then(url => { if(w && !w.closed){ try{ w.location.replace(url); return; }catch(e){} } location.href = url; })
-    .catch(e => { const m = (e && e.message) || 'Could not open the BEO PDF.'; if(w && !w.closed) say(m, true); else alert(m); });
-  return false;
-}
 // One agenda line per order: when, who, what it is worth, and whether the
 // money is already in. Item names go on a second, quieter line.
 function ordRow(o){
@@ -2536,7 +2521,7 @@ function ordRow(o){
     ['Guests', o.guests || ''],
     ['Channel', o.channel || ''],
     ['Total', o.total_cents ? '$'+(o.total_cents/100).toFixed(2)+(o.paid?' (paid)':' (unpaid)') : '']
-  ]) + (o.beo_pdf ? '<a class="xt-a" href="#" data-beo="'+esc(o.beo_pdf)+'" onclick="return openBeoPdf(this,event)">📄 Open BEO PDF</a>' : '');
+  ]) + (o.beo_pdf ? '<a class="xt-a" href="/beo.html?u='+encodeURIComponent(o.beo_pdf)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">📄 Open BEO PDF</a>' : '');
   return agRow(meta.tag, meta.label, esc(when)+' \u00b7 '+esc(o.name)+money+paid, detail);
 }
 // One calendar load at a time: overlapping loads each reset then refill the same
