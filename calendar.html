@@ -326,20 +326,6 @@ function mondayOf(d){ const x=midnight(d); x.setDate(x.getDate()-((x.getDay()+6)
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MON3=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DOW3=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-// BEO items: the beo-pdf function builds the PDF from the saved BEO and answers with a
-// short-lived signed link, so it opens as a plain PDF. Same as index.html's openBeoPdf.
-function openBeoPdf(el, ev){
-  if(ev){ ev.preventDefault(); ev.stopPropagation(); }
-  const u = el.getAttribute('data-beo'); if(!u) return false;
-  let w = null; try{ w = window.open('', '_blank'); }catch(e){}
-  const say = (m, err) => { try{ w.document.body.innerHTML = '<p style="font:600 16px system-ui,sans-serif;padding:24px;color:'+(err?'#b91c1c':'#06273a')+'">'+esc(m)+'</p>'; }catch(e){} };
-  if(w){ try{ w.document.write('<!doctype html><title>BEO</title><meta name="viewport" content="width=device-width,initial-scale=1"><body></body>'); w.document.close(); }catch(e){} say('Building the BEO PDF…'); }
-  fetch(u, { method:'POST', headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_KEY }, body:'{}' })
-    .then(r => r.json().catch(() => ({})).then(j => { if(!r.ok || !j.url) throw new Error(j.error || ('Could not open the BEO PDF (error '+r.status+').')); return j.url; }))
-    .then(url => { if(w && !w.closed){ try{ w.location.replace(url); return; }catch(e){} } location.href = url; })
-    .catch(e => { const m = (e && e.message) || 'Could not open the BEO PDF.'; if(w && !w.closed) say(m, true); else alert(m); });
-  return false;
-}
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 // minutes after midnight from "18:00", "6:00 PM", "18:00:00"
 function tmin(s){ if(!s) return null; const m=String(s).trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([ap])?\.?m?\.?/i); if(!m) return null;
@@ -442,7 +428,7 @@ function loadMonth(y,m){
           const tbd=!!o.time_tbd;
           put(fmt(a),{ cat:'order', title:kind+' — '+(o.name||'Guest'), sub:(tbd?'Time TBD · ':'')+(o.total_cents?money(o.total_cents)+(o.paid?'':' · unpaid')+' · ':'')+names, t0:tbd?null:dmin(a), t1:tbd?null:dmin(a)+30, soft:true, all:tbd,
             rows:[['clock',null], o.guests?['people', esc(o.guests)+' guests']:null, names?['note',esc(names)]:null, o.total_cents?['check', money(o.total_cents)+(o.paid?' · paid':' · unpaid')]:null, o.channel?['tag',esc(o.channel)]:null,
-              o.beo_pdf?['note','<a href="#" data-beo="'+esc(o.beo_pdf)+'" onclick="return openBeoPdf(this,event)" style="font-weight:700;color:#0b6aa9;text-decoration:none">📄 Open BEO PDF</a>']:null] }); });
+              o.beo_pdf?['note','<a href="/beo.html?u='+encodeURIComponent(o.beo_pdf)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="font-weight:700;color:#0b6aa9;text-decoration:none">📄 Open BEO PDF</a>']:null] }); });
       }catch(e){} })(),
       // Wix reservations (holds the portal books for events/experiences are skipped)
       (async()=>{ try{
