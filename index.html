@@ -2506,7 +2506,8 @@ function ordRow(o){
     order:    { tag:'t-order',    label:'Order'    },
     pickup:   { tag:'t-pickup',   label:'Pickup'   }
   }[o.kind] || { tag:'t-pickup', label:'Pickup' };
-  const when = new Date(o.at).toLocaleTimeString('en-US',{ hour:'numeric', minute:'2-digit' });
+  // BEO tiles (catering leads) can have no time yet — the feed parks them at noon
+  const when = o.time_tbd ? 'Time TBD' : new Date(o.at).toLocaleTimeString('en-US',{ hour:'numeric', minute:'2-digit' });
   const money = o.total_cents ? ' · $'+(o.total_cents/100).toFixed(2) : '';
   const paid  = o.total_cents ? (o.paid ? '' : ' · <span class="ag-unpaid">unpaid</span>') : '';
   const names = (o.items||[]).map(i=>(Number(i.qty)>1 ? i.qty+'\u00d7 ' : '')+i.name).join(', ');
@@ -2517,9 +2518,10 @@ function ordRow(o){
   // item names and channel moved into the expandable detail
   const detail = agDetail([
     ['Items', names ? names+more : ''],
+    ['Guests', o.guests || ''],
     ['Channel', o.channel || ''],
     ['Total', o.total_cents ? '$'+(o.total_cents/100).toFixed(2)+(o.paid?' (paid)':' (unpaid)') : '']
-  ]);
+  ]) + (o.beo_code ? '<a class="xt-a" href="/manager#catering/'+encodeURIComponent(o.beo_code)+'/beo" onclick="event.stopPropagation()">📋 Open BEO →</a>' : '');
   return agRow(meta.tag, meta.label, esc(when)+' \u00b7 '+esc(o.name)+money+paid, detail);
 }
 // One calendar load at a time: overlapping loads each reset then refill the same
