@@ -316,7 +316,7 @@ tr.me td.emp{ background:#eef0f3; }
       <!-- notifications (visible without login so the opt-in flow is publicly viewable; saving requires employee ID) -->
       <div class="card" id="notifyCard">
         <h3><i class="ti ti-bell"></i> Notifications</h3>
-        <p style="font-size:0.84rem;color:var(--sub);margin:-2px 0 10px;">Add your email or mobile number to get the schedule when it's published or changes, plus a reminder the day before you work.</p>
+        <p style="font-size:0.84rem;color:var(--sub);margin:-2px 0 10px;">Add your email or mobile number, then check what you want sent to each — schedule changes, a reminder the day before you work, and more.</p>
         <p id="notifyLoginNote" style="font-size:0.82rem;color:var(--sub);margin:0 0 10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px;"><i class="ti ti-user"></i> Sign in with your employee ID above to add or remove your contact info.</p>
         <input type="email" id="notifyEmail" placeholder="you@example.com" autocomplete="email"
                style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;font-size:1rem;font-family:inherit;margin-bottom:10px;background:var(--surface);color:var(--ink);">
@@ -326,6 +326,8 @@ tr.me td.emp{ background:#eef0f3; }
                style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;font-size:1rem;font-family:inherit;margin:10px 0;background:var(--surface);color:var(--ink);">
         <label style="display:flex;gap:8px;align-items:flex-start;font-size:0.78rem;color:var(--sub);margin:0 0 10px;"><input type="checkbox" id="smsConsent" style="margin-top:2px;"> <span>I agree to receive recurring scheduling and shift-reminder text messages from GREYS Fine Cheeses &amp; Entertaining at the number provided. Message frequency varies. Message &amp; data rates may apply. Reply STOP to opt out, HELP for help.</span></label><button class="btn btn-primary btn-block" onclick="savePhone()">Save mobile number</button>
         <div class="ro-msg" id="notifyPhoneMsg"></div>
+        <div class="np" id="npBox"></div>
+        <div class="ro-msg" id="npMsg"></div>
         <p style="font-size:0.76rem;color:var(--sub);line-height:1.55;margin:10px 0 0;">By saving your mobile number you agree to receive recurring automated work-scheduling text messages from <strong>Greys Fine Cheese &amp; Entertaining (GREYS)</strong>: published schedules and schedule changes, next-day shift reminders, time-off request decisions, shift swap updates, and manager announcements. Consent is optional and is not a condition of employment. Message frequency varies — typically a few messages per week. <strong>Message &amp; data rates may apply.</strong> Reply <strong>STOP</strong> to any message to cancel, or <strong>HELP</strong> for help; you can also opt out any time by clearing your number here. <a href="/terms">SMS Terms &amp; Conditions</a> · <a href="/privacy">Privacy Policy</a></p>
       </div>
 
@@ -856,6 +858,126 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   if(typeof _enter==='function') window.enter=function(){ var r=_enter.apply(this, arguments); setTimeout(go, 700); return r; };
   window.addEventListener('DOMContentLoaded', function(){ if(!localStorage.getItem('greys_emp_id')) setTimeout(go, 300); });
   window.addEventListener('hashchange', go);
+})();
+</script>
+<!-- NOTIFY-PREFS (2026-11-04): "What to send you" — a Text / Email checkbox for each kind of notice, in the Notifications card.
+     Saved per employee in portal_notify_prefs via the portal_notify_get / portal_notify_set RPCs (employee ID check, same
+     trust level as the rest of this page). Unticked = that notice stops on that channel; nothing saved = everything on.
+     Keep NP_KINDS in sync with manager.html and supabase/sql/2026-11-04_portal_notify_prefs.sql. -->
+<style>
+.np{ margin:12px 0 2px; border:1px solid var(--line); border-radius:14px; overflow:hidden; background:var(--surface); }
+.np:empty{ display:none; }
+.np-head,.np-row{ display:grid; grid-template-columns:minmax(0,1fr) 58px 58px; align-items:center; }
+.np-head{ background:#f4f7f9; padding:9px 4px 9px 12px; font-size:0.68rem; font-weight:800; text-transform:uppercase; letter-spacing:0.3px; color:var(--sub); }
+.np-head span{ text-align:center; }
+.np-head span:first-child{ text-align:left; }
+.np-row{ padding:2px 4px 2px 12px; border-top:1px solid var(--line); }
+.np-name{ font-weight:700; font-size:0.9rem; line-height:1.3; padding:7px 0; }
+.np-name small{ display:block; font-weight:500; font-size:0.74rem; color:var(--sub); margin-top:1px; }
+.np-cb{ position:relative; display:flex; justify-content:center; align-items:center; min-height:48px; cursor:pointer; }
+.np-cb input{ position:absolute; opacity:0; width:1px; height:1px; pointer-events:none; }
+.np-box{ width:28px; height:28px; border:2px solid #b9c5d1; border-radius:8px; background:#fff; display:grid; place-items:center; transition:background .12s, border-color .12s; }
+.np-cb input:checked + .np-box{ background:var(--accent); border-color:var(--accent); }
+.np-cb input:checked + .np-box::after{ content:''; width:7px; height:13px; margin-top:-3px; border:solid #fff; border-width:0 3px 3px 0; transform:rotate(45deg); }
+.np-cb input:focus-visible + .np-box{ box-shadow:0 0 0 3px rgba(236,138,94,0.35); }
+.np-cb input:disabled + .np-box{ opacity:0.4; }
+.np-cb.dis{ cursor:not-allowed; }
+.np-na{ text-align:center; color:#b9c5d1; font-weight:700; }
+.np-foot{ font-size:0.78rem; color:var(--sub); padding:9px 12px; border-top:1px solid var(--line); background:#fafbfc; line-height:1.45; }
+</style>
+<script>
+(function(){
+  var NP_KINDS = [
+    { k:'schedule',  label:'Schedule posted or changed', sub:'When your week goes up or moves',      ch:['sms','email'] },
+    { k:'reminder',  label:'Reminder the day before',    sub:'The afternoon before you work',        ch:['sms','email'] },
+    { k:'timeoff',   label:'Time-off answers',           sub:'Approved or denied',                   ch:['sms','email'] },
+    { k:'swap',      label:'Shift swaps',                sub:'Offers to you, and swap decisions',    ch:['sms','email'] },
+    { k:'timefix',   label:'Time card fixes',            sub:'When a clock-in fix is approved or declined', ch:['sms','email'] },
+    { k:'announce',  label:'Announcements',              sub:'Team news from managers',              ch:['sms','email'] },
+    { k:'quicktext', label:'Quick texts from managers',  sub:'One-off texts (text only)',            ch:['sms'] }
+  ];
+  var NP = { prefs:{}, phone:false, email:false, loaded:false, seq:0 };
+  function $(id){ return document.getElementById(id); }
+  function me(){ try{ return ME; }catch(_){ return null; } }
+  function isOn(k, c){ var v = NP.prefs[k]; return !(v && v[c] === false); }
+  function say(t, tone){
+    var m = $('npMsg'); if(!m) return;
+    m.style.color = tone==='bad' ? 'var(--wax)' : tone==='ok' ? 'var(--mint-i)' : 'var(--sub)';
+    m.textContent = t || '';
+  }
+  function render(){
+    var box = $('npBox'); if(!box) return;
+    var who = me();
+    var h = '<div class="np-head"><span>What to send you</span><span>Text</span><span>Email</span></div>';
+    NP_KINDS.forEach(function(k){
+      h += '<div class="np-row"><div class="np-name">'+esc(k.label)+'<small>'+esc(k.sub)+'</small></div>'
+        + ['sms','email'].map(function(c){
+            if(k.ch.indexOf(c) < 0) return '<div class="np-na" aria-hidden="true">—</div>';
+            var dis = !who || !NP.loaded || (c==='sms' ? !NP.phone : !NP.email);
+            return '<label class="np-cb'+(dis?' dis':'')+'"><input type="checkbox" data-k="'+k.k+'" data-c="'+c+'"'
+              + (isOn(k.k, c) ? ' checked' : '') + (dis ? ' disabled' : '')
+              + ' aria-label="'+esc(k.label)+' by '+(c==='sms' ? 'text' : 'email')+'"><span class="np-box"></span></label>';
+          }).join('')
+        + '</div>';
+    });
+    var foot = !who ? 'Sign in with your employee ID above to pick what you get.'
+      : !NP.loaded ? 'Loading your choices…'
+      : (!NP.phone && !NP.email) ? 'Add your email or mobile number above, then pick what you want.'
+      : !NP.phone ? 'Add a mobile number above to turn on texts.'
+      : !NP.email ? 'Add an email above to turn on emails.'
+      : 'Untick anything you don’t want. Changes save right away.';
+    box.innerHTML = h + '<div class="np-foot">'+foot+'</div>';
+    box.querySelectorAll('input[type=checkbox]').forEach(function(cb){ cb.addEventListener('change', onToggle); });
+  }
+  function snapshot(){
+    var out = {};
+    NP_KINDS.forEach(function(k){ out[k.k] = {}; k.ch.forEach(function(c){ out[k.k][c] = isOn(k.k, c); }); });
+    return out;
+  }
+  async function onToggle(e){
+    var cb = e.target, who = me(); if(!who) return;
+    var k = cb.dataset.k, c = cb.dataset.c;
+    NP.prefs[k] = Object.assign({}, NP.prefs[k], { [c]: cb.checked });
+    var mine = ++NP.seq;
+    say('Saving…');
+    var res; try{ res = await sb.rpc('portal_notify_set', { p_emp: who.id, p_prefs: snapshot(), p_login: who.login_id }); }catch(err){ res = { error: err }; }
+    if(mine !== NP.seq) return;                       // a newer tap is already saving the full set
+    if(res.error){ say('Couldn’t save — try again.', 'bad'); await load(); return; }
+    if(res.data && typeof res.data === 'object') NP.prefs = res.data;
+    say('✅ Saved.', 'ok');
+    setTimeout(function(){ if(mine === NP.seq) say(''); }, 3000);
+  }
+  async function contacts(){
+    var who = me(); if(!who) return;
+    try{
+      var r = await fn('get-my-email', { employee_id: who.id, login_id: who.login_id });
+      if(r.ok){ NP.email = !!String(r.data.email||'').trim(); NP.phone = !!String(r.data.phone||'').trim() && r.data.sms_opt_in !== false; }
+    }catch(_){}
+  }
+  async function load(){
+    var who = me();
+    if(!who){ NP.prefs = {}; NP.loaded = false; render(); return; }
+    var res; try{ res = await sb.rpc('portal_notify_get', { p_emp: who.id, p_login: who.login_id }); }catch(err){ res = { error: err }; }
+    NP.loaded = !res.error;
+    NP.prefs = (NP.loaded && res.data && typeof res.data === 'object') ? res.data : {};
+    if(!NP.loaded) say('Couldn’t load your choices — refresh to try again.', 'bad');
+    render();
+  }
+  function wrap(name, after){
+    var orig = window[name]; if(typeof orig !== 'function') return;
+    window[name] = async function(){ var out = await orig.apply(this, arguments); try{ await after(); }catch(_){} return out; };
+  }
+  // sign-in runs loadEmail(); saving a number or email changes which column is usable
+  wrap('loadEmail', async function(){ await contacts(); await load(); });
+  wrap('savePhone', async function(){ await contacts(); render(); });
+  wrap('saveEmail', async function(){ await contacts(); render(); });
+  var _logout = window.logout;
+  if(typeof _logout === 'function') window.logout = function(){
+    var out = _logout.apply(this, arguments);
+    NP.prefs = {}; NP.loaded = false; NP.phone = NP.email = false; NP.seq++; say(''); render();
+    return out;
+  };
+  window.addEventListener('DOMContentLoaded', function(){ if(!NP.loaded) render(); });
 })();
 </script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->

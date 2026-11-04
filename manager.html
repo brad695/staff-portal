@@ -1139,7 +1139,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
   <div id="panel-announcements" class="panel">
     <div class="section-card">
       <h2>📣 New announcement</h2>
-      <div class="hint">Emails <strong>and texts</strong> every active employee (with an email / mobile number on file) at the chosen location, and shows on the staff schedule page.</div>
+      <div class="hint">Emails <strong>and texts</strong> every active employee (with an email / mobile number on file) at the chosen location, and shows on the staff schedule page. Skips anyone who unticked Announcements in their notification choices.</div>
       <div class="rec-fields">
         <div class="rf full"><label>Title</label><input type="text" id="annTitle" placeholder="e.g. Holiday hours next week"></div>
         <div class="rf full"><label>Message</label><textarea id="annBody" placeholder="Details…"></textarea></div>
@@ -1152,7 +1152,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     </div>
     <div class="section-card">
       <h2>📱 Quick text (SMS only)</h2>
-      <div class="hint">Sends a one-off text to every active employee with a mobile number on file — nothing is posted to the staff page. Staff add their own number on the schedule page under Notifications.</div>
+      <div class="hint">Sends a one-off text to every active employee with a mobile number on file — nothing is posted to the staff page. Staff add their own number (and pick what they get) on the schedule page under Notifications; anyone who unticked Quick texts is skipped.</div>
       <div class="rec-fields">
         <div class="rf full"><label>Message</label><textarea id="smsBody" placeholder="e.g. We're slammed tonight — anyone free to pick up a shift, text me back!"></textarea></div>
         <div class="rf"><label>Location</label><select id="smsLoc"><option value="all">All locations</option><option value="memphis">Memphis</option><option value="nashville">Nashville</option></select></div>
@@ -3252,6 +3252,12 @@ async function recSave(){
       if(error){ document.getElementById('recErr').textContent = '❌ Saved, but "On the schedule" didn’t: '+error.message; if(!wasId) REC_CTX.id = empId; return; }
     }
   }
+  if(kind==='employees' && typeof npMgrSave==='function'){
+    // NOTIFY-PREFS (2026-11-04): the Text / Email boxes at the bottom of this window
+    const empId = wasId || (r.data && r.data.id) || null;
+    const bad = empId ? await npMgrSave(empId) : '';
+    if(bad){ document.getElementById('recErr').textContent = '❌ Saved, but the text / email choices didn’t: '+bad; if(!wasId) REC_CTX.id = empId; return; }
+  }
   if(kind==='events'){
     // ⏱ hours before the event that the Wix block starts (2026-11-02) — portal-api's item row doesn't carry it
     const evId = wasId || (r.data && r.data.id) || null;
@@ -3762,6 +3768,7 @@ async function publishWeek(loc){
     let t = '✅ Published — emailed '+r.data.notified+', texted '+(r.data.sms_notified||0)+' of '+r.data.changed+' affected employee(s).';
     if(r.data.no_contact && r.data.no_contact.length) t += ' No contact info on file: '+r.data.no_contact.join(', ')+'.';
     else if(r.data.no_email && r.data.no_email.length) t += ' No email on file: '+r.data.no_email.join(', ')+'.';
+    if(r.data.opted_out && r.data.opted_out.length) t += ' Turned schedule notices off: '+r.data.opted_out.join(', ')+'.';
     el.textContent = t; sgLoad();
   } else { el.className='save-msg err'; el.textContent='❌ '+(r.data.error||'Publish failed'); }
   setTimeout(()=>{ el.textContent=''; },12000);
@@ -3889,6 +3896,7 @@ async function smsSend(){
   if(r.ok){
     let t = '✅ Texted '+r.data.sent+' of '+r.data.total+' employee(s).';
     if(r.data.no_phone && r.data.no_phone.length) t += ' No number on file: '+r.data.no_phone.join(', ')+'.';
+    if(r.data.opted_out && r.data.opted_out.length) t += ' Turned quick texts off: '+r.data.opted_out.join(', ')+'.';
     m.textContent = t;
     document.getElementById('smsBody').value='';
   } else { m.className='save-msg err'; m.textContent='❌ '+(r.data.error||'Send failed'); }
@@ -17409,6 +17417,89 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     window.addEventListener('beforeunload', function(e){ if(st.dirty){ e.preventDefault(); e.returnValue = ''; } });
   }
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
+<!-- NOTIFY-PREFS (2026-11-04): "Texts & emails they get" — the same Text / Email checkboxes staff see on schedule.html,
+     shown at the bottom of the employee editor. Reads/writes portal_notify_prefs via portal_notify_get / portal_notify_set
+     (admin session). Only saved when a box was changed. Keep NP_KINDS in sync with schedule.html and
+     supabase/sql/2026-11-04_portal_notify_prefs.sql. -->
+<style>
+.npm{ border:1px solid var(--line); border-radius:var(--r); overflow:hidden; background:#fff; }
+.npm-row{ display:grid; grid-template-columns:minmax(0,1fr) 64px 64px; align-items:center; padding:7px 12px; border-top:1px solid var(--line-soft, #eee); font-size:0.86rem; }
+.npm-row:first-child{ border-top:none; }
+.npm-head{ background:#f7f7f7; font-size:0.66rem; font-weight:800; text-transform:uppercase; letter-spacing:0.3px; color:var(--sub); padding:8px 12px; }
+.npm-row > span:not(:first-child){ text-align:center; }
+.npm-row small{ display:block; font-size:0.74rem; color:var(--sub); }
+.npm-cb{ display:flex; justify-content:center; }
+.rf .npm input[type=checkbox]{ width:20px; height:20px; padding:0; margin:0; border:none; accent-color:var(--cheddar, #c8952c); cursor:pointer; }
+.rf .npm input[type=checkbox]:disabled{ cursor:not-allowed; }
+.npm-note{ font-size:0.76rem; color:var(--sub); margin-top:6px; line-height:1.4; }
+.npm-note.bad{ color:var(--wax, #c0392b); }
+</style>
+<script>
+(function(){
+  var NP_KINDS = [
+    { k:'schedule',  label:'Schedule posted or changed', ch:['sms','email'] },
+    { k:'reminder',  label:'Reminder the day before',    ch:['sms','email'] },
+    { k:'timeoff',   label:'Time-off answers',           ch:['sms','email'] },
+    { k:'swap',      label:'Shift swaps',                ch:['sms','email'] },
+    { k:'timefix',   label:'Time card fixes',            ch:['sms','email'] },
+    { k:'announce',  label:'Announcements',              ch:['sms','email'] },
+    { k:'quicktext', label:'Quick texts from managers',  sub:'text only', ch:['sms'] }
+  ];
+  var NPM = null;   // { id, prefs, ready, dirty } for the employee window that's open
+  function isOn(k, c){ var v = NPM && NPM.prefs[k]; return !(v && v[c] === false); }
+  function draw(note, bad){
+    var wrap = document.getElementById('rec-w-notify'); if(!wrap || !NPM) return;
+    var h = '<label>Texts &amp; emails they get</label><div class="npm"><div class="npm-row npm-head"><span>Notice</span><span>Text</span><span>Email</span></div>';
+    NP_KINDS.forEach(function(k){
+      h += '<div class="npm-row"><span>'+esc(k.label)+(k.sub ? '<small>'+esc(k.sub)+'</small>' : '')+'</span>'
+        + ['sms','email'].map(function(c){
+            if(k.ch.indexOf(c) < 0) return '<span style="color:#bbb;">—</span>';
+            return '<span class="npm-cb"><input type="checkbox" data-k="'+k.k+'" data-c="'+c+'"'+(isOn(k.k, c) ? ' checked' : '')
+              + (NPM.ready ? '' : ' disabled')+' aria-label="'+esc(k.label)+' by '+(c==='sms' ? 'text' : 'email')+'"></span>';
+          }).join('') + '</div>';
+    });
+    h += '</div><div class="npm-note'+(bad ? ' bad' : '')+'">'+(note || 'Same boxes they see on the schedule page under Notifications. Texts need a mobile number on file, emails need an email.')+'</div>';
+    wrap.innerHTML = h;
+    wrap.querySelectorAll('input[type=checkbox]').forEach(function(cb){
+      cb.addEventListener('change', function(){
+        NPM.prefs[cb.dataset.k] = Object.assign({}, NPM.prefs[cb.dataset.k], { [cb.dataset.c]: cb.checked });
+        NPM.dirty = true;
+      });
+    });
+  }
+  async function mount(id){
+    var fields = document.getElementById('recFields'); if(!fields) return;
+    var me = NPM = { id: id, prefs: {}, ready: !id, dirty: false };
+    fields.insertAdjacentHTML('beforeend', '<div class="rec-section">Notifications</div><div class="rf full" id="rec-w-notify"></div>');
+    draw(id ? 'Loading their choices…' : '');
+    if(!id) return;
+    var res; try{ res = await sb.rpc('portal_notify_get', { p_emp: id }); }catch(err){ res = { error: err }; }
+    if(me !== NPM) return;   // the window was closed or reopened meanwhile
+    if(res.error){ draw('Couldn’t load their choices: '+(res.error.message || res.error)+' — boxes are locked so nothing gets overwritten.', true); return; }
+    NPM.prefs = (res.data && typeof res.data === 'object') ? res.data : {};
+    NPM.ready = true;
+    draw('');
+  }
+  var _openRec = window.openRec;
+  if(typeof _openRec === 'function') window.openRec = function(kind, row){
+    var out = _openRec.apply(this, arguments);
+    NPM = null;
+    if(kind === 'employees') mount(row ? row.id : null);
+    return out;
+  };
+  // called by recSave() after the employee row saved; returns '' or an error message
+  window.npMgrSave = async function(empId){
+    if(!NPM || !NPM.ready || !NPM.dirty) return '';
+    if(NPM.id && NPM.id !== empId) return '';
+    var out = {};
+    NP_KINDS.forEach(function(k){ out[k.k] = {}; k.ch.forEach(function(c){ out[k.k][c] = isOn(k.k, c); }); });
+    var res; try{ res = await sb.rpc('portal_notify_set', { p_emp: empId, p_prefs: out }); }catch(err){ res = { error: err }; }
+    if(res.error) return res.error.message || String(res.error);
+    NPM.id = empId; NPM.dirty = false;
+    return '';
+  };
 })();
 </script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
