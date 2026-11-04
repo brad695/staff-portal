@@ -395,6 +395,9 @@ function loadMonth(y,m){
     base.schedules.forEach(s=>{ if(!s.date) return; spanDays(s.date, s.endDate, mS, mE, d=>put(d,{ cat:'sched', title:s.name, sub:s.note, all:true, from:s.date, to:s.endDate||s.date, rows:[['clock',null], s.note?['note',esc(s.note)]:null] })); });
     base.timeoff.forEach(s=>{ if(!s.date) return; spanDays(s.date, s.endDate, mS, mE, d=>put(d,{ cat:'off', title:s.name+' — time off', sub:s.note, all:true, from:s.date, to:s.endDate||s.date, rows:[['clock',null], s.note?['note','“'+esc(s.note)+'”']:null] })); });
 
+    // one feed call serves the order tiles AND the BEO links on experiences (exp_beo, by confirmation code)
+    const feedP = fetch(ORDERS_URL,{ method:'POST', headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_KEY }, body:JSON.stringify({ action:'feed', from:mS, to:mE, loc:LOC }) })
+      .then(r=>r.ok?r.json():null).catch(()=>null);
     await Promise.all([
       // ticket-site classes + ticketed events (location is a capitalised label)
       (async()=>{ try{
@@ -412,15 +415,16 @@ function loadMonth(y,m){
       // experiences
       (async()=>{ try{
         const { data } = await sb.rpc('portal_experiences', { p_from:mS, p_to:mE, p_loc:LOC });
+        const xb = ((await feedP)||{}).exp_beo || {};
         (data||[]).forEach(x=>{ if(!x.starts_at) return; const a=new Date(x.starts_at), b=x.ends_at?new Date(x.ends_at):null; const hold=x.status==='pending';
           put(fmt(a),{ cat:'exp', title:x.experience+(x.guest_name?' — '+x.guest_name:''), sub:(hold?'On hold · ':'')+'👥 '+(x.party_size||'?')+(x.tables?' · '+x.tables:''), t0:dmin(a), t1:b?dmin(b):dmin(a)+120, soft:!b,
             rows:[['clock',null], ['people', (x.party_size||'?')+' guests'+(x.guest_name?' · '+esc(x.guest_name):'')], x.tables?['pin','Tables: '+esc(x.tables)]:null,
-              ['check', hold?'Held for an inquiry — not paid yet':(x.payment_status==='paid'?'Paid':'Not paid yet')], x.code?['tag','Confirmation '+esc(x.code)]:null, x.notes?['note',esc(x.notes)]:null] }); });
+              ['check', hold?'Held for an inquiry — not paid yet':(x.payment_status==='paid'?'Paid':'Not paid yet')], x.code?['tag','Confirmation '+esc(x.code)]:null, x.notes?['note',esc(x.notes)]:null,
+              xb[x.code]?['note','<a href="/beo.html?u='+encodeURIComponent(xb[x.code])+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="font-weight:700;color:#0b6aa9;text-decoration:none">📄 Open BEO PDF</a>']:null] }); });
       }catch(e){} })(),
       // Square future orders (pickups, deliveries, catering)
       (async()=>{ try{
-        const res = await fetch(ORDERS_URL,{ method:'POST', headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_KEY }, body:JSON.stringify({ action:'feed', from:mS, to:mE, loc:LOC }) });
-        if(!res.ok) return; const data=await res.json();
+        const data=await feedP; if(!data) return;
         (data.orders||[]).forEach(o=>{ if(!o.at) return; const a=new Date(o.at);
           const kind={ delivery:'Delivery', catering:'Catering', order:'Order', pickup:'Pickup' }[o.kind]||'Pickup';
           const names=(o.items||[]).map(i=>(Number(i.qty)>1?i.qty+'× ':'')+i.name).join(', ')+((o.items||[]).length>=6?' …':'');

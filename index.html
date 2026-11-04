@@ -2393,7 +2393,7 @@ function renderReservations(recs){
 
 // ═══ CALENDAR ═══
 let _calYear=new Date().getFullYear(), _calMonth=new Date().getMonth(), _selDay=null;
-let _calData={ res:{}, ev:{}, sp:{}, sch:{}, off:{}, cls:{}, ord:{}, exp:{} };
+let _calData={ res:{}, ev:{}, sp:{}, sch:{}, off:{}, cls:{}, ord:{}, exp:{}, xbeo:{} };
 let _calTarget={ label:'calMonthLabel', list:'agendaList' };   // where the calendar renders: full view or inline home preview
 async function loadCalMonth(y,m){
   _calData.res={};
@@ -2464,6 +2464,12 @@ async function loadExpThreads(){
     all.forEach(x=>{ x.threads=by[x.code]||null; });
   }catch(e){}
 }
+// BEO link on an Experience (2026-11-03): a paid booking gets a catering lead + BEO, hidden from the
+// calendar so the job isn't listed twice; the square-orders feed sends exp_beo = { <confirmation code>: <signed beo-pdf link> }.
+function expBeoHtml(x){
+  const u=_calData.xbeo&&x&&_calData.xbeo[x.code]; if(!u) return '';
+  return '<a class="xt-a" href="/beo.html?u='+encodeURIComponent(u)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">📄 Open BEO PDF</a>';
+}
 function expThreadHtml(x){
   if(!x.threads||!x.threads.length) return '';
   let h='<div class="xt"><div class="xt-h">💬 Conversation</div>';
@@ -2481,7 +2487,7 @@ function expThreadHtml(x){
 // catering order booked at the counter appears once, not twice.
 const ORDERS_URL = SB_URL + '/functions/v1/square-orders';
 async function loadCalOrders(mS,mE){
-  _calData.ord={};
+  _calData.ord={}; _calData.xbeo={};
   try{
     const res = await fetch(ORDERS_URL, {
       method:'POST',
@@ -2490,12 +2496,13 @@ async function loadCalOrders(mS,mE){
     });
     if(!res.ok) return;
     const data = await res.json();
+    _calData.xbeo = data.exp_beo || {};   // experience bookings' BEO links, by confirmation code
     (data.orders||[]).forEach(o=>{ if(!o.at) return;
       const d = fmt(new Date(o.at));
       (_calData.ord[d]=_calData.ord[d]||[]).push(o);
     });
     Object.values(_calData.ord).forEach(a=>a.sort((x,y)=>Date.parse(x.at)-Date.parse(y.at)));
-  }catch(e){ _calData.ord={}; }
+  }catch(e){ _calData.ord={}; _calData.xbeo={}; }
 }
 // One agenda line per order: when, who, what it is worth, and whether the
 // money is already in. Item names go on a second, quieter line.
@@ -2597,7 +2604,7 @@ function renderAgenda(y,m,tgt,only){
         +(x.payment_status==='paid'?' <span class="ag-ok">\u2705</span>':hold?' <span class="ag-tent">\u23f3</span>':''),
       agDetail([['Time', x.time+(x.until?' – '+x.until:'')], ['Tables', x.tables||''],
         ['Status', hold?'Held for an inquiry until '+hu+' — not paid yet':''],
-        ['Paid', hold?'':(x.payment_status==='paid'?'Yes':'Not yet')], ['Confirmation', x.code], ['Notes', x.notes]])+expThreadHtml(x)); });
+        ['Paid', hold?'':(x.payment_status==='paid'?'Yes':'Not yet')], ['Confirmation', x.code], ['Notes', x.notes]])+expBeoHtml(x)+expThreadHtml(x)); });
     res.forEach(r=>{ const c=can.includes(r.status); const txt=esc(r.time)+' · '+esc(r.name)+' · 👥'+esc(r.party); rows+=agRow(c?'t-cancel':'t-res', c?'Cancelled':'Reserved', c?'<span class="ag-strike">'+txt+'</span>':txt); });
     sch.forEach(n=>rows+=agRow('t-sched','Schedule',esc(n.name||n),agDetail([
       ['Notes', n.note], ['Through', (n.endDate&&n.endDate!==date)?fmtDisplay(n.endDate):'']
