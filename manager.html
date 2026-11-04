@@ -2146,9 +2146,11 @@ window.catOpenById = async function(id){
 // ONE LIST (Maverick 2026-10-08): catering leads, private events (a catering lead whose occasion
 // starts "Private event"), table requests (occasion starts "Table request") and experience inquiries (INQ_ROWS, their own table and modal) together.
 // Experience stages are shown under the nearest catering stage for the filter chips.
+// Paid experience BOOKINGS (Maverick 2026-11-03: no kitchen ticket, they go on a BEO) arrive as catering leads
+// whose occasion starts "Experience" (DB trigger rb_experience_lead_sync) -> kind experience, stage Paid, BEO filled in.
 const CAT_KINDS = { catering:['Catering','#06273a'], event:['Private event','#7c3aed'], experience:['Experience','#b45309'], table:['Table request','#0f766e'] };
 const INQ_AS_CAT = { new:'new', replied:'replied', link_sent:'contract_sent', booked:'paid', lost:'lost' };
-function catKindOf(r){ const o = r.occasion||''; return /^private event/i.test(o) ? 'event' : /^table request/i.test(o) ? 'table' : 'catering'; }
+function catKindOf(r){ const o = r.occasion||''; return /^private event/i.test(o) ? 'event' : /^table request/i.test(o) ? 'table' : /^experience/i.test(o) ? 'experience' : 'catering'; }
 function catAll(){
   const a = CAT_ROWS.map(r=>({ kind:catKindOf(r), stage:r.stage, r }));
   const b = (typeof INQ_ROWS!=='undefined' ? INQ_ROWS : []).map(r=>({ kind: (r.details&&r.details.kind==='event') ? 'event' : 'experience', stage: INQ_AS_CAT[r.stage]||'new', inq:true, r }));
@@ -2158,7 +2160,7 @@ function catRender(){
   const all = catAll();
   const unread = all.filter(x=>x.r.unread).length;
   const bd = document.getElementById('catBadge'); if(bd){ bd.textContent = unread; bd.style.display = unread ? '' : 'none'; }
-  const isOpen = x => x.stage!=='paid' && x.stage!=='lost';
+  const isOpen = x => !!x.r.unread || (x.stage!=='paid' && x.stage!=='lost'); // unread stays under Open until someone opens it
   const kc = { all:0, catering:0, event:0, experience:0, table:0 };
   all.filter(isOpen).forEach(x=>{ kc.all++; kc[x.kind]++; });
   const kd = document.getElementById('catKinds');
