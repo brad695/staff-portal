@@ -2072,8 +2072,17 @@ async function inqThread(){
   el.scrollTop = el.scrollHeight;
 }
 // inquiry times are '18:00' when a slot is held (Memphis), or words: '12–2 pm', '4–7 pm', 'after 7' (2026-10-06)
-function inqTime(t){ if(!/^\d{1,2}:\d{2}/.test(String(t))) return String(t); const [h,m]=String(t).split(':').map(Number); return ((h%12)||12)+':'+String(m).padStart(2,'0')+(h>=12?' PM':' AM'); }
+// words ('6:00 PM' on a request since 2026-11-04, '12–2 pm') are shown as they are
+function inqTime(t){ if(!/^\d{1,2}:\d{2}$/.test(String(t))) return String(t); const [h,m]=String(t).split(':').map(Number); return ((h%12)||12)+':'+String(m).padStart(2,'0')+(h>=12?' PM':' AM'); }
 function inqClose(){ document.getElementById('inqModal').style.display='none'; INQ_CUR=null; }
+// '18:00' or '6:00 PM' -> '18:00'; anything else (a window like '12–2 pm', 'after 7') -> ''
+function inqTime24(t){
+  t = String(t||'').trim();
+  if(/^\d{2}:\d{2}$/.test(t)) return t;
+  const m = /^(\d{1,2}):(\d{2})\s*([AP])\.?M\.?$/i.exec(t); if(!m) return '';
+  const h = (+m[1] % 12) + (/p/i.test(m[3]) ? 12 : 0);
+  return h < 24 && +m[2] < 60 ? String(h).padStart(2,'0') + ':' + m[2] : '';
+}
 function inqLink(){
   const r = INQ_CUR; if(!r) return INQ_SITE;
   const [first, ...rest] = (r.name||'').trim().split(/\s+/);
@@ -2081,8 +2090,10 @@ function inqLink(){
   if(r.experience_type_id) p.set('book', r.experience_type_id); else p.set('ask','');
   if(r.preferred_date) p.set('date', r.preferred_date);
   if(r.party_size) p.set('party', r.party_size);
-  // the slot they picked is held for them (48 h); the link pays for that same reservation
-  if(r.preferred_time && /^\d{2}:\d{2}$/.test(r.preferred_time)) p.set('time', r.preferred_time);
+  // the time they asked for: '18:00' (a held slot — the link pays for that same reservation) or, on a
+  // request, '6:00 PM' (2026-11-04) — sent as &time=18:00 so the booking page opens on it
+  const tm = inqTime24(r.preferred_time); if(tm) p.set('time', tm);
+  if(r.details && r.details.option_key) p.set('opt', r.details.option_key);
   if(r.reservation_id && r.reservation_code && r.hold_expires_at){ p.set('hold', r.reservation_id); p.set('hc', r.reservation_code); }
   if(first) p.set('first', first); if(rest.length) p.set('last', rest.join(' '));
   if(r.email) p.set('email', r.email); if(r.phone) p.set('phone', r.phone);

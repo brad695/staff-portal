@@ -866,7 +866,7 @@ function mapInq(q){const d=q.details||{},r=q.res;
 const isLead=c=>!!(c&&c.lead);
 const isInq=c=>isLead(c)&&c.lead.kind==='exp';
 const money=c=>'$'+(Math.round(c)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-function leadTime(t){const m=/^(\d{1,2}):(\d{2})/.exec(t||'');if(!m)return t||'';const h=+m[1];return ((h%12)||12)+':'+m[2]+(h>=12?' PM':' AM');}
+function leadTime(t){const m=/^(\d{1,2}):(\d{2})$/.exec(t||'');if(!m)return t||'';const h=+m[1];return ((h%12)||12)+':'+m[2]+(h>=12?' PM':' AM');}
 function leadDate(d,o){return d?new Date(d+'T12:00:00').toLocaleDateString([],o||{weekday:'short',month:'short',day:'numeric'}):'';}
 function leadWhen(L){return L.date?leadDate(L.date)+(L.time?' · '+leadTime(L.time):''):'Date TBD';}
 const FUL={pickup:'Pick-up',delivery:'Delivery',onsite:'On-site service'};
