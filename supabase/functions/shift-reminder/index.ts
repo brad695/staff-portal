@@ -52,17 +52,21 @@ Deno.serve(async (req: Request) => {
   const { data: shifts, error } = await admin.from("portal_shifts").select("*").eq("date", target).order("start_time");
   if (error) return json({ error: error.message }, 500);
   const byEmp: Record<number, any[]> = {};
-  (shifts || []).forEach((s: any) => { (byEmp[s.employee_id] ||= []).push(s); });
+  // scheduled days off never get a "you work tomorrow" email (same rule as portal-api's text reminder)
+  (shifts || []).filter((s: any) => s.kind !== "off").forEach((s: any) => { (byEmp[s.employee_id] ||= []).push(s); });
   const ids = Object.keys(byEmp).map(Number);
 
   let sent = 0;
   if (ids.length) {
-    const [{ data: emps }, { data: contacts }] = await Promise.all([
+    const [{ data: emps }, { data: contacts }, { data: prefs }] = await Promise.all([
       admin.from("portal_employees").select("id,name,active").in("id", ids),
       admin.from("portal_employee_contacts").select("*").in("employee_id", ids),
+      // NOTIFY-PREFS (2026-11-04): anyone who unticked "Reminder the day before" → Email is skipped (missing = on)
+      admin.from("portal_notify_prefs").select("employee_id,prefs").in("employee_id", ids),
     ]);
+    const noEmail = new Set<number>((prefs || []).filter((p: any) => p?.prefs?.reminder?.email === false).map((p: any) => Number(p.employee_id)));
     const emailOf: Record<number, string> = {};
-    (contacts || []).forEach((c: any) => { if (c.email) emailOf[c.employee_id] = c.email; });
+    (contacts || []).forEach((c: any) => { if (c.email && !noEmail.has(Number(c.employee_id))) emailOf[c.employee_id] = c.email; });
     const dayLabel = new Date(target + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
     for (const id of ids) {
       const emp = (emps || []).find((e: any) => e.id === id);

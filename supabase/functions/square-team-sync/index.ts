@@ -672,12 +672,15 @@ async function applyFix(env: Env, r: any, dry = false) {
 async function notifyFix(r: any, approved: boolean, mnote: string) {
   try {
     const { data: c } = await admin.from("portal_employee_contacts").select("email,phone,sms_opt_in").eq("employee_id", r.employee_id).maybeSingle();
+    // NOTIFY-PREFS (2026-11-04): the person's "Time card fixes" Text / Email boxes (portal_notify_prefs; missing = on)
+    const { data: np } = await admin.from("portal_notify_prefs").select("prefs").eq("employee_id", r.employee_id).maybeSingle();
+    const want = (np as any)?.prefs?.timefix || {};
     const when = r.req_end ? `${dayLabel(r.work_date)} ${clock(new Date(r.req_start))}–${clock(new Date(r.req_end))}`
       : `${dayLabel(r.work_date)} (clock-in ${clock(new Date(r.req_start))})`;
     const word = approved ? "approved — it’s in Square now" : "declined";
     const phone = e164(c?.phone);
     const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "", tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "", from = Deno.env.get("TWILIO_FROM") ?? "";
-    if (phone && c?.sms_opt_in !== false && sid && tok && from) {
+    if (phone && c?.sms_opt_in !== false && want.sms !== false && sid && tok && from) {
       const text = `GREYS: your time fix for ${when} was ${word}.${mnote ? " " + mnote : ""}`.slice(0, 600);
       const params = new URLSearchParams({ To: phone, Body: text });
       if (/^MG[0-9a-fA-F]{32}$/.test(from)) params.set("MessagingServiceSid", from); else params.set("From", from);
@@ -690,7 +693,7 @@ async function notifyFix(r: any, approved: boolean, mnote: string) {
       } catch (e) { err = errMsg(e); }
       await admin.from("portal_sms_log").insert({ employee_id: r.employee_id, kind: "timefix", ref: String(r.id), to_phone: phone, body: text, ok, error: err }).then(() => {}, () => {});
     }
-    if (c?.email) {
+    if (c?.email && want.email !== false) {
       const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       await fetch(`${SUPABASE_URL}/functions/v1/send-confirmation`, {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE}` },
