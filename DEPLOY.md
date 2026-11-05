@@ -10,7 +10,7 @@ Three static pages, no app server (nothing to cold-start):
 
 ## Staff scheduling
 
-- **Roster:** Manager console → Staff Scheduling → Employees. Name, employee ID (the staff login — any text: number, initials, nickname; unique per location, matched case-insensitively), role, active/inactive. Per location. CSV import supported (`name, employee_id, role, active`).
+- **Roster:** Manager console → Staff → Employees (the same tab has time card fixes, time-off requests and shift swaps; Staff Scheduling is just the weekly grids; notes, specials and announcements have their own "Notes & Announcements" section). Name, employee ID (the staff login — any text: number, initials, nickname; unique per location, matched case-insensitively), role, active/inactive. Per location. CSV import supported (`name, employee_id, role, active`).
 - **Weekly grids:** the Staff Scheduling tab shows all three locations at once (shared week navigation), each with its own **🖨 Print** (opens a printer-friendly landscape sheet) and **⧉ Copy previous week** buttons. Click any cell to add a shift (start, end, role, note); click a shift chip to edit or delete. The editor's **Copy this shift to…** row duplicates it to any employee/day of the week. Week starts Monday.
 - **Locations:** the console has no global location switch — each item carries its own location (filter chips per list). The manager console is desktop-first; the staff pages are phone-first.
 - **Shared staff pool:** Nashville and Franklin share employees (`LOC_GROUPS` in manager.html and schedule.html). Both manager grids show the combined roster; a shift belongs to the grid it's added on. Staff at either site see shifts from both, tagged NSH/FRK, and their time-off requests count across both sites. Memphis is separate.

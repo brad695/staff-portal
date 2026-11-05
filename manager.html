@@ -615,12 +615,12 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
 <div id="consoleView" class="hide">
   <div class="tabs">
     <div class="tab-head">Staff</div>
-    <div class="tab active" onclick="mtab('content')">Notes · Specials · Info</div>
     <div class="tab" onclick="mtab('scheduling')">Staff Scheduling</div>
-    <div class="tab" onclick="mtab('timeoff')">Time Off &amp; Swaps <span id="tfBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
+    <div class="tab" onclick="mtab('employees')">Employees <span id="tfBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
+    <div class="tab-head">Notes &amp; Announcements</div>
+    <div class="tab active" onclick="mtab('content')">Notes · Specials · Info</div>
     <div class="tab" onclick="mtab('announcements')">Announcements</div>
-    <div class="tab" onclick="mtab('ordering')">🛒 Online Ordering <span id="ooTabPill" class="oo-tabpill">OFF</span></div>
-    <div class="tab-head">Events &amp; Reservations</div>
+    <div class="tab-head">Events &amp; Resys</div>
     <div class="tab" onclick="mtab('events')">Events</div>
     <div class="tab" onclick="mtab('resys')">Reservations</div>
     <div class="tab-head">Tickets &amp; Classes</div>
@@ -635,10 +635,6 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab" onclick="tkTab(this,'bulk')">Bulk Add Classes</div>
     <div class="tab" onclick="tkTab(this,'customers')">Customers</div>
     <div class="tab" onclick="tkTab(this,'promos')">Promo Codes</div>
-    <div class="tab-head">Experiences</div>
-    <div class="tab" onclick="tkTab(this,'experiences')">✨ Experiences</div>
-    <div class="tab" onclick="tkTab(this,'expbookings')">📅 Bookings</div>
-    <div class="tab" onclick="mtab('inqform')">📝 Inquiry Form</div>
     <div class="tab-head">Cheese Case</div>
     <div class="tab" onclick="mtab('plu')">🧀 New Case Entry</div>
     <div class="tab" onclick="mtab('jamlabels')">🏷️ Jam Labels</div>
@@ -648,6 +644,12 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab-head">Catering</div>
     <div class="tab" onclick="mtab('catering')">💼 Catering Leads <span id="catBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
     <div class="tab" onclick="mtab('preorders')">📅 Pre-Orders</div>
+    <div class="tab" onclick="tkTab(this,'experiences')">✨ Experiences</div>
+    <div class="tab" onclick="tkTab(this,'expbookings')">📅 Bookings</div>
+    <div class="tab" onclick="mtab('inqform')">📝 Inquiry Form</div>
+    <div class="tab-head">Online Ordering</div>
+    <div class="tab" onclick="mtab('ordering')">🛒 Online Ordering <span id="ooTabPill" class="oo-tabpill">OFF</span></div>
+    <div class="tab" onclick="mtab('orderpad')">🧾 Order Pad</div>
     <div class="tab-head">Cheese Club</div>
     <div class="tab" onclick="ccTab(this,'members')">Members</div>
     <div class="tab" onclick="ccTab(this,'boxes')">Boxes</div>
@@ -700,8 +702,16 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
   <div id="panel-ordering" class="panel">
     <div class="section-card">
       <h2>🛒 Online Ordering</h2>
-      <div class="hint">Turn ordering on <strong>orderonline.greyscheese.com</strong> off or on for each shop. Off takes effect within about 10 seconds: the menu stays up, a notice says ordering is paused, and nobody can check out. Orders already paid are not affected. It stays off until someone turns it back on. (Uber Eats, DoorDash and Square Online are separate and not changed here.)</div>
+      <div class="hint">Turn ordering on <strong>orderonline.greyscheese.com</strong> off or on for each shop. Off takes effect within about 10 seconds: the menu stays up, a notice says ordering is paused, and nobody can check out. Orders already paid are not affected. Turning a shop off asks for how long — <strong>1, 2, 3 or 4 hours</strong>, <strong>until end of day</strong>, or until someone turns it back on — and a timed pause turns itself back on within a minute of the time. (Uber Eats, DoorDash and Square Online are separate and not changed here.)</div>
       <div class="oo-grid" id="ooGrid"><div class="rec-empty">Loading…</div></div>
+    </div>
+  </div>
+  <!-- ORDER PAD (2026-11-04): the counter tablet's order pad (order.html) inside the console; loads on first open -->
+  <div id="panel-orderpad" class="panel">
+    <div class="section-card">
+      <h2>🧾 Order Pad</h2>
+      <div class="hint">The counter tablet's order pad — same catalog, same orders, same Square Terminal. <a href="/order" target="_blank" rel="noopener">Open it full screen ↗</a> · Tapping <strong>Lock</strong> in it signs this browser out of the console too (they share one sign-in).</div>
+      <iframe id="opFrame" class="jl-frame" title="Order Pad" data-src="/order"></iframe>
     </div>
   </div>
   <div id="panel-inquiries" class="panel">
@@ -971,8 +981,34 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     </div>
   </div>
 
-  <!-- TIME OFF & SWAPS (combined page: requests · calendar entries · shift swaps) -->
-  <div id="panel-timeoff" class="panel">
+  <!-- EMPLOYEES (2026-11-04: was Time Off & Swaps) — swaps waiting on you · roster · time card fixes ·
+       time-off requests · time off entries · shift swaps -->
+  <div id="panel-employees" class="panel">
+    <div class="section-card" id="sgSwapCard" style="display:none;border:1px solid var(--gold,#c9a961);">
+      <h2>🔁 Swaps waiting on you</h2>
+      <div class="hint">A coworker accepted these shift offers — they only take effect once you approve. Approving moves the shift and notifies both employees.</div>
+      <div id="sgSwapList"></div>
+    </div>
+    <div class="section-card">
+      <h2>🧑‍🍳 Employees</h2>
+      <div class="hint"><strong>Employee ID</strong> is what staff type to open their schedule (no password) — it can be anything: a number, initials, a nickname. Set someone <strong>inactive</strong> to hide them from the grid without deleting their history. Click a row to edit.</div>
+      <div class="toolbar">
+        <div class="chips" id="employeesChips"></div>
+        <div class="spacer"></div>
+        <span class="save-msg" id="employeesMsg"></span>
+        <button class="btn btn-gold" onclick="recNew('employees')">＋ Add employee</button>
+      </div>
+      <div class="rec-list" id="employeesList"><div class="rec-empty">Loading…</div></div>
+      <div class="csv-box">
+        <strong style="font-size:0.82rem;">Import CSV:</strong>
+        <input type="file" id="employeesCsv" accept=".csv,text/csv" onchange="csvPick('employees')" />
+        <span style="font-size:0.8rem;color:var(--sub);">into</span>
+        <select class="loc-sel" id="employeesCsvLoc"><option value="memphis">Memphis</option><option value="nashville">Nashville</option></select>
+        <button class="btn btn-navy btn-sm" onclick="csvImport('employees')">Import rows</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('employees')">⬇ Template</button>
+        <span class="csv-status" id="employeesCsvStatus">Columns: name, employee_id, role, active</span>
+      </div>
+    </div>
     <div class="section-card" id="tfCard">
       <h2>⏱️ Time Card Fixes <span id="tfCount" class="pill pill-req" style="display:none;margin-left:6px;"></span></h2>
       <div class="hint">Staff ask from <strong>My Hours</strong> on the portal home — wrong times on a clock-in, a missed clock-in or clock-out, or a whole shift they never clocked. <strong>Approve</strong> writes it straight into Square; Decline leaves Square alone. Either way they get a text/email.</div>
@@ -1019,13 +1055,8 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     </div>
   </div>
 
-  <!-- STAFF SCHEDULING -->
+  <!-- STAFF SCHEDULING (just the weekly grids) -->
   <div id="panel-scheduling" class="panel">
-    <div class="section-card" id="sgSwapCard" style="display:none;border:1px solid var(--gold,#c9a961);">
-      <h2>🔁 Swaps waiting on you</h2>
-      <div class="hint">A coworker accepted these shift offers — they only take effect once you approve. Approving moves the shift and notifies both employees.</div>
-      <div id="sgSwapList"></div>
-    </div>
     <div class="section-card">
       <h2>🗓️ Weekly Schedule — all locations</h2>
       <div class="hint">Both schedules for the week below. A shift belongs to the grid you add it on. Click any cell to add a shift; <strong>drag a shift</strong> to another day or employee to copy it there (the original stays put); click one to edit, delete or copy it. Approved time off shows as a red <strong>OFF</strong> badge, and staff availability shows as grey <strong>unavail</strong> / green <strong>★</strong> chips. Edits stay private until you hit <strong>📣 Publish &amp; notify</strong> — that emails everyone whose week changed. Staff open their schedule at <strong>staff.greyscheese.com/schedule</strong> with their employee ID.</div>
@@ -1039,26 +1070,6 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
 
     <div id="sgAll"></div>
 
-    <div class="section-card">
-      <h2>🧑‍🍳 Employees</h2>
-      <div class="hint"><strong>Employee ID</strong> is what staff type to open their schedule (no password) — it can be anything: a number, initials, a nickname. Set someone <strong>inactive</strong> to hide them from the grid without deleting their history. Click a row to edit.</div>
-      <div class="toolbar">
-        <div class="chips" id="employeesChips"></div>
-        <div class="spacer"></div>
-        <span class="save-msg" id="employeesMsg"></span>
-        <button class="btn btn-gold" onclick="recNew('employees')">＋ Add employee</button>
-      </div>
-      <div class="rec-list" id="employeesList"><div class="rec-empty">Loading…</div></div>
-      <div class="csv-box">
-        <strong style="font-size:0.82rem;">Import CSV:</strong>
-        <input type="file" id="employeesCsv" accept=".csv,text/csv" onchange="csvPick('employees')" />
-        <span style="font-size:0.8rem;color:var(--sub);">into</span>
-        <select class="loc-sel" id="employeesCsvLoc"><option value="memphis">Memphis</option><option value="nashville">Nashville</option></select>
-        <button class="btn btn-navy btn-sm" onclick="csvImport('employees')">Import rows</button>
-        <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('employees')">⬇ Template</button>
-        <span class="csv-status" id="employeesCsvStatus">Columns: name, employee_id, role, active</span>
-      </div>
-    </div>
   </div>
 
   <!-- record editor modal -->
@@ -1808,7 +1819,9 @@ async function enterConsole(session){
 async function logout(){ SESSION=null; await sb.auth.signOut({ scope:'local' }); location.reload(); }
 
 function mtab(name){
+  if (name === 'timeoff') name = 'employees';   // Time Off & Swaps lives on the Employees tab now (2026-11-04)
   if (name === 'jamlabels') { const f = document.getElementById('jlFrame'); if (f && !f.src) f.src = f.dataset.src; }
+  if (name === 'orderpad') { const f = document.getElementById('opFrame'); if (f && !f.src) f.src = f.dataset.src; }
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   const tab = document.querySelector('.tab[onclick*="'+name+'"]');
@@ -1829,7 +1842,7 @@ function openHashTab(){
   const [want, code, view] = raw.split('/');
   // old links in staff emails; manager.html#inquiries/<CODE> (from Greys Chat) opens that experience inquiry
   if (want === 'inquiries') { mtab('catering'); if (code) inqOpenByCode(code); return; }
-  if (document.getElementById('panel-' + want)) mtab(want);
+  if (want === 'timeoff' || document.getElementById('panel-' + want)) mtab(want);
   if (want === 'catering' && code) catOpenByCode(code, view);
 }
 async function inqOpenByCode(code){
@@ -3852,7 +3865,7 @@ async function loadSwaps(){
     }).join('');
   }catch(e){ el.innerHTML='<div class="to-empty">❌ Could not load swaps.</div>'; }
 }
-// Swaps a coworker accepted → waiting on manager approval, pinned atop Staff Scheduling
+// Swaps a coworker accepted → waiting on manager approval, pinned atop the Employees tab
 async function sgSwapLoad(){
   const card = document.getElementById('sgSwapCard'), el = document.getElementById('sgSwapList');
   if(!card || !el) return;
@@ -15248,12 +15261,14 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   // change which four sections get a slot on the phone bar.
   const META = {
     'Staff':                  { ico:'👥', desk:'Staff',       phone:'Staff'    },
-    'Events & Reservations':  { ico:'🗓',  desk:'Events',      phone:'Events'   },
+    'Notes & Announcements':  { ico:'📌', desk:'Notes',       phone:'Notes'    },
+    'Events & Resys':         { ico:'🗓',  desk:'Events & Resys', phone:'Events' },
     'Tickets & Classes':      { ico:'🎟',  desk:'Tickets',     phone:'Tickets'  },
     'Experiences':            { ico:'✨', desk:'Experiences', phone:'Exp'      },
     'Cheese Case':            { ico:'🧀', desk:'Cheese Case', phone:'Cheese'   },
     'Marketing':              { ico:'📣', desk:'Marketing',   phone:'Mktg'     },
     'Catering':               { ico:'🥂', desk:'Catering',    phone:'Catering' },
+    'Online Ordering':        { ico:'🛒', desk:'Online Ordering', phone:'Ordering' },
     'Cheese Club':            { ico:'📦', desk:'Cheese Club', phone:'Club'     }
   };
   const PRIMARY = ['Staff','Tickets & Classes','Cheese Case','Catering'];
@@ -15264,12 +15279,14 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   // dark enough to carry white text — check that before swapping one out.
   const COLORS = {
     'Staff':                  { sc:'#4f46e5', soft:'#eef1fe' },
-    'Events & Reservations':  { sc:'#0f766e', soft:'#e6f4f2' },
+    'Notes & Announcements':  { sc:'#475569', soft:'#eef1f5' },
+    'Events & Resys':         { sc:'#0f766e', soft:'#e6f4f2' },
     'Tickets & Classes':      { sc:'#7c3aed', soft:'#f2ecfe' },
     'Experiences':            { sc:'#a52b1e', soft:'#fbecea' },
     'Cheese Case':            { sc:'#b45309', soft:'#fdf1e3' },
     'Marketing':              { sc:'#be123c', soft:'#fdeef1' },
     'Catering':               { sc:'#047857', soft:'#e7f5ef' },
+    'Online Ordering':        { sc:'#0369a1', soft:'#e6f0fb' },
     'Cheese Club':            { sc:'#1d4ed8', soft:'#eaf0fe' }
   };
   const FALLBACK = { sc:'#b45309', soft:'#fdf1e3' };
@@ -15584,13 +15601,14 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     panel:'<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/>',
     map:'<path d="M9 4.5l-5.5 2v13l5.5-2 6 2 5.5-2v-13l-5.5 2z"/><path d="M9 4.5v13M15 6.5v13"/>',
     key:'<circle cx="7.5" cy="15.5" r="3.5"/><path d="M10 13l9.5-9.5M16.5 6.5l2.5 2.5M14 9l2 2"/>',
-    pen:'<path d="M4 20h4.2L19 9.2a2.4 2.4 0 0 0-3.4-3.4L4.8 16.6z"/><path d="M14 7.5l3.4 3.4"/>'
+    pen:'<path d="M4 20h4.2L19 9.2a2.4 2.4 0 0 0-3.4-3.4L4.8 16.6z"/><path d="M14 7.5l3.4 3.4"/>',
+    note:'<path d="M6 3.5h9l3.5 3.5v13H6z"/><path d="M15 3.5V7h3.5M8.8 11h6.4M8.8 14.5h6.4M8.8 18h3.6"/>'
   };
   const svg = k => '<svg viewBox="0 0 24 24">'+(I[k]||I.dot)+'</svg>';
   const SECT = {
-    'Staff':['users','#a5b4fc'], 'Events & Reservations':['cal','#5eead4'], 'Tickets & Classes':['ticket','#7dd3fc'],
+    'Staff':['users','#a5b4fc'], 'Notes & Announcements':['note','#c4b5fd'], 'Events & Resys':['cal','#5eead4'], 'Tickets & Classes':['ticket','#7dd3fc'],
     'Experiences':['spark','#fdba74'], 'Cheese Case':['cheese','#fcd34d'], 'Marketing':['mega','#fda4af'],
-    'Catering':['glass','#6ee7b7'], 'Cheese Club':['box','#93c5fd']
+    'Catering':['glass','#6ee7b7'], 'Online Ordering':['bag','#67e8f9'], 'Cheese Club':['box','#93c5fd']
   };
   const DESK = window.matchMedia('(min-width:821px)');
 
@@ -15688,7 +15706,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 
     // desktop order + nothing expanded by default; a section click only
     // toggles its list open/closed (capture on the list beats v2's handler)
-    const ORDER = ['Events & Reservations','Tickets & Classes','Experiences','Catering','Cheese Case','Staff','Marketing','Cheese Club'];
+    const ORDER = ['Events & Resys','Tickets & Classes','Catering','Online Ordering','Cheese Case','Staff','Notes & Announcements','Marketing','Cheese Club'];
     const sorted = G.groups.slice().sort((a,b)=>{ const x=ORDER.indexOf(a.name), y=ORDER.indexOf(b.name); return (x<0?99:x)-(y<0?99:y); });
     sorted.forEach(g=> list.appendChild(g.btn));
     list.append(lkBtn, lkGrp);
@@ -17310,13 +17328,13 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   window.__iqf = { state: st, load: load, problem: problem };
 })();
 </script>
-<!-- ONLINE-ORDERING SWITCH (2026-10-10): the 🛒 Online Ordering tab (Staff section). One switch per shop for
+<!-- ONLINE-ORDERING SWITCH (2026-10-10): the 🛒 Online Ordering tab (Online Ordering section). One switch per shop for
      orderonline.greyscheese.com. State lives in site_content 'online_ordering' = { memphis:{paused,at,by}, nashville:{…} },
      written only by the set_online_ordering RPC (is_app_admin) and read by the square-online-order edge function
      (re-read every ~10 s). This console is the only place the switch lives. -->
 <style id="oo-switch">
 .oo-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
-.oo-card{ display:flex; align-items:center; gap:16px; padding:20px; border-radius:14px; border:1px solid var(--line,#e5e7eb); background:#f6fbf7; }
+.oo-card{ display:flex; flex-wrap:wrap; align-items:center; gap:16px; padding:20px; border-radius:14px; border:1px solid var(--line,#e5e7eb); background:#f6fbf7; }
 .oo-card.off{ background:#fef2f2; border-color:#fca5a5; }
 .oo-card .oo-tx{ flex:1; min-width:0; }
 .oo-card .oo-name{ font-size:1.15rem; font-weight:700; color:#111827; }
@@ -17333,6 +17351,16 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 .oo-err{ color:#b91c1c; font-size:.85rem; margin-top:12px; }
 .oo-tabpill{ display:none; margin-left:6px; padding:1px 7px; border-radius:999px; background:#b91c1c; color:#fff; font-size:.68rem; font-weight:700; letter-spacing:.03em; vertical-align:middle; }
 .oo-tabpill.show{ display:inline-block; }
+/* "turn off for how long?" — big buttons, one tap each */
+.oo-pick{ flex-basis:100%; display:flex; flex-wrap:wrap; gap:8px; padding-top:14px; border-top:1px dashed #fca5a5; }
+.oo-pick .oo-q{ flex-basis:100%; font-size:.85rem; font-weight:700; color:#7f1d1d; }
+.oo-pick button{ min-height:46px; padding:0 18px; border-radius:10px; border:1px solid #fca5a5; background:#fff; color:#991b1b; font:inherit; font-size:.95rem; font-weight:700; cursor:pointer; }
+.oo-pick button:hover{ background:#fee2e2; }
+.oo-pick button.oo-eod{ background:#b91c1c; border-color:#b91c1c; color:#fff; }
+.oo-pick button.oo-eod:hover{ background:#991b1b; }
+.oo-pick button.oo-soft{ border-style:dashed; color:#6b7280; font-weight:600; }
+.oo-pick button.oo-x{ border-color:transparent; background:none; color:#6b7280; font-weight:600; }
+.oo-pick button:disabled{ opacity:.55; cursor:default; }
 @media (prefers-reduced-motion:reduce){ .oo-sw, .oo-sw::after{ transition:none; } }
 </style>
 <script>
@@ -17340,27 +17368,44 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   var grid = document.getElementById('ooGrid'), panel = document.getElementById('panel-ordering');
   if (!grid || !panel || typeof sb === 'undefined') return;
   var SHOPS = [['memphis','Memphis'], ['nashville','Nashville']];
-  var state = null, busy = {}, err = '';
+  var state = null, busy = {}, err = '', picking = null;
   function h(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); }
+  function clock(d){ return d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }); }
   function when(iso){
     if (!iso) return '';
     var d = new Date(iso); if (isNaN(d)) return '';
-    var t = d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-    return d.toDateString() === new Date().toDateString() ? 'today at ' + t : d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) + ' at ' + t;
+    return d.toDateString() === new Date().toDateString() ? 'today at ' + clock(d) : d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) + ' at ' + clock(d);
+  }
+  // "OFF until 8:45 PM" · "OFF for the rest of today" · "OFF — customers can't order" (no time limit)
+  function offText(v){
+    var u = v.until ? new Date(v.until) : null;
+    if (!u || isNaN(u)) return 'OFF — customers can’t order';
+    var now = new Date();
+    if (u <= now) return 'OFF — turning back on now';
+    var tomorrow = new Date(now); tomorrow.setDate(now.getDate() + 1);
+    if (u.getHours() === 0 && u.getMinutes() === 0 && u.toDateString() === tomorrow.toDateString()) return 'OFF for the rest of today';
+    return 'OFF until ' + (u.toDateString() === now.toDateString() ? clock(u) : u.toLocaleDateString('en-US', { weekday:'short' }) + ' ' + clock(u));
   }
   function draw(){
     if (!state){ grid.innerHTML = '<div class="rec-empty">' + (err ? h(err) : 'Loading…') + '</div>'; return; }
     var anyOff = false;
     grid.innerHTML = SHOPS.map(function(s){
-      var v = state[s[0]] || {}, off = v.paused === true; if (off) anyOff = true;
-      var by = v.at ? 'Turned ' + (off ? 'off ' : 'on ') + when(v.at) + (v.by ? ' by ' + h(v.by) : '') : '';
-      return '<div class="oo-card' + (off ? ' off' : '') + '">'
+      var v = state[s[0]] || {}, off = v.paused === true, b = !!busy[s[0]]; if (off) anyOff = true;
+      var by = v.at ? 'Turned ' + (off ? 'off ' : 'on ') + when(v.at) + (v.by ? ' by ' + h(v.by === 'timer' ? 'the timer' : v.by) : '') : '';
+      var pick = !off && picking === s[0]
+        ? '<div class="oo-pick"><div class="oo-q">Turn off ' + s[1] + ' online ordering for…</div>'
+          + [1,2,3,4].map(function(n){ return '<button type="button" data-pick="' + n + '"' + (b ? ' disabled' : '') + '>' + n + ' hour' + (n > 1 ? 's' : '') + '</button>'; }).join('')
+          + '<button type="button" class="oo-eod" data-pick="eod"' + (b ? ' disabled' : '') + '>Until end of day</button>'
+          + '<button type="button" class="oo-soft" data-pick="off"' + (b ? ' disabled' : '') + '>Until I turn it back on</button>'
+          + '<button type="button" class="oo-x" data-pick="cancel">Cancel</button></div>'
+        : '';
+      return '<div class="oo-card' + (off ? ' off' : '') + '" data-shop="' + s[0] + '">'
         + '<div class="oo-tx"><div class="oo-name">' + s[1] + '</div>'
-        + '<div class="oo-st">' + (off ? 'OFF — customers can’t order' : 'On — taking orders') + '</div>'
+        + '<div class="oo-st">' + (off ? offText(v) : 'On — taking orders') + '</div>'
         + (by ? '<div class="oo-by">' + by + '</div>' : '')
         + '<a class="oo-link" href="https://orderonline.greyscheese.com/?shop=' + s[0] + '" target="_blank" rel="noopener">See the order site →</a></div>'
         + '<button type="button" class="oo-sw" role="switch" data-shop="' + s[0] + '" aria-checked="' + (off ? 'false' : 'true') + '"'
-        + ' aria-label="Online ordering for ' + s[1] + '"' + (busy[s[0]] ? ' disabled' : '') + '></button></div>';
+        + ' aria-label="Online ordering for ' + s[1] + '"' + (b ? ' disabled' : '') + '></button>' + pick + '</div>';
     }).join('') + (err ? '<div class="oo-err" style="grid-column:1/-1">' + h(err) + '</div>' : '');
     var pill = document.getElementById('ooTabPill'); if (pill) pill.classList.toggle('show', anyOff);
   }
@@ -17372,21 +17417,38 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     }catch(e){ if (!state) err = 'Couldn’t load the switch. Check your connection and reload.'; }
     draw();
   }
-  grid.addEventListener('click', async function(ev){
-    var b = ev.target.closest && ev.target.closest('.oo-sw'); if (!b || b.disabled) return;
-    var shop = b.getAttribute('data-shop'), turnOn = b.getAttribute('aria-checked') === 'false';
+  async function save(shop, call){
     busy[shop] = true; err = ''; draw();
     var who = '';
     try{ who = ((await sb.auth.getSession()).data.session.user.email) || ''; }catch(e){}
     try{
-      var r = await sb.rpc('set_online_ordering', { p_shop: shop, p_on: turnOn, p_by: who });
+      var r = await call(who);
       if (r.error) throw r.error;
       state = r.data || state;
     }catch(e){ err = 'That didn’t save' + (e && e.message ? ' (' + e.message + ')' : '') + '. Ordering is unchanged.'; }
     busy[shop] = false; draw();
+  }
+  grid.addEventListener('click', async function(ev){
+    var t = ev.target;
+    var p = t.closest && t.closest('[data-pick]');
+    if (p){
+      if (p.disabled) return;
+      var shop = p.closest('.oo-card').getAttribute('data-shop'), k = p.getAttribute('data-pick');
+      picking = null;
+      if (k === 'cancel'){ draw(); return; }
+      if (k === 'off') return save(shop, function(who){ return sb.rpc('set_online_ordering', { p_shop: shop, p_on: false, p_by: who }); });
+      var until = new Date();
+      if (k === 'eod') until.setHours(24, 0, 0, 0);            // midnight tonight
+      else until = new Date(Date.now() + Number(k) * 3600000);  // 1–4 hours from now
+      return save(shop, function(who){ return sb.rpc('pause_online_ordering', { p_shop: shop, p_until: until.toISOString(), p_by: who }); });
+    }
+    var b = t.closest && t.closest('.oo-sw'); if (!b || b.disabled) return;
+    var sh = b.getAttribute('data-shop'), turnOn = b.getAttribute('aria-checked') === 'false';
+    if (!turnOn){ picking = picking === sh ? null : sh; err = ''; draw(); return; }   // ON → ask how long first
+    save(sh, function(who){ return sb.rpc('set_online_ordering', { p_shop: sh, p_on: true, p_by: who }); });
   });
   load();
-  // fresh whenever the tab is opened, and every minute while it is showing (someone may flip it from the portal)
+  // fresh whenever the tab is opened, and every minute while it is showing (someone may flip it from the portal, or the timer may turn it back on)
   new MutationObserver(function(){ if (panel.classList.contains('active')) load(); }).observe(panel, { attributes:true, attributeFilter:['class'] });
   setInterval(function(){ if (!document.hidden) load(); }, 60000);
 })();
