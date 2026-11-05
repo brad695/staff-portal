@@ -17071,7 +17071,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
      (re-read every ~10 s). The same switch is on the staff portal home page (index.html). -->
 <style id="oo-switch">
 .oo-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
-.oo-card{ display:flex; align-items:center; gap:16px; padding:20px; border-radius:14px; border:1px solid var(--line,#e5e7eb); background:#f6fbf7; }
+.oo-card{ display:flex; flex-wrap:wrap; align-items:center; gap:16px; padding:20px; border-radius:14px; border:1px solid var(--line,#e5e7eb); background:#f6fbf7; }
 .oo-card.off{ background:#fef2f2; border-color:#fca5a5; }
 .oo-card .oo-tx{ flex:1; min-width:0; }
 .oo-card .oo-name{ font-size:1.15rem; font-weight:700; color:#111827; }
@@ -17088,6 +17088,16 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 .oo-err{ color:#b91c1c; font-size:.85rem; margin-top:12px; }
 .oo-tabpill{ display:none; margin-left:6px; padding:1px 7px; border-radius:999px; background:#b91c1c; color:#fff; font-size:.68rem; font-weight:700; letter-spacing:.03em; vertical-align:middle; }
 .oo-tabpill.show{ display:inline-block; }
+/* "turn off for how long?" — big buttons, one tap each */
+.oo-pick{ flex-basis:100%; display:flex; flex-wrap:wrap; gap:8px; padding-top:14px; border-top:1px dashed #fca5a5; }
+.oo-pick .oo-q{ flex-basis:100%; font-size:.85rem; font-weight:700; color:#7f1d1d; }
+.oo-pick button{ min-height:46px; padding:0 18px; border-radius:10px; border:1px solid #fca5a5; background:#fff; color:#991b1b; font:inherit; font-size:.95rem; font-weight:700; cursor:pointer; }
+.oo-pick button:hover{ background:#fee2e2; }
+.oo-pick button.oo-eod{ background:#b91c1c; border-color:#b91c1c; color:#fff; }
+.oo-pick button.oo-eod:hover{ background:#991b1b; }
+.oo-pick button.oo-soft{ border-style:dashed; color:#6b7280; font-weight:600; }
+.oo-pick button.oo-x{ border-color:transparent; background:none; color:#6b7280; font-weight:600; }
+.oo-pick button:disabled{ opacity:.55; cursor:default; }
 @media (prefers-reduced-motion:reduce){ .oo-sw, .oo-sw::after{ transition:none; } }
 </style>
 <script>
@@ -17095,27 +17105,44 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   var grid = document.getElementById('ooGrid'), panel = document.getElementById('panel-ordering');
   if (!grid || !panel || typeof sb === 'undefined') return;
   var SHOPS = [['memphis','Memphis'], ['nashville','Nashville']];
-  var state = null, busy = {}, err = '';
+  var state = null, busy = {}, err = '', picking = null;
   function h(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); }
+  function clock(d){ return d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }); }
   function when(iso){
     if (!iso) return '';
     var d = new Date(iso); if (isNaN(d)) return '';
-    var t = d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-    return d.toDateString() === new Date().toDateString() ? 'today at ' + t : d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) + ' at ' + t;
+    return d.toDateString() === new Date().toDateString() ? 'today at ' + clock(d) : d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }) + ' at ' + clock(d);
+  }
+  // "OFF until 8:45 PM" · "OFF for the rest of today" · "OFF — customers can't order" (no time limit)
+  function offText(v){
+    var u = v.until ? new Date(v.until) : null;
+    if (!u || isNaN(u)) return 'OFF — customers can’t order';
+    var now = new Date();
+    if (u <= now) return 'OFF — turning back on now';
+    var tomorrow = new Date(now); tomorrow.setDate(now.getDate() + 1);
+    if (u.getHours() === 0 && u.getMinutes() === 0 && u.toDateString() === tomorrow.toDateString()) return 'OFF for the rest of today';
+    return 'OFF until ' + (u.toDateString() === now.toDateString() ? clock(u) : u.toLocaleDateString('en-US', { weekday:'short' }) + ' ' + clock(u));
   }
   function draw(){
     if (!state){ grid.innerHTML = '<div class="rec-empty">' + (err ? h(err) : 'Loading…') + '</div>'; return; }
     var anyOff = false;
     grid.innerHTML = SHOPS.map(function(s){
-      var v = state[s[0]] || {}, off = v.paused === true; if (off) anyOff = true;
-      var by = v.at ? 'Turned ' + (off ? 'off ' : 'on ') + when(v.at) + (v.by ? ' by ' + h(v.by) : '') : '';
-      return '<div class="oo-card' + (off ? ' off' : '') + '">'
+      var v = state[s[0]] || {}, off = v.paused === true, b = !!busy[s[0]]; if (off) anyOff = true;
+      var by = v.at ? 'Turned ' + (off ? 'off ' : 'on ') + when(v.at) + (v.by ? ' by ' + h(v.by === 'timer' ? 'the timer' : v.by) : '') : '';
+      var pick = !off && picking === s[0]
+        ? '<div class="oo-pick"><div class="oo-q">Turn off ' + s[1] + ' online ordering for…</div>'
+          + [1,2,3,4].map(function(n){ return '<button type="button" data-pick="' + n + '"' + (b ? ' disabled' : '') + '>' + n + ' hour' + (n > 1 ? 's' : '') + '</button>'; }).join('')
+          + '<button type="button" class="oo-eod" data-pick="eod"' + (b ? ' disabled' : '') + '>Until end of day</button>'
+          + '<button type="button" class="oo-soft" data-pick="off"' + (b ? ' disabled' : '') + '>Until I turn it back on</button>'
+          + '<button type="button" class="oo-x" data-pick="cancel">Cancel</button></div>'
+        : '';
+      return '<div class="oo-card' + (off ? ' off' : '') + '" data-shop="' + s[0] + '">'
         + '<div class="oo-tx"><div class="oo-name">' + s[1] + '</div>'
-        + '<div class="oo-st">' + (off ? 'OFF — customers can’t order' : 'On — taking orders') + '</div>'
+        + '<div class="oo-st">' + (off ? offText(v) : 'On — taking orders') + '</div>'
         + (by ? '<div class="oo-by">' + by + '</div>' : '')
         + '<a class="oo-link" href="https://orderonline.greyscheese.com/?shop=' + s[0] + '" target="_blank" rel="noopener">See the order site →</a></div>'
         + '<button type="button" class="oo-sw" role="switch" data-shop="' + s[0] + '" aria-checked="' + (off ? 'false' : 'true') + '"'
-        + ' aria-label="Online ordering for ' + s[1] + '"' + (busy[s[0]] ? ' disabled' : '') + '></button></div>';
+        + ' aria-label="Online ordering for ' + s[1] + '"' + (b ? ' disabled' : '') + '></button>' + pick + '</div>';
     }).join('') + (err ? '<div class="oo-err" style="grid-column:1/-1">' + h(err) + '</div>' : '');
     var pill = document.getElementById('ooTabPill'); if (pill) pill.classList.toggle('show', anyOff);
   }
@@ -17127,21 +17154,38 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     }catch(e){ if (!state) err = 'Couldn’t load the switch. Check your connection and reload.'; }
     draw();
   }
-  grid.addEventListener('click', async function(ev){
-    var b = ev.target.closest && ev.target.closest('.oo-sw'); if (!b || b.disabled) return;
-    var shop = b.getAttribute('data-shop'), turnOn = b.getAttribute('aria-checked') === 'false';
+  async function save(shop, call){
     busy[shop] = true; err = ''; draw();
     var who = '';
     try{ who = ((await sb.auth.getSession()).data.session.user.email) || ''; }catch(e){}
     try{
-      var r = await sb.rpc('set_online_ordering', { p_shop: shop, p_on: turnOn, p_by: who });
+      var r = await call(who);
       if (r.error) throw r.error;
       state = r.data || state;
     }catch(e){ err = 'That didn’t save' + (e && e.message ? ' (' + e.message + ')' : '') + '. Ordering is unchanged.'; }
     busy[shop] = false; draw();
+  }
+  grid.addEventListener('click', async function(ev){
+    var t = ev.target;
+    var p = t.closest && t.closest('[data-pick]');
+    if (p){
+      if (p.disabled) return;
+      var shop = p.closest('.oo-card').getAttribute('data-shop'), k = p.getAttribute('data-pick');
+      picking = null;
+      if (k === 'cancel'){ draw(); return; }
+      if (k === 'off') return save(shop, function(who){ return sb.rpc('set_online_ordering', { p_shop: shop, p_on: false, p_by: who }); });
+      var until = new Date();
+      if (k === 'eod') until.setHours(24, 0, 0, 0);            // midnight tonight
+      else until = new Date(Date.now() + Number(k) * 3600000);  // 1–4 hours from now
+      return save(shop, function(who){ return sb.rpc('pause_online_ordering', { p_shop: shop, p_until: until.toISOString(), p_by: who }); });
+    }
+    var b = t.closest && t.closest('.oo-sw'); if (!b || b.disabled) return;
+    var sh = b.getAttribute('data-shop'), turnOn = b.getAttribute('aria-checked') === 'false';
+    if (!turnOn){ picking = picking === sh ? null : sh; err = ''; draw(); return; }   // ON → ask how long first
+    save(sh, function(who){ return sb.rpc('set_online_ordering', { p_shop: sh, p_on: true, p_by: who }); });
   });
   load();
-  // fresh whenever the tab is opened, and every minute while it is showing (someone may flip it from the portal)
+  // fresh whenever the tab is opened, and every minute while it is showing (someone may flip it from the portal, or the timer may turn it back on)
   new MutationObserver(function(){ if (panel.classList.contains('active')) load(); }).observe(panel, { attributes:true, attributeFilter:['class'] });
   setInterval(function(){ if (!document.hidden) load(); }, 60000);
 })();

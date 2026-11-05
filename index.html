@@ -3025,7 +3025,10 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
       tile.classList.toggle('off', off);
       chip.textContent = off ? 'Off' : 'On';
       state.textContent = off ? 'Off' : 'On';
-      sub.textContent = off ? ((st.at ? 'Since ' + when(st.at) : 'Paused') + ' — customers can’t order') : 'Taking orders · ' + NAME;
+      // ONLINE-ORDERING TIMER (2026-11-04): a timed pause says when it comes back on by itself
+      var back = st.until ? new Date(st.until) : null; if (back && isNaN(back)) back = null;
+      var eod = back && back.getHours() === 0 && back.getMinutes() === 0 && back - new Date() < 86400000;
+      sub.textContent = off ? ((back ? (eod ? 'Off for the rest of today' : 'Back on at ' + when(st.until)) : (st.at ? 'Since ' + when(st.at) : 'Paused')) + ' — customers can’t order') : 'Taking orders · ' + NAME;
       tile.setAttribute('aria-label', 'Online ordering for ' + NAME + ' is ' + (off ? 'off' : 'on') + ' — opens the switch in the manager console');
     }catch(e){ chip.textContent = '?'; sub.textContent = 'Couldn’t check'; }
   }
