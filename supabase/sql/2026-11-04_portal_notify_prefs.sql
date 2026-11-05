@@ -20,13 +20,18 @@ create table if not exists public.portal_notify_prefs (
   updated_at  timestamptz not null default now(),
   updated_by  text
 );
-alter table public.portal_notify_prefs enable row level security;
-drop policy if exists "portal_notify_prefs admin read" on public.portal_notify_prefs;
-create policy "portal_notify_prefs admin read" on public.portal_notify_prefs
-  for select to authenticated using (public.is_app_admin());
+alter table public.portal_notify_prefs enable row level security;   -- no anon access; writes only via the RPCs below
+
+do $$ begin
+  if not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'portal_notify_prefs'
+                 and policyname = 'portal_notify_prefs admin read') then
+    create policy "portal_notify_prefs admin read" on public.portal_notify_prefs
+      for select to authenticated using (public.is_app_admin());
+  end if;
+end $$;
 
 -- keep only known kinds/channels with true/false values
-create or replace function public.portal_notify_clean(p jsonb)
+create function public.portal_notify_clean(p jsonb)
 returns jsonb language sql immutable set search_path = public as $$
   select coalesce(jsonb_object_agg(k.kind, ch.val), '{}'::jsonb)
   from (values ('schedule'),('reminder'),('timeoff'),('swap'),('timefix'),('announce'),('quicktext')) as k(kind)
@@ -40,9 +45,10 @@ returns jsonb language sql immutable set search_path = public as $$
   where ch.val is not null;
 $$;
 
--- a manager (is_app_admin), or the employee themself (active row + matching employee ID)
-create or replace function public.portal_notify_can(p_emp bigint, p_login text)
-returns boolean language sql stable security definer set search_path = public as $$
+-- a manager (is_app_admin), or the employee themself (active row + matching employee ID).
+-- Runs as the caller: it only reads portal_employees, which the staff pages can already read.
+create function public.portal_notify_can(p_emp bigint, p_login text)
+returns boolean language sql stable set search_path = public as $$
   select coalesce(public.is_app_admin(), false)
       or exists (
         select 1 from public.portal_employees e
@@ -51,9 +57,8 @@ returns boolean language sql stable security definer set search_path = public as
            and lower(btrim(e.login_id)) = lower(btrim(p_login))
       );
 $$;
-revoke execute on function public.portal_notify_can(bigint, text) from public, anon, authenticated;
 
-create or replace function public.portal_notify_get(p_emp bigint, p_login text default null)
+create function public.portal_notify_get(p_emp bigint, p_login text default null)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 begin
   if not public.portal_notify_can(p_emp, p_login) then
@@ -62,7 +67,7 @@ begin
   return coalesce((select prefs from public.portal_notify_prefs where employee_id = p_emp), '{}'::jsonb);
 end $$;
 
-create or replace function public.portal_notify_set(p_emp bigint, p_prefs jsonb, p_login text default null)
+create function public.portal_notify_set(p_emp bigint, p_prefs jsonb, p_login text default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   v jsonb := public.portal_notify_clean(coalesce(p_prefs, '{}'::jsonb));
@@ -79,7 +84,5 @@ begin
   return v;
 end $$;
 
-revoke execute on function public.portal_notify_get(bigint, text) from public;
-revoke execute on function public.portal_notify_set(bigint, jsonb, text) from public;
 grant execute on function public.portal_notify_get(bigint, text) to anon, authenticated, service_role;
 grant execute on function public.portal_notify_set(bigint, jsonb, text) to anon, authenticated, service_role;
