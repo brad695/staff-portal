@@ -608,9 +608,10 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
 <div id="consoleView" class="hide">
   <div class="tabs">
     <div class="tab-head">Staff</div>
-    <div class="tab active" onclick="mtab('content')">Notes · Specials · Info</div>
     <div class="tab" onclick="mtab('scheduling')">Staff Scheduling</div>
-    <div class="tab" onclick="mtab('timeoff')">Time Off &amp; Swaps <span id="tfBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
+    <div class="tab" onclick="mtab('employees')">Employees <span id="tfBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
+    <div class="tab-head">Notes &amp; Announcements</div>
+    <div class="tab active" onclick="mtab('content')">Notes · Specials · Info</div>
     <div class="tab" onclick="mtab('announcements')">Announcements</div>
     <div class="tab-head">Events &amp; Reservations</div>
     <div class="tab" onclick="mtab('events')">Events</div>
@@ -965,8 +966,34 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     </div>
   </div>
 
-  <!-- TIME OFF & SWAPS (combined page: requests · calendar entries · shift swaps) -->
-  <div id="panel-timeoff" class="panel">
+  <!-- EMPLOYEES (2026-11-04: was Time Off & Swaps) — swaps waiting on you · roster · time card fixes ·
+       time-off requests · time off entries · shift swaps -->
+  <div id="panel-employees" class="panel">
+    <div class="section-card" id="sgSwapCard" style="display:none;border:1px solid var(--gold,#c9a961);">
+      <h2>🔁 Swaps waiting on you</h2>
+      <div class="hint">A coworker accepted these shift offers — they only take effect once you approve. Approving moves the shift and notifies both employees.</div>
+      <div id="sgSwapList"></div>
+    </div>
+    <div class="section-card">
+      <h2>🧑‍🍳 Employees</h2>
+      <div class="hint"><strong>Employee ID</strong> is what staff type to open their schedule (no password) — it can be anything: a number, initials, a nickname. Set someone <strong>inactive</strong> to hide them from the grid without deleting their history. Click a row to edit.</div>
+      <div class="toolbar">
+        <div class="chips" id="employeesChips"></div>
+        <div class="spacer"></div>
+        <span class="save-msg" id="employeesMsg"></span>
+        <button class="btn btn-gold" onclick="recNew('employees')">＋ Add employee</button>
+      </div>
+      <div class="rec-list" id="employeesList"><div class="rec-empty">Loading…</div></div>
+      <div class="csv-box">
+        <strong style="font-size:0.82rem;">Import CSV:</strong>
+        <input type="file" id="employeesCsv" accept=".csv,text/csv" onchange="csvPick('employees')" />
+        <span style="font-size:0.8rem;color:var(--sub);">into</span>
+        <select class="loc-sel" id="employeesCsvLoc"><option value="memphis">Memphis</option><option value="nashville">Nashville</option></select>
+        <button class="btn btn-navy btn-sm" onclick="csvImport('employees')">Import rows</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('employees')">⬇ Template</button>
+        <span class="csv-status" id="employeesCsvStatus">Columns: name, employee_id, role, active</span>
+      </div>
+    </div>
     <div class="section-card" id="tfCard">
       <h2>⏱️ Time Card Fixes <span id="tfCount" class="pill pill-req" style="display:none;margin-left:6px;"></span></h2>
       <div class="hint">Staff ask from <strong>My Hours</strong> on the portal home — wrong times on a clock-in, a missed clock-in or clock-out, or a whole shift they never clocked. <strong>Approve</strong> writes it straight into Square; Decline leaves Square alone. Either way they get a text/email.</div>
@@ -1013,13 +1040,8 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     </div>
   </div>
 
-  <!-- STAFF SCHEDULING -->
+  <!-- STAFF SCHEDULING (just the weekly grids) -->
   <div id="panel-scheduling" class="panel">
-    <div class="section-card" id="sgSwapCard" style="display:none;border:1px solid var(--gold,#c9a961);">
-      <h2>🔁 Swaps waiting on you</h2>
-      <div class="hint">A coworker accepted these shift offers — they only take effect once you approve. Approving moves the shift and notifies both employees.</div>
-      <div id="sgSwapList"></div>
-    </div>
     <div class="section-card">
       <h2>🗓️ Weekly Schedule — all locations</h2>
       <div class="hint">Both schedules for the week below. A shift belongs to the grid you add it on. Click any cell to add a shift; <strong>drag a shift</strong> to another day or employee to copy it there (the original stays put); click one to edit, delete or copy it. Approved time off shows as a red <strong>OFF</strong> badge, and staff availability shows as grey <strong>unavail</strong> / green <strong>★</strong> chips. Edits stay private until you hit <strong>📣 Publish &amp; notify</strong> — that emails everyone whose week changed. Staff open their schedule at <strong>staff.greyscheese.com/schedule</strong> with their employee ID.</div>
@@ -1033,26 +1055,6 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
 
     <div id="sgAll"></div>
 
-    <div class="section-card">
-      <h2>🧑‍🍳 Employees</h2>
-      <div class="hint"><strong>Employee ID</strong> is what staff type to open their schedule (no password) — it can be anything: a number, initials, a nickname. Set someone <strong>inactive</strong> to hide them from the grid without deleting their history. Click a row to edit.</div>
-      <div class="toolbar">
-        <div class="chips" id="employeesChips"></div>
-        <div class="spacer"></div>
-        <span class="save-msg" id="employeesMsg"></span>
-        <button class="btn btn-gold" onclick="recNew('employees')">＋ Add employee</button>
-      </div>
-      <div class="rec-list" id="employeesList"><div class="rec-empty">Loading…</div></div>
-      <div class="csv-box">
-        <strong style="font-size:0.82rem;">Import CSV:</strong>
-        <input type="file" id="employeesCsv" accept=".csv,text/csv" onchange="csvPick('employees')" />
-        <span style="font-size:0.8rem;color:var(--sub);">into</span>
-        <select class="loc-sel" id="employeesCsvLoc"><option value="memphis">Memphis</option><option value="nashville">Nashville</option></select>
-        <button class="btn btn-navy btn-sm" onclick="csvImport('employees')">Import rows</button>
-        <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('employees')">⬇ Template</button>
-        <span class="csv-status" id="employeesCsvStatus">Columns: name, employee_id, role, active</span>
-      </div>
-    </div>
   </div>
 
   <!-- record editor modal -->
@@ -1848,6 +1850,7 @@ async function enterConsole(session){
 async function logout(){ SESSION=null; await sb.auth.signOut({ scope:'local' }); location.reload(); }
 
 function mtab(name){
+  if (name === 'timeoff') name = 'employees';   // Time Off & Swaps lives on the Employees tab now (2026-11-04)
   if (name === 'jamlabels') { const f = document.getElementById('jlFrame'); if (f && !f.src) f.src = f.dataset.src; }
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
@@ -1869,7 +1872,7 @@ function openHashTab(){
   const [want, code, view] = raw.split('/');
   // old links in staff emails; manager.html#inquiries/<CODE> (from Greys Chat) opens that experience inquiry
   if (want === 'inquiries') { mtab('catering'); if (code) inqOpenByCode(code); return; }
-  if (document.getElementById('panel-' + want)) mtab(want);
+  if (want === 'timeoff' || document.getElementById('panel-' + want)) mtab(want);
   if (want === 'catering' && code) catOpenByCode(code, view);
 }
 async function inqOpenByCode(code){
@@ -3809,7 +3812,7 @@ async function loadSwaps(){
     }).join('');
   }catch(e){ el.innerHTML='<div class="to-empty">❌ Could not load swaps.</div>'; }
 }
-// Swaps a coworker accepted → waiting on manager approval, pinned atop Staff Scheduling
+// Swaps a coworker accepted → waiting on manager approval, pinned atop the Employees tab
 async function sgSwapLoad(){
   const card = document.getElementById('sgSwapCard'), el = document.getElementById('sgSwapList');
   if(!card || !el) return;
@@ -15040,6 +15043,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   // change which four sections get a slot on the phone bar.
   const META = {
     'Staff':                  { ico:'👥', desk:'Staff',       phone:'Staff'    },
+    'Notes & Announcements':  { ico:'📌', desk:'Notes',       phone:'Notes'    },
     'Events & Reservations':  { ico:'🗓',  desk:'Events',      phone:'Events'   },
     'Tickets & Classes':      { ico:'🎟',  desk:'Tickets',     phone:'Tickets'  },
     'Experiences':            { ico:'✨', desk:'Experiences', phone:'Exp'      },
@@ -15056,6 +15060,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   // dark enough to carry white text — check that before swapping one out.
   const COLORS = {
     'Staff':                  { sc:'#4f46e5', soft:'#eef1fe' },
+    'Notes & Announcements':  { sc:'#475569', soft:'#eef1f5' },
     'Events & Reservations':  { sc:'#0f766e', soft:'#e6f4f2' },
     'Tickets & Classes':      { sc:'#7c3aed', soft:'#f2ecfe' },
     'Experiences':            { sc:'#a52b1e', soft:'#fbecea' },
@@ -15375,11 +15380,12 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     flask:'<path d="M9.5 3h5M10.5 3v5.5L5.2 18.2A1.9 1.9 0 0 0 6.9 21h10.2a1.9 1.9 0 0 0 1.7-2.8L13.5 8.5V3"/><path d="M7.6 15h8.8"/>',
     panel:'<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/>',
     key:'<circle cx="7.5" cy="15.5" r="3.5"/><path d="M10 13l9.5-9.5M16.5 6.5l2.5 2.5M14 9l2 2"/>',
-    pen:'<path d="M4 20h4.2L19 9.2a2.4 2.4 0 0 0-3.4-3.4L4.8 16.6z"/><path d="M14 7.5l3.4 3.4"/>'
+    pen:'<path d="M4 20h4.2L19 9.2a2.4 2.4 0 0 0-3.4-3.4L4.8 16.6z"/><path d="M14 7.5l3.4 3.4"/>',
+    note:'<path d="M6 3.5h9l3.5 3.5v13H6z"/><path d="M15 3.5V7h3.5M8.8 11h6.4M8.8 14.5h6.4M8.8 18h3.6"/>'
   };
   const svg = k => '<svg viewBox="0 0 24 24">'+(I[k]||I.dot)+'</svg>';
   const SECT = {
-    'Staff':['users','#a5b4fc'], 'Events & Reservations':['cal','#5eead4'], 'Tickets & Classes':['ticket','#7dd3fc'],
+    'Staff':['users','#a5b4fc'], 'Notes & Announcements':['note','#c4b5fd'], 'Events & Reservations':['cal','#5eead4'], 'Tickets & Classes':['ticket','#7dd3fc'],
     'Experiences':['spark','#fdba74'], 'Cheese Case':['cheese','#fcd34d'], 'Marketing':['mega','#fda4af'],
     'Catering':['glass','#6ee7b7'], 'Cheese Club':['box','#93c5fd']
   };
@@ -15479,7 +15485,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 
     // desktop order + nothing expanded by default; a section click only
     // toggles its list open/closed (capture on the list beats v2's handler)
-    const ORDER = ['Events & Reservations','Tickets & Classes','Experiences','Catering','Cheese Case','Staff','Marketing','Cheese Club'];
+    const ORDER = ['Events & Reservations','Tickets & Classes','Experiences','Catering','Cheese Case','Staff','Notes & Announcements','Marketing','Cheese Club'];
     const sorted = G.groups.slice().sort((a,b)=>{ const x=ORDER.indexOf(a.name), y=ORDER.indexOf(b.name); return (x<0?99:x)-(y<0?99:y); });
     sorted.forEach(g=> list.appendChild(g.btn));
     list.append(lkBtn, lkGrp);
