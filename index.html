@@ -1197,6 +1197,123 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
 .v8-h b[tabindex]:focus{ outline:none; }
 }
 </style>
+<!-- SNAP ORDER (2026-11-05): the gold home tile + #view-snap (photo of a paper Future Order form → checked → calendar). See the SNAP ORDER script. -->
+<style id="snap-order">
+@media screen{
+/* the tile — GREYS gold, a dark "Take photo" bar at the bottom */
+.dash .wg-snap{ --fg:#2b1a00; --fg2:rgba(43,26,0,.74); --chip:rgba(43,26,0,.12); background:linear-gradient(155deg,#f6c453 0%,#e0a21c 55%,#c68a0e 100%); }
+.dash .wg-snap .wg-art{ opacity:.13; }
+.wg-snap-sub{ display:block; font-size:.8rem; font-weight:700; line-height:1.3; color:var(--fg2); }
+.wg-snap-cta{ display:flex; align-items:center; justify-content:center; gap:7px; min-height:44px; margin-top:auto; border-radius:12px; background:#1f1300; color:#fff; font-size:.88rem; font-weight:800; box-shadow:0 6px 14px -8px rgba(31,19,0,.8); }
+.wg-snap-cta i{ font-size:18px; line-height:1; }
+.dash .wg-snap .wg-foot{ margin-top:0; }
+
+/* the screen */
+.sn{ --sn-ink:#161a1f; --sn-sub:#6b7280; --sn-line:#e5e7eb; --sn-warn:#fff4d6; --sn-warn-line:#f1c75b; color:var(--sn-ink); }
+.sn-store{ display:flex; align-items:center; gap:7px; margin:0 0 12px; font-size:.86rem; color:var(--sn-sub); }
+.sn-store i{ font-size:17px; color:#b77d06; }
+.sn-store b{ color:var(--sn-ink); }
+.sn-signin{ margin:0 0 12px; padding:14px; border:1px solid var(--sn-line); border-radius:16px; background:#fff; }
+.sn-signin b{ display:block; font-size:1rem; font-weight:800; }
+.sn-signin p{ margin:2px 0 10px; font-size:.86rem; color:var(--sn-sub); }
+.sn-shot{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; width:100%; min-height:200px; padding:22px 16px; border:2px dashed #e0a21c; border-radius:18px; background:#fffaf0; color:#2b1a00; font:inherit; text-align:center; cursor:pointer; }
+.sn-shot i{ font-size:48px; line-height:1; color:#b77d06; }
+.sn-shot b{ font-size:1.12rem; font-weight:800; }
+.sn-shot span{ font-size:.84rem; color:#7a5a12; }
+.sn-shot:active{ transform:scale(.99); }
+.sn-alt{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:12px 0; }
+.sn-btn{ display:flex; align-items:center; justify-content:center; gap:7px; width:100%; min-height:48px; padding:0 14px; border:1px solid #d9dce3; border-radius:12px; background:#fff; color:var(--sn-ink); font:inherit; font-size:.92rem; font-weight:800; cursor:pointer; }
+.sn-btn i{ font-size:18px; line-height:1; }
+.sn-go{ display:flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:54px; padding:0 16px; border:0; border-radius:14px; background:#e0a21c; color:#1f1300; font:inherit; font-size:1.02rem; font-weight:800; cursor:pointer; box-shadow:0 8px 18px -12px rgba(120,80,0,.9); }
+.sn-go:disabled{ opacity:.6; cursor:default; }
+.sn-go i{ font-size:20px; line-height:1; }
+.sn-how{ margin:2px 2px 16px; font-size:.84rem; line-height:1.5; color:var(--sn-sub); }
+.sn-rr{ display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-top:1px solid #eef0f3; font-size:.88rem; }
+.sn-rr:first-of-type{ border-top:0; padding-top:0; }
+.sn-rr b{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:800; }
+.sn-rr span{ flex:none; color:var(--sn-sub); }
+.sn-read{ position:relative; max-width:360px; margin:0 auto 14px; border-radius:14px; overflow:hidden; background:#111; box-shadow:0 10px 30px -14px rgba(0,0,0,.55); }
+.sn-read img{ display:block; width:100%; max-height:58vh; object-fit:contain; }
+.sn-read .ph{ height:300px; }
+.sn-scan{ position:absolute; left:0; right:0; top:-22%; height:22%; background:linear-gradient(180deg, rgba(224,162,28,0), rgba(224,162,28,.42) 85%, rgba(224,162,28,.9)); animation:snScan 1.8s ease-in-out infinite; pointer-events:none; }
+@keyframes snScan{ from{ top:-22%; } to{ top:100%; } }
+.sn-status{ display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:20px; font-size:.98rem; font-weight:800; }
+.sn-status small{ display:block; font-size:.8rem; font-weight:600; color:var(--sn-sub); }
+.sn-top{ display:flex; align-items:center; gap:12px; margin:0 0 12px; }
+.sn-thumb{ flex:none; width:66px; height:86px; padding:0; border:1px solid var(--sn-line); border-radius:10px; overflow:hidden; background:#111; cursor:zoom-in; }
+.sn-thumb img{ display:block; width:100%; height:100%; object-fit:cover; }
+.sn-top b{ display:block; font-size:1.05rem; font-weight:800; }
+.sn-top span{ display:block; font-size:.8rem; line-height:1.4; color:var(--sn-sub); }
+.sn-key{ display:inline-block; width:11px; height:11px; margin-right:5px; border-radius:3px; background:var(--sn-warn); box-shadow:inset 0 0 0 1px var(--sn-warn-line); vertical-align:-1px; }
+.sn-top .sn-n{ display:inline-block; margin-top:5px; padding:3px 9px; border-radius:999px; background:#161a1f; color:#fff; font-size:.72rem; font-weight:800; }
+.sn-note{ margin:0 0 12px; padding:10px 12px; border-radius:12px; font-size:.86rem; font-weight:700; line-height:1.4; }
+.sn-note.warn{ background:#fff4d6; color:#6b4300; }
+.sn-note.bad{ background:#fef2f2; color:#b91c1c; }
+.sn-card{ margin:0 0 12px; padding:14px; border:1px solid var(--sn-line); border-radius:16px; background:#fff; }
+.sn-h{ margin:0 0 10px; font-size:.74rem; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--sn-sub); }
+.sn-f{ display:block; margin:0 0 10px; }
+.sn-f > span{ display:block; margin:0 0 4px; font-size:.78rem; font-weight:800; color:#4b5563; }
+.sn-f input, .sn-f select, .sn-f textarea{ display:block; width:100%; min-height:46px; padding:8px 10px; border:1px solid #d9dce3; border-radius:10px; font:inherit; font-size:1rem; color:var(--sn-ink); background:#fff; }
+.sn-f textarea{ min-height:84px; resize:vertical; }
+.sn-f small{ display:block; margin-top:3px; font-size:.74rem; color:var(--sn-sub); }
+.sn-chk > span::after, .sn-line.sn-chk .m > b::after{ content:"check"; display:inline-block; margin-left:6px; padding:1px 6px; border-radius:5px; background:#f1c75b; color:#3b2300; font-size:.64rem; font-weight:800; letter-spacing:.3px; text-transform:uppercase; vertical-align:1px; }
+.sn-f.sn-chk input, .sn-f.sn-chk select, .sn-f.sn-chk textarea{ background:var(--sn-warn); border-color:var(--sn-warn-line); }
+.sn-2{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; }
+.sn-seg{ display:flex; gap:4px; padding:3px; margin:0 0 10px; border-radius:10px; background:#f3f4f6; }
+.sn-seg.sn-chk{ background:var(--sn-warn); box-shadow:inset 0 0 0 1px var(--sn-warn-line); }
+.sn-seg button{ flex:1; min-height:42px; border:0; border-radius:8px; background:transparent; font:inherit; font-size:.9rem; font-weight:800; color:#4b5563; cursor:pointer; }
+.sn-seg button[aria-pressed="true"]{ background:#fff; color:#161a1f; box-shadow:0 1px 3px rgba(0,0,0,.14); }
+.sn-line{ display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"main main" "qty amt"; gap:8px 10px; padding:10px 0; border-top:1px solid #eef0f3; }
+.sn-line:first-child{ border-top:0; padding-top:2px; }
+@media(min-width:440px){ .sn-line{ grid-template-columns:minmax(0,1fr) auto auto; grid-template-areas:"main qty amt"; align-items:center; } }
+.sn-line .m{ grid-area:main; min-width:0; }
+.sn-line .m > b{ display:block; font-size:.95rem; font-weight:800; line-height:1.25; }
+.sn-line .m small{ display:block; margin-top:1px; font-size:.76rem; color:var(--sn-sub); }
+.sn-line.sn-chk{ margin:0 -8px; padding-left:8px; padding-right:8px; border-radius:10px; background:var(--sn-warn); }
+.sn-qty{ grid-area:qty; display:flex; align-items:center; gap:4px; }
+.sn-qty button{ width:42px; height:42px; border:1px solid #d9dce3; border-radius:10px; background:#fff; font:inherit; font-size:1.25rem; font-weight:800; color:#161a1f; cursor:pointer; }
+.sn-qty input{ width:54px; height:42px; border:1px solid #d9dce3; border-radius:10px; font:inherit; font-size:1rem; font-weight:800; text-align:center; color:#161a1f; background:#fff; -moz-appearance:textfield; }
+.sn-qty input::-webkit-outer-spin-button, .sn-qty input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+.sn-amt{ grid-area:amt; justify-self:end; align-self:center; min-width:76px; text-align:right; font-size:.95rem; font-weight:800; }
+.sn-opts{ display:flex; flex-wrap:wrap; gap:6px; margin-top:7px; }
+.sn-opts button{ min-height:36px; padding:0 13px; border:1px solid #d9dce3; border-radius:999px; background:#fff; font:inherit; font-size:.84rem; font-weight:800; color:#4b5563; cursor:pointer; }
+.sn-opts button[aria-pressed="true"]{ background:#161a1f; border-color:#161a1f; color:#fff; }
+.sn-oth{ display:grid; grid-template-columns:minmax(0,1fr) 104px; gap:8px; }
+.sn-oth input{ width:100%; min-height:42px; padding:6px 9px; border:1px solid #d9dce3; border-radius:10px; font:inherit; font-size:1rem; color:#161a1f; background:#fff; }
+.sn-line.sn-chk .sn-oth input{ border-color:var(--sn-warn-line); }
+.sn-add{ display:flex; align-items:center; justify-content:center; gap:6px; width:100%; min-height:46px; margin-top:8px; border:1.5px dashed #e0a21c; border-radius:12px; background:#fffaf0; color:#6b4300; font:inherit; font-size:.9rem; font-weight:800; cursor:pointer; }
+.sn-add i{ font-size:17px; }
+.sn-empty{ padding:4px 0; font-size:.86rem; color:var(--sn-sub); }
+.sn-tot{ display:grid; gap:4px; font-size:.9rem; }
+.sn-tot div{ display:flex; justify-content:space-between; gap:10px; color:#4b5563; }
+.sn-tot .t{ margin-top:2px; padding-top:7px; border-top:1px solid #eef0f3; font-size:1.06rem; font-weight:800; color:#161a1f; }
+.sn-tot small{ font-size:.74rem; color:var(--sn-sub); }
+.sn-err{ min-height:1.2em; margin:2px 2px 8px; font-size:.88rem; font-weight:800; color:#b91c1c; }
+.sn-acts{ display:grid; gap:10px; margin:4px 0 26px; }
+.sn-done{ padding:22px 4px 6px; text-align:center; }
+.sn-done .ok{ display:flex; align-items:center; justify-content:center; width:74px; height:74px; margin:0 auto 12px; border-radius:50%; background:#ecfdf5; color:#047857; font-size:40px; }
+.sn-done h3{ margin:0 0 6px; font-size:1.35rem; font-weight:800; }
+.sn-done p{ margin:0 0 18px; font-size:.95rem; line-height:1.5; color:var(--sn-sub); }
+.sn-done p b{ color:var(--sn-ink); }
+.sn-done .sn-acts{ margin-top:10px; }
+.sn-zoom{ position:fixed; inset:0; z-index:120; overflow:auto; background:rgba(0,0,0,.94); -webkit-overflow-scrolling:touch; }
+.sn-zoom img{ display:block; width:100%; height:auto; cursor:zoom-in; }
+.sn-zoom.big img{ width:220%; max-width:none; cursor:zoom-out; }
+.sn-zoom button{ position:fixed; top:calc(12px + env(safe-area-inset-top)); right:12px; z-index:1; display:flex; align-items:center; justify-content:center; width:46px; height:46px; border:0; border-radius:50%; background:#fff; color:#161a1f; font-size:24px; cursor:pointer; }
+.sn-zoom .hint{ position:fixed; left:50%; bottom:calc(18px + env(safe-area-inset-bottom)); transform:translateX(-50%); padding:6px 12px; border-radius:999px; background:rgba(255,255,255,.16); color:#fff; font-size:.8rem; font-weight:700; white-space:nowrap; pointer-events:none; }
+/* Add an item (same sheet as Edit tiles) */
+.sn-pick h4{ margin:12px 2px 6px; font-size:.72rem; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:#6b7280; }
+.sn-pick h4:first-child{ margin-top:0; }
+.sn-pick button{ display:flex; align-items:center; gap:10px; width:100%; min-height:50px; margin:0 0 6px; padding:6px 12px; border:1px solid #e7e9ee; border-radius:12px; background:#fff; font:inherit; text-align:left; cursor:pointer; }
+.sn-pick button b{ flex:1; min-width:0; font-size:.92rem; font-weight:800; color:#161a1f; }
+.sn-pick button small{ display:block; font-size:.74rem; font-weight:600; color:#6b7280; }
+.sn-pick button > span{ flex:none; font-size:.86rem; font-weight:800; color:#6b4300; }
+.sn button:focus-visible, .sn-pick button:focus-visible, .sn-zoom button:focus-visible{ outline:3px solid #e0a21c; outline-offset:2px; }
+.sn input:focus, .sn select:focus, .sn textarea:focus{ outline:3px solid rgba(224,162,28,.45); border-color:#e0a21c; }
+@media (prefers-reduced-motion:reduce){ .sn-scan{ animation:none; top:40%; } }
+}
+@media print{ .sn-zoom{ display:none !important; } }
+</style>
 </head>
 <body>
 <div class="app">
@@ -1267,6 +1384,14 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
         <span class="wg-head"><span class="wg-t">Catering Leads</span><span class="wg-chip opt" id="wgLeadChip" hidden></span></span>
         <span class="wg-list" id="wgLeadList"></span>
         <span class="wg-foot" id="wgLeadFoot">Loading&hellip;</span>
+      </button>
+      <!-- SNAP ORDER: photo of a paper Future Order form → read, checked, then on the calendar + Catering → Pre-Orders (SNAP ORDER script) -->
+      <button class="wg wg-snap" id="tile-snap" style="--i:5" onclick="openSnap()" aria-label="Snap Order: photo of a Future Order form" data-tile="snap" data-name="Snap Order" data-icon="ti-camera" data-swatch="#e0a21c" data-ink="#1f1300">
+        <i class="ti ti-camera wg-art" aria-hidden="true"></i>
+        <span class="wg-head"><span class="wg-t">Snap Order</span></span>
+        <span class="wg-snap-sub">Photo of a Future Order form &rarr; calendar</span>
+        <span class="wg-snap-cta" aria-hidden="true"><i class="ti ti-camera"></i>Take photo</span>
+        <span class="wg-foot" id="wgSnapFoot">Paper catering orders</span>
       </button>
       <button class="wg wg-stf" id="tile-stuff" style="--i:5" onclick="showView('stuff')" aria-label="Stuff to Know" data-tile="stuff" data-size-def="2x1" data-name="Stuff to Know" data-icon="ti-info-circle" data-swatch="#fff3d4" data-ink="#a16207">
         <span class="wg-head"><span class="wg-t">Stuff to Know</span><span class="wg-chip" id="wgStfN" hidden></span></span>
@@ -1856,6 +1981,14 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
   window.homeLayout={ edit:edit, done:done, current:current, apply:apply, resize:resizeTo, fold:fold };
 })();
 </script>
+
+  <!-- ══ SNAP ORDER (2026-11-05): photo of a paper Future Order form → order-photo reads it → checked here → calendar + Catering → Pre-Orders ══ -->
+  <div id="view-snap" class="view">
+    <div class="sec-head"><button class="back-btn" onclick="showView('home')" aria-label="Back">‹</button><h2>Snap Order</h2></div>
+    <div class="sec-body"><div id="snapApp" class="sn"></div></div>
+    <input type="file" id="snapCam" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+    <input type="file" id="snapPick" accept="image/*" tabindex="-1" aria-hidden="true" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+  </div>
 
   <!-- ══ SPECIALS ══ -->
   <div id="view-specials" class="view">
@@ -2526,9 +2659,12 @@ function ordRow(o){
   const detail = agDetail([
     ['Items', names ? names+more : ''],
     ['Guests', o.guests || ''],
+    ['Notes', o.note || ''],
     ['Channel', o.channel || ''],
     ['Total', o.total_cents ? '$'+(o.total_cents/100).toFixed(2)+(o.paid?' (paid)':' (unpaid)') : '']
-  ]) + (o.beo_pdf ? '<a class="xt-a" href="/beo.html?u='+encodeURIComponent(o.beo_pdf)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">📄 Open BEO PDF</a>' : '');
+  ]) + (o.beo_pdf ? '<a class="xt-a" href="/beo.html?u='+encodeURIComponent(o.beo_pdf)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">📄 Open BEO PDF</a>' : '')
+    // order-form pre-orders (Snap Order tile): the photo of the paper form, a 7-day signed link from the feed
+    + (o.photo ? '<a class="xt-a" href="'+esc(o.photo)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">📷 Order form photo</a>' : '');
   return agRow(meta.tag, meta.label, esc(when)+' \u00b7 '+esc(o.name)+money+paid, detail);
 }
 // One calendar load at a time: overlapping loads each reset then refill the same
@@ -3035,6 +3171,382 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
   load();
   setInterval(function(){ if (!document.hidden) load(); }, 60000);
   document.addEventListener('visibilitychange', function(){ if (!document.hidden) load(); });
+})();
+</script>
+<!-- SNAP ORDER (2026-11-05): the Snap Order tile + #view-snap. A server photographs a filled-in paper "Future Order" form
+     (the Catering Order Form); the order-photo edge function keeps the photo (private bucket order-forms) and reads it with
+     Claude; the server checks the reading here (yellow = not sure) and taps Add — that files a confirmed catering pre-order
+     (preorders, source 'photo'), which shows on the calendar and in Manager → Catering → Pre-Orders. No Square order is made
+     (it was rung on Square; the form carries the ticket #). Signed in with the employee ID (greys_emp_id), like Schedule. -->
+<script>
+(function(){
+  var app=document.getElementById('snapApp'), view=document.getElementById('view-snap');
+  if(!app || !view || typeof SB_URL==='undefined') return;
+  var FN=SB_URL+'/functions/v1/order-photo', cam=document.getElementById('snapCam'), pick=document.getElementById('snapPick');
+  var RECENT='greys_snap_recent', MENU=null, TAX=9.75, menuP=null;
+  var S={ step:'start' };          // start → reading → review → done
+
+  function emp(){ try{ return (localStorage.getItem('greys_emp_id')||'').trim(); }catch(e){ return ''; } }
+  function e(s){ return esc(s); }
+  function usd(c){ return '$'+((Math.round(c)||0)/100).toFixed(2); }
+  function cents(v){ return Math.round((parseFloat(v)||0)*100); }
+  function locLabel(l){ return (LOCATIONS[l]||{}).label||l||''; }
+  function uuid(){
+    if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){ var r=Math.random()*16|0; return (c==='x'?r:(r&3|8)).toString(16); });
+  }
+  function when(iso){ var d=new Date(iso); return d.toLocaleDateString('en-US',{ weekday:'short', month:'short', day:'numeric' })+' · '+d.toLocaleTimeString('en-US',{ hour:'numeric', minute:'2-digit' }); }
+  function post(body, ms){
+    var ctl=window.AbortController ? new AbortController() : null, t=ctl ? setTimeout(function(){ ctl.abort(); }, ms||30000) : 0;
+    return fetch(FN, { method:'POST', headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_KEY }, body:JSON.stringify(body), signal:ctl ? ctl.signal : undefined })
+      .then(function(r){ return r.json().catch(function(){ return { ok:false, error:'The server answered '+r.status+' — try again.' }; }); })
+      .catch(function(err){ return { ok:false, error:(err && err.name==='AbortError') ? 'That took too long — check the signal and try again.' : 'No connection — check the signal and try again.' }; })
+      .then(function(r){ clearTimeout(t); return r; });
+  }
+  function loadMenu(){
+    if(MENU) return Promise.resolve(MENU);
+    if(!menuP) menuP=post({ action:'menu' }, 20000).then(function(r){ if(r && r.ok){ MENU=r.menu||[]; TAX=r.tax_rate||9.75; } else menuP=null; return MENU; });
+    return menuP;
+  }
+  function M(k){ for(var i=0;i<(MENU||[]).length;i++) if(MENU[i].key===k) return MENU[i]; return null; }
+  function recent(){ try{ var a=JSON.parse(localStorage.getItem(RECENT)||'[]'); return Array.isArray(a) ? a.filter(function(x){ return x && x.name && Date.now()-x.t<3*86400e3; }).slice(0,5) : []; }catch(err){ return []; } }
+  function remember(d){ try{ var a=recent(); a.unshift({ name:d.name, when:d.when, loc:d.loc, t:Date.now() }); localStorage.setItem(RECENT, JSON.stringify(a.slice(0,5))); }catch(err){} tileFoot(); }
+  function tileFoot(){ var f=document.getElementById('wgSnapFoot'), r=recent()[0]; if(f) f.innerHTML=r ? 'Last: <b>'+e(r.name)+'</b> · '+e(r.when) : 'Paper catering orders'; }
+  function top(){ window.scrollTo(0,0); }
+
+  // ── the photo: oriented, then sized to what Claude reads at full detail (2576 px long edge, ~4,784 28-px tiles) ──
+  function viaImg(file){
+    return new Promise(function(res, rej){ var u=URL.createObjectURL(file), im=new Image();
+      im.onload=function(){ res(im); }; im.onerror=function(){ URL.revokeObjectURL(u); rej(new Error('That photo could not be opened — try another.')); }; im.src=u; });
+  }
+  function decode(file){
+    if(!window.createImageBitmap) return viaImg(file);
+    return createImageBitmap(file, { imageOrientation:'from-image' })
+      .catch(function(){ return createImageBitmap(file); }).catch(function(){ return viaImg(file); });
+  }
+  function jpeg(c, q){ return new Promise(function(res, rej){ c.toBlob(function(b){ if(b) res(b); else rej(new Error('That photo could not be prepared — try again.')); }, 'image/jpeg', q); }); }
+  function prep(file){
+    return decode(file).then(function(bmp){
+      var w=bmp.naturalWidth||bmp.width, h=bmp.naturalHeight||bmp.height;
+      if(!w || !h) throw new Error('That photo could not be opened — try another.');
+      var s=Math.min(1, 2576/Math.max(w,h));
+      while(Math.ceil(w*s/28)*Math.ceil(h*s/28)>4700 && s>0.05) s*=0.97;
+      var W=Math.max(1,Math.round(w*s)), H=Math.max(1,Math.round(h*s)), c=document.createElement('canvas');
+      c.width=W; c.height=H;
+      var g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,W,H); g.drawImage(bmp,0,0,W,H);
+      if(bmp.close) try{ bmp.close(); }catch(err){}
+      return jpeg(c,0.86).then(function(b){ return b.size>2.4e6 ? jpeg(c,0.72) : b; }).then(function(b){ return b.size>2.4e6 ? jpeg(c,0.6) : b; });
+    });
+  }
+  function b64(blob){ return new Promise(function(res, rej){ var r=new FileReader(); r.onload=function(){ res(String(r.result).replace(/^data:[^,]*,/,'')); }; r.onerror=function(){ rej(new Error('That photo could not be read — try again.')); }; r.readAsDataURL(blob); }); }
+  function setImg(blob){ if(S.imgUrl) try{ URL.revokeObjectURL(S.imgUrl); }catch(err){} S.imgUrl=blob ? URL.createObjectURL(blob) : null; }
+
+  function blank(){ return { index:0, lines:[], other:[], unsure:[], warnings:[] }; }
+  function fromDraft(d){
+    return { index:d.index||0, name:d.name||'', phone:d.phone||'', date:d.date||'', time:d.time||'', date_written:d.date_written||'', time_written:d.time_written||'',
+      ticket:d.ticket||'', fulfillment:d.fulfillment||'pickup', address:d.address||'', notes:d.notes||'', taken_by:d.taken_by||'',
+      payment:d.payment||'unpaid', deposit:d.deposit_cents ? (d.deposit_cents/100).toFixed(2) : '',
+      lines:(d.lines||[]).map(function(l){ return { key:l.key, qty:l.qty, option:l.option||'', unsure:!!l.unsure }; }),
+      other:(d.other||[]).map(function(o){ return { name:o.name||'', qty:o.qty||1, price:o.price_cents ? (o.price_cents/100).toFixed(2) : '', unsure:!!o.unsure }; }),
+      unsure:(d.unsure||[]).slice(), warnings:(d.warnings||[]).slice(), ref:uuid() };
+  }
+
+  // ── flow ──
+  function needSign(){
+    if(window.homeSignIn) window.homeSignIn(function(){ render(); }, { title:'Sign in to add orders', blurb:'Orders you add are saved under your employee ID.' });
+  }
+  function reset(){ setImg(null); S={ step:'start' }; render(); }
+  function onFile(file){
+    if(!file) return;
+    if(file.type && !/^image\//.test(file.type)){ S={ step:'start', err:'That file isn’t a photo.' }; render(); return; }
+    if(!emp()){ needSign(); return; }
+    setImg(null);
+    S={ step:'reading', loc:LOC }; render(); top();
+    var mine=S;
+    prep(file).then(function(blob){
+      if(S!==mine) return null;
+      setImg(blob); render();
+      return b64(blob);
+    }).then(function(data){
+      if(!data || S!==mine) return null;
+      return Promise.all([ post({ action:'read', emp:emp(), loc:mine.loc, image:data }, 130000), loadMenu() ]);
+    }).then(function(rs){
+      if(!rs || S!==mine) return;
+      var r=rs[0];
+      if(!r || !r.ok){ S={ step:'start', err:(r && r.error) || 'Couldn’t send the photo — try again.' }; setImg(null); render(); return; }
+      S.photo=r.photo; S.readId=r.read_id; S.problem=r.problem||'';
+      S.queue=(r.orders && r.orders.length) ? r.orders : [blank()];
+      S.qi=0; S.cur=fromDraft(S.queue[0]); S.step='review'; S.err='';
+      render(); top();
+    }).catch(function(err){ if(S!==mine) return; setImg(null); S={ step:'start', err:(err && err.message) || 'Something went wrong — try again.' }; render(); });
+  }
+  function startTyped(){
+    setImg(null);
+    S={ step:'review', loc:LOC, photo:null, readId:null, problem:'', queue:[blank()], qi:0, err:'' };
+    S.cur=fromDraft(S.queue[0]);
+    render(); top();
+    loadMenu().then(function(){ if(S.step==='review') render(true); });
+  }
+  function nextOrder(){
+    if(S.qi>=S.queue.length-1){ reset(); return; }
+    S.qi++; S.cur=fromDraft(S.queue[S.qi]); S.step='review'; S.err=''; S.busy=false;
+    render(); top();
+  }
+
+  // ── review: read what's on screen back into S.cur ──
+  function sync(){
+    var c=S.cur; if(!c || S.step!=='review') return;
+    app.querySelectorAll('[data-f]').forEach(function(el){ var k=el.getAttribute('data-f'); if(k==='loc') S.loc=el.value; else c[k]=el.value; });
+    app.querySelectorAll('.sn-line').forEach(function(row){
+      var q=row.querySelector('[data-qty]'), n=q ? Math.max(0, Math.min(999, parseInt(q.value,10)||0)) : 0;
+      if(row.hasAttribute('data-i')){ var l=c.lines[+row.getAttribute('data-i')]; if(l) l.qty=n; }
+      else if(row.hasAttribute('data-o')){ var o=c.other[+row.getAttribute('data-o')]; if(o){ o.qty=n; o.name=row.querySelector('[data-on]').value; o.price=row.querySelector('[data-op]').value; } }
+    });
+  }
+  function totals(c){
+    var sub=0;
+    c.lines.forEach(function(l){ var m=M(l.key); if(m) sub+=m.price_cents*(l.qty||0); });
+    c.other.forEach(function(o){ sub+=cents(o.price)*(o.qty||0); });
+    var tax=Math.round(sub*TAX/100);
+    return { sub:sub, tax:tax, total:sub+tax };
+  }
+  function refresh(){
+    var c=S.cur, t=totals(c);
+    app.querySelectorAll('.sn-line').forEach(function(row){
+      var a=row.querySelector('.sn-amt'); if(!a) return;
+      if(row.hasAttribute('data-i')){ var l=c.lines[+row.getAttribute('data-i')], m=l && M(l.key); a.textContent=m ? usd(m.price_cents*l.qty) : ''; }
+      else { var o=c.other[+row.getAttribute('data-o')]; a.textContent=o ? usd(cents(o.price)*o.qty) : ''; }
+    });
+    ['sub','tax','total'].forEach(function(k){ var el=app.querySelector('[data-t="'+k+'"]'); if(el) el.textContent=usd(t[k]); });
+  }
+  function prune(){
+    var c=S.cur, n=c.lines.length+c.other.length;
+    c.lines=c.lines.filter(function(l){ return l.qty>0; });
+    c.other=c.other.filter(function(o){ return o.qty>0; });
+    if(c.lines.length+c.other.length!==n) render(true); else refresh();
+  }
+  function drop(c,k){ var i=c.unsure.indexOf(k); if(i>=0) c.unsure.splice(i,1); }
+  function unflag(row){
+    if(!row) return;
+    var c=S.cur, i=row.getAttribute('data-i'), o=row.getAttribute('data-o');
+    if(i!==null && c.lines[+i]) c.lines[+i].unsure=false;
+    if(o!==null && c.other[+o]) c.other[+o].unsure=false;
+    row.classList.remove('sn-chk');
+  }
+
+  // ── screens ──
+  function startHtml(){
+    var h='';
+    if(S.err) h+='<div class="sn-note bad" role="alert">'+e(S.err)+'</div>';
+    h+='<div class="sn-store"><i class="ti ti-map-pin" aria-hidden="true"></i><span>Orders go on the <b>'+e(locLabel(LOC))+'</b> calendar</span></div>';
+    if(!emp()) h+='<div class="sn-signin"><b>Sign in first</b><p>Orders you add are saved under your employee ID.</p><button type="button" class="sn-go" data-a="signin">Sign in</button></div>';
+    h+='<button type="button" class="sn-shot" data-a="cam"><i class="ti ti-camera" aria-hidden="true"></i><b>Take a photo of the order form</b><span>The whole Future Order slip, flat, in good light</span></button>'
+      +'<div class="sn-alt"><button type="button" class="sn-btn" data-a="pick"><i class="ti ti-photo" aria-hidden="true"></i>Choose a photo</button><button type="button" class="sn-btn" data-a="type"><i class="ti ti-keyboard" aria-hidden="true"></i>Type it in</button></div>'
+      +'<p class="sn-how">It reads the slip, you check it, and it goes on the calendar and in Catering → Pre-Orders. Nothing is charged.</p>';
+    var rec=recent();
+    if(rec.length) h+='<div class="sn-card"><div class="sn-h">Added on this phone</div>'+rec.map(function(r){ return '<div class="sn-rr"><b>'+e(r.name)+'</b><span>'+e(r.when)+'</span></div>'; }).join('')+'</div>';
+    return h;
+  }
+  function readingHtml(){
+    return '<div class="sn-read">'+(S.imgUrl ? '<img src="'+S.imgUrl+'" alt="Your photo of the order form">' : '<div class="ph"></div>')+'<div class="sn-scan" aria-hidden="true"></div></div>'
+      +'<div class="sn-status" role="status"><span class="spin"></span><span>'+(S.imgUrl ? 'Reading the form…' : 'Getting the photo ready…')+'<small>Usually 10–30 seconds</small></span></div>';
+  }
+  function chk(c, f){ return c.unsure.indexOf(f)>=0 ? ' sn-chk' : ''; }
+  function fld(label, key, val, type, attrs, cls, hint){
+    return '<label class="sn-f'+(cls||'')+'"><span>'+label+'</span><input data-f="'+key+'" type="'+type+'" value="'+e(val)+'" '+(attrs||'')+'>'+(hint ? '<small>'+e(hint)+'</small>' : '')+'</label>';
+  }
+  function seg(group, val, label, cur){ return '<button type="button" data-'+group+'="'+val+'" aria-pressed="'+(cur===val)+'">'+label+'</button>'; }
+  function qty(n){ return '<div class="sn-qty"><button type="button" data-q="-1" aria-label="One less">−</button><input type="number" inputmode="numeric" min="0" max="999" value="'+n+'" data-qty aria-label="How many"><button type="button" data-q="1" aria-label="One more">+</button></div>'; }
+  function reviewHtml(){
+    var c=S.cur, n=S.queue.length, t=totals(c), h='';
+    h+='<div class="sn-top">'+(S.imgUrl ? '<button type="button" class="sn-thumb" data-a="zoom" aria-label="See the photo bigger"><img src="'+S.imgUrl+'" alt=""></button>' : '')
+      +'<div><b>'+(S.photo ? 'Check it, then add it' : 'Type in the order')+'</b><span>'+(S.photo ? '<i class="sn-key"></i>Yellow = couldn’t read it for sure. Tap the photo to see it bigger.' : 'Same boxes as the paper form.')+'</span>'
+      +(n>1 ? '<span class="sn-n">Order '+(S.qi+1)+' of '+n+' on this photo</span>' : '')+'</div></div>';
+    if(S.problem) h+='<div class="sn-note warn">'+e(S.problem)+'</div>';
+    c.warnings.forEach(function(w){ h+='<div class="sn-note warn">'+e(w)+'</div>'; });
+    if(!MENU) h+='<div class="sn-note bad">Couldn’t load the menu yet — check the signal. <button type="button" class="sn-btn" data-a="menu" style="margin-top:8px">Try again</button></div>';
+    h+='<div class="sn-card"><div class="sn-h">Customer</div>'
+      +fld('Name','name',c.name,'text','autocomplete="off" autocapitalize="words"',chk(c,'name'))
+      +fld('Phone','phone',c.phone,'tel','inputmode="tel" autocomplete="off"',chk(c,'phone'))+'</div>';
+    h+='<div class="sn-card"><div class="sn-h">When</div><div class="sn-2">'
+      +fld('Date','date',c.date,'date','',chk(c,'date'), c.date_written ? 'Written: “'+c.date_written+'”' : '')
+      +fld('Time','time',c.time,'time','step="300"',chk(c,'time'), c.time_written ? 'Written: “'+c.time_written+'”' : '')+'</div>'
+      +'<div class="sn-seg'+chk(c,'fulfillment')+'" role="group" aria-label="Pickup or delivery">'+seg('ful','pickup','Pickup',c.fulfillment)+seg('ful','delivery','Delivery',c.fulfillment)+'</div>'
+      +(c.fulfillment==='delivery' ? fld('Delivery address','address',c.address,'text','autocomplete="off"',chk(c,'address')) : '')
+      +'<div class="sn-2">'+fld('Square ticket #','ticket',c.ticket,'text','inputmode="numeric" autocomplete="off"',chk(c,'ticket'))
+      +'<label class="sn-f"><span>Shop</span><select data-f="loc">'+['memphis','nashville'].map(function(l){ return '<option value="'+l+'"'+(S.loc===l?' selected':'')+'>'+e(locLabel(l))+'</option>'; }).join('')+'</select></label></div></div>';
+    h+='<div class="sn-card"><div class="sn-h">Items</div><div class="sn-lines">';
+    if(!c.lines.length && !c.other.length) h+='<div class="sn-empty">No items yet — tap Add item.</div>';
+    c.lines.forEach(function(l,i){
+      var m=M(l.key); if(!m) return;
+      h+='<div class="sn-line'+(l.unsure?' sn-chk':'')+'" data-i="'+i+'"><div class="m"><b>'+e(m.name)+'</b><small>'+(m.serves ? e(m.serves)+' · ' : '')+usd(m.price_cents)+' each</small>'
+        +(m.options && m.options.length ? '<div class="sn-opts" role="group" aria-label="'+e(m.name)+'">'+m.options.map(function(o){ return '<button type="button" data-opt="'+e(o)+'" aria-pressed="'+(l.option===o)+'">'+e(o)+'</button>'; }).join('')+'</div>' : '')
+        +'</div>'+qty(l.qty)+'<div class="sn-amt">'+usd(m.price_cents*l.qty)+'</div></div>';
+    });
+    c.other.forEach(function(o,i){
+      h+='<div class="sn-line'+(o.unsure?' sn-chk':'')+'" data-o="'+i+'"><div class="m"><b>Other item</b><div class="sn-oth"><input data-on value="'+e(o.name)+'" placeholder="What is it?" aria-label="Item name" autocomplete="off"><input data-op type="number" inputmode="decimal" step="0.01" min="0" value="'+e(o.price)+'" placeholder="$ each" aria-label="Price each"></div></div>'
+        +qty(o.qty)+'<div class="sn-amt">'+usd(cents(o.price)*o.qty)+'</div></div>';
+    });
+    h+='</div><button type="button" class="sn-add" data-a="add"><i class="ti ti-plus" aria-hidden="true"></i>Add item</button></div>';
+    h+='<div class="sn-card"><div class="sn-h">Notes / allergies</div><label class="sn-f'+chk(c,'notes')+'"><span class="v8-sr">Notes and allergies</span><textarea data-f="notes" rows="3">'+e(c.notes)+'</textarea></label>'
+      +fld('Taken by','taken_by',c.taken_by,'text','autocapitalize="words" autocomplete="off"',chk(c,'taken_by'))+'</div>';
+    h+='<div class="sn-card"><div class="sn-h">Payment</div><div class="sn-seg'+((chk(c,'paid')||chk(c,'deposit')) ? ' sn-chk' : '')+'" role="group" aria-label="Payment">'
+      +seg('pay','unpaid','Not paid',c.payment)+seg('pay','deposit','Deposit',c.payment)+seg('pay','paid','Paid',c.payment)+'</div>'
+      +(c.payment==='deposit' ? fld('Deposit $','deposit',c.deposit,'number','inputmode="decimal" step="0.01" min="0"','') : '')
+      +'<div class="sn-tot"><div><span>Subtotal</span><b data-t="sub">'+usd(t.sub)+'</b></div><div><span>Tax '+TAX+'%</span><b data-t="tax">'+usd(t.tax)+'</b></div>'
+      +'<div class="t"><span>Total</span><b data-t="total">'+usd(t.total)+'</b></div><small>Paid on Square — nothing is charged here.</small></div></div>';
+    h+='<div class="sn-err" role="alert">'+e(S.err||'')+'</div><div class="sn-acts">'
+      +'<button type="button" class="sn-go" data-a="create"'+(S.busy ? ' disabled' : '')+'><i class="ti ti-calendar-plus" aria-hidden="true"></i>'+(S.busy ? 'Adding…' : 'Add to calendar')+'</button>'
+      +(n>1 && S.qi<n-1 ? '<button type="button" class="sn-btn" data-a="skip">Skip this one</button>' : '')
+      +'<button type="button" class="sn-btn" data-a="retake"><i class="ti ti-camera" aria-hidden="true"></i>'+(S.photo ? 'Retake photo' : 'Use a photo instead')+'</button></div>';
+    return h;
+  }
+  function doneHtml(){
+    var d=S.saved||{}, more=S.queue && S.qi<S.queue.length-1;
+    return '<div class="sn-done"><div class="ok"><i class="ti ti-check" aria-hidden="true"></i></div><h3>'+(d.again ? 'Already added' : 'Added')+'</h3>'
+      +'<p><b>'+e(d.name)+'</b> · '+e(d.when)+'<br>On the '+e(locLabel(d.loc))+' calendar and in Catering → Pre-Orders.</p>'
+      +(more ? '<button type="button" class="sn-go" data-a="next">Next order on this photo ('+(S.qi+2)+' of '+S.queue.length+')</button>'
+             : '<button type="button" class="sn-go" data-a="again"><i class="ti ti-camera" aria-hidden="true"></i>Snap another</button>')
+      +'<div class="sn-acts"><button type="button" class="sn-btn" data-a="cal"><i class="ti ti-calendar" aria-hidden="true"></i>See the calendar</button></div></div>';
+  }
+  function render(keep){
+    var y=window.scrollY;
+    app.innerHTML = S.step==='reading' ? readingHtml() : S.step==='review' ? reviewHtml() : S.step==='done' ? doneHtml() : startHtml();
+    if(keep) window.scrollTo(0,y);
+  }
+
+  // ── filing it ──
+  function check(c){
+    if(!c.name.trim()) return ['name','Add the customer’s name.'];
+    if(!c.date) return ['date','Add the date.'];
+    if(!c.time) return ['time','Add the time.'];
+    if(!c.lines.length && !c.other.some(function(o){ return o.name.trim(); })) return [null,'Add at least one item.'];
+    for(var i=0;i<c.lines.length;i++){ var m=M(c.lines[i].key); if(m && m.options.length && !c.lines[i].option) return [null,'Pick '+m.options.join(' / ')+' for '+m.name+'.']; }
+    if(c.other.some(function(o){ return !o.name.trim(); })) return [null,'Name the other item, or take it off.'];
+    if(c.payment==='deposit' && !(parseFloat(c.deposit)>0)) return ['deposit','Add the deposit amount.'];
+    return null;
+  }
+  function payload(c){
+    return { name:c.name.trim(), phone:c.phone.trim(), date:c.date, time:c.time, ticket:c.ticket.trim(), fulfillment:c.fulfillment, address:c.address.trim(),
+      notes:c.notes, taken_by:c.taken_by.trim(), payment:c.payment, deposit_cents:cents(c.deposit),
+      lines:c.lines.map(function(l){ return { key:l.key, qty:l.qty, option:l.option }; }),
+      other:c.other.map(function(o){ return { name:o.name.trim(), qty:o.qty, price_cents:cents(o.price) }; }) };
+  }
+  function create(force){
+    if(S.busy) return;
+    var c=S.cur, bad=check(c), mine=S;
+    if(bad){
+      S.err=bad[1]; render(true);
+      var el=bad[0] && app.querySelector('[data-f="'+bad[0]+'"]');
+      if(el) el.focus(); else { var er=app.querySelector('.sn-err'); if(er) er.scrollIntoView({ block:'center' }); }
+      return;
+    }
+    S.err=''; S.busy=true; render(true);
+    post({ action:'create', emp:emp(), loc:S.loc, photo:S.photo||undefined, index:c.index||0, read_id:S.readId||undefined, ref:S.photo ? undefined : c.ref, order:payload(c), force:!!force }, 30000)
+      .then(function(r){
+        if(S!==mine) return;
+        S.busy=false;
+        if(r && r.ok===false && r.duplicate){
+          var d=r.duplicate;
+          if(confirm('Square ticket #'+c.ticket+' is already on the calendar for '+d.customer_name+' ('+when(d.pickup_at)+').\n\nAdd this one too?')){ create(true); return; }
+          render(true); return;
+        }
+        if(!r || !r.ok){ S.err=(r && r.error) || 'Couldn’t add it — try again.'; render(true); return; }
+        var p=r.preorder||{};
+        S.saved={ name:p.customer_name||c.name, when:when(p.pickup_at), loc:p.loc_slug||S.loc, again:!!r.again };
+        if(!r.again) remember(S.saved);
+        S.step='done'; render(); top();
+      });
+  }
+
+  // ── the add-item sheet (same sheet as Edit tiles) ──
+  function openPicker(){
+    if(!MENU){ loadMenu().then(function(){ if(MENU) openPicker(); else { S.err='Couldn’t load the menu — check the signal.'; render(true); } }); return; }
+    var groups=[], by={};
+    MENU.forEach(function(m){ if(!by[m.section]){ by[m.section]=[]; groups.push(m.section); } by[m.section].push(m); });
+    var html='<div class="v8-h"><b>Add an item</b><button type="button" class="v8-x" data-x aria-label="Close"><i class="ti ti-x" aria-hidden="true"></i></button></div><div class="sn-pick">'
+      +groups.map(function(g){ return '<h4>'+e(g)+'</h4>'+by[g].map(function(m){ return '<button type="button" data-k="'+e(m.key)+'"><b>'+e(m.name)+(m.serves ? '<small>'+e(m.serves)+'</small>' : '')+'</b><span>'+usd(m.price_cents)+'</span></button>'; }).join(''); }).join('')
+      +'<h4>Other</h4><button type="button" data-k="__other"><b>Something else<small>Type the name and price</small></b><span><i class="ti ti-plus" aria-hidden="true"></i></span></button></div>';
+    var s=window.homeSheet ? window.homeSheet(html) : null; if(!s) return;
+    s.addEventListener('click', function(ev){
+      var b=ev.target.closest('[data-k]'); if(!b) return;
+      var k=b.getAttribute('data-k'), c=S.cur, m=M(k), l=null;
+      if(k==='__other') c.other.push({ name:'', qty:1, price:'', unsure:false });
+      else if(m){
+        if(!m.options.length) c.lines.forEach(function(x){ if(!l && x.key===k) l=x; });
+        if(l) l.qty++; else c.lines.push({ key:k, qty:1, option:'', unsure:false });
+      }
+      var x=s.querySelector('[data-x]'); if(x) x.click();
+      render(true);
+      if(k==='__other'){ var ins=app.querySelectorAll('[data-on]'); if(ins.length) ins[ins.length-1].focus(); }
+    });
+  }
+  function zoom(){
+    if(!S.imgUrl) return;
+    var z=document.createElement('div'), prev=document.activeElement;
+    z.className='sn-zoom'; z.setAttribute('role','dialog'); z.setAttribute('aria-modal','true'); z.setAttribute('aria-label','Photo of the order form');
+    z.innerHTML='<img src="'+S.imgUrl+'" alt="Photo of the order form"><button type="button" aria-label="Close"><i class="ti ti-x" aria-hidden="true"></i></button><span class="hint">Tap the photo to zoom in</span>';
+    document.body.appendChild(z);
+    function shut(){ z.remove(); if(prev && prev.focus) prev.focus({ preventScroll:true }); }
+    z.querySelector('button').focus();
+    z.addEventListener('click', function(ev){ if(ev.target.closest('button')) shut(); else if(ev.target.tagName==='IMG') z.classList.toggle('big'); });
+    z.addEventListener('keydown', function(ev){ if(ev.key==='Escape') shut(); });
+  }
+
+  // ── events ──
+  app.addEventListener('click', function(ev){
+    var b=ev.target.closest('button'); if(!b || !app.contains(b)) return;
+    var a=b.getAttribute('data-a');
+    if(a==='signin'){ needSign(); return; }
+    if(a==='cam' || a==='pick'){ if(!emp()){ needSign(); return; } var inp=a==='cam' ? cam : pick; inp.value=''; inp.click(); return; }
+    if(a==='type'){ if(!emp()){ needSign(); return; } startTyped(); return; }
+    if(a==='zoom'){ zoom(); return; }
+    if(a==='again'){ reset(); return; }
+    if(a==='next'){ nextOrder(); return; }
+    if(a==='cal'){ showView('calendar'); return; }
+    if(a==='menu'){ loadMenu().then(function(){ render(true); }); return; }
+    if(S.step!=='review') return;
+    sync();
+    if(a==='add'){ openPicker(); return; }
+    if(a==='create'){ create(false); return; }
+    if(a==='skip'){ nextOrder(); return; }
+    if(a==='retake'){
+      if((S.cur.name || S.cur.lines.length) && !confirm('Start over with a new photo? What’s on this screen will be cleared.')) return;
+      reset(); if(emp()){ cam.value=''; cam.click(); }
+      return;
+    }
+    var q=b.getAttribute('data-q');
+    if(q){ var row=b.closest('.sn-line'), box=row && row.querySelector('[data-qty]'); if(!box) return;
+      box.value=Math.max(0, Math.min(999, (parseInt(box.value,10)||0)+(+q))); sync(); unflag(row); prune(); return; }
+    if(b.hasAttribute('data-opt')){ var r2=b.closest('.sn-line'), l=r2 && S.cur.lines[+r2.getAttribute('data-i')];
+      if(l){ l.option=b.getAttribute('data-opt'); l.unsure=false; } render(true); return; }
+    if(b.hasAttribute('data-ful')){ S.cur.fulfillment=b.getAttribute('data-ful'); drop(S.cur,'fulfillment'); render(true); return; }
+    if(b.hasAttribute('data-pay')){ S.cur.payment=b.getAttribute('data-pay'); drop(S.cur,'paid'); drop(S.cur,'deposit'); render(true); return; }
+  });
+  app.addEventListener('input', function(ev){
+    if(S.step!=='review') return;
+    var t=ev.target; sync();
+    var k=t.getAttribute && t.getAttribute('data-f'), lab=t.closest('.sn-f.sn-chk');
+    if(k && lab){ drop(S.cur,k); lab.classList.remove('sn-chk'); }
+    if(t.closest('.sn-line')) unflag(t.closest('.sn-line'));
+    if(k==='deposit' || k==='loc') return;
+    refresh();
+  });
+  app.addEventListener('change', function(ev){ if(S.step==='review' && ev.target.hasAttribute('data-qty')){ sync(); prune(); } });
+  cam.addEventListener('change', function(){ onFile(cam.files && cam.files[0]); });
+  pick.addEventListener('change', function(){ onFile(pick.files && pick.files[0]); });
+
+  // the tile opens the screen (and asks for the employee ID first if this phone hasn't got one)
+  window.openSnap=function(){ showView('snap'); if(!emp()) needSign(); };
+  var on=false;
+  function activated(){
+    var now=view.classList.contains('active');
+    if(now && !on){ if(S.step==='done') reset(); else if(S.step!=='reading') render(); loadMenu(); }
+    on=now;
+  }
+  new MutationObserver(activated).observe(view, { attributes:true, attributeFilter:['class'] });
+  activated();
+  tileFoot();
 })();
 </script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->

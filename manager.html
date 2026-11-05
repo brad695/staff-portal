@@ -14788,16 +14788,20 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
             const pill = p.payment_status === 'paid' ? '<span class="pill pill-ok">Paid</span>'
                        : p.payment_status === 'pending' ? '<span class="pill pill-req">Awaiting tap</span>'
                        : p.payment_status === 'refunded' ? '<span class="pill pill-mid">Refunded</span>'
+                       : p.payment_status === 'partial' ? '<span class="pill pill-mid">Deposit '+usd(p.paid_cents)+'</span>'
                        : '<span class="pill pill-bad">Unpaid</span>';
             return '<tr>'
               + '<td><b>'+fmtWhen(p.pickup_at)+'</b><div class="po-sub">'+(out<=0?'today':(out+' day'+(out===1?'':'s')+' out'))+'</div></td>'
-              + '<td>'+esc(p.customer_name)+'<div class="po-sub">'+esc(p.customer_phone||'')+(p.loc_slug?' · '+esc(locLabel(p.loc_slug)):'')+'</div></td>'
+              + '<td>'+esc(p.customer_name)+'<div class="po-sub">'+esc(p.customer_phone||'')+(p.loc_slug?' · '+esc(locLabel(p.loc_slug)):'')
+              +   (p.square_ticket_no?' · Ticket #'+esc(p.square_ticket_no):'')+(p.fulfillment==='delivery'?' · Delivery':'')
+              +   ((p.source==='photo'||p.source==='form')?' · Order form'+(p.taken_by?' (taken by '+esc(p.taken_by)+')':''):'')+'</div></td>'
               + '<td>'+(p.items||[]).length+'</td>'
               + '<td>'+usd(p.total_cents)+'</td>'
               + '<td>'+pill+'</td>'
               + '<td style="white-space:nowrap;">'
               +   '<button class="btn btn-ghost btn-sm" data-sheet="'+p.id+'">Sheet</button> '
-              +   (p.payment_status !== 'paid' && p.status !== 'canceled' ? '<button class="btn btn-gold btn-sm" data-retry="'+p.id+'">Charge</button> ' : '')
+              +   (p.form_photo_path ? '<button class="btn btn-ghost btn-sm" data-photo="'+p.id+'">📷 Form</button> ' : '')
+              +   (p.square_order_id && p.payment_status !== 'paid' && p.status !== 'canceled' ? '<button class="btn btn-gold btn-sm" data-retry="'+p.id+'">Charge</button> ' : '')
               +   (p.status !== 'canceled' ? '<button class="btn btn-wax btn-sm" data-cancel="'+p.id+'">Cancel</button>' : '')
               + '</td></tr>';
           }).join('')
@@ -14808,13 +14812,28 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 
   async function cancelOrder(id){
     const row = ($('#poList')._rows||[]).find(r=> r.id === id);
-    const warn = row && row.payment_status === 'paid'
+    const warn = row && !row.square_order_id
+      ? 'Take '+row.customer_name+'’s order off the calendar?'+(row.paid_cents > 0 ? '\n\nIt was paid on Square'+(row.square_ticket_no ? ' (ticket #'+row.square_ticket_no+')' : '')+' — do any refund there.' : '')
+      : row && row.payment_status === 'paid'
       ? 'Refund '+usd(row.paid_cents)+' to '+row.customer_name+' and cancel this order?\n\nThe kitchen ticket already printed when it was paid — Square cannot un-print it. Pull the sheet from the binder too.'
       : 'Cancel this pre-order?';
     if(!confirm(warn)) return;
-    const reason = prompt('Reason (goes on the refund):', 'Customer canceled') || '';
+    const reason = prompt(row && !row.square_order_id ? 'Reason (optional):' : 'Reason (goes on the refund):', 'Customer canceled') || '';
     try{ await poFn({action:'cancel', id, reason}); toast('Canceled.'); loadList(); }
     catch(e){ toast(e.message, true); }
+  }
+
+  /* ---------- order-form photo (Snap Order tile, 2026-11-05) ----------
+     Private bucket order-forms; managers read it through the "order-forms admin read" storage policy.
+     The tab opens first (inside the click) so a pop-up blocker doesn't eat it, then gets the signed link. */
+  async function openFormPhoto(po){
+    if(!po || !po.form_photo_path) return;
+    const w = window.open('', '_blank');
+    try{
+      const { data, error } = await sb.storage.from('order-forms').createSignedUrl(po.form_photo_path, 600);
+      if(error || !data || !data.signedUrl) throw new Error(error ? error.message : 'no link');
+      if(w) w.location.href = data.signedUrl; else location.href = data.signedUrl;
+    }catch(err){ if(w) w.close(); toast('Couldn’t open the photo: '+err.message, true); }
   }
 
   /* ---------- catering sheet (8.5x11 for the binder) ---------- */
@@ -14841,13 +14860,13 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       + '.foot{margin-top:30px;font-size:11px;color:#777;font-family:Arial,sans-serif;}'
       + '</style></head><body>'
       + '<h1>GREYS</h1><div class="gold">Catering Pre-Order</div>'
-      + '<div class="when"><span style="font-size:11px;letter-spacing:2px;font-family:Arial,sans-serif;text-transform:uppercase;color:#666;">Pickup</span><b>'+fmtWhen(po.pickup_at)+'</b></div>'
-      + '<div class="meta"><div><b>'+esc(po.customer_name)+'</b><br>'+esc(po.customer_phone||'—')+'<br>'+esc(po.customer_email||'')+'</div>'
+      + '<div class="when"><span style="font-size:11px;letter-spacing:2px;font-family:Arial,sans-serif;text-transform:uppercase;color:#666;">'+(po.fulfillment==='delivery'?'Delivery':'Pickup')+'</span><b>'+fmtWhen(po.pickup_at)+'</b></div>'
+      + '<div class="meta"><div><b>'+esc(po.customer_name)+'</b><br>'+esc(po.customer_phone||'—')+'<br>'+esc(po.customer_email||'')+(po.fulfillment==='delivery'?'<br><b>Deliver to:</b> '+esc(po.delivery_address||'—'):'')+'</div>'
       +   '<div>'+(po.payment_status==='paid'?'<b>PAID IN FULL</b>':'<b>BALANCE DUE</b>')+'<br>'+usd(po.total_cents)+'<br>Order '+esc(String(po.id).slice(0,8))+'</div></div>'
       + '<table><thead><tr><th>Item</th><th class="c">Qty</th><th class="r">Total</th></tr></thead><tbody>'+lines+'</tbody></table>'
       + '<div class="tot">Total <b>'+usd(po.total_cents)+'</b></div>'
       + '<div class="notes"><b style="font-family:Arial,sans-serif;font-size:11px;letter-spacing:1px;">NOTES</b><br>'+esc(po.notes||'')+'</div>'
-      + '<div class="foot">Ticket printed to the kitchen when this order was paid. This sheet is the working copy — keep it in the catering binder.</div>'
+      + '<div class="foot">'+(po.square_order_id ? 'Ticket printed to the kitchen when this order was paid.' : 'From the paper Future Order form'+(po.square_ticket_no?' · Square ticket #'+esc(po.square_ticket_no):'')+(po.taken_by?' · taken by '+esc(po.taken_by):'')+'.')+' This sheet is the working copy — keep it in the catering binder.</div>'
       + '</body></html>'
     );
     w.document.close();
@@ -15023,9 +15042,10 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     });
 
     $('#poList').addEventListener('click', e=>{
-      const s = e.target.dataset.sheet, c = e.target.dataset.cancel, r = e.target.dataset.retry;
+      const s = e.target.dataset.sheet, c = e.target.dataset.cancel, r = e.target.dataset.retry, ph = e.target.dataset.photo;
       const rows = $('#poList')._rows || [];
       if(s) printSheet(rows.find(x=>x.id===s));
+      if(ph) openFormPhoto(rows.find(x=>x.id===ph));
       if(c) cancelOrder(c);
       if(r) poFn({action:'retry_charge', id:r}).then(res=> openPay(res.preorder)).catch(e2=> toast(e2.message, true));
     });
