@@ -15738,6 +15738,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       ['/chat','chat','Greys Chat'],
       ['https://tickets.greyscheese.com','ticket','Ticket Site',1],
       ['https://tickets.greyscheese.com/experiences','spark','Experiences Site',1],
+      ['https://info.greyscheese.com','mega','Inquiry Form',1],
       ['https://cheeseclub.greyscheese.com','box','Cheese Club',1],
       // the Cheese Club page's own editor: sign in with the manager password, change words/photos, Publish
       ['https://cheeseclub.greyscheese.com/?edit','pen','Edit Cheese Club Page',1],
@@ -17231,7 +17232,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     event: 'Built in: shop, guests, date and a start time (12:00 to 7:00), then name, email, phone and a message. Goes to 💼 Catering Leads tagged Private event, so it can get a proposal and an invoice. The questions below share one "A few details" screen.'
   };
   var STAGING = /staging/i.test(location.hostname);
-  var FORM_SITE = STAGING ? 'https://ticket-rennet.onrender.com/inquiry' : 'https://tickets.greyscheese.com/inquiry';
+  // the live form has its own site since 2026-11-05 (info.greyscheese.com); staging keeps it on the staging ticket site
+  var FORM_SITE = STAGING ? 'https://ticket-rennet.onrender.com/inquiry' : 'https://info.greyscheese.com/';
   var st = { form: formOf(null), saved: null, type: 'table', loaded: false, dirty: false, frameReady: false };
 
   function h(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
