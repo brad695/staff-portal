@@ -14,6 +14,10 @@
 //   list   {source, source_ids[]}                                   admin
 //   sweep  {}  reconcile: release holds whose event/experience is gone or moved,
 //              hold confirmed experiences that have none.          public (idempotent)
+//              At-home experiences (rb_experience_types.at_home) happen at the guest's
+//              place, so they never hold tables (v7, 2026-10-05).
+// Experiences at a shop in EXP_BY_TABLE (Nashville) hold picked tables, not a guest count
+// (v13, 2026-11-05) — see EXP_BY_TABLE.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CORS = {
@@ -42,6 +46,12 @@ const WIX_LOCS: Record<string, string> = {
   franklin: "10119bc0-206a-415b-8423-660b05f56dec",
 };
 const SOURCES = ["portal_item", "event", "experience"];
+// Shops whose experiences hold tables one by one instead of a guest count (2026-11-05).
+// Maverick: Nashville has "five 2 tops that can all be combined" and takes one experience a
+// day (rb_settings.experience_rules), up to 10 guests. Its Wix floor has three 2-tops and three
+// 4-tops whose biggest combination seats 6, so Wix refuses a guest-count hold over 6. Here the
+// hold takes free tables itself — 2-tops first, then 4-tops — until their seats cover the party.
+const EXP_BY_TABLE = new Set(["nashville"]);
 // experience reservations that should hold tables: booked, or held for an inquiry (48 h)
 const LIVE_EXP = ["confirmed", "pending"];
 const DEAD = ["CANCELED", "CANCELLED", "DECLINED", "NO_SHOW", "FINISHED"];
@@ -212,6 +222,17 @@ async function doHold(p: HoldReq) {
   if (unknown.length) return { status: 400, body: { error: "Some of those tables no longer exist in Wix — reopen the editor." } };
 
   const old = await heldFor(source, sourceId);
+  const mine = new Set(old.map((h: any) => h.wix_reservation_id).filter(Boolean));
+  // An experience at a shop in EXP_BY_TABLE: pick the free tables that seat the party
+  if (source === "experience" && !want.length && guests && EXP_BY_TABLE.has(locKey(p.location))) {
+    const busy = new Set((await wixOverlapping(locId, S, E)).filter((x: any) => !mine.has(x.id)).flatMap(tableIdsOf));
+    const num = (t: any) => parseInt(String(t.name).replace(/\D/g, ""), 10) || 0;
+    const pool = loc.tables.filter((t: any) => !busy.has(t.id))
+      .sort((a: any, b: any) => (a.seatsMax - b.seatsMax) || (num(a) - num(b)));
+    let seats = 0;
+    for (const t of pool) { if (seats >= guests) break; want.push(t.id); seats += Math.max(t.seatsMin || 1, t.seatsMax || 2); }
+    if (seats < guests) return { status: 409, body: { error: "Wix says those tables aren't free for that time." } };
+  }
   // Same window, same ask, same label → nothing to do. Picked-table holds store guests=null.
   if (old.length && old.every((h: any) => Date.parse(h.starts_at) === start.getTime() && Date.parse(h.ends_at) === end.getTime()
       && h.wix_location_id === locId && h.label === label)) {
@@ -225,7 +246,6 @@ async function doHold(p: HoldReq) {
   }
 
   // Pre-check specific tables against everything on the Wix floor except our own old holds
-  const mine = new Set(old.map((h: any) => h.wix_reservation_id).filter(Boolean));
   if (want.length) {
     const over = (await wixOverlapping(locId, S, E)).filter((x: any) => !mine.has(x.id));
     const conflicts: any[] = [];
@@ -308,14 +328,15 @@ async function sweep() {
     const ok = new Map((data || []).map((r: any) => [String(r.id), r]));
     for (const h of ev) { const r: any = ok.get(h.source_id); if (!r || r.archived || r.block_scope !== "tables" || WIX_LOCS[locKey(r.location)] !== h.wix_location_id) stale.push(h); }
   }
-  // Experiences: follow rb_reservations (cancelled / moved → release; confirmed/pending with no hold → hold)
+  // Experiences: follow rb_reservations (cancelled / moved → release; confirmed/pending with no hold → hold).
+  // At-home experiences never hold tables.
   const { data: exps } = await admin.from("rb_reservations")
-    .select("id, status, starts_at, ends_at, party_size, location, guest_name, rb_experience_types(name)")
+    .select("id, status, starts_at, ends_at, party_size, location, guest_name, rb_experience_types(name, at_home)")
     .eq("kind", "experience").gte("ends_at", new Date().toISOString());
   const expMap = new Map((exps || []).map((r: any) => [String(r.id), r]));
   for (const h of bySrc("experience")) {
     const r: any = expMap.get(h.source_id);
-    if (!r || !LIVE_EXP.includes(r.status) || Date.parse(r.starts_at) !== Date.parse(h.starts_at) || Date.parse(r.ends_at) !== Date.parse(h.ends_at)) stale.push(h);
+    if (!r || r.rb_experience_types?.at_home || !LIVE_EXP.includes(r.status) || Date.parse(r.starts_at) !== Date.parse(h.starts_at) || Date.parse(r.ends_at) !== Date.parse(h.ends_at)) stale.push(h);
   }
   const relErrs = await releaseRows(stale);
   report.errors.push(...relErrs);
@@ -326,6 +347,7 @@ async function sweep() {
   const { data: recentFail } = await admin.from("table_holds").select("source_id").eq("source", "experience").eq("status", "failed").gte("created_at", since);
   const skip = new Set((recentFail || []).map((r: any) => r.source_id));
   for (const r of (exps || []) as any[]) {
+    if (r.rb_experience_types?.at_home) continue; // at the guest's place: no tables to hold
     if (!LIVE_EXP.includes(r.status) || heldIds.has(String(r.id)) || skip.has(String(r.id))) continue;
     if (Date.parse(r.starts_at) < Date.now()) continue;
     const out = await doHold({
