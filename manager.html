@@ -4180,6 +4180,20 @@ window.addEventListener('DOMContentLoaded', async ()=>{
 #panel-cheese .nl-src[hidden],#panel-cheese .nl-edit[hidden]{display:none}
 #panel-cheese .nl-hint{font-size:12.5px;margin:10px 0 0}
 #panel-cheese .nl-hint code{font-size:12px;background:var(--alt);padding:1px 5px;border-radius:5px}
+#panel-cheese .nl-pdf{margin-top:14px;border:1.5px dashed var(--line);border-radius:10px;padding:12px 14px;background:var(--alt);transition:border-color .15s,background .15s}
+#panel-cheese .nl-pdf.has{border-style:solid;background:#fff}
+#panel-cheese .nl-pdf.drag{border-color:var(--green);background:#eef4ef}
+#panel-cheese .nl-pdf-empty{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+#panel-cheese .nl-pdf-empty .muted{font-size:13px;flex:1;min-width:200px;line-height:1.45}
+#panel-cheese .nl-pdf-file{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+#panel-cheese .nl-pdf-ico{flex:none;width:38px;height:46px;border-radius:5px;background:#896D39;color:#fff;font:700 11px Inter,sans-serif;letter-spacing:.05em;display:grid;place-items:center}
+#panel-cheese .nl-pdf-meta{flex:1;min-width:160px}
+#panel-cheese .nl-pdf-meta a{font-weight:600;color:var(--ink);word-break:break-word}
+#panel-cheese .nl-pdf-meta small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px;line-height:1.4}
+#panel-cheese .nl-pdf-acts{display:flex;gap:6px;flex-wrap:wrap}
+#panel-cheese .nl-row-pdf{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;background:#f3ebdd;color:#6f5523;font:600 11px Inter,sans-serif;vertical-align:1px}
+#panel-cheese .nl-sent-pdf{font-size:14px;margin:-6px 0 14px}
+#panel-cheese .nl-sent-pdf a{font-weight:600}
 #panel-cheese .nl-side{display:flex;flex-direction:column;gap:14px;position:sticky;top:88px}
 #panel-cheese .nl-card{padding:18px}
 #panel-cheese .nl-card h4{font-size:16px;margin:0 0 10px}
@@ -11569,13 +11583,15 @@ function editClub(c,onSaved){
    Members are the Square club's club_members (active + paused by default, one email per address).
    Drafts, preview, test, schedule and send all go through club-newsletter; photos go to the public
    email-assets bucket. */
-const NL={list:null,cur:null,failed:[],dirty:false,body:null,draw:0,aud:null,audKey:'',audSeq:0,audT:0,poll:0,range:null,src:false,testTo:''};
+const NL={list:null,cur:null,failed:[],dirty:false,body:null,draw:0,aud:null,audKey:'',audSeq:0,audT:0,poll:0,range:null,src:false,testTo:'',pdfBusy:false};
 try{NL.testTo=localStorage.getItem('ccnl_test_to')||'';}catch(e){}
 const nlCall=(action,p)=>ccFnJson('club-newsletter',Object.assign({action},p||{}));
 const NL_WORD={draft:'Draft',scheduled:'Scheduled',sending:'Sending',sent:'Sent',canceled:'Stopped'};
 const nlWhen=iso=>iso?new Date(iso).toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
 const nlMonth=m=>m?fmtMonth(String(m).slice(0,10)):'No month set';
 const nlLive=()=>ADMIN_TAB==='news';
+const nlBytes=n=>n>=1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';
+const nlIsPdf=f=>!!f&&(f.type==='application/pdf'||/\.pdf$/i.test(f.name||''));
 function nlPill(n){
   let t=NL_WORD[n.status]||n.status;
   if(n.status==='scheduled')t+=' · '+nlWhen(n.send_at);
@@ -11667,7 +11683,7 @@ function nlList(){
   if(!items.length){body.append($(`<div class="empty">No newsletters yet — start one with “New newsletter”.</div>`));return;}
   const list=$(`<div class="nl-list"></div>`);
   items.forEach(n=>{
-    const row=$(`<button type="button" class="nl-row"><span class="nl-row-m">${esc(nlMonth(n.month))}</span><span class="nl-row-s">${esc(n.subject||'(no subject yet)')}</span>${nlPill(n)}</button>`);
+    const row=$(`<button type="button" class="nl-row"><span class="nl-row-m">${esc(nlMonth(n.month))}</span><span class="nl-row-s">${esc(n.subject||'(no subject yet)')}${n.pdf_url?'<span class="nl-row-pdf">PDF</span>':''}</span>${nlPill(n)}</button>`);
     row.addEventListener('click',()=>nlOpen(n.id));list.append(row);
   });
   body.append(list);
@@ -11716,7 +11732,9 @@ function nlEditor(){
       <div class="nl-edit" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Newsletter text" data-ed></div>
       <textarea class="nl-src" data-src aria-label="Newsletter HTML" hidden></textarea>
       <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" data-file hidden>
-      <p class="muted nl-hint">Member details like <code>{{first_name}}</code> and <code>{{pickup}}</code> are filled in for each person when it sends.</p>
+      <div class="nl-pdf" data-pdf></div>
+      <input type="file" accept="application/pdf,.pdf" data-pdffile hidden>
+      <p class="muted nl-hint">Member details like <code>{{first_name}}</code> and <code>{{pickup}}</code> are filled in for each person when it sends. With a PDF attached, the text is optional — it's the note that goes with it (leave it empty and a short one is added).</p>
     </div>
     <div class="nl-side">
       <div class="card nl-card">
@@ -11794,8 +11812,19 @@ function nlEditor(){
     if(h)insertHtml(nlClean(h)||esc(t));
     else insertHtml(t.split(/\r?\n\s*\r?\n/).map(p=>'<p>'+esc(p).replace(/\r?\n/g,'<br>')+'</p>').join(''));
   });
-  ed.addEventListener('drop',e=>{if(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length){e.preventDefault();nlPhoto(e.dataTransfer.files[0],insertHtml);}});
+  ed.addEventListener('drop',e=>{if(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length){e.preventDefault();const f=e.dataTransfer.files[0];if(nlIsPdf(f))nlPdfAttach(f);else nlPhoto(f,insertHtml);}});
   file.addEventListener('change',()=>{const f=file.files&&file.files[0];file.value='';if(f)nlPhoto(f,insertHtml);});
+  // the PDF: attach / replace / remove, or drop one on the box
+  const pbox=q('[data-pdf]'),pfile=q('[data-pdffile]');
+  pbox.addEventListener('click',e=>{
+    if(e.target.closest('[data-pdfpick]')){pfile.click();return;}
+    if(e.target.closest('[data-pdfremove]')){Object.assign(NL.cur,{pdf_url:null,pdf_name:null,pdf_bytes:null});NL.dirty=true;nlPdfDraw();toast('PDF removed — save the draft to keep the change.');}
+  });
+  pfile.addEventListener('change',()=>{const f=pfile.files&&pfile.files[0];pfile.value='';if(f)nlPdfAttach(f);});
+  pbox.addEventListener('dragover',e=>{e.preventDefault();pbox.classList.add('drag');});
+  pbox.addEventListener('dragleave',()=>pbox.classList.remove('drag'));
+  pbox.addEventListener('drop',e=>{e.preventDefault();pbox.classList.remove('drag');const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)nlPdfAttach(f);});
+  nlPdfDraw();
   const merge=q('[data-merge]');
   merge.addEventListener('change',()=>{const v=merge.value;merge.value='';if(v){restore();document.execCommand('insertText',false,v);NL.dirty=true;keep();}});
   q('.nl-tools').addEventListener('mousedown',e=>{if(e.target.closest('button'))e.preventDefault();});
@@ -11842,7 +11871,8 @@ function nlEditor(){
     if(!nlHasContent())return;
     const cnt=NL.aud?NL.aud.count:null;
     if(cnt===0){toast('Nobody matches who this goes to.',true);return;}
-    if(!confirm('Send “'+(nlCollect().subject)+'” to '+(cnt==null?'all matching':cnt)+' member'+(cnt===1?'':'s')+' now?'))return;
+    const sc=nlCollect();
+    if(!confirm('Send “'+sc.subject+'” to '+(cnt==null?'all matching':cnt)+' member'+(cnt===1?'':'s')+(sc.pdf_url?' with '+(sc.pdf_name||'the PDF')+' attached':'')+' now?'))return;
     if(!(await nlSave(true)))return;
     const b=q('[data-send]');b.disabled=true;b.textContent='Sending…';
     try{const d=await nlCall('send',{id:NL.cur.id});NL.cur=Object.assign(NL.cur,d.newsletter||{});toast(NL.cur.status==='sent'?'Sent to '+NL.cur.sent_count+' member'+(NL.cur.sent_count===1?'':'s')+'.':'Sending…');nlEditor();}
@@ -11854,6 +11884,39 @@ function nlEditor(){
     try{await nlCall('delete',{id:NL.cur.id});NL.cur=null;NL.dirty=false;toast('Draft deleted.');drawNewsletter(NL.body);}catch(e){toast(e.message,true);}
   });
   NL.aud=null;NL.audKey='';nlCount();
+}
+function nlPdfDraw(){
+  const box=NL.body&&NL.body.querySelector('[data-pdf]');if(!box)return;
+  const n=NL.cur||{};
+  box.classList.toggle('has',!!n.pdf_url&&!NL.pdfBusy);
+  if(NL.pdfBusy){box.innerHTML='<div class="nl-pdf-empty"><span class="muted">Uploading the PDF…</span></div>';return;}
+  if(!n.pdf_url){
+    box.innerHTML='<div class="nl-pdf-empty"><button type="button" class="btn btn-ghost btn-sm" data-pdfpick>📎 Attach a PDF</button><span class="muted">Sending the newsletter as a PDF (from Canva, Word…)? Up to 10 MB. It\'s attached to every email, with a button to open it.</span></div>';
+    return;
+  }
+  box.innerHTML='<div class="nl-pdf-file"><span class="nl-pdf-ico" aria-hidden="true">PDF</span><div class="nl-pdf-meta"><a href="'+esc(n.pdf_url)+'" target="_blank" rel="noopener">'+esc(n.pdf_name||'newsletter.pdf')+'</a><small>'+(n.pdf_bytes?esc(nlBytes(n.pdf_bytes))+' · ':'')+'attached to every email, with an “Open the newsletter” button</small></div><div class="nl-pdf-acts"><button type="button" class="btn btn-ghost btn-sm" data-pdfpick>Replace</button><button type="button" class="btn btn-ghost btn-sm" data-pdfremove>Remove</button></div></div>';
+}
+// the PDF goes to the public club-newsletter bucket (managers only can upload); the newsletter keeps its link
+async function nlPdfAttach(f){
+  if(NL.pdfBusy||!NL.cur)return;
+  if(!nlIsPdf(f)){toast('Pick a PDF file.',true);return;}
+  if(f.size>10*1024*1024){toast('That PDF is '+nlBytes(f.size)+' — 10 MB is the most. In Canva, download it as “PDF Standard” to make it smaller.',true);return;}
+  if(!f.size){toast('That PDF is empty.',true);return;}
+  try{const head=new Uint8Array(await f.slice(0,1024).arrayBuffer());if(!String.fromCharCode.apply(null,head).includes('%PDF-')){toast("That file isn't a PDF.",true);return;}}
+  catch(e){toast('That file could not be read.',true);return;}
+  NL.pdfBusy=true;nlPdfDraw();
+  try{
+    const base=String(f.name||'newsletter').replace(/\.pdf$/i,'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9.-]+/g,'-').replace(/-+/g,'-').replace(/^[-.]+|[-.]+$/g,'').slice(0,60)||'newsletter';
+    const path=new Date().toISOString().slice(0,7)+'/'+Date.now().toString(36)+Math.random().toString(36).slice(2,8)+'/'+base+'.pdf';
+    const {error}=await sb.storage.from('club-newsletter').upload(path,f,{contentType:'application/pdf',upsert:false,cacheControl:'3600'});
+    if(error)throw new Error('Upload failed: '+error.message);
+    const url=sb.storage.from('club-newsletter').getPublicUrl(path).data.publicUrl;
+    let name=String(f.name||'').replace(/[\u0000-\u001f"\\/:*?<>|]+/g,' ').replace(/\s+/g,' ').trim().slice(0,120)||base+'.pdf';
+    if(!/\.pdf$/i.test(name))name+='.pdf';
+    Object.assign(NL.cur,{pdf_url:url,pdf_name:name,pdf_bytes:f.size});
+    NL.dirty=true;toast('PDF attached — save the draft to keep it.');
+  }catch(e){toast(e.message,true);}
+  finally{NL.pdfBusy=false;nlPdfDraw();}
 }
 function nlToggleSrc(ed,src,btn){
   if(!NL.src){src.value=ed.innerHTML.replace(/<\/(p|h2|h3|ul|ol|li|blockquote)>/gi,'</$1>\n').trim();ed.hidden=true;src.hidden=false;NL.src=true;btn.classList.add('on');src.oninput=()=>{NL.dirty=true;};src.focus();}
@@ -11874,17 +11937,20 @@ function nlCollect(){
   const g=NL.body,v=s=>{const e=g.querySelector(s);return e?e.value:'';};
   const ed=g.querySelector('[data-ed]'),src=g.querySelector('[data-src]');
   const html=NL.src?src.value:ed.innerHTML;
-  return {id:NL.cur&&NL.cur.id||undefined,month:v('[data-f="month"]'),subject:v('[data-f="subject"]').trim(),preheader:v('[data-f="preheader"]').trim(),body_html:/^(\s|<p><br><\/p>)*$/i.test(html)?'':html,audience:nlAudience()};
+  const p=NL.cur||{};
+  return {id:p.id||undefined,month:v('[data-f="month"]'),subject:v('[data-f="subject"]').trim(),preheader:v('[data-f="preheader"]').trim(),body_html:/^(\s|<p><br><\/p>)*$/i.test(html)?'':html,audience:nlAudience(),pdf_url:p.pdf_url||'',pdf_name:p.pdf_name||'',pdf_bytes:p.pdf_bytes||0};
 }
 function nlHasContent(){
   const c=nlCollect();
   if(!c.subject){toast('Add a subject first.',true);NL.body.querySelector('[data-f="subject"]').focus();return false;}
-  if(!c.body_html.replace(/<[^>]*>/g,'').trim()){toast('Write the newsletter first.',true);return false;}
+  if(NL.pdfBusy){toast('Wait for the PDF to finish uploading.',true);return false;}
+  if(!c.body_html.replace(/<[^>]*>/g,'').replace(/&nbsp;/gi,' ').trim()&&!c.pdf_url){toast('Write the newsletter or attach a PDF first.',true);return false;}
   return true;
 }
 async function nlSave(quiet){
   const c=nlCollect();
-  if(!quiet&&!c.subject&&!c.body_html){toast('Nothing to save yet.',true);return false;}
+  if(!quiet&&!c.subject&&!c.body_html&&!c.pdf_url){toast('Nothing to save yet.',true);return false;}
+  if(NL.pdfBusy){toast('Wait for the PDF to finish uploading.',true);return false;}
   if(quiet&&NL.cur.id&&!NL.dirty)return true;
   const b=NL.body.querySelector('[data-save]');if(b){b.disabled=true;b.textContent='Saving…';}
   try{
@@ -11927,7 +11993,7 @@ async function nlPreview(c){
   NL.body.append(ov);ov.querySelector('[data-close]').focus();
   try{
     const d=await nlCall('preview',c);
-    ov.querySelector('.nl-pv-sub').textContent=d.subject+(d.to?' — shown as it goes to '+d.to:'');
+    ov.querySelector('.nl-pv-sub').textContent=d.subject+(d.to?' — shown as it goes to '+d.to:'')+(d.pdf?' · 📎 '+(d.pdf.name||'PDF')+' attached':'');
     const f=document.createElement('iframe');f.title='Email preview';f.setAttribute('sandbox','');f.srcdoc=d.html;
     const fr=ov.querySelector('.nl-pv-frame');fr.innerHTML='';fr.append(f);
     ov.querySelectorAll('[data-w]').forEach(b=>b.addEventListener('click',()=>{f.style.width=b.dataset.w==='375'?'375px':'100%';}));
@@ -11946,6 +12012,7 @@ function nlSent(){
   const card=$(`<div class="card nl-sent">
     <h3>${esc(n.subject||'(no subject)')}</h3>
     <p class="muted">${esc(nlMonth(n.month))} · ${esc(nlAudText(n.audience))}${n.started_at?' · started '+esc(nlWhen(n.started_at)):''}${n.finished_at?' · finished '+esc(nlWhen(n.finished_at)):''}</p>
+    ${n.pdf_url?`<p class="nl-sent-pdf">📎 <a href="${esc(n.pdf_url)}" target="_blank" rel="noopener">${esc(n.pdf_name||'newsletter.pdf')}</a> <span class="muted">${n.pdf_bytes?'· '+esc(nlBytes(n.pdf_bytes))+' ':''}· attached</span></p>`:''}
     <div class="nl-stats"><div><b>${n.recipient_count||0}</b><span>members</span></div><div><b>${n.sent_count||0}</b><span>delivered</span></div><div><b>${n.failed_count||0}</b><span>failed</span></div></div>
     ${n.status==='sending'?`<div class="nl-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div><p class="muted">Sending — you can leave this page; it keeps going.</p>`:''}
     ${n.last_error?`<div class="nl-note nl-err">${esc(n.last_error)}</div>`:''}
@@ -11955,7 +12022,7 @@ function nlSent(){
   const pv=$(`<button type="button" class="btn btn-ghost btn-sm">See the email</button>`);pv.addEventListener('click',nlPreviewSaved);acts.append(pv);
   const dup=$(`<button type="button" class="btn btn-ghost btn-sm">Copy into a new draft</button>`);
   dup.addEventListener('click',async()=>{
-    try{const d=await nlCall('save',{month:NL.list?NL.list.default_month:n.month,subject:n.subject,preheader:n.preheader,body_html:n.body_html,audience:n.audience});NL.cur=d.newsletter;NL.dirty=false;toast('Copied into a new draft.');nlEditor();}
+    try{const d=await nlCall('save',{month:NL.list?NL.list.default_month:n.month,subject:n.subject,preheader:n.preheader,body_html:n.body_html,audience:n.audience});NL.cur=d.newsletter;NL.dirty=false;toast('Copied into a new draft.'+(n.pdf_url?' Attach this month’s PDF.':''));nlEditor();}
     catch(e){toast(e.message,true);}
   });
   acts.append(dup);
@@ -11979,7 +12046,7 @@ function nlSent(){
 }
 function nlPreviewSaved(){
   const n=NL.cur;
-  nlPreview({id:n.id,month:String(n.month||'').slice(0,7),subject:n.subject||'',preheader:n.preheader||'',body_html:n.body_html||'',audience:n.audience||{}});
+  nlPreview({id:n.id,month:String(n.month||'').slice(0,7),subject:n.subject||'',preheader:n.preheader||'',body_html:n.body_html||'',audience:n.audience||{},pdf_url:n.pdf_url||'',pdf_name:n.pdf_name||'',pdf_bytes:n.pdf_bytes||0});
 }
 
 /* ====== COMPS — prepaid & comp memberships (square-club comp_* actions) ======
