@@ -118,6 +118,12 @@
     .ro-pending{ background:var(--butter); color:var(--butter-i); }
     .ro-approved{ background:var(--mint); color:var(--mint-i); }
     .ro-denied{ background:var(--offbg); color:var(--offink); }
+    /* request off: Full day(s) / Part of a day (2026-11-06) */
+    .ro-seg{ display:flex; gap:6px; margin-bottom:12px; }
+    .ro-opt{ flex:1; padding:9px 6px; border:1px solid var(--line); background:var(--surface); color:var(--sub); border-radius:12px; font-weight:700; font-size:0.84rem; cursor:pointer; font-family:inherit; }
+    .ro-opt.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+    .ro-grid.one{ grid-template-columns:1fr; }
+    .cell-off .ot, .off-pill .ot{ text-transform:none; }
     .hide{ display:none; }
 
     /* swaps */
@@ -292,9 +298,17 @@ tr.me td.emp{ background:#eef0f3; }
 
       <div class="card hide" id="roCard">
         <h3><i class="ti ti-beach"></i> Request time off</h3>
-        <div class="ro-grid">
-          <label class="ro-f">Start<input type="date" id="roStart"></label>
-          <label class="ro-f">End (optional)<input type="date" id="roEnd"></label>
+        <div class="ro-seg" role="group" aria-label="How much time off">
+          <button type="button" class="ro-opt on" data-ro="full" aria-pressed="true" onclick="roMode('full')">Full day(s)</button>
+          <button type="button" class="ro-opt" data-ro="part" aria-pressed="false" onclick="roMode('part')">Part of a day</button>
+        </div>
+        <div class="ro-grid" id="roDates">
+          <label class="ro-f"><span id="roStartLbl">Start</span><input type="date" id="roStart"></label>
+          <label class="ro-f" id="roEndF">End (optional)<input type="date" id="roEnd"></label>
+        </div>
+        <div class="ro-grid hide" id="roTimes">
+          <label class="ro-f">Off from<input type="time" id="roFrom"></label>
+          <label class="ro-f">Until<input type="time" id="roTo"></label>
         </div>
         <label class="ro-f" style="display:block;margin-bottom:12px;">Reason (optional)<input type="text" id="roReason" placeholder="e.g. vacation"></label>
         <button class="btn btn-primary btn-block" onclick="roSubmit()">Submit request</button>
@@ -454,23 +468,43 @@ function enter(emp){
   roLoad(); swapLoad(); avLoad(); loadEmail(); annLoad(); loadToday();
 }
 
-/* ── request time off (name comes from the logged-in employee) ── */
+/* ── request time off (name comes from the logged-in employee) ──
+   Full day(s): start + optional end date. Part of a day: one day + Off from / Until
+   (portal_time_off.start_time / end_time; null = the whole day). */
+let RO_MODE = 'full';
+function roMode(mode){
+  RO_MODE = mode==='part' ? 'part' : 'full';
+  const part = RO_MODE==='part';
+  document.querySelectorAll('#roCard .ro-opt').forEach(b=>{ const on = b.dataset.ro===RO_MODE; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on?'true':'false'); });
+  document.getElementById('roDates').classList.toggle('one', part);
+  document.getElementById('roEndF').classList.toggle('hide', part);
+  document.getElementById('roTimes').classList.toggle('hide', !part);
+  document.getElementById('roStartLbl').textContent = part ? 'Day' : 'Start';
+  document.getElementById('roReason').placeholder = part ? 'e.g. doctor appointment' : 'e.g. vacation';
+  document.getElementById('roMsg').textContent = '';
+}
 async function roSubmit(){
   if(!ME) return;
+  const part = RO_MODE==='part';
   const start = document.getElementById('roStart').value;
-  const end = document.getElementById('roEnd').value;
+  const end = part ? '' : document.getElementById('roEnd').value;
+  const from = part ? document.getElementById('roFrom').value : '';
+  const until = part ? document.getElementById('roTo').value : '';
   const reason = document.getElementById('roReason').value.trim();
   const m = document.getElementById('roMsg');
-  if(!start){ m.style.color='var(--wax)'; m.textContent='Pick a start date.'; return; }
+  if(!start){ m.style.color='var(--wax)'; m.textContent = part ? 'Pick the day.' : 'Pick a start date.'; return; }
   if(end && end < start){ m.style.color='var(--wax)'; m.textContent='End date is before the start date.'; return; }
-  const { error } = await sb.from('portal_time_off').insert({
-    name: ME.name, start_date: start, end_date: end || null, reason, location: LOC
-  });
+  if(part && (!from || !until)){ m.style.color='var(--wax)'; m.textContent='Pick the hours you need off.'; return; }
+  if(part && until <= from){ m.style.color='var(--wax)'; m.textContent='"Until" has to be after "Off from".'; return; }
+  const row = { name: ME.name, start_date: start, end_date: end || null, reason, location: LOC };
+  if(part){ row.start_time = from; row.end_time = until; }
+  const { error } = await sb.from('portal_time_off').insert(row);
   if(error){ m.style.color='var(--wax)'; m.textContent='Could not submit — try again.'; return; }
   m.style.color='var(--mint-i)'; m.textContent='✅ Request sent — your manager will review it.';
-  document.getElementById('roEnd').value=''; document.getElementById('roReason').value='';
+  ['roEnd','roReason','roFrom','roTo'].forEach(id=>{ document.getElementById(id).value=''; });
   roLoad();
 }
+function roHours(r){ return r && r.start_time ? fmtTime(r.start_time)+'–'+fmtTime(r.end_time) : ''; }
 async function roLoad(){
   if(!ME) return;
   const el = document.getElementById('roList'); if(!el) return;
@@ -479,7 +513,8 @@ async function roLoad(){
     .order('start_date', {ascending:false}).limit(8);
   const rows = data||[];
   el.innerHTML = rows.map(r=>{
-    const range = fmtShort(r.start_date) + (r.end_date && r.end_date!==r.start_date ? ' – '+fmtShort(r.end_date) : '');
+    const range = fmtShort(r.start_date) + (r.end_date && r.end_date!==r.start_date ? ' – '+fmtShort(r.end_date) : '')
+      + (r.start_time ? ' · '+roHours(r) : '');
     const st = r.status||'pending';
     return '<div class="ro-req"><div class="r-when">'+range
       +(r.reason?'<div class="r-why">"'+esc(r.reason)+'"</div>':'')+'</div>'
@@ -557,9 +592,27 @@ async function loadWeek(){
   render();
 }
 
-function offFor(emp, dateIso){
+function offRows(emp, dateIso){
   const n = normName(emp.name);
-  return TIMEOFF.some(r => normName(r.name)===n && r.start_date<=dateIso && (r.end_date||r.start_date)>=dateIso);
+  return TIMEOFF.filter(r => normName(r.name)===n && r.start_date<=dateIso && (r.end_date||r.start_date)>=dateIso);
+}
+function offFor(emp, dateIso){ return offRows(emp, dateIso).length > 0; }
+// '' = not off · 'day' = the whole day · '2p–5p' = part of the day (several are joined)
+function offWhen(emp, dateIso){
+  const rows = offRows(emp, dateIso);
+  if(!rows.length) return '';
+  if(rows.some(r => !r.start_time)) return 'day';
+  return rows.map(roHours).join(', ');
+}
+function offTag(ow){ return ow==='day' ? '' : ' <span class="ot">'+ow+'</span>'; }
+function tMin(t){ const p = String(t||'').split(':').map(Number); return (p[0]||0)*60 + (p[1]||0); }
+// does approved time off cover any of this shift? (whole day or a shift with no times: yes)
+function offHits(emp, s){
+  const rows = offRows(emp, s.date);
+  if(!rows.length) return false;
+  if(rows.some(r => !r.start_time) || !shHasTimes(s)) return true;
+  const a = tMin(s.start_time); let b = tMin(s.end_time); if(b <= a) b += 1440;
+  return rows.some(r => tMin(r.start_time) < b && tMin(r.end_time) > a);
 }
 
 function render(){
@@ -575,11 +628,12 @@ function render(){
   days.forEach(d=>{
     const di = iso(d);
     const dayShifts = mine.filter(s=>s.date===di);
-    const isOff = ME && offFor(ME, di);
+    const ow = ME ? offWhen(ME, di) : '';
+    const isOff = !!ow;
     if(!dayShifts.length && !isOff) return;
     const dayCell = '<div class="my-day"><div class="dw">'+d.toLocaleDateString('en-US',{weekday:'short'})+'</div><div class="dn">'+d.getDate()+'</div></div>';
     if(isOff && !dayShifts.length){
-      rows.push('<div class="my-row">'+dayCell+'<div class="my-main"><span class="off-pill">Approved off</span></div></div>');
+      rows.push('<div class="my-row">'+dayCell+'<div class="my-main"><span class="off-pill">Approved off'+offTag(ow)+'</span></div></div>');
     }
     dayShifts.forEach(s=>{
       const locTag = LOC_GROUPS[LOC].length>1 ? ' <span class="loc-tag '+s.location+'">'+LOC_SHORT[s.location]+'</span>' : '';
@@ -607,7 +661,7 @@ function render(){
         '<div class="my-time">'+fmtTime(s.start_time)+' – '+fmtTime(s.end_time)+locTag+'</div>'+
         (s.role?'<div class="my-role">'+esc(s.role)+'</div>':'')+
         (s.note?'<div class="my-note">'+esc(s.note)+'</div>':'')+
-        '</div>'+(isOff?'<span class="off-pill">off?</span>':'')+swapBtn+'</div>');
+        '</div>'+(isOff?'<span class="off-pill">'+(ow==='day' ? 'off?' : 'off'+offTag(ow)+(offHits(ME,s)?'?':''))+'</span>':'')+swapBtn+'</div>');
     });
   });
   document.getElementById('myWeek').innerHTML = rows.length ? rows.join('') : '<div class="my-empty">No shifts scheduled this week. 🎉</div>';
@@ -628,7 +682,8 @@ function render(){
       const di = iso(d);
       const cls = di===todayIso ? ' class="today"' : '';
       const bits = [];
-      if(offFor(emp, di)) bits.push('<div class="cell-off">Off</div>');
+      const ow = offWhen(emp, di);
+      if(ow) bits.push('<div class="cell-off">Off'+offTag(ow)+'</div>');
       SHIFTS.filter(s=>s.employee_id===emp.id && s.date===di).forEach(s=>{
         const locTag = LOC_GROUPS[LOC].length>1 ? ' <span class="loc-tag '+s.location+'">'+LOC_SHORT[s.location]+'</span>' : '';
         const kind = shKind(s);

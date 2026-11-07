@@ -782,7 +782,8 @@ Deno.serve(async (req: Request) => {
           const { data: emps } = await admin.from("portal_employees").select("id,name").eq("active", true).in("location", group).ilike("name", likeLit(reqRow.name));
           const emp = (emps || [])[0];
           if (emp) {
-            const range = fmtDate(reqRow.start_date) + (reqRow.end_date && reqRow.end_date !== reqRow.start_date ? " – " + fmtDate(reqRow.end_date) : "");
+            const range = fmtDate(reqRow.start_date) + (reqRow.end_date && reqRow.end_date !== reqRow.start_date ? " – " + fmtDate(reqRow.end_date) : "")
+              + (reqRow.start_time && reqRow.end_time ? `, ${fmtTime(reqRow.start_time)}–${fmtTime(reqRow.end_time)}` : "");
             const verdict = payload.status === "approved" ? "approved" : "denied";
             const phones = await phonesFor([emp.id], "timeoff");
             if (phones[emp.id]) await sendSMS(phones[emp.id], `GREYS: your time-off request for ${range} was ${verdict}${verdict === "approved" ? " ✅" : ""}.`, { employee_id: emp.id, kind: "timeoff", ref: String(payload.id) });

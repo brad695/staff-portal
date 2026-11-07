@@ -3476,7 +3476,8 @@ function renderTimeOff(){
   const el = document.getElementById('toList');
   if(!_to.length){ el.innerHTML='<div class="to-empty">No requests.</div>'; return; }
   el.innerHTML = _to.map(r=>{
-    const range = (r.end_date && r.end_date!==r.start_date) ? fmtDisplay(r.start_date)+' – '+fmtDisplay(r.end_date) : fmtDisplay(r.start_date);
+    const range = ((r.end_date && r.end_date!==r.start_date) ? fmtDisplay(r.start_date)+' – '+fmtDisplay(r.end_date) : fmtDisplay(r.start_date))
+      + (r.start_time ? ' · '+sgOffHours(r)+' (part of the day)' : '');
     const label = (r.status||'pending').charAt(0).toUpperCase()+(r.status||'pending').slice(1);
     return '<div class="to-item"><div class="to-info"><div class="to-name">'+esc(r.name)+'</div>'+
       '<div class="to-meta">📅 '+range+'</div>'+
@@ -3504,7 +3505,12 @@ function sgIso(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,
 function sgAdd(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
 function sgFmtT(t){ if(!t) return ''; const p=t.split(':').map(Number); const ap=p[0]>=12?'p':'a'; return (((p[0]+11)%12)+1)+(p[1]?':'+String(p[1]).padStart(2,'0'):'')+ap; }
 function sgHours(s){ const a=s.start_time.split(':').map(Number), b=s.end_time.split(':').map(Number); let h=(b[0]+b[1]/60)-(a[0]+a[1]/60); if(h<=0) h+=24; return h; }
-function sgOff(loc,name,di){ const n=String(name||'').trim().toLowerCase(); return SG[loc].to.some(r=>String(r.name||'').trim().toLowerCase()===n && r.start_date<=di && (r.end_date||r.start_date)>=di); }
+function sgOffRows(loc,name,di){ const n=String(name||'').trim().toLowerCase(); return SG[loc].to.filter(r=>String(r.name||'').trim().toLowerCase()===n && r.start_date<=di && (r.end_date||r.start_date)>=di); }
+function sgOff(loc,name,di){ return sgOffRows(loc,name,di).length>0; }
+function sgOffHours(r){ return sgFmtT(String(r.start_time).slice(0,5))+'–'+sgFmtT(String(r.end_time).slice(0,5)); }
+// '' = not off · 'day' = the whole day · '2p–5p' = part of the day (several are joined)
+function sgOffWhen(loc,name,di){ const rs=sgOffRows(loc,name,di); if(!rs.length) return ''; if(rs.some(r=>!r.start_time)) return 'day'; return rs.map(sgOffHours).join(', '); }
+function sgOffWarn(ow,they){ if(!ow) return ''; return ' — ⚠️ '+(they?'they have':'has')+' approved time off '+(ow==='day'?'':ow+' ')+(they?'that day':'this day'); }
 function sgMove(n){ sgWeek=sgAdd(sgWeek,n*7); sgLoad(); }
 function sgToday(){ sgWeek=sgMonday(new Date()); sgLoad(); }
 
@@ -3575,7 +3581,8 @@ function sgRender(){
         const cells = days.map((d,wd)=>{
           const di=sgIso(d);
           const bits=[];
-          if(sgOff(loc,emp.name,di)) bits.push('<div style="background:#f6dad4;color:var(--wax);border-radius:2px;padding:2px 6px;margin:2px 0;font-size:0.62rem;font-weight:800;text-transform:uppercase;text-align:center;">Off</div>');
+          const ow=sgOffWhen(loc,emp.name,di);
+          if(ow) bits.push('<div style="background:#f6dad4;color:var(--wax);border-radius:2px;padding:2px 6px;margin:2px 0;font-size:0.62rem;font-weight:800;text-transform:uppercase;text-align:center;">Off'+(ow==='day'?'':' <span style="text-transform:none;">'+ow+'</span>')+'</div>');
           sgAv(loc,emp.id,wd).forEach(a=>{
             bits.push(a.kind==='preferred'
               ? '<div style="background:#e7f6ee;color:#0a7a52;border:1px dashed #9fd8bc;border-radius:2px;padding:1px 5px;margin:2px 0;font-size:0.6rem;font-weight:700;text-align:center;" title="Prefers to work'+(a.note?': '+esc(a.note):'')+'">'+sgAvLabel(a)+'</div>'
@@ -3628,7 +3635,8 @@ function printGrid(loc){
     let hrs=0;
     const cells = days.map(d=>{
       const di=sgIso(d); const bits=[];
-      if(sgOff(loc,emp.name,di)) bits.push('<div class="off">OFF</div>');
+      const ow=sgOffWhen(loc,emp.name,di);
+      if(ow) bits.push('<div class="off">OFF'+(ow==='day'?'':' '+ow)+'</div>');
       g.shifts.filter(s=>s.employee_id===emp.id && s.date===di).forEach(s=>{
         const kind = sgKind(s);
         if(kind==='off'){ bits.push('<div class="off">OFF</div>'); return; }
@@ -3669,7 +3677,7 @@ function openShift(loc, empId, date, shiftId){
   const unav = sgAv(loc,empId,wd).find(a=>a.kind==='unavailable');
   document.getElementById('shSub').textContent = LOC_LABELS[loc]+' · '+emp.name+' · '
     +new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})
-    +(sgOff(loc,emp.name,date)?' — ⚠️ has approved time off this day':'')
+    +sgOffWarn(sgOffWhen(loc,emp.name,date))
     +(unav?' — ⚠️ marked unavailable '+(unav.start_time?sgFmtT(String(unav.start_time).slice(0,5))+'–'+sgFmtT(String(unav.end_time||'').slice(0,5)):'all day'):'');
   const kind = sh ? sgKind(sh) : 'shift';
   document.getElementById('shKindSel').value = kind;
@@ -3716,7 +3724,7 @@ async function shCopy(){
   if(!r.ok){ m.textContent='❌ '+(r.data.error||'Copy failed'); return; }
   const when = new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'numeric',day:'numeric'});
   m.textContent = '✅ Copied to '+(emp?emp.name:'employee')+' · '+when
-    +(emp && sgOff(SH_CTX.loc,emp.name,date)?' — ⚠️ they have approved time off that day':'');
+    +(emp ? sgOffWarn(sgOffWhen(SH_CTX.loc,emp.name,date), true) : '');
   sgLoad(); // refresh the grid behind the modal; keep it open for more copies
 }
 function shClose(){ document.getElementById('shiftModal').style.display='none'; SH_CTX=null; }
@@ -3807,7 +3815,7 @@ async function sgDrop(ev, loc, empId, date){
   if(r.ok){
     el.className='save-msg';
     el.textContent='✅ Copied to '+(emp?emp.name:'employee')+' · '+new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'numeric',day:'numeric'})
-      +(emp && sgOff(loc,emp.name,date)?' — ⚠️ they have approved time off that day':'');
+      +(emp ? sgOffWarn(sgOffWhen(loc,emp.name,date), true) : '');
   }
   else { el.className='save-msg err'; el.textContent='❌ '+(r.data.error||'Copy failed'); }
   setTimeout(()=>{ el.textContent=''; },4500);
