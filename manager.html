@@ -701,10 +701,12 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     </div>
     <div class="section-card" id="ocdCard">
       <h2>📅 Closed Dates</h2>
-      <div class="hint">Block days on <strong>orderonline.greyscheese.com</strong> — holidays, private events, anything. A blocked day shows no pickup times and checkout turns it down; it takes effect within about 10 seconds, and past dates drop off by themselves. Orders already placed for that day are not changed. Weekly closed days (like Mondays) come from each shop&#8217;s hours in Square, not from here.</div>
+      <div class="hint">Block days on <strong>orderonline.greyscheese.com</strong> — holidays, private events, anything — or <strong>close early</strong> at a set time (the last pickup is 15 minutes before). Blocked times show no pickup slots and checkout turns them down; it takes effect within about 10 seconds, and past dates drop off by themselves. Orders already placed are not changed. Weekly closed days (like Mondays) come from each shop&#8217;s hours in Square, not from here.</div>
       <form class="ocd-add" id="ocdForm" autocomplete="off" novalidate>
         <label>Date<input type="date" id="ocdDay"></label>
         <label>Shop<select id="ocdShop"><option value="all">Both shops</option><option value="memphis">Memphis</option><option value="nashville">Nashville</option></select></label>
+        <label>Hours<select id="ocdKind"><option value="day">Closed all day</option><option value="early">Close early at…</option></select></label>
+        <label id="ocdAtWrap" hidden>Closes at<input type="time" id="ocdAt" step="900" value="15:00"></label>
         <label class="ocd-grow">Reason <span>(customers see this)</span><input type="text" id="ocdLabel" maxlength="40" placeholder="e.g. Thanksgiving"></label>
         <button type="submit" class="btn btn-gold" id="ocdAdd">Block date</button>
       </form>
@@ -17322,12 +17324,17 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
      written only by the set_order_closed_date RPC (is_app_admin; adds or removes ONE day + shop, drops past days) and
      read by the square-online-order edge function (v14+, re-read every ~10 s): a closed day offers no pickup times on
      the order site and pay refuses it. Weekly closed days are NOT here — they come from each shop's hours in Square.
-     Remove asks twice in place (no browser dialog). -->
+     Remove asks twice in place (no browser dialog).
+     EARLY CLOSE (2026-11-07, Maverick: "times like if we want to close the store at 3:00"): Hours = "Close early at…"
+     goes through set_order_closure(…, p_close_at 'HH:MM') — same rules as set_order_closed_date plus the time; the
+     entry keeps the day open until then (last pickup 15 min before; square-online-order v15+). A day + shop holds
+     one entry, so saving again replaces it (all day ↔ early). -->
 <style id="ocd-style">
 .ocd-add{ display:flex; flex-wrap:wrap; align-items:flex-end; gap:12px; margin:4px 0 16px; }
 .ocd-add label{ display:flex; flex-direction:column; gap:4px; font-size:.78rem; font-weight:700; color:#374151; }
 .ocd-add label span{ font-weight:500; color:#6b7280; }
 .ocd-add .ocd-grow{ flex:1 1 220px; }
+.ocd-add [hidden]{ display:none !important; }
 .ocd-add input, .ocd-add select{ box-sizing:border-box; min-height:44px; padding:0 10px; border:1px solid var(--line,#e5e7eb); border-radius:8px; background:#fff; color:#111827; font:inherit; font-size:16px; }
 .ocd-add .btn{ min-height:44px; }
 .ocd-list{ display:flex; flex-direction:column; gap:8px; }
@@ -17336,6 +17343,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 .ocd-row .ocd-date{ min-width:160px; font-weight:700; color:#111827; }
 .ocd-row .ocd-shop{ flex:none; padding:2px 9px; border-radius:999px; background:#e0f2fe; color:#075985; font-size:.76rem; font-weight:700; }
 .ocd-row .ocd-shop.all{ background:#fef3c7; color:#92400e; }
+.ocd-row .ocd-hrs{ flex:none; padding:2px 9px; border-radius:999px; background:#f3f4f6; color:#374151; font-size:.76rem; font-weight:700; }
+.ocd-row .ocd-hrs.early{ background:#ede9fe; color:#5b21b6; }
 .ocd-row .ocd-lbl{ flex:1; min-width:0; color:#374151; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .ocd-row .ocd-lbl.none{ color:#9ca3af; font-style:italic; }
 .ocd-row .ocd-x{ flex:none; min-height:40px; padding:0 14px; border-radius:8px; border:1px solid #fca5a5; background:#fff; color:#b91c1c; font:inherit; font-size:.85rem; font-weight:700; cursor:pointer; }
@@ -17355,6 +17364,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   var panel = document.getElementById('panel-ordering');
   if (!form || !list || !panel || typeof sb === 'undefined') return;
   var dayIn = document.getElementById('ocdDay'), shopIn = document.getElementById('ocdShop'), lblIn = document.getElementById('ocdLabel'), addBtn = document.getElementById('ocdAdd');
+  var kindIn = document.getElementById('ocdKind'), atWrap = document.getElementById('ocdAtWrap'), atIn = document.getElementById('ocdAt');
   var SHOPN = { all:'Both shops', memphis:'Memphis', nashville:'Nashville' };
   var dates = null, err = '', busy = false, sure = '', sureT = 0;
   function h(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); }
@@ -17363,6 +17373,12 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     var p = {}; new Intl.DateTimeFormat('en-US', { timeZone:'America/Chicago', year:'numeric', month:'2-digit', day:'2-digit' })
       .formatToParts(new Date()).forEach(function(x){ p[x.type] = x.value; });
     return p.year + '-' + p.month + '-' + p.day;
+  }
+  // '15:00' → '3 PM', '13:30' → '1:30 PM'
+  function hhmm(t){
+    var m = /^(\d{1,2}):(\d{2})/.exec(String(t || '')); if (!m) return '';
+    var h = +m[1], mm = +m[2];
+    return ((h % 12) || 12) + (mm ? ':' + m[2] : '') + ' ' + (h >= 12 ? 'PM' : 'AM');
   }
   function nice(key){
     var a = String(key).split('-');
@@ -17378,7 +17394,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       var id = d.day + '|' + (d.shop || 'all'), s = d.shop || 'all';
       return '<div class="ocd-row" data-id="' + h(id) + '">'
         + '<span class="ocd-when"><span class="ocd-date">' + h(nice(d.day)) + (d.day === t ? ' · today' : '') + '</span>'
-        + '<span class="ocd-shop' + (s === 'all' ? ' all' : '') + '">' + h(SHOPN[s] || s) + '</span></span>'
+        + '<span class="ocd-shop' + (s === 'all' ? ' all' : '') + '">' + h(SHOPN[s] || s) + '</span>'
+        + (d.close_at ? '<span class="ocd-hrs early">Closes ' + h(hhmm(d.close_at)) + '</span>' : '<span class="ocd-hrs">All day</span>') + '</span>'
         + '<span class="ocd-lbl' + (d.label ? '' : ' none') + '">' + h(d.label || 'no reason given') + '</span>'
         + '<button type="button" class="ocd-x' + (sure === id ? ' sure' : '') + '" data-id="' + h(id) + '"' + (busy ? ' disabled' : '')
         + ' aria-label="Remove ' + h(nice(d.day) + ' (' + (SHOPN[s] || s) + ')') + '">' + (sure === id ? 'Sure? Remove' : 'Remove') + '</button></div>';
@@ -17393,13 +17410,13 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     }catch(e){ if (!dates) err = 'Couldn’t load closed dates. Check your connection and reload.'; }
     draw();
   }
-  async function save(day, shop, closed, label){
+  async function save(day, shop, closed, label, closeAt){
     busy = true; err = ''; draw();
     var who = '';
     try{ who = ((await sb.auth.getSession()).data.session.user.email) || ''; }catch(e){}
     var ok = false;
     try{
-      var r = await sb.rpc('set_order_closed_date', { p_day: day, p_shop: shop, p_closed: closed, p_label: label || null, p_by: who });
+      var r = await sb.rpc('set_order_closure', { p_day: day, p_shop: shop, p_closed: closed, p_label: label || null, p_by: who, p_close_at: closeAt || null });
       if (r.error) throw r.error;
       dates = (r.data && r.data.dates) || [];
       ok = true;
@@ -17413,8 +17430,11 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     var day = dayIn.value, t = today();
     if (!day){ err = 'Pick a date first.'; draw(); dayIn.focus(); return; }
     if (day < t){ err = 'That date has already passed.'; draw(); dayIn.focus(); return; }
-    if (await save(day, shopIn.value, true, lblIn.value.trim())){ dayIn.value = ''; lblIn.value = ''; dayIn.focus(); }
+    var early = kindIn.value === 'early', at = early ? atIn.value : '';
+    if (early && !/^\d{2}:\d{2}$/.test(at)){ err = 'Pick the closing time.'; draw(); atIn.focus(); return; }
+    if (await save(day, shopIn.value, true, lblIn.value.trim(), at)){ dayIn.value = ''; lblIn.value = ''; kindIn.value = 'day'; atWrap.hidden = true; dayIn.focus(); }
   });
+  kindIn.addEventListener('change', function(){ atWrap.hidden = kindIn.value !== 'early'; if (!atWrap.hidden && !atIn.value) atIn.value = '15:00'; });
   list.addEventListener('click', function(ev){
     var b = ev.target.closest && ev.target.closest('.ocd-x'); if (!b || b.disabled) return;
     var id = b.getAttribute('data-id');
