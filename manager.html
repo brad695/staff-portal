@@ -692,12 +692,24 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
 
   <!-- RESERVATIONS -->
   <!-- Experience inquiries: HoneyBook-style conversations with customers before they book -->
-  <!-- Online Ordering on/off (script: ONLINE-ORDERING SWITCH, near the end) -->
+  <!-- Online Ordering on/off (script: ONLINE-ORDERING SWITCH, near the end) + Closed Dates (script: ORDER CLOSED DATES, right after it) -->
   <div id="panel-ordering" class="panel">
     <div class="section-card">
       <h2>🛒 Online Ordering</h2>
       <div class="hint">Turn ordering on <strong>orderonline.greyscheese.com</strong> off or on for each shop. Off takes effect within about 10 seconds: the menu stays up, a notice says ordering is paused, and nobody can check out. Orders already paid are not affected. Turning a shop off asks for how long — <strong>1, 2, 3 or 4 hours</strong>, <strong>until end of day</strong>, or until someone turns it back on — and a timed pause turns itself back on within a minute of the time. (Uber Eats, DoorDash and Square Online are separate and not changed here.)</div>
       <div class="oo-grid" id="ooGrid"><div class="rec-empty">Loading…</div></div>
+    </div>
+    <div class="section-card" id="ocdCard">
+      <h2>📅 Closed Dates</h2>
+      <div class="hint">Block days on <strong>orderonline.greyscheese.com</strong> — holidays, private events, anything. A blocked day shows no pickup times and checkout turns it down; it takes effect within about 10 seconds, and past dates drop off by themselves. Orders already placed for that day are not changed. Weekly closed days (like Mondays) come from each shop&#8217;s hours in Square, not from here.</div>
+      <form class="ocd-add" id="ocdForm" autocomplete="off" novalidate>
+        <label>Date<input type="date" id="ocdDay"></label>
+        <label>Shop<select id="ocdShop"><option value="all">Both shops</option><option value="memphis">Memphis</option><option value="nashville">Nashville</option></select></label>
+        <label class="ocd-grow">Reason <span>(customers see this)</span><input type="text" id="ocdLabel" maxlength="40" placeholder="e.g. Thanksgiving"></label>
+        <button type="submit" class="btn btn-gold" id="ocdAdd">Block date</button>
+      </form>
+      <div class="ocd-list" id="ocdList"><div class="rec-empty">Loading…</div></div>
+      <div class="oo-err" id="ocdErr" role="alert"></div>
     </div>
   </div>
   <!-- ORDER PAD (2026-11-04): the counter tablet's order pad (order.html) inside the console; loads on first open -->
@@ -17302,6 +17314,119 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   // fresh whenever the tab is opened, and every minute while it is showing (someone may flip it from the portal, or the timer may turn it back on)
   new MutationObserver(function(){ if (panel.classList.contains('active')) load(); }).observe(panel, { attributes:true, attributeFilter:['class'] });
   setInterval(function(){ if (!document.hidden) load(); }, 60000);
+})();
+</script>
+<!-- ORDER CLOSED DATES (2026-11-07, Maverick: "add a section for us to block future dates, pre-block christmas,
+     thanksgiving and new years day"): the 📅 Closed Dates card on the 🛒 Online Ordering tab. State lives in
+     site_content 'order_closed_dates' = { dates: [{ day:'YYYY-MM-DD', shop:'all'|'memphis'|'nashville', label, by, at }] },
+     written only by the set_order_closed_date RPC (is_app_admin; adds or removes ONE day + shop, drops past days) and
+     read by the square-online-order edge function (v14+, re-read every ~10 s): a closed day offers no pickup times on
+     the order site and pay refuses it. Weekly closed days are NOT here — they come from each shop's hours in Square.
+     Remove asks twice in place (no browser dialog). -->
+<style id="ocd-style">
+.ocd-add{ display:flex; flex-wrap:wrap; align-items:flex-end; gap:12px; margin:4px 0 16px; }
+.ocd-add label{ display:flex; flex-direction:column; gap:4px; font-size:.78rem; font-weight:700; color:#374151; }
+.ocd-add label span{ font-weight:500; color:#6b7280; }
+.ocd-add .ocd-grow{ flex:1 1 220px; }
+.ocd-add input, .ocd-add select{ box-sizing:border-box; min-height:44px; padding:0 10px; border:1px solid var(--line,#e5e7eb); border-radius:8px; background:#fff; color:#111827; font:inherit; font-size:16px; }
+.ocd-add .btn{ min-height:44px; }
+.ocd-list{ display:flex; flex-direction:column; gap:8px; }
+.ocd-row{ display:flex; align-items:center; gap:12px; padding:10px 14px; border:1px solid var(--line,#e5e7eb); border-radius:10px; background:#fff; }
+.ocd-row .ocd-when{ flex:none; display:flex; align-items:center; gap:12px; }
+.ocd-row .ocd-date{ min-width:160px; font-weight:700; color:#111827; }
+.ocd-row .ocd-shop{ flex:none; padding:2px 9px; border-radius:999px; background:#e0f2fe; color:#075985; font-size:.76rem; font-weight:700; }
+.ocd-row .ocd-shop.all{ background:#fef3c7; color:#92400e; }
+.ocd-row .ocd-lbl{ flex:1; min-width:0; color:#374151; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ocd-row .ocd-lbl.none{ color:#9ca3af; font-style:italic; }
+.ocd-row .ocd-x{ flex:none; min-height:40px; padding:0 14px; border-radius:8px; border:1px solid #fca5a5; background:#fff; color:#b91c1c; font:inherit; font-size:.85rem; font-weight:700; cursor:pointer; }
+.ocd-row .ocd-x:hover{ background:#fee2e2; }
+.ocd-row .ocd-x.sure{ background:#b91c1c; border-color:#b91c1c; color:#fff; }
+.ocd-row .ocd-x:disabled{ opacity:.55; cursor:default; }
+@media (max-width:640px){
+  .ocd-row{ flex-wrap:wrap; row-gap:6px; }
+  .ocd-row .ocd-when{ flex-basis:100%; }
+  .ocd-row .ocd-date{ min-width:0; }
+  .ocd-row .ocd-lbl{ white-space:normal; }
+}
+</style>
+<script>
+(function(){
+  var form = document.getElementById('ocdForm'), list = document.getElementById('ocdList'), errEl = document.getElementById('ocdErr');
+  var panel = document.getElementById('panel-ordering');
+  if (!form || !list || !panel || typeof sb === 'undefined') return;
+  var dayIn = document.getElementById('ocdDay'), shopIn = document.getElementById('ocdShop'), lblIn = document.getElementById('ocdLabel'), addBtn = document.getElementById('ocdAdd');
+  var SHOPN = { all:'Both shops', memphis:'Memphis', nashville:'Nashville' };
+  var dates = null, err = '', busy = false, sure = '', sureT = 0;
+  function h(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); }
+  // the shops' calendar day (Central), YYYY-MM-DD
+  function today(){
+    var p = {}; new Intl.DateTimeFormat('en-US', { timeZone:'America/Chicago', year:'numeric', month:'2-digit', day:'2-digit' })
+      .formatToParts(new Date()).forEach(function(x){ p[x.type] = x.value; });
+    return p.year + '-' + p.month + '-' + p.day;
+  }
+  function nice(key){
+    var a = String(key).split('-');
+    return new Date(Date.UTC(+a[0], +a[1] - 1, +a[2], 12)).toLocaleDateString('en-US', { timeZone:'UTC', weekday:'short', month:'short', day:'numeric', year:'numeric' });
+  }
+  function draw(){
+    errEl.textContent = err;
+    addBtn.disabled = busy;
+    if (!dates){ list.innerHTML = '<div class="rec-empty">' + (err ? 'Couldn’t load closed dates.' : 'Loading…') + '</div>'; return; }
+    var t = today(), up = dates.filter(function(d){ return d && d.day >= t; });
+    if (!up.length){ list.innerHTML = '<div class="rec-empty">No closed dates — every day with shop hours is open for pickup.</div>'; return; }
+    list.innerHTML = up.map(function(d){
+      var id = d.day + '|' + (d.shop || 'all'), s = d.shop || 'all';
+      return '<div class="ocd-row" data-id="' + h(id) + '">'
+        + '<span class="ocd-when"><span class="ocd-date">' + h(nice(d.day)) + (d.day === t ? ' · today' : '') + '</span>'
+        + '<span class="ocd-shop' + (s === 'all' ? ' all' : '') + '">' + h(SHOPN[s] || s) + '</span></span>'
+        + '<span class="ocd-lbl' + (d.label ? '' : ' none') + '">' + h(d.label || 'no reason given') + '</span>'
+        + '<button type="button" class="ocd-x' + (sure === id ? ' sure' : '') + '" data-id="' + h(id) + '"' + (busy ? ' disabled' : '')
+        + ' aria-label="Remove ' + h(nice(d.day) + ' (' + (SHOPN[s] || s) + ')') + '">' + (sure === id ? 'Sure? Remove' : 'Remove') + '</button></div>';
+    }).join('');
+  }
+  async function load(){
+    try{
+      var r = await sb.from('site_content').select('data').eq('key','order_closed_dates').maybeSingle();
+      if (r.error) throw r.error;
+      dates = (r.data && r.data.data && r.data.data.dates) || [];
+      if (err && err.indexOf('load') >= 0) err = '';
+    }catch(e){ if (!dates) err = 'Couldn’t load closed dates. Check your connection and reload.'; }
+    draw();
+  }
+  async function save(day, shop, closed, label){
+    busy = true; err = ''; draw();
+    var who = '';
+    try{ who = ((await sb.auth.getSession()).data.session.user.email) || ''; }catch(e){}
+    var ok = false;
+    try{
+      var r = await sb.rpc('set_order_closed_date', { p_day: day, p_shop: shop, p_closed: closed, p_label: label || null, p_by: who });
+      if (r.error) throw r.error;
+      dates = (r.data && r.data.dates) || [];
+      ok = true;
+    }catch(e){ err = 'That didn’t save' + (e && e.message ? ' (' + e.message + ')' : '') + '. Nothing changed.'; }
+    busy = false; draw();
+    return ok;
+  }
+  form.addEventListener('submit', async function(ev){
+    ev.preventDefault();
+    if (busy) return;
+    var day = dayIn.value, t = today();
+    if (!day){ err = 'Pick a date first.'; draw(); dayIn.focus(); return; }
+    if (day < t){ err = 'That date has already passed.'; draw(); dayIn.focus(); return; }
+    if (await save(day, shopIn.value, true, lblIn.value.trim())){ dayIn.value = ''; lblIn.value = ''; dayIn.focus(); }
+  });
+  list.addEventListener('click', function(ev){
+    var b = ev.target.closest && ev.target.closest('.ocd-x'); if (!b || b.disabled) return;
+    var id = b.getAttribute('data-id');
+    if (sure !== id){ sure = id; clearTimeout(sureT); sureT = setTimeout(function(){ sure = ''; draw(); }, 4000); draw(); return; }
+    sure = ''; clearTimeout(sureT);
+    var parts = id.split('|');
+    save(parts[0], parts[1], false, null);
+  });
+  dayIn.min = today();
+  load();
+  new MutationObserver(function(){ if (panel.classList.contains('active')){ dayIn.min = today(); load(); } }).observe(panel, { attributes:true, attributeFilter:['class'] });
+  window.__ocd = { load: load, today: today, state: function(){ return dates; } };
 })();
 </script>
 <!-- CHANGE PASSWORD (2026-10-20, Maverick: "change password button in the console").
