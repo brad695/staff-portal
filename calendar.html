@@ -366,7 +366,7 @@ function loadBase(){
       else if(r.type==='special') out.specials.push(x);
     });
     out.schedules = sc.map(r=>({ name:r.name, date:r.date, endDate:r.end_date||'', note:r.note||'' }));
-    out.timeoff = to.filter(r=>r.status==='approved').map(r=>({ name:r.name, date:r.start_date, endDate:r.end_date||'', note:r.reason||'' }));
+    out.timeoff = to.filter(r=>r.status==='approved').map(r=>({ name:r.name, date:r.start_date, endDate:r.end_date||'', note:r.reason||'', t0:tmin(r.start_time), t1:tmin(r.end_time) }));   // part of a day: t0/t1 (2026-11-06)
     return out;
   })();
   return BASE;
@@ -393,7 +393,7 @@ function loadMonth(y,m){
       else occurrences(s, mS, mE).forEach(d=>put(d,it(d)));
     });
     base.schedules.forEach(s=>{ if(!s.date) return; spanDays(s.date, s.endDate, mS, mE, d=>put(d,{ cat:'sched', title:s.name, sub:s.note, all:true, from:s.date, to:s.endDate||s.date, rows:[['clock',null], s.note?['note',esc(s.note)]:null] })); });
-    base.timeoff.forEach(s=>{ if(!s.date) return; spanDays(s.date, s.endDate, mS, mE, d=>put(d,{ cat:'off', title:s.name+' — time off', sub:s.note, all:true, from:s.date, to:s.endDate||s.date, rows:[['clock',null], s.note?['note','“'+esc(s.note)+'”']:null] })); });
+    base.timeoff.forEach(s=>{ if(!s.date) return; spanDays(s.date, s.endDate, mS, mE, d=>put(d,{ cat:'off', title:s.name+' — time off', sub:s.note, all:s.t0==null, t0:s.t0, t1:s.t1, from:s.date, to:s.endDate||s.date, rows:[['clock',null], s.note?['note','“'+esc(s.note)+'”']:null] })); });
 
     // one feed call serves the order tiles AND the BEO links on experiences (exp_beo, by confirmation code)
     const feedP = fetch(ORDERS_URL,{ method:'POST', headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_KEY }, body:JSON.stringify({ action:'feed', from:mS, to:mE, loc:LOC }) })

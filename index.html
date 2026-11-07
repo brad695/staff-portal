@@ -2321,7 +2321,9 @@ async function loadSchedules(){
   renderSchedCards();
   if (document.getElementById('view-calendar').classList.contains('active')) renderCalendar();
 }
-function approvedTimeOff(){ return (_timeOff||[]).filter(r=>r.status==='approved').map(r=>({ id:r.id, name:r.name, date:r.startDate, endDate:r.endDate||'', note:r.reason||'', timeoff:true })); }
+function approvedTimeOff(){ return (_timeOff||[]).filter(r=>r.status==='approved').map(r=>({ id:r.id, name:r.name, date:r.startDate, endDate:r.endDate||'', note:r.reason||'', timeoff:true, startTime:r.startTime||'', endTime:r.endTime||'' })); }
+// part of a day off → "2:00 PM – 5:00 PM" ('' = the whole day)
+function offHours(o){ return o && o.startTime ? fmtTime(String(o.startTime).slice(0,5))+' – '+fmtTime(String(o.endTime).slice(0,5)) : ''; }
 function combinedSchedule(){ return _schedules.map(s=>Object.assign({timeoff:false},s)).concat(approvedTimeOff()).sort((a,b)=>(a.date||'').localeCompare(b.date||'')); }
 function renderSchedCards(){
   const grid=document.getElementById('schedGrid'); if(!grid) return;
@@ -2330,7 +2332,7 @@ function renderSchedCards(){
   grid.innerHTML = items.map(s=>{ const isPast=(s.endDate||s.date)<today;
     const range=(s.endDate&&s.endDate!==s.date)?fmtDisplay(s.date)+' – '+fmtDisplay(s.endDate):fmtDisplay(s.date);
     if(s.timeoff){ return `<div class="card timeoff${isPast?' past':''}">
-      <div class="c-day">🌴 ${isPast?'Past · ':''}${range} · Time Off</div>
+      <div class="c-day">🌴 ${isPast?'Past · ':''}${range}${s.startTime?' · '+offHours(s):''} · Time Off</div>
       <div class="c-title">${esc(s.name)}</div>
       ${s.note?`<div class="c-body">"${esc(s.note)}"</div>`:''}</div>`; }
     return `<div class="card sched${isPast?' past':''}">
@@ -2341,7 +2343,7 @@ function renderSchedCards(){
 
 // ═══ TIME OFF ═══
 let _timeOff=[];
-function mapTimeOff(r){ return { id:r.id, name:r.name, startDate:r.start_date, endDate:r.end_date||'', reason:r.reason||'', status:r.status||'pending', submittedAt:r.submitted_at }; }
+function mapTimeOff(r){ return { id:r.id, name:r.name, startDate:r.start_date, endDate:r.end_date||'', reason:r.reason||'', status:r.status||'pending', submittedAt:r.submitted_at, startTime:r.start_time||'', endTime:r.end_time||'' }; }
 async function loadTimeOff(){
   try{ const { data } = await sb.from('portal_time_off').select('*').eq('location', LOC).order('start_date'); _timeOff=(data||[]).map(mapTimeOff); }catch(e){ _timeOff=[]; }
   renderTimeOffList(); renderSchedCards();
@@ -2745,7 +2747,7 @@ function renderAgenda(y,m,tgt,only){
     sch.forEach(n=>rows+=agRow('t-sched','Schedule',esc(n.name||n),agDetail([
       ['Notes', n.note], ['Through', (n.endDate&&n.endDate!==date)?fmtDisplay(n.endDate):'']
     ])));
-    off.forEach(n=>rows+=agRow('t-off','Time Off',esc(n.name||n),agDetail([
+    off.forEach(n=>rows+=agRow('t-off','Time Off',esc(n.name||n)+(n.startTime?' · '+offHours(n):''),agDetail([
       ['Reason', n.note], ['Through', (n.endDate&&n.endDate!==date)?fmtDisplay(n.endDate):'']
     ])));
     html+= only ? rows : '<div class="ag-day'+(date<today?' ag-past':'')+(date===today?' ag-is-today':'')+'" data-date="'+date+'"><div class="ag-date">'+dl+(date===today?'<span class="ag-today">Today</span>':'')+'</div>'+rows+'</div>';
@@ -3024,7 +3026,7 @@ function calGoToday(){ _calYear=new Date().getFullYear(); _calMonth=new Date().g
     }
     if(!foot){
       var off=(typeof approvedTimeOff==='function' ? approvedTimeOff() : []).filter(function(o){ return o.date && o.date<=today && (o.endDate||o.date)>=today; });
-      foot = off.length ? '🌴 '+off.map(function(o){ return esc(first(o.name)); }).join(', ')+' off today' : 'Open schedule →';
+      foot = off.length ? '🌴 '+off.map(function(o){ return esc(first(o.name))+(o.startTime ? ' '+hmT(o.startTime)+'–'+hmT(o.endTime) : ''); }).join(', ')+' off today' : 'Open schedule →';
     }
     $('wgSchFoot').innerHTML=foot;
   }
