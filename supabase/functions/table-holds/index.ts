@@ -9,15 +9,29 @@
 //
 // Actions (POST ?action=…, JSON body):
 //   availability {location, start, end, source?, source_id?}      admin
-//   hold   {source, source_id, location, start, end, label, table_ids?[], guests?}  admin | service
+//   hold   {source, source_id, location, start, end, label, table_ids?[], guests?, check_closed?}  admin | service
 //   release {source, source_id}                                     admin | service
 //   list   {source, source_ids[]}                                   admin
 //   sweep  {}  reconcile: release holds whose event/experience is gone or moved,
 //              hold confirmed experiences that have none.          public (idempotent)
 //              At-home experiences (rb_experience_types.at_home) happen at the guest's
 //              place, so they never hold tables (v7, 2026-10-05).
+//   floor  {}  copy each shop's Wix floor into public.wix_floor / wix_floor_bookings (v14)
+//                                                                   public (idempotent, ≤ once a minute)
 // Experiences at a shop in EXP_BY_TABLE (Nashville) hold picked tables, not a guest count
 // (v13, 2026-11-05) — see EXP_BY_TABLE.
+//
+// v14 (2026-11-08) — Maverick: "reservations are blocked but not experiences, they should follow
+// the same table seating as reservations in wix".
+//   · floor: the shop's active tables, table combinations, closures (special hours marked closed:
+//     holidays, buyouts, class and event blocks) and live bookings for the next FLOOR_DAYS days.
+//     rb_get_availability and rb_create_experience_v2 read that copy (rb_wix_closed, rb_wix_fits),
+//     so an experience is open only where Wix is open and would seat the party. Cron wix-floor-sync
+//     runs it every 2 minutes; every hold made or released here updates wix_floor_bookings at once.
+//   · An experience hold is refused when a Wix closure touches it (a reservation made through the
+//     API skips Wix's online rules). The sweep's re-hold of a booked experience skips that check.
+//   · Nashville (EXP_BY_TABLE) holds the tables Wix itself would seat the party at — one free table
+//     that takes the party, else the tightest free table combination (wixSeat) — not any free tables.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CORS = {
@@ -47,11 +61,13 @@ const WIX_LOCS: Record<string, string> = {
 };
 const SOURCES = ["portal_item", "event", "experience"];
 // Shops whose experiences hold tables one by one instead of a guest count (2026-11-05).
-// Maverick: Nashville has "five 2 tops that can all be combined" and takes one experience a
-// day (rb_settings.experience_rules), up to 10 guests. Its Wix floor has three 2-tops and three
-// 4-tops whose biggest combination seats 6, so Wix refuses a guest-count hold over 6. Here the
-// hold takes free tables itself — 2-tops first, then 4-tops — until their seats cover the party.
+// Maverick: Nashville has "seven 2-tops that can all be pushed together, plus two 4-tops". Since v14
+// the hold takes the tables Wix itself would seat the party at (wixSeat): its floor has the seven
+// 2-tops combining in a row and the two 4-tops on their own.
 const EXP_BY_TABLE = new Set(["nashville"]);
+// Shops whose Wix floor is copied for the experience functions (v14)
+const FLOOR_LOCS = ["memphis", "nashville"];
+const FLOOR_DAYS = 75; // experiences book up to 60 days out (rb_settings.horizon_days)
 // experience reservations that should hold tables: booked, or held for an inquiry (48 h)
 const LIVE_EXP = ["confirmed", "pending"];
 const DEAD = ["CANCELED", "CANCELLED", "DECLINED", "NO_SHOW", "FINISHED"];
@@ -85,10 +101,37 @@ async function wixLocation(locId: string) {
   const r = await fetch(`${WIX_LOC_URL}/${encodeURIComponent(locId)}`, { headers: WIX_HEADERS });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(d.message || "Could not load the Wix reservation location.");
-  const tm = d.reservationLocation?.configuration?.tableManagement || {};
+  const cfg = d.reservationLocation?.configuration || {};
+  const tm = cfg.tableManagement || {};
   const tables = (tm.tableDefinitions || []).filter((t: any) => t.isActive !== false)
     .map((t: any) => ({ id: t.id, name: t.name, seatsMin: t.seatsMin ?? 1, seatsMax: t.seatsMax ?? 2 }));
-  return { mode: String(tm.mode || ""), tables, combos: tm.tableCombinations || [] };
+  const combos = (tm.tableCombinations || []).filter((c: any) => c && c.isActive !== false)
+    .map((c: any) => ({ tableIds: (c.tableIds || []).map(String), seatsMin: c.seatsMin ?? 1, seatsMax: c.seatsMax ?? 0 }))
+    .filter((c: any) => c.tableIds.length);
+  // special hours marked closed — the Wix dashboard's holidays and "block" periods
+  const closed = ((cfg.onlineReservations?.businessSchedule?.specialHourPeriod || []) as any[])
+    .filter((p) => p && p.isClosed && Date.parse(p.endDate || "") > Date.parse(p.startDate || ""))
+    .map((p) => ({ start: new Date(p.startDate).toISOString(), end: new Date(p.endDate).toISOString(), comment: str(p.comment).slice(0, 200) }));
+  return { mode: String(tm.mode || ""), tables, combos, closed };
+}
+// the closures that touch [s, e)
+const closedDuring = (closed: any[], s: number, e: number) =>
+  closed.filter((c) => Date.parse(c.start) < e && Date.parse(c.end) > s);
+
+// Where Wix itself would seat `guests` from the free tables: one table that takes the party
+// (the smallest), else the tightest free table combination. [] = nowhere. Same rule as the SQL
+// rb_wix_fits that rb_get_availability uses — keep the two in step.
+function wixSeat(tables: any[], combos: any[], busy: Set<string>, guests: number): string[] {
+  const num = (t: any) => parseInt(String(t.name).replace(/\D/g, ""), 10) || 0;
+  const free = new Map(tables.filter((t) => !busy.has(t.id)).map((t) => [t.id, t]));
+  const one = [...free.values()]
+    .filter((t: any) => guests >= (t.seatsMin || 1) && guests <= (t.seatsMax || 2))
+    .sort((a: any, b: any) => (a.seatsMax - b.seatsMax) || (num(a) - num(b)))[0];
+  if (one) return [one.id];
+  const combo = combos
+    .filter((c: any) => guests >= (c.seatsMin || 1) && guests <= (c.seatsMax || 0) && c.tableIds.every((id: string) => free.has(id)))
+    .sort((a: any, b: any) => (a.seatsMax - b.seatsMax) || (a.tableIds.length - b.tableIds.length))[0];
+  return combo ? [...combo.tableIds] : [];
 }
 
 // Reservations whose [start,end) overlaps the window. Search only filters on startDate,
@@ -122,6 +165,30 @@ async function wixOverlapping(locId: string, start: string, end: string) {
 }
 const tableIdsOf = (x: any): string[] => x?.details?.tableIds || x?.details?.tables?.ids || [];
 const whoOf = (x: any) => [x?.reservee?.firstName, x?.reservee?.lastName].filter(Boolean).join(" ") || "Guest";
+
+// Every live reservation that starts in [from, to) — the whole list or an error, never part of it.
+async function wixBetween(locId: string, from: string, to: string) {
+  const filter = { "$and": [
+    { "details.reservationLocationId": { "$eq": locId } },
+    { "details.startDate": { "$gte": from } },
+    { "details.startDate": { "$lt": to } },
+  ] };
+  const out: any[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; ; page++) {
+    if (page >= 20) throw new Error("More than 2,000 Wix reservations to copy.");
+    const body = cursor
+      ? { search: { cursorPaging: { limit: 100, cursor } } }
+      : { search: { filter, sort: [{ fieldName: "details.startDate", order: "ASC" }], cursorPaging: { limit: 100 } } };
+    const r = await fetch(WIX_RES_URL + "/search", { method: "POST", headers: WIX_HEADERS, body: JSON.stringify(body) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.message || "Could not read Wix reservations.");
+    out.push(...(d.reservations || []));
+    cursor = d.pagingMetadata?.cursors?.next || null;
+    if (!d.pagingMetadata?.hasNext || !cursor) break;
+  }
+  return out.filter((x: any) => !DEAD.includes(String(x.status || "")));
+}
 
 async function wixCreate(locId: string, start: string, end: string, party: number, label: string, tableIds?: string[]) {
   const details: Record<string, any> = { reservationLocationId: locId, startDate: start, endDate: end, partySize: party };
@@ -173,6 +240,82 @@ async function wixCancel(resId: string) {
   throw new Error(last?.message || ud?.message || "Wix could not cancel the hold.");
 }
 
+// ── the floor copy (v14) ──────────────────────────────────────────
+// Our own holds go into wix_floor_bookings the moment they exist, and out the moment they're gone,
+// so the experience functions never wait for the next copy to see them. Best effort: the next
+// floor copy puts right anything this misses.
+async function floorAdd(rows: any[]) {
+  const now = new Date().toISOString();
+  const add = rows.filter((h) => h && h.wix_reservation_id && FLOOR_LOCS.includes(h.location)
+      && Date.parse(h.ends_at) > Date.parse(h.starts_at))
+    .map((h) => ({
+      wix_reservation_id: h.wix_reservation_id, location: h.location, starts_at: h.starts_at, ends_at: h.ends_at,
+      party: h.guests ?? null, table_ids: h.wix_table_ids || [], status: "RESERVED", synced_at: now,
+    }));
+  if (!add.length) return;
+  try { await admin.from("wix_floor_bookings").upsert(add, { onConflict: "wix_reservation_id" }); } catch (_) { /* next copy */ }
+}
+async function floorDrop(ids: string[]) {
+  const list = ids.filter(Boolean);
+  if (!list.length) return;
+  try { await admin.from("wix_floor_bookings").delete().in("wix_reservation_id", list); } catch (_) { /* next copy */ }
+}
+
+// Copy each shop's Wix floor. Skips when every shop was copied in the last minute, unless forced.
+async function floorSync(force: boolean) {
+  if (!force) {
+    const { data } = await admin.from("wix_floor").select("location, synced_at");
+    const fresh = (data || []).filter((r: any) => FLOOR_LOCS.includes(r.location) && Date.now() - Date.parse(r.synced_at) < 60000);
+    if (fresh.length >= FLOOR_LOCS.length) return { ok: true, skipped: "copied in the last minute" };
+  }
+  const fetchedAt = new Date().toISOString();
+  const from = new Date(Date.now() - 12 * 3600000).toISOString();
+  const to = new Date(Date.now() + FLOOR_DAYS * 86400000).toISOString();
+  const report: Record<string, unknown> = {};
+  for (const key of FLOOR_LOCS) {
+    try {
+      const locId = WIX_LOCS[key];
+      const loc = await wixLocation(locId);
+      const live = await wixBetween(locId, from, to);
+      const bookings: any[] = [];
+      for (const x of live) {
+        const st = Date.parse(x.details?.startDate || "");
+        if (!x.id || isNaN(st)) continue;
+        const en = Date.parse(x.details?.endDate || "") || st + 90 * 60000;
+        if (en <= st) continue;
+        bookings.push({
+          wix_reservation_id: String(x.id), location: key, starts_at: new Date(st).toISOString(), ends_at: new Date(en).toISOString(),
+          party: Number(x.details?.partySize) || null, table_ids: tableIdsOf(x).map(String), status: String(x.status || ""),
+          synced_at: new Date().toISOString(),
+        });
+      }
+      const floor = {
+        location: key, wix_location_id: locId, mode: loc.mode, synced_at: new Date().toISOString(),
+        tables: loc.tables.map((t: any) => ({ id: t.id, name: t.name, seats_min: t.seatsMin, seats_max: t.seatsMax })),
+        combos: loc.combos.map((c: any) => ({ table_ids: c.tableIds, seats_min: c.seatsMin, seats_max: c.seatsMax })),
+        closed: loc.closed,
+      };
+      if (bookings.length) {
+        const { error } = await admin.from("wix_floor_bookings").upsert(bookings, { onConflict: "wix_reservation_id" });
+        if (error) throw new Error(error.message);
+      }
+      // gone from Wix (cancelled, moved out of the window): drop — but keep anything written since we started reading
+      let q = admin.from("wix_floor_bookings").delete({ count: "exact" }).eq("location", key)
+        .gte("starts_at", from).lt("starts_at", to).lt("synced_at", fetchedAt);
+      if (bookings.length) q = q.not("wix_reservation_id", "in", "(" + bookings.map((b) => b.wix_reservation_id).join(",") + ")");
+      const { count: gone, error: delErr } = await q;
+      if (delErr) throw new Error(delErr.message);
+      const { error: fErr } = await admin.from("wix_floor").upsert(floor, { onConflict: "location" });
+      if (fErr) throw new Error(fErr.message);
+      report[key] = { ok: true, tables: floor.tables.length, combos: floor.combos.length, closed: floor.closed.length, bookings: bookings.length, gone: gone ?? 0 };
+    } catch (e) {
+      report[key] = { ok: false, error: String((e as Error)?.message ?? e).slice(0, 300) };
+    }
+  }
+  await admin.from("wix_floor_bookings").delete().lt("ends_at", new Date(Date.now() - 86400000).toISOString());
+  return { ok: true, ...report };
+}
+
 // ── ledger ────────────────────────────────────────────────────────
 async function heldFor(source: string, sourceId: string) {
   const { data } = await admin.from("table_holds").select("*").eq("source", source).eq("source_id", sourceId).eq("status", "held");
@@ -180,18 +323,21 @@ async function heldFor(source: string, sourceId: string) {
 }
 async function releaseRows(rows: any[]) {
   const errors: string[] = [];
+  const dropped: string[] = [];
   for (const h of rows) {
     try {
       if (h.wix_reservation_id) await wixCancel(h.wix_reservation_id);
       await admin.from("table_holds").update({ status: "released", updated_at: new Date().toISOString() }).eq("id", h.id);
+      if (h.wix_reservation_id) dropped.push(h.wix_reservation_id);
     } catch (e) {
       errors.push(String((e as Error).message || e));
     }
   }
+  await floorDrop(dropped);
   return errors;
 }
 
-type HoldReq = { source: string; source_id: string; location: string; start: string; end: string; label: string; table_ids?: string[]; guests?: number; persist?: boolean };
+type HoldReq = { source: string; source_id: string; location: string; start: string; end: string; label: string; table_ids?: string[]; guests?: number; persist?: boolean; check_closed?: boolean };
 
 // persist:true (from the console editors) records the table choice on the event row.
 // portal-api's itemRow only knows none/window/day, so for staff events this is the
@@ -217,21 +363,23 @@ async function doHold(p: HoldReq) {
   const label = str(p.label).trim() || "Event";
 
   const loc = await wixLocation(locId);
+  // An experience never goes where Wix has the shop closed (v14). A reservation made through the
+  // API skips Wix's online rules, so this is the check. The sweep's re-hold of a booked one skips it.
+  if (source === "experience" && p.check_closed !== false && closedDuring(loc.closed, start.getTime(), end.getTime()).length) {
+    return { status: 409, body: { error: "Wix has the shop closed then.", closed: true } };
+  }
   const byId: Record<string, any> = Object.fromEntries(loc.tables.map((t: any) => [t.id, t]));
   const unknown = want.filter((id) => !byId[id]);
   if (unknown.length) return { status: 400, body: { error: "Some of those tables no longer exist in Wix — reopen the editor." } };
 
   const old = await heldFor(source, sourceId);
   const mine = new Set(old.map((h: any) => h.wix_reservation_id).filter(Boolean));
-  // An experience at a shop in EXP_BY_TABLE: pick the free tables that seat the party
+  // An experience at a shop in EXP_BY_TABLE: the free tables Wix itself would seat the party at
   if (source === "experience" && !want.length && guests && EXP_BY_TABLE.has(locKey(p.location))) {
     const busy = new Set((await wixOverlapping(locId, S, E)).filter((x: any) => !mine.has(x.id)).flatMap(tableIdsOf));
-    const num = (t: any) => parseInt(String(t.name).replace(/\D/g, ""), 10) || 0;
-    const pool = loc.tables.filter((t: any) => !busy.has(t.id))
-      .sort((a: any, b: any) => (a.seatsMax - b.seatsMax) || (num(a) - num(b)));
-    let seats = 0;
-    for (const t of pool) { if (seats >= guests) break; want.push(t.id); seats += Math.max(t.seatsMin || 1, t.seatsMax || 2); }
-    if (seats < guests) return { status: 409, body: { error: "Wix says those tables aren't free for that time." } };
+    const seat = wixSeat(loc.tables, loc.combos, busy, guests);
+    if (!seat.length) return { status: 409, body: { error: "Wix says those tables aren't free for that time." } };
+    want.push(...seat);
   }
   // Same window, same ask, same label → nothing to do. Picked-table holds store guests=null.
   if (old.length && old.every((h: any) => Date.parse(h.starts_at) === start.getTime() && Date.parse(h.ends_at) === end.getTime()
@@ -281,7 +429,9 @@ async function doHold(p: HoldReq) {
         const t0 = byId[ids[0]];
         const party = h.guests || (t0 ? t0.seatsMax : 2);
         const res = await wixCreate(h.wix_location_id, h.starts_at, h.ends_at, party, h.label, h.guests ? undefined : ids);
-        await admin.from("table_holds").insert({ ...stripRow(h), wix_reservation_id: res.id, wix_table_ids: tableIdsOf(res) });
+        const back = { ...stripRow(h), wix_reservation_id: res.id, wix_table_ids: tableIdsOf(res) };
+        await admin.from("table_holds").insert(back);
+        await floorAdd([back]);
       } catch (_) { /* reported below */ }
     }
     await admin.from("table_holds").insert({
@@ -297,6 +447,7 @@ async function doHold(p: HoldReq) {
     wix_table_ids: c.tables, table_names: c.tables.map((id: string) => byId[id]?.name || id),
   }));
   const { data, error } = await admin.from("table_holds").insert(rows).select("*");
+  await floorAdd(rows);
   if (error) return { status: 500, body: { error: "Held in Wix but could not record it: " + error.message } };
   await persistChoice(p, source, sourceId, want, guests);
   return { status: 200, body: { ok: true, holds: data, mode: loc.mode } };
@@ -352,7 +503,7 @@ async function sweep() {
     if (Date.parse(r.starts_at) < Date.now()) continue;
     const out = await doHold({
       source: "experience", source_id: String(r.id), location: r.location || "memphis",
-      start: r.starts_at, end: r.ends_at, guests: r.party_size,
+      start: r.starts_at, end: r.ends_at, guests: r.party_size, check_closed: false, // already booked: hold its tables regardless
       label: ((r.rb_experience_types?.name || "Experience") + " – " + (r.guest_name || "")).trim(),
     }).catch((e) => ({ status: 500, body: { error: String(e) } }));
     if (out.status === 200) report.held++; else { report.failed++; report.errors.push(String((out.body as any).error)); }
@@ -370,6 +521,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     if (action === "sweep") return json({ ok: true, ...(await sweep()) });
+    if (action === "floor") return json(await floorSync(isService(req)));
 
     const service = isService(req);
     const adm = service || (await isAdmin(req));
