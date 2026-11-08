@@ -7198,7 +7198,12 @@ const EXP_SITE = "https://tickets.greyscheese.com/experiences";
 const EXP_MIN_NOTICE_DAYS = 7;
 const expBlank = () => ({ id: null, name: "", description: "", price_cents: 30000, per_person: false,
   duration_min: 90, min_party: 2, max_party: 8, tables_needed: 2, lead_time_min: EXP_MIN_NOTICE_DAYS * 1440, active: true,
-  sort_order: 99, image_url: "", bookable: true, info_url: "" });
+  sort_order: 99, image_url: "", bookable: true, info_url: "", price_unit_guests: null, options: null, price_label: "" });
+// How an experience is priced, the same three ways rb_experience_quote() charges (2026-11-07):
+// per person, per group of N guests (price_unit_guests: "per table of 6", "per 2 guests"), or one
+// price per party. Choices (options) each carry their own price, charged the same way.
+const expPriceShort = (x) => (Array.isArray(x.options) && x.options.length > 1 ? "from " : "") + money(x.price_cents) +
+  (x.per_person ? " / guest" : x.price_unit_guests > 0 ? " / " + x.price_unit_guests + " guests" : " / party");
 
 // Booked experiences — one experience (x) or all of them (x = null, the Bookings tab).
 // Cancel / refund go through square-experience-pay, which checks the staff login.
@@ -7321,7 +7326,7 @@ function ExperienceBookings({ x, onBack, onEdit }) {
       {onBack && <button className="cc-back" onClick={onBack}>← All experiences</button>}
       <div className="cc-dash-head">
         <div>
-          <p className="cc-eyebrow">{x ? "Experience · " + money(x.price_cents) + (x.per_person ? " / guest" : " / party") + " · parties of " + x.min_party + "–" + x.max_party : "Every experience · tickets.greyscheese.com/experiences"}</p>
+          <p className="cc-eyebrow">{x ? "Experience · " + expPriceShort(x) + " · parties of " + x.min_party + "–" + x.max_party : "Every experience · tickets.greyscheese.com/experiences"}</p>
           <h2 className="cc-h2">{x ? x.name : "Booked experiences"}</h2>
         </div>
         {x && onEdit && <div className="cc-dash-btns"><button className="cc-btn cc-btn-ghost" onClick={onEdit}>Edit experience</button></div>}
@@ -7450,7 +7455,7 @@ function AdminExperiences({ go }) {
                   <span className="cc-td-sub">{x.active ? "🟢 On the site" : "⏸ Hidden"} · {x.bookable === false ? "📝 Request only" : "💳 Books online"} · {x.tables_needed} table{x.tables_needed === 1 ? "" : "s"}</span>
                 </span>
               </span>
-              <span className="cc-mono">{money(x.price_cents)}{x.per_person ? " / guest" : " / party"}</span>
+              <span className="cc-mono">{expPriceShort(x)}</span>
               <span className="cc-mono">{x.min_party}–{x.max_party} · {x.duration_min} min</span>
               <span className="cc-mono"><button className="cc-link" onClick={() => setViewing(x)}>{b.paid} booked{b.held ? " · " + b.held + " on hold" : ""}</button></span>
               <span className="cc-td-actions">
@@ -7473,7 +7478,15 @@ function ExperienceEdit({ x, count, onCancel, onSaved }) {
   const [name, setName] = useState(x.name || "");
   const [desc, setDesc] = useState(x.description || "");
   const [price, setPrice] = useState(((x.price_cents || 0) / 100).toString());
-  const [perPerson, setPerPerson] = useState(!!x.per_person);
+  // party | person | group (every N guests, or part of N, pays the price)
+  const [mode, setMode] = useState(x.per_person ? "person" : x.price_unit_guests > 0 ? "group" : "party");
+  const [unit, setUnit] = useState(String(x.price_unit_guests > 0 ? x.price_unit_guests : 6));
+  // choices guests pick from (Wine & Cheese: The Classic / The Indulgent). label = "Name · what's in it"
+  const [opts, setOpts] = useState(() => (Array.isArray(x.options) ? x.options : []).map((o) => {
+    const [nm, ...more] = String(o.label || "").split(" · ");
+    return { key: o.key || "", name: nm, more: more.join(" · "), price: ((Number(o.price_cents) || 0) / 100).toString() };
+  }));
+  const [label, setLabel] = useState(x.price_label || "");
   const [duration, setDuration] = useState(String(x.duration_min || 90));
   const [minP, setMinP] = useState(String(x.min_party || 1));
   const [maxP, setMaxP] = useState(String(x.max_party || 8));
@@ -7512,17 +7525,43 @@ function ExperienceEdit({ x, count, onCancel, onSaved }) {
     setImageBusy(false);
   };
 
+  const unitN = Math.floor(Number(unit) || 0);
+  const pMin = Math.max(1, Math.floor(Number(minP) || 1)), pMax = Math.max(pMin, Math.floor(Number(maxP) || pMin));
+  const optCents = opts.map((o) => Math.round(Number(o.price) * 100) || 0);
+  const goodOpt = optCents.filter((c) => c > 0).sort((a, b) => a - b);
+  const baseCents = opts.length ? (goodOpt[0] || 0) : (Math.round(Number(price) * 100) || 0);
+  const chargeFor = (c, n) => mode === "person" ? c * n : mode === "group" && unitN >= 2 ? c * Math.ceil(n / unitN) : c;
+  const perWords = mode === "person" ? " per person" : mode === "group" ? " per " + (unitN >= 2 ? unitN : "N") + " guests" : " per party";
+  const priceWords = goodOpt.length > 1 ? [...new Set(goodOpt)].map((c) => money(c)).join(" or ") : money(baseCents);
+  const suggested = priceWords + perWords + " · " + (pMin <= 2 && pMax >= 20 ? "up to " + pMax + " guests" : pMin + " to " + pMax + " guests");
+  const labelMissesPrice = label.trim() && baseCents > 0 && !label.includes(money(baseCents));
+  const setOpt = (i, patch) => setOpts(opts.map((o, k) => (k === i ? { ...o, ...patch } : o)));
+
   const save = async () => {
     setErr("");
-    const cents = Math.round(Number(price) * 100);
+    const cents = baseCents;
     const mn = Math.floor(Number(minP)), mx = Math.floor(Number(maxP)), du = Math.floor(Number(duration)), tb = Math.floor(Number(tables));
     if (!name.trim()) return setErr("Give it a name.");
-    if (!(cents > 0)) return setErr("Enter a price.");
+    if (mode === "group" && !(unitN >= 2)) return setErr("Guests per group must be 2 or more.");
+    const optsOut = [];
+    for (let i = 0; i < opts.length; i++) {
+      const o = opts[i], nm = o.name.trim(), more = o.more.trim(), c = optCents[i];
+      if (!nm && !more && !o.price) continue; // an empty row
+      if (!nm) return setErr("Give choice " + (i + 1) + " a name.");
+      if (!(c > 0)) return setErr("Give " + nm + " a price.");
+      let key = o.key || nm.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30) || "choice";
+      while (optsOut.some((p) => p.key === key)) key += "-" + (i + 1);
+      optsOut.push({ key, label: nm + (more ? " · " + more : ""), price_cents: c });
+    }
+    if (optsOut.length === 1) return setErr("Add a second choice, or remove this one (one choice is the same as no choice).");
+    if (!(cents > 0)) return setErr(opts.length ? "Give the choices a price." : "Enter a price.");
     if (!(mn >= 1) || !(mx >= mn)) return setErr("Party size: the most must be at least the fewest.");
     if (!(du >= 15)) return setErr("Length must be at least 15 minutes.");
     if (!(tb >= 1)) return setErr("It needs at least one table.");
     if (infoUrl.trim() && !/^https:\/\/\S+$/i.test(infoUrl.trim())) return setErr("The greyscheese.com page must be a full link starting with https://");
-    const row = { name: name.trim(), description: desc.trim(), price_cents: cents, per_person: perPerson,
+    const row = { name: name.trim(), description: desc.trim(), price_cents: optsOut.length ? Math.min(...optsOut.map((o) => o.price_cents)) : cents,
+      per_person: mode === "person", price_unit_guests: mode === "group" ? unitN : null,
+      options: optsOut.length ? optsOut : null, price_label: label.trim() || suggested,
       duration_min: du, min_party: mn, max_party: mx, tables_needed: tb,
       lead_time_min: Math.max(EXP_MIN_NOTICE_DAYS, Math.ceil(Number(lead) || 0)) * 1440,
       bookable, active, image_url: imageUrl || null, info_url: infoUrl.trim() || null };
@@ -7536,7 +7575,6 @@ function ExperienceEdit({ x, count, onCancel, onSaved }) {
     onSaved();
   };
 
-  const total = Math.round(Number(price) * 100) || 0;
   return (
     <div className="cc-edit">
       <button className="cc-back" onClick={onCancel}>← Back</button>
@@ -7573,20 +7611,61 @@ function ExperienceEdit({ x, count, onCancel, onSaved }) {
       <div className="cc-row2">
         <div>
           <label className="cc-label">Price ($)</label>
-          <input className="cc-input" type="number" min="0" step="1" value={price} onChange={(e) => setPrice(e.target.value)} />
+          {opts.length
+            ? <input className="cc-input" value={goodOpt.length ? "From " + money(goodOpt[0]) : "Set by the choices below"} disabled />
+            : <input className="cc-input" type="number" min="0" step="1" value={price} onChange={(e) => setPrice(e.target.value)} />}
         </div>
         <div>
           <label className="cc-label">Priced</label>
-          <select className="cc-input" value={perPerson ? "person" : "party"} onChange={(e) => setPerPerson(e.target.value === "person")}>
+          <select className="cc-input" value={mode} onChange={(e) => setMode(e.target.value)}>
             <option value="party">Per party (one price for the group)</option>
             <option value="person">Per guest</option>
+            <option value="group">Per group of guests (e.g. per table of 6, or per 2 guests)</option>
           </select>
         </div>
       </div>
+      {mode === "group" && (
+        <div className="cc-row2">
+          <div>
+            <label className="cc-label">Guests per group</label>
+            <input className="cc-input" type="number" min="2" step="1" value={unit} onChange={(e) => setUnit(e.target.value)} />
+          </div>
+          <div />
+        </div>
+      )}
       <p className="cc-hint">
-        {perPerson ? `A party of ${Number(minP) || 1} pays ${money(total * (Number(minP) || 1))}, a party of ${Number(maxP) || 1} pays ${money(total * (Number(maxP) || 1))}.`
-          : `Every party pays ${money(total)}, whatever its size.`}
+        {!baseCents ? "Enter a price."
+          : mode === "person" ? `A party of ${pMin} pays ${money(chargeFor(baseCents, pMin))}, a party of ${pMax} pays ${money(chargeFor(baseCents, pMax))}.`
+          : mode === "group" ? (unitN >= 2
+              ? `Every ${unitN} guests (or part of ${unitN}) pays ${money(baseCents)}: ${pMin} guests pay ${money(chargeFor(baseCents, pMin))}` +
+                (unitN + 1 > pMin && unitN + 1 < pMax ? `, ${unitN + 1} pay ${money(chargeFor(baseCents, unitN + 1))}` : "") +
+                `, ${pMax} pay ${money(chargeFor(baseCents, pMax))}.`
+              : "Enter how many guests each price covers (2 or more).")
+          : `Every party pays ${money(baseCents)}, whatever its size.`}
+        {opts.length > 0 && baseCents > 0 && " Those are for the lowest-priced choice; each choice below is charged the same way at its own price."}
       </p>
+
+      <label className="cc-label">Choices guests pick from <span style={{ fontWeight: 400, color: "#6b7280" }}>(optional)</span></label>
+      <p className="cc-hint" style={{ marginTop: 0 }}>Like a tasting's Classic and Indulgent. Guests must pick one, and each has its own price{mode === "person" ? " per guest" : mode === "group" ? " per group" : ""}. Leave empty for one price.</p>
+      {opts.map((o, i) => (
+        <div key={i} style={{ display: "grid", gridTemplateColumns: "1.1fr 1.5fr 90px auto", gap: 8, alignItems: "center", marginBottom: 8 }}>
+          <input className="cc-input" style={{ margin: 0 }} placeholder="Name, e.g. The Classic" value={o.name} onChange={(e) => setOpt(i, { name: e.target.value })} />
+          <input className="cc-input" style={{ margin: 0 }} placeholder="What's in it (optional)" value={o.more} onChange={(e) => setOpt(i, { more: e.target.value })} />
+          <input className="cc-input" style={{ margin: 0 }} type="number" min="0" step="1" placeholder="$" value={o.price} onChange={(e) => setOpt(i, { price: e.target.value })} />
+          <button className="cc-mini danger" onClick={() => setOpts(opts.filter((_, k) => k !== i))}>Remove</button>
+        </div>
+      ))}
+      <button className="cc-mini" onClick={() => setOpts([...opts, { key: "", name: "", more: "", price: "" }])}>＋ Add a choice</button>
+
+      <label className="cc-label" style={{ marginTop: 14 }}>Price line guests see</label>
+      <input className="cc-input" value={label} placeholder={suggested} onChange={(e) => setLabel(e.target.value)} />
+      <p className="cc-hint">
+        Shown under the name on the inquiry form and the experiences page.{" "}
+        {label.trim()
+          ? <>From the settings above it would read <b>{suggested}</b> <button className="cc-link" onClick={() => setLabel(suggested)}>Use that</button></>
+          : <>Left empty, it will read <b>{suggested}</b>.</>}
+      </p>
+      {labelMissesPrice && <p className="cc-hint" style={{ color: "#b45309", marginTop: -4 }}>⚠ This price line doesn't mention {money(baseCents)}. Update it if the price changed.</p>}
 
       <div className="cc-row2">
         <div>
