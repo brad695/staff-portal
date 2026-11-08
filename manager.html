@@ -7620,7 +7620,7 @@ function ExperienceEdit({ x, count, onCancel, onSaved }) {
         <option value="book">Book &amp; pay online (open times only)</option>
         <option value="request">Request a date (we confirm and send a booking link)</option>
       </select>
-      <p className="cc-hint">Online booking checks the open times at both shops. Nashville takes one in-store experience a day, up to 10 guests.</p>
+      <p className="cc-hint">Online booking checks the open times at both shops. Nashville takes one in-store experience a day, up to 12 guests.</p>
 
       <label className="cc-label">Book at least … days ahead (7 or more)</label>
       <input className="cc-input" type="number" min={EXP_MIN_NOTICE_DAYS} value={lead} onChange={(e) => setLead(e.target.value)} />
@@ -17266,7 +17266,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   var KIND_NAMES = { one:'Buttons — pick one', many:'Buttons — pick any', text:'Short typed answer', long:'Long typed answer' };
   var BUILT_IN = {
     table: 'Built in: which shop, guests (1 to 6), date and time, then name, email, phone and a note. Memphis and Nashville book the table on the spot (it lands in Wix reservations and they get a confirmation email). Questions you add here show on a "A few details" screen.',
-    experience: 'Built in: which experience (and tasting), shop, guests, date and time, then name, email, phone and a message. Experiences that book online (✨ Experiences → Edit → "How guests get it") show only open times at least 7 days out and end on Book & pay (or a 48-hour hold with their question); the others are requests — any half hour, nothing held. Nashville: one in-store experience a day, up to 10 guests. Requests and holds show in 💼 Catering Leads tagged Experience; paid bookings land there with a BEO. The questions below share one "A few details" screen.',
+    experience: 'Built in: which experience (and tasting), shop, guests, date and time, then name, email, phone and a message. Experiences that book online (✨ Experiences → Edit → "How guests get it") show only open times at least 7 days out and end on Book & pay (or a 48-hour hold with their question); the others are requests — any half hour, nothing held. Nashville: one in-store experience a day, up to 12 guests. Requests and holds show in 💼 Catering Leads tagged Experience; paid bookings land there with a BEO. The questions below share one "A few details" screen.',
     catering: 'Built in: shop and pickup / delivery / on site / off site (plus the address), then guests, date and time, then the interest buttons (Greysing Table, Charcuterie board, Private event, Sandwiches / box lunches), name, email, phone and a message. Goes to 💼 Catering Leads. The questions below show under the date on the second screen.',
     event: 'Built in: shop, guests, date and a start time (12:00 to 7:00), then name, email, phone and a message. Goes to 💼 Catering Leads tagged Private event, so it can get a proposal and an invoice. The questions below share one "A few details" screen.'
   };
