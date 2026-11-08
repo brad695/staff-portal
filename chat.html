@@ -822,7 +822,8 @@ const stL=L=>(L.kind==='exp'?ISTAGE_L:STAGE_L)[L.stage]||L.stage;
 const lUrl=L=>L.kind==='exp'?inqUrl(L.code):leadUrl(L.code);
 // the subject chat-api sends with (the same as the catering / inquiries functions), so replies come back here
 const leadSubj=L=>L.kind==='exp'?'Re: Your GREYS '+((L.exp||'').trim()||'experience')+' question [#'+L.code+']':'Re: Your GREYS catering question [#'+L.code+']';
-const KIND_ORDER=['Catering','Experience','Private event','Table request'],KIND_PL={Catering:'Catering',Experience:'Experiences','Private event':'Private events','Table request':'Table requests'};
+// the inquiry form's donation requests and "Just Ask Us a Question" (2026-11-08) are their own kinds (chat_lead_kind)
+const KIND_ORDER=['Catering','Experience','Private event','Table request','Donation request','Question'],KIND_PL={Catering:'Catering',Experience:'Experiences','Private event':'Private events','Table request':'Table requests','Donation request':'Donation requests',Question:'Questions'};
 let STAFF=[];
 const convos={}; const msgs={}; const byId={};
 const ONLINE=new Set();
@@ -868,7 +869,9 @@ const isInq=c=>isLead(c)&&c.lead.kind==='exp';
 const money=c=>'$'+(Math.round(c)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 function leadTime(t){const m=/^(\d{1,2}):(\d{2})$/.exec(t||'');if(!m)return t||'';const h=+m[1];return ((h%12)||12)+':'+m[2]+(h>=12?' PM':' AM');}
 function leadDate(d,o){return d?new Date(d+'T12:00:00').toLocaleDateString([],o||{weekday:'short',month:'short',day:'numeric'}):'';}
-function leadWhen(L){return L.date?leadDate(L.date)+(L.time?' · '+leadTime(L.time):''):'Date TBD';}
+// a question or a donation request has no date (2026-11-08): its shop shows instead of "Date TBD"
+const undated=L=>!L.date&&!!L.loc&&L.kind==='cat'&&/^\s*(question|donation)/i.test(L.occ||'');
+function leadWhen(L){return L.date?leadDate(L.date)+(L.time?' · '+leadTime(L.time):''):undated(L)?'GREYS '+L.loc:'Date TBD';}
 const FUL={pickup:'Pick-up',delivery:'Delivery',onsite:'On-site service'};
 // open = still being sold; booked = signed+ and the event hasn't passed; closed = lost, or the event is over
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -1126,7 +1129,7 @@ function convoHead(c){
   const tabs=`<div class="tabs">${tab('messages','dms','Messages')}${c.type==='client'&&!isLead(c)?tab('details','note','Client details'):''}${tab('files','file','Files',files)}${tab('pins','pin','Pins',pins)}${c.type==='channel'&&c.joined?`<button class="tab" data-act="addbm" title="Add a bookmark">${ic('plus',16)}</button>`:''}</div>`;
   const bm=c.type==='channel'&&(c.bookmarks.length||c.joined)?`<div class="bm-bar">${c.bookmarks.map((b,i)=>`<span class="bm-w"><a class="bm" href="${esc(b.u)}" target="_blank" rel="noopener" data-bm="${i}">${esc(b.e||'🔗')} ${esc(b.t)}</a>${c.joined?`<button class="bm-more" data-act="bmmenu" data-bmi="${i}" title="Edit or remove" aria-label="Bookmark options">${ic('dots',14)}</button>`:''}</span>`).join('')}${c.joined?`<button class="bm add" data-act="addbm">${ic('plus',14)} Add a bookmark</button>`:''}</div>`:'';
   const L=c.lead;
-  const strip=isLead(c)?`<div class="client-strip lead-strip"><span class="lst st-${L.stage}">${esc(stL(L))}</span><span class="ct">${ic('clock',14)}${esc(leadWhen(L))}</span>${L.guests?`<span class="ct">${ic('people',14)}${L.guests} guests</span>`:''}${L.kind==='exp'
+  const strip=isLead(c)?`<div class="client-strip lead-strip"><span class="lst st-${L.stage}">${esc(stL(L))}</span><span class="ct">${ic(undated(L)?'store':'clock',14)}${esc(leadWhen(L))}</span>${L.guests?`<span class="ct">${ic('people',14)}${L.guests} guests</span>`:''}${L.kind==='exp'
       ?(L.exp&&!L.event?`<span>${esc(L.exp)}${L.opt?' · '+esc(L.opt):''}</span>`:'')+(inqLine(L)?`<span>${esc(inqLine(L))}</span>`:'')
       :(L.ful?`<span>${esc(FUL[L.ful]||L.ful)}</span>`:'')+(L.quote?`<span>${esc(quoteLine(L.quote))}</span>`:'')}<button class="portal-link" data-act="leadpane">${ic(L.kind==='exp'?'cal':'brief',15)}${L.kind==='exp'?'Inquiry':'Lead'}</button></div>`
     :c.type==='client'?`<div class="client-strip">${c.client.tag?`<span class="tagpill">${esc(c.client.tag)}</span>`:''}${c.client.meta?`<span>${esc(c.client.meta)}</span>`:''}${c.client.phone?`<span class="ct">${ic('phone',14)}${esc(prettyPhone(c.client.phone))}</span>`:''}${c.client.email?`<span class="ct">${ic('mail',14)}${esc(c.client.email)}</span>`:''}<button class="portal-link" data-act="clientedit">${ic('edit',15)}Edit</button></div>`:'';

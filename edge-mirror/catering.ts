@@ -33,6 +33,8 @@
 // Emails go through send-mail. Every customer email uses the subject
 // "Your GREYS catering question [#CODE]" so the Gmail sync script (subject:(GREYS question))
 // brings their replies back in via inquiries?action=ingest, which routes catering codes here.
+// (Questions: "Your GREYS question [#CODE]"; donation requests: "Your GREYS donation question [#CODE]" —
+// any other subject must keep both words, GREYS and question, or the customer's reply never comes back.)
 // verify_jwt = false (ask / view / sign are public).
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from "npm:pdf-lib@1.17.1";
@@ -116,10 +118,14 @@ const btn = (href: string, label: string) =>
   `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 8px"><tr><td style="background:${GOLD};border-radius:3px">
      <a href="${esc(href)}" style="display:inline-block;padding:13px 26px;font:700 13px/1 'League Spartan',Arial,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:${NAVY};text-decoration:none">${esc(label)}</a>
    </td></tr></table>`;
-// Donation requests come in here too (the inquiry form's "Donation request", 2026-11-08: occasion
-// "Donation request"). Their emails talk about the donation request, not catering or a proposal.
+// Donation requests and questions come in here too (the inquiry form's "Donation request" and "Just Ask Us a
+// Question", 2026-11-08: occasion "Donation request" / "Question"). Their emails don't talk about catering or a
+// proposal. Their subjects still say "GREYS … question" so replies come back (v15's "Your GREYS donation
+// request [#CODE]" didn't match the Gmail sync, v16 fixes it).
 const isDonation = (lead: any) => /^donation/i.test(String(lead?.occasion || ""));
-const subjectFor = (lead: any) => isDonation(lead) ? `Your GREYS donation request [#${lead.code}]` : `Your GREYS catering question [#${lead.code}]`;
+const isQuestion = (lead: any) => /^question\b/i.test(String(lead?.occasion || ""));
+const subjectFor = (lead: any) => isQuestion(lead) ? `Your GREYS question [#${lead.code}]`
+  : isDonation(lead) ? `Your GREYS donation question [#${lead.code}]` : `Your GREYS catering question [#${lead.code}]`;
 const proposalLink = (q: any) => `${SITE}/catering.html?q=${q.sign_token}`;
 
 async function note(leadId: string, body: string, by = "system") {
@@ -421,7 +427,8 @@ async function ask(req: Request, b: Record<string, unknown>) {
   if (okRate === false) throw new PublicError("Too many messages from this connection — please try again later or call the shop.");
   const name = clean(b.name, 120), email = clean(b.email, 200).toLowerCase(), message = clean(b.message, 4000);
   if (!name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new PublicError("Please enter your name and a valid email.");
-  if (message.length < 2) throw new PublicError(/^donation/i.test(clean(b.occasion, 120)) ? "Tell us what you're requesting." : "Tell us a little about your event.");
+  const occ = clean(b.occasion, 120);
+  if (message.length < 2) throw new PublicError(/^donation/i.test(occ) ? "Tell us what you're requesting." : /^question\b/i.test(occ) ? "Type your question." : "Tell us a little about your event.");
   const date = clean(b.event_date, 10);
   if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new PublicError("Pick a valid date.");
   const fulfillment = ["pickup", "delivery", "onsite"].includes(clean(b.fulfillment, 20)) ? clean(b.fulfillment, 20) : null;
@@ -435,12 +442,13 @@ async function ask(req: Request, b: Record<string, unknown>) {
   await admin.from("catering_messages").insert({ lead_id: lead.id, direction: "in", body: message, sent_by: email });
   const facts = [lead.occasion, lead.event_date && fmtDate(lead.event_date) + (lead.event_time ? " " + fmtTime(lead.event_time) : ""),
     lead.guests && `${lead.guests} guests`, lead.fulfillment && FULFILL[lead.fulfillment], lead.location, lead.budget && "Budget " + lead.budget, lead.phone].filter(Boolean).map((x) => esc(String(x))).join(" · ");
-  const don = isDonation(lead);
-  await sendMail(STAFF_INBOX, `New ${don ? "donation request" : "catering inquiry"} from ${name} [#${lead.code}]`,
+  const don = isDonation(lead), qn = isQuestion(lead);
+  await sendMail(STAFF_INBOX, `New ${qn ? "question" : don ? "donation request" : "catering inquiry"} from ${name} [#${lead.code}]`,
     shell(`<p><b>${esc(name)}</b>${lead.company ? " (" + esc(lead.company) + ")" : ""} &lt;${esc(email)}&gt; wrote:</p><blockquote style="border-left:3px solid ${GOLD};margin:0;padding:4px 12px">${para(message)}</blockquote>
       <p style="font:13px Arial;color:#6E6353">${facts}</p>${btn(PORTAL + "#catering", "Open in the portal")}`, false), email);
   await sendMail(email, subjectFor(lead),
-    shell(`<p>Hi ${esc(name.split(" ")[0])},</p><p>${don ? "Thanks for thinking of GREYS! We've got your donation request and will get back to you by email."
+    shell(`<p>Hi ${esc(name.split(" ")[0])},</p><p>${qn ? "Thanks for reaching out to GREYS! We've got your question and will get back to you by email."
+      : don ? "Thanks for thinking of GREYS! We've got your donation request and will get back to you by email."
       : "Thanks for thinking of GREYS for your event! We've got your details and will be in touch shortly with ideas and a proposal."}</p>
       <p style="font:13px Arial;color:#6E6353">What you sent us:</p><blockquote style="border-left:3px solid ${GOLD};margin:0;padding:4px 12px;color:#6E6353">${para(message)}</blockquote>`));
   return { ok: true, code: lead.code };
