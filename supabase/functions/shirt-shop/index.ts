@@ -23,8 +23,11 @@
 // Test (sandbox) checkouts skip Printful unless printful_test is true, and are never confirmed.
 // If Printful is unreachable at checkout the sale still goes through, marked "not sent" — admin_retry sends it.
 // Mapping: a variant needs printful_sync_variant_id (a product made in the Printful dashboard) or
-// printful_variant_id + print_file_url. admin_printful_sync fills printful_sync_variant_id by matching Printful
-// product names to ours (sizes: S M L XL 2XL). On the live site an unmapped variant shows as unavailable.
+// printful_variant_id + print_file_url. admin_printful_sync ("Get products from Printful" in the console) brings the
+// Printful store in: each Printful product (one shop shirt per colour) is linked to ours by printful_product_id, else
+// by name, else ADDED (name, photo, sizes and prices from Printful); sizes link by size (2XL = XXL). Once Printful is
+// connected (PRINTFUL_TOKEN) the shop only shows linked sizes, on staging too; without it (local copies) test
+// checkouts can use every size.
 // Status comes back on the Printful webhook (admin_printful_setup registers it): shipped → tracking is stored and
 // the customer gets a "shipped" email; failed / canceled / on hold → Brad gets an alert email.
 //
@@ -42,7 +45,8 @@
 //   cron:    sweep {secret}
 //   printful_hook ?key=PRINTFUL_HOOK_KEY            (Printful → us)
 //   admin (a signed-in console admin — Authorization: Bearer <session token>, checked with is_app_admin() — or {pass} =
-//   NOTES_PASS): admin_orders · admin_retry {code} · admin_confirm {code} · admin_printful_setup · admin_printful_sync
+//   NOTES_PASS, or {secret} = app_secrets.cc_cron_secret for server-side SQL): admin_orders · admin_retry {code} ·
+//   admin_confirm {code} · admin_printful_setup · admin_printful_sync {dry_run?}
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 const env = (k: string) => {
@@ -163,11 +167,29 @@ export const db = {
     if (error) throw new Error(error.message);
     return data ?? [];
   },
-  async setPrintfulIds(map: { id: string; sync: number }[]) {
-    for (const m of map) {
-      const { error } = await admin().from("shirt_variants").update({ printful_sync_variant_id: m.sync }).eq("id", m.id);
-      if (error) throw new Error(error.message);
-    }
+  // every shirt of the shop, on sale or not (the Printful sync must not re-add one the console switched off)
+  async allProducts(): Promise<any[]> {
+    const { data, error } = await admin().from("shirt_products").select("*, shirt_variants(*)").eq("shop", SHOP).order("sort_order");
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  },
+  async addProduct(row: Record<string, unknown>): Promise<string> {
+    const { data, error } = await admin().from("shirt_products").insert(row).select("id").single();
+    if (error) throw new Error(error.message);
+    return (data as any).id;
+  },
+  async patchProduct(id: string, patch: Record<string, unknown>) {
+    const { error } = await admin().from("shirt_products").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id);
+    if (error) throw new Error(error.message);
+  },
+  async addVariants(rows: Record<string, unknown>[]) {
+    if (!rows.length) return;
+    const { error } = await admin().from("shirt_variants").insert(rows);
+    if (error) throw new Error(error.message);
+  },
+  async patchVariant(id: string, patch: Record<string, unknown>) {
+    const { error } = await admin().from("shirt_variants").update(patch).eq("id", id);
+    if (error) throw new Error(error.message);
   },
   // the manager console's signed-in user: same check as the console's RLS (public.is_app_admin)
   async isAdmin(token: string): Promise<boolean> {
@@ -237,7 +259,7 @@ async function catalog(): Promise<Product[]> {
   catalogCache = { at: Date.now(), list };
   return list;
 }
-export const _resetCaches = () => { settingsCache = null; catalogCache = null; sandboxLoc = null; };
+export const _resetCaches = () => { settingsCache = null; catalogCache = null; sandboxLoc = null; pfStoreId = null; };
 
 // ---------- environment ----------
 const listEnv = (name: string, dflt: string[]) => {
@@ -261,6 +283,9 @@ const baseFor = (e: Env) => (e === "production" ? "https://connect.squareup.com"
 const scriptFor = (e: Env) => (e === "production" ? "https://web.squarecdn.com/v1/square.js" : "https://sandbox.web.squarecdn.com/v1/square.js");
 const printfulReady = () => !!env("PRINTFUL_TOKEN");
 const mapped = (v: Variant) => !!(v.printful_sync_variant_id || (v.printful_variant_id && v.print_file_url));
+// What the shop sells: sizes linked to Printful. Only when Printful isn't connected at all (local copies) do test
+// checkouts get every size.
+const sellable = (e: Env, v: Variant) => mapped(v) || (e === "sandbox" && !printfulReady());
 const PAUSED_MSG = "The shirt shop is taking a short break. Please check back soon, or call us at " + SHOP_PHONE + ".";
 
 function corsFor(req: Request) {
@@ -295,11 +320,12 @@ async function square(path: string, init: RequestInit, e: Env): Promise<any> {
   }
   return data;
 }
-async function printful(path: string, init: RequestInit = {}): Promise<any> {
+let pfStoreId: string | null = null; // found with /stores when the token covers the whole account and PRINTFUL_STORE_ID isn't set
+async function printful(path: string, init: RequestInit = {}, again = true): Promise<any> {
   const token = env("PRINTFUL_TOKEN");
   if (!token) throw new PrintfulError("PRINTFUL_TOKEN is not set", 0);
   const headers: Record<string, string> = { Authorization: "Bearer " + token, "Content-Type": "application/json" };
-  const store = env("PRINTFUL_STORE_ID");
+  const store = env("PRINTFUL_STORE_ID") ?? pfStoreId;
   if (store) headers["X-PF-Store-Id"] = store;
   let res: Response;
   try {
@@ -310,6 +336,14 @@ async function printful(path: string, init: RequestInit = {}): Promise<any> {
   const data: any = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg = data?.error?.message || (typeof data?.result === "string" ? data.result : "") || `Printful error (${res.status})`;
+    // An account-wide token has to name the store: use the account's only store (nothing was made by the refused call).
+    if (again && !store && res.status === 400 && /store/i.test(msg) && path !== "/stores") {
+      const list = await printful("/stores", {}, false).catch(() => null);
+      if (Array.isArray(list) && list.length === 1 && list[0]?.id) {
+        pfStoreId = String(list[0].id);
+        return printful(path, init, false);
+      }
+    }
     throw new PrintfulError(String(msg).slice(0, 400), res.status);
   }
   return data?.result ?? data;
@@ -374,7 +408,7 @@ export function priceLines(cat: Product[], raw: unknown, e: Env): Line[] {
     const q = Math.floor(Number((r as any)?.qty));
     if (!id || !Number.isFinite(q) || q < 1) throw new PublicError("Please check the quantities in your cart.");
     const hit = byId.get(id);
-    if (!hit || (e === "production" && !mapped(hit.v))) { gone.push(id); continue; }
+    if (!hit || !sellable(e, hit.v)) { gone.push(id); continue; }
     qty.set(id, (qty.get(id) ?? 0) + q);
   }
   if (gone.length) throw new PublicError("Something in your cart isn't available anymore — please check your cart.", 409, { gone });
@@ -501,9 +535,10 @@ async function catalogAction(req: Request) {
     tax_states: Object.keys(s.tax_rates),
     states: US_STATES,
     pay,
-    products: cat.map((p) => ({
-      id: p.id, slug: p.slug, name: p.name, tagline: p.tagline, description: p.description, image: p.image_url, price_cents: p.price_cents,
-      variants: p.variants.map((v) => ({ id: v.id, size: v.size, price_cents: v.price_cents, available: e === "sandbox" || mapped(v) })),
+    products: cat.map((p) => ({ p, vs: p.variants.filter((v) => sellable(e, v)) })).filter((x) => x.vs.length).map(({ p, vs }) => ({
+      id: p.id, slug: p.slug, name: p.name, tagline: p.tagline, description: p.description, image: p.image_url,
+      price_cents: Math.min(...vs.map((v) => v.price_cents)),
+      variants: vs.map((v) => ({ id: v.id, size: v.size, price_cents: v.price_cents, available: true })),
     })),
   };
 }
@@ -784,6 +819,10 @@ async function printfulHook(req: Request, url: URL, body: any) {
 async function checkPass(req: Request, b: any) {
   const pass = env("NOTES_PASS");
   if (pass && String(b.pass ?? "") === pass) return;
+  if (b.secret) { // server side: SQL / pg_cron holding app_secrets.cc_cron_secret
+    const s = await db.cronSecret();
+    if (s && String(b.secret) === s) return;
+  }
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
   if (token.split(".").length === 3 && (await db.isAdmin(token))) return;
   throw new PublicError("Sign in to the manager console first.", 401);
@@ -840,11 +879,45 @@ async function adminPrintfulSetup(req: Request, b: any) {
   try { store = await printful("/store"); } catch (_) { /* account-level token without PRINTFUL_STORE_ID */ }
   return { ok: true, webhook: { url: String(hook?.url ?? "").replace(key, "…"), types: hook?.types ?? types }, store: store ? { id: store.id, name: store.name, type: store.type } : null };
 }
-// Matches Printful store products to ours by name and size, and saves printful_sync_variant_id.
+// ---------- Printful → shop ("Get products from Printful") ----------
+const SIZE_ORDER = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL", "4XL", "5XL"];
+const sizeRank = (s: string) => (SIZE_ORDER.includes(s) ? SIZE_ORDER.indexOf(s) : 50);
+const pfSize = (sv: any) => sizeOf(sv?.size ?? String(sv?.name ?? "").split("/").pop());
+const pfColor = (sv: any) => {
+  if (sv?.color) return clean(sv.color, 40);
+  const parts = String(sv?.name ?? "").split("/").map((x) => x.trim());
+  return parts.length >= 3 ? clean(parts[parts.length - 2], 40) : "";
+};
+const pfCents = (sv: any) => {
+  const c = Math.round(Number(sv?.retail_price) * 100);
+  return Number.isFinite(c) && c >= 100 && c <= 50000 ? c : null;
+};
+// the shirt on the model (Printful's "preview" mockup), else the product thumbnail — never the bare print file
+const pfPhoto = (svs: any[], fallback: unknown) => {
+  for (const sv of svs) for (const f of sv?.files ?? []) if (f?.type === "preview" && (f.preview_url || f.thumbnail_url)) return String(f.preview_url || f.thumbnail_url);
+  return fallback ? String(fallback) : null;
+};
+const pfBlank = (svs: any[]) => clean(String(svs[0]?.product?.name ?? "").replace(/\s*\([^)]*\)\s*$/, ""), 160) || null;
+// "Brie Right Back - Unisex T-Shirt" → "Brie Right Back" (the shop and Square add "Tee")
+const shopName = (raw: unknown) => {
+  const n = clean(raw, 80);
+  const short = n.replace(/\s*[-–—|:·]\s*(unisex\s+)?([a-z]+\s+)?(t-?shirt|tee)s?$/i, "").replace(/\s+(t-?shirt|tee)s?$/i, "").trim();
+  return short || n;
+};
+const slugify = (s: string) => s.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "shirt";
+const bySize = (svs: any[]) => {
+  const seen = new Set<string>();
+  return svs.filter((sv) => { const s = pfSize(sv); if (!s || seen.has(s)) return false; seen.add(s); return true; })
+    .sort((a, b) => sizeRank(pfSize(a)) - sizeRank(pfSize(b)));
+};
+
+// Brings the Printful store into the shop. Each Printful product — one shop shirt per colour — is linked to ours by
+// printful_product_id (+ colour), else by name, else added. Sizes link by size; sizes new in Printful are added; a
+// shirt or size that's gone from Printful is unlinked, so the shop stops selling it. Name, photo and prices come from
+// Printful only when a shirt is first linked or added — after that the console owns them. dry_run: report only.
 async function adminPrintfulSync(req: Request, b: any) {
   await checkPass(req, b);
-  catalogCache = null;
-  const cat = await catalog();
+  const dry = b.dry_run === true;
   const listed: any[] = [];
   for (let offset = 0; offset < 500; offset += 100) {
     const page = await printful(`/store/products?limit=100&offset=${offset}`);
@@ -852,26 +925,105 @@ async function adminPrintfulSync(req: Request, b: any) {
     listed.push(...arr);
     if (arr.length < 100) break;
   }
-  const save: { id: string; sync: number }[] = [];
-  const report: { product: string; printful: string | null; sizes: Record<string, number | null> }[] = [];
-  for (const p of cat) {
-    const want = normName(p.name);
-    const hit = listed.find((x) => normName(x.name) === want) ?? listed.find((x) => normName(x.name).includes(want));
-    const sizes: Record<string, number | null> = {};
-    if (hit) {
-      const full = await printful(`/store/products/${hit.id}`);
-      const svs: any[] = full?.sync_variants ?? [];
-      for (const v of p.variants) {
-        const sv = svs.find((x) => !x.is_ignored && sizeOf(x.size ?? String(x.name ?? "").split("/").pop()) === v.size);
-        sizes[v.size] = sv ? Number(sv.id) : null;
-        if (sv) save.push({ id: v.id, sync: Number(sv.id) });
+  const ours: any[] = await db.allProducts();
+  const slugs = new Set<string>(ours.map((p) => String(p.slug)));
+  const skus = new Set<string>(ours.flatMap((p) => (p.shirt_variants ?? []).map((v: any) => String(v.sku))));
+  const claimed = new Set<string>(), seen = new Set<number>();
+  let sort = ours.reduce((a, p) => Math.max(a, Number(p.sort_order) || 0), -1);
+  let saved = 0, added = 0, unlinked = 0;
+  const report: { product: string; printful: string | null; sizes: Record<string, number | null>; action: string }[] = [];
+  const skuFor = (sv: any) => {
+    let s = "pf-" + sv.id, n = 2;
+    while (skus.has(s)) s = `pf-${sv.id}-${n++}`;
+    skus.add(s);
+    return s;
+  };
+
+  for (const pp of listed) {
+    if (pp?.is_ignored || !pp?.id) continue;
+    const full = await printful(`/store/products/${pp.id}`);
+    const all: any[] = (full?.sync_variants ?? []).filter((v: any) => !v.is_ignored && pfSize(v));
+    seen.add(Number(pp.id));
+    const base = shopName(full?.sync_product?.name ?? pp.name);
+    if (!all.length) { report.push({ product: base, printful: String(pp.name ?? ""), sizes: {}, action: "no sizes in Printful" }); continue; }
+    const groups = new Map<string, any[]>();
+    for (const sv of all) groups.set(pfColor(sv), [...(groups.get(pfColor(sv)) ?? []), sv]);
+    const multi = groups.size > 1;
+
+    for (const [color, gv0] of groups) {
+      const gv = bySize(gv0);
+      const pcolor = multi ? color : "";
+      const name = multi && color ? `${base} (${color})` : base;
+      const label = String(pp.name ?? base) + (multi && color ? ` · ${color}` : "");
+      let o = ours.find((x) => !claimed.has(x.id) && x.printful_product_id != null && Number(x.printful_product_id) === Number(pp.id) && (x.printful_color ?? "") === pcolor);
+      if (!o) {
+        const pfn = normName(pp.name ?? base);
+        o = ours.find((x) => !claimed.has(x.id) && x.printful_product_id == null && normName(x.name) && (pfn === normName(x.name) || pfn.includes(normName(x.name))));
       }
-    } else for (const v of p.variants) sizes[v.size] = null;
-    report.push({ product: p.name, printful: hit ? String(hit.name) : null, sizes });
+      const prices = gv.map(pfCents).filter((c): c is number => c != null);
+      const sizes: Record<string, number | null> = {};
+
+      if (!o) { // a new shirt
+        let slug = slugify(name), n = 2;
+        while (slugs.has(slug)) slug = `${slugify(name)}-${n++}`;
+        slugs.add(slug);
+        const price = prices.length ? Math.min(...prices) : 2800;
+        const row = {
+          shop: SHOP, slug, name, tagline: color ? `${color} tee` : "", description: "", image_url: pfPhoto(gv, full?.sync_product?.thumbnail_url ?? pp.thumbnail_url),
+          blank: pfBlank(gv), price_cents: price, active: true, sort_order: ++sort, printful_product_id: Number(pp.id), printful_color: pcolor,
+        };
+        const id = dry ? "new:" + slug : await db.addProduct(row);
+        const rows = gv.map((sv, i) => ({
+          product_id: id, size: pfSize(sv), sku: skuFor(sv), price_cents: pfCents(sv) ?? price, active: true, sort_order: i, printful_sync_variant_id: Number(sv.id),
+        }));
+        if (!dry) await db.addVariants(rows);
+        for (const r of rows) sizes[r.size] = r.printful_sync_variant_id;
+        saved += rows.length; added++;
+        report.push({ product: name, printful: label, sizes, action: "added" });
+        continue;
+      }
+
+      claimed.add(o.id);
+      const first = o.printful_product_id == null;
+      if (first && !dry) await db.patchProduct(o.id, { printful_product_id: Number(pp.id), printful_color: pcolor, ...(prices.length ? { price_cents: Math.min(...prices) } : {}) });
+      const have = (o.shirt_variants ?? []) as any[];
+      for (const v of have) {
+        const sv = gv.find((x) => pfSize(x) === v.size);
+        const want = sv ? Number(sv.id) : null, cur = v.printful_sync_variant_id == null ? null : Number(v.printful_sync_variant_id);
+        sizes[v.size] = want;
+        const patch: Record<string, unknown> = {};
+        if (cur !== want) patch.printful_sync_variant_id = want;
+        if (first && sv && pfCents(sv)) patch.price_cents = pfCents(sv);
+        if (Object.keys(patch).length && !dry) await db.patchVariant(v.id, patch);
+        if (cur !== want) want ? saved++ : unlinked++;
+      }
+      const sizesHad = new Set(have.map((v) => String(v.size)));
+      const base$ = prices.length ? Math.min(...prices) : Number(o.price_cents) || 2800;
+      const extra = gv.filter((sv) => !sizesHad.has(pfSize(sv))).map((sv) => ({
+        product_id: o.id, size: pfSize(sv), sku: skuFor(sv), price_cents: pfCents(sv) ?? base$, active: true,
+        sort_order: sizeRank(pfSize(sv)), printful_sync_variant_id: Number(sv.id),
+      }));
+      if (extra.length && !dry) await db.addVariants(extra);
+      for (const r of extra) sizes[r.size] = r.printful_sync_variant_id;
+      saved += extra.length;
+      report.push({ product: String(o.name), printful: label, sizes, action: first ? "linked" : "updated" });
+    }
   }
-  if (b.dry_run !== true) await db.setPrintfulIds(save);
+
+  // linked shirts whose Printful product is gone: unlink them so the shop stops selling them
+  for (const o of ours) {
+    if (o.printful_product_id == null || seen.has(Number(o.printful_product_id))) continue;
+    const linkedVs = ((o.shirt_variants ?? []) as any[]).filter((v) => v.printful_sync_variant_id != null);
+    if (!linkedVs.length) continue;
+    if (!dry) for (const v of linkedVs) await db.patchVariant(v.id, { printful_sync_variant_id: null });
+    unlinked += linkedVs.length;
+    report.push({ product: String(o.name), printful: null, sizes: Object.fromEntries(linkedVs.map((v) => [v.size, null])), action: "gone from Printful" });
+  }
   catalogCache = null;
-  return { ok: true, saved: b.dry_run === true ? 0 : save.length, report, printful_products: listed.map((x) => x.name) };
+  return {
+    ok: true, dry_run: dry, saved: dry ? 0 : saved, added: dry ? 0 : added, unlinked: dry ? 0 : unlinked, would: dry ? { saved, added, unlinked } : undefined,
+    report, printful_products: listed.filter((x) => !x?.is_ignored).map((x) => x.name),
+  };
 }
 
 // ---------- email (send-mail, like the order site) ----------

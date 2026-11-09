@@ -11,7 +11,7 @@
   Signed-in console admins only: it reuses the console's Supabase session (same site, same browser storage).
     Switches   site_content 'shirt_shop' (RLS: is_app_admin may write) — live cards, pause, Printful mode, shipping, tax
     Orders     shirt-shop function, admin_orders / admin_retry / admin_confirm
-    Printful   admin_printful_setup (webhook) / admin_printful_sync (match products by name + size)
+    Printful   admin_printful_setup (webhook) / admin_printful_sync (get products: link by name, add the rest)
     Shirts     shirt_products / shirt_variants (RLS: is_app_admin may write) — price, on/off, Printful link status
 -->
 <style>
@@ -154,14 +154,17 @@
     // Printful
     h += '<div class="card"><h2>Printful</h2>' +
       '<ol class="steps"><li>In Supabase → Edge Functions → Secrets, add <b>PRINTFUL_TOKEN</b> (Printful → Settings → API) and <b>PRINTFUL_HOOK_KEY</b> (any long random string).</li>' +
-      '<li>In Printful, make one product per design (the shirt listed below) with sizes S–2XL, named like the shirt here.</li>' +
-      '<li>Press <b>Match products</b>, then <b>Connect shipping updates</b>.</li></ol>' +
-      '<div class="row"><button class="btn" data-act="sync">Match products</button><button class="btn ghost" data-act="setup">Connect shipping updates</button><span class="msg" id="m-pf"></span></div>';
+      '<li>Make the shirts in Printful (a manual order / API store). A shirt named like one below links to it; any other is added to the shop with Printful’s name, photo, sizes and prices.</li>' +
+      '<li>Press <b>Get products from Printful</b> (again whenever you add one), then <b>Connect shipping updates</b> once.</li></ol>' +
+      '<div class="row"><button class="btn" data-act="sync">Get products from Printful</button><button class="btn ghost" data-act="setup">Connect shipping updates</button><span class="msg" id="m-pf"></span></div>';
     if (A.report) {
-      h += '<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Shirt</th><th>Printful product</th><th>S</th><th>M</th><th>L</th><th>XL</th><th>XXL</th></tr></thead><tbody>' +
+      h += '<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Shirt</th><th>Printful product</th><th>Sizes</th><th></th></tr></thead><tbody>' +
+        (A.report.length ? '' : '<tr><td colspan="4" class="muted">Printful has no products yet.</td></tr>') +
         A.report.map(function (r) {
-          return '<tr><td>' + esc(r.product) + '</td><td>' + (r.printful ? esc(r.printful) : '<span class="pill warn">not found</span>') + '</td>' +
-            ['S', 'M', 'L', 'XL', 'XXL'].map(function (z) { return '<td>' + (r.sizes[z] ? '✓' : '—') + '</td>'; }).join('') + '</tr>';
+          var zs = Object.keys(r.sizes || {}).map(function (z) { return r.sizes[z] ? esc(z) : '<s class="muted">' + esc(z) + '</s>'; }).join(' ');
+          var cls = r.action === 'added' || r.action === 'linked' ? 'ok' : r.action === 'updated' ? '' : 'warn';
+          return '<tr><td>' + esc(r.product) + '</td><td>' + (r.printful ? esc(r.printful) : '<span class="pill warn">not in Printful</span>') + '</td>' +
+            '<td>' + (zs || '—') + '</td><td><span class="pill ' + cls + '">' + esc(r.action || '') + '</span></td></tr>';
         }).join('') + '</tbody></table></div>';
     }
     h += '</div>';
@@ -174,12 +177,12 @@
         var vs = p.shirt_variants || [];
         var linked = vs.filter(function (v) { return v.printful_sync_variant_id || (v.printful_variant_id && v.print_file_url); }).length;
         return '<tr><td><b>' + esc(p.name) + '</b></td><td class="hide-sm muted">' + esc(p.blank || '') + '</td>' +
-          '<td class="nowrap">$<input data-price="' + esc(p.id) + '" value="' + (p.price_cents / 100).toFixed(2) + '" inputmode="decimal" style="width:70px;height:32px;border:1.5px solid #D9D1C4;border-radius:6px;padding:0 6px" /> <span class="muted">XXL +$3</span></td>' +
+          '<td class="nowrap">$<input data-price="' + esc(p.id) + '" value="' + (p.price_cents / 100).toFixed(2) + '" inputmode="decimal" style="width:70px;height:32px;border:1.5px solid #D9D1C4;border-radius:6px;padding:0 6px" /> <span class="muted">big sizes keep their extra</span></td>' +
           '<td>' + (linked === vs.length && vs.length ? '<span class="pill ok">' + linked + '/' + vs.length + ' sizes</span>' : '<span class="pill warn">' + linked + '/' + vs.length + ' sizes</span>') + '</td>' +
           '<td><input type="checkbox" data-active="' + esc(p.id) + '"' + (p.active ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:#06273A" aria-label="' + esc(p.name) + ' on sale" /></td></tr>';
       }).join('') + '</tbody></table></div>' +
       '<div class="row" style="margin-top:10px"><button class="btn" data-act="save-shirts">Save shirts</button><span class="msg" id="m-shirts"></span></div>' +
-      '<p class="msg">Live sizes need a Printful link; until then the shop shows them as unavailable (test checkouts don’t need it).</p></div>';
+      '<p class="msg">A shirt shows in the shop (staging too) once its sizes are linked to Printful.</p></div>';
     $('#app').innerHTML = h;
   }
   function opt(v, label, cur) { return '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>' + label + '</option>'; }
@@ -226,7 +229,7 @@
         if (c !== p.price_cents) {
           for (var j = 0; j < (p.shirt_variants || []).length; j++) {
             var v = p.shirt_variants[j];
-            var vr = await sb.from('shirt_variants').update({ price_cents: c + (v.size === 'XXL' ? 300 : 0) }).eq('id', v.id);
+            var vr = await sb.from('shirt_variants').update({ price_cents: Math.max(100, v.price_cents + c - p.price_cents) }).eq('id', v.id); // bigger sizes keep their upcharge
             if (vr.error) throw new Error(vr.error.message);
           }
         }
@@ -250,10 +253,12 @@
         await loadOrders(); render();
         say('#m-' + code, 'Printful: ' + d.printful_status, 'good');
       } else if (a === 'sync') {
-        say('#m-pf', 'Matching…');
+        say('#m-pf', 'Getting products…');
         var r = await fn('admin_printful_sync', {});
         A.report = r.report; await loadProducts(); render();
-        say('#m-pf', 'Linked ' + r.saved + ' sizes.' + (r.printful_products.length ? '' : ' Printful has no products yet.'), 'good');
+        say('#m-pf', !r.printful_products.length ? 'Printful has no products yet.' :
+          (r.added ? 'Added ' + r.added + ' shirt' + (r.added === 1 ? '' : 's') + '. ' : '') + 'Linked ' + r.saved + ' size' + (r.saved === 1 ? '' : 's') + '.' +
+          (r.unlinked ? ' Unlinked ' + r.unlinked + ' (gone from Printful).' : ''), 'good');
       } else if (a === 'setup') {
         say('#m-pf', 'Connecting…');
         var s = await fn('admin_printful_setup', {});

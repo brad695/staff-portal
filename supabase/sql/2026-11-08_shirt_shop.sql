@@ -12,7 +12,9 @@
 -- PRINTFUL MAPPING: a variant ships only once it points at Printful — either
 --   printful_sync_variant_id  (a product made in the Printful dashboard; preferred), or
 --   printful_variant_id + print_file_url  (a Printful catalog blank + our own print-ready PNG).
--- On the live site an unmapped variant shows as unavailable; test (sandbox) checkouts don't need it.
+-- "Get products from Printful" (console → admin_printful_sync) links Printful's products to these rows by name, and
+-- adds the ones we don't have (printful_product_id / printful_color say where a row came from). Once Printful is
+-- connected, the shop only shows linked sizes — staging too.
 --
 -- Safe to re-run.
 
@@ -25,6 +27,8 @@ create table if not exists public.shirt_products (
   description text not null default '',
   image_url text,                                  -- shop photo (site path like /shop-img/x.webp, or a full URL)
   blank text,                                      -- the shirt it prints on, for setting it up in Printful
+  printful_product_id bigint,                      -- the Printful store product it's linked to
+  printful_color text,                             -- which colour of it, when that Printful product has several
   price_cents integer not null check (price_cents > 0),
   active boolean not null default true,
   sort_order integer not null default 0,
@@ -32,6 +36,9 @@ create table if not exists public.shirt_products (
   updated_at timestamptz not null default now(),
   unique (shop, slug)
 );
+
+alter table public.shirt_products add column if not exists printful_product_id bigint;
+alter table public.shirt_products add column if not exists printful_color text;
 
 create table if not exists public.shirt_variants (
   id uuid primary key default gen_random_uuid(),

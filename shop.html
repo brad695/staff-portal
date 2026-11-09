@@ -312,7 +312,7 @@
       <div class="display-header d-flex align-items-center justify-content-between">
         <h2 class="section-title text-uppercase">Featured Shirts</h2>
         <div class="btn-right">
-          <a href="#latest-products" class="d-inline-block text-uppercase text-hover fw-bold">View all</a>
+          <a href="#latest-products" id="feat-all" class="d-inline-block text-uppercase text-hover fw-bold">View all</a>
         </div>
       </div>
       <div class="product-content padding-small">
@@ -489,9 +489,12 @@
   }
   function renderRows() {
     var ps = S.cat.products, feat = ps.slice(0, 5), late = [];
-    for (var i = 5; i < 10 && ps.length; i++) late.push(ps[i % ps.length]); // the template fills 10 cards in catalog order, wrapping round
+    // the template shows two rows of 5, wrapping round the catalog; 5 shirts or fewer get one row, no repeats
+    if (ps.length > 5) for (var i = 5; i < 10; i++) late.push(ps[i % ps.length]);
     $('#featured-row').innerHTML = feat.length ? feat.map(cardHTML).join('') : '<p class="shop-oops">No shirts right now — check back soon.</p>';
+    $('#featured-row').classList.toggle('justify-content-center', ps.length > 0 && ps.length < 5);
     $('#latest-row').innerHTML = late.map(cardHTML).join('');
+    $('#latest-products').hidden = !late.length; $('#feat-all').hidden = !late.length;
     $('#featured-row').setAttribute('aria-busy', 'false'); $('#latest-row').setAttribute('aria-busy', 'false');
   }
   async function loadCatalog() {
