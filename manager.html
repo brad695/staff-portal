@@ -4185,23 +4185,6 @@ window.addEventListener('DOMContentLoaded', async ()=>{
 #panel-cheese .nl-compose{padding:20px}
 #panel-cheese .nl-fields{display:grid;grid-template-columns:170px 1fr;gap:12px}
 #panel-cheese .nl-compose label.fld span small{font-weight:400}
-#panel-cheese .nl-tools{display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:var(--alt);border:1px solid var(--line);border-bottom:none;border-radius:10px 10px 0 0}
-#panel-cheese .nl-tools button{background:#fff;border:1px solid var(--line);border-radius:7px;padding:6px 10px;font:500 13px Inter,sans-serif;color:var(--ink);cursor:pointer;min-height:34px}
-#panel-cheese .nl-tools button:hover{border-color:#b9c7bd}
-#panel-cheese .nl-tools button.on{background:var(--green);border-color:var(--green);color:#fff}
-#panel-cheese .nl-tools select{width:auto;padding:6px 8px;font-size:13px;border-radius:7px;min-height:34px}
-#panel-cheese .nl-edit{min-height:380px;max-height:62vh;overflow:auto;border:1.5px solid var(--line);border-radius:0 0 10px 10px;padding:18px 20px;background:#fff;font:16px/1.6 Arial,Helvetica,sans-serif;color:#06273A}
-#panel-cheese .nl-edit:focus{outline:none;border-color:var(--green)}
-#panel-cheese .nl-edit h2{font:700 22px Georgia,'Times New Roman',serif;color:#06273A;margin:18px 0 8px}
-#panel-cheese .nl-edit h3{font:700 13px Arial,Helvetica,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#896D39;margin:18px 0 6px}
-#panel-cheese .nl-edit p{margin:0 0 12px}
-#panel-cheese .nl-edit ul,#panel-cheese .nl-edit ol{margin:0 0 12px;padding-left:22px}
-#panel-cheese .nl-edit a{color:#896D39;text-decoration:underline}
-#panel-cheese .nl-edit img{max-width:100%;height:auto;display:block;margin:8px 0 14px;border-radius:4px}
-#panel-cheese .nl-edit hr{border:0;border-top:1px solid #E2DACA;margin:18px 0}
-#panel-cheese .nl-edit blockquote{margin:0 0 12px;padding:10px 14px;border-left:3px solid #896D39;background:#FBF8F2}
-#panel-cheese .nl-src{display:block;width:100%;min-height:380px;border-radius:0 0 10px 10px;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace}
-#panel-cheese .nl-src[hidden],#panel-cheese .nl-edit[hidden]{display:none}
 #panel-cheese .nl-hint{font-size:12.5px;margin:10px 0 0}
 #panel-cheese .nl-hint code{font-size:12px;background:var(--alt);padding:1px 5px;border-radius:5px}
 #panel-cheese .nl-pdf{margin-top:14px;border:1.5px dashed var(--line);border-radius:10px;padding:12px 14px;background:var(--alt);transition:border-color .15s,background .15s}
@@ -4258,6 +4241,104 @@ window.addEventListener('DOMContentLoaded', async ()=>{
 #panel-cheese .nl-pv-sp{flex:0 0 0}
 #panel-cheese .nl-pv-frame{flex:1;background:#F3EFE6;display:flex;justify-content:center;overflow:auto}
 #panel-cheese .nl-pv-frame iframe{border:0;width:100%;height:100%;background:#fff;transition:width .2s}
+/* the template editor (2026-11-08): the email itself in the club site's look — navy page, GREYS logo,
+   menu band, Barlow Condensed headings, Nunito Sans words, brass picture frames, gold button */
+#panel-cheese .nl-tpl-head{display:flex;gap:10px 14px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:16px 0 10px}
+#panel-cheese .nl-tpl-head p{margin:0;font-size:13.5px;line-height:1.45;flex:1 1 260px}
+#panel-cheese .nl-tpl-head p b{color:var(--ink);font-weight:600}
+#panel-cheese .nl-mailwrap{background:#06273A;border-radius:12px;overflow:hidden}
+#panel-cheese .nl-mail{max-width:600px;margin:0 auto;color:#F5F7F2;font-family:'Nunito Sans',Inter,system-ui,sans-serif}
+#panel-cheese .nl-m-top{padding:24px 24px 18px}
+#panel-cheese .nl-m-logo{display:block;width:250px;max-width:72%;height:auto}
+#panel-cheese .nl-m-nav{margin:0 24px;display:grid;grid-template-columns:1fr 1.15fr 1fr;border-top:1px solid #F5F7F2;border-bottom:1px solid #F5F7F2;text-align:center;font:700 15px/1.2 'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:1.4px;text-transform:uppercase;color:#FAFAFA;user-select:none}
+#panel-cheese .nl-m-nav span{padding:10px 4px}
+#panel-cheese .nl-m-hero{padding:28px 24px 26px}
+#panel-cheese .nl-m-eye{font:800 12px/1.4 'Nunito Sans',Inter,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#E6B33C}
+#panel-cheese .nl-m-h1{margin:10px 0 0;font:700 44px/1.02 'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.01em;text-transform:uppercase;color:#F5F7F2;min-height:1.02em;word-break:break-word}
+#panel-cheese .nl-m-herop{position:relative;margin-top:22px}
+#panel-cheese .nl-m-card{margin:0 24px 26px;background:#fff;color:#2E3A46;padding:32px 28px 28px}
+#panel-cheese .nl-ce{outline:1px dashed transparent;outline-offset:5px;border-radius:2px;cursor:text;transition:outline-color .12s}
+#panel-cheese .nl-ce:hover{outline-color:rgba(230,179,60,.8)}
+#panel-cheese .nl-ce:focus{outline:2px solid #E6B33C}
+#panel-cheese .nl-ce:empty::before{content:attr(data-ph);color:#9AA5AE;pointer-events:none}
+#panel-cheese .nl-m-h1.nl-ce:empty::before{color:rgba(245,247,242,.42)}
+#panel-cheese .nl-m-blocks{min-height:20px}
+#panel-cheese .nl-b{position:relative;margin:0 0 26px}
+#panel-cheese .nl-b-tools{position:absolute;top:-16px;right:-16px;z-index:3;display:flex;gap:3px;opacity:0;transition:opacity .12s}
+#panel-cheese .nl-b:hover>.nl-b-tools,#panel-cheese .nl-b:focus-within>.nl-b-tools{opacity:1}
+#panel-cheese .nl-b-tools button{width:30px;height:30px;padding:0;border-radius:50%;border:1px solid #D6CDBC;background:#fff;color:#06273A;font:600 14px/1 Inter,sans-serif;cursor:pointer;box-shadow:0 1px 4px rgba(6,39,58,.18);display:grid;place-items:center}
+#panel-cheese .nl-b-tools button:hover:not(:disabled){background:#06273A;border-color:#06273A;color:#fff}
+#panel-cheese .nl-b-tools button[data-rm]:hover{background:#9a4034;border-color:#9a4034}
+#panel-cheese .nl-b-tools button:disabled{opacity:.35;cursor:default}
+#panel-cheese .nl-b-tools button:focus-visible{outline:2px solid #E6B33C;outline-offset:1px}
+#panel-cheese .nl-b-fmt{position:absolute;left:-8px;top:-50px;z-index:4;display:none;gap:4px;align-items:center;padding:5px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 18px rgba(6,39,58,.18);white-space:nowrap}
+#panel-cheese .nl-b-text:focus-within>.nl-b-fmt{display:flex}
+#panel-cheese .nl-b-fmt button{background:#fff;border:1px solid var(--line);border-radius:7px;padding:5px 10px;font:500 13px Inter,sans-serif;color:var(--ink);cursor:pointer;min-height:32px}
+#panel-cheese .nl-b-fmt button:hover{border-color:#b9c7bd;background:var(--alt)}
+#panel-cheese .nl-b-fmt select{width:auto;padding:5px 8px;font-size:13px;border-radius:7px;min-height:32px}
+#panel-cheese .nl-b-rule{display:none;width:40px;height:3px;background:#896D39;margin:0 0 12px}
+#panel-cheese .nl-b-text.has-title>.nl-b-rule{display:block}
+#panel-cheese .nl-b-title{margin:0 0 10px;font:700 28px/1.05 'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.01em;text-transform:uppercase;color:#06273A;word-break:break-word}
+#panel-cheese .nl-b-title:empty{margin:0 0 6px;font:400 13px/1.4 'Nunito Sans',Inter,sans-serif;text-transform:none;letter-spacing:0}
+#panel-cheese .nl-b-body{min-height:1.6em;font:400 16px/1.6 'Nunito Sans',Inter,sans-serif;color:#2E3A46;word-break:break-word}
+#panel-cheese .nl-b-body p{margin:0 0 14px}
+#panel-cheese .nl-b-body>:last-child{margin-bottom:0}
+#panel-cheese .nl-b-body ul,#panel-cheese .nl-b-body ol{margin:0 0 14px;padding-left:22px}
+#panel-cheese .nl-b-body li{margin:0 0 7px}
+#panel-cheese .nl-b-body b,#panel-cheese .nl-b-body strong{font-weight:800;color:#06273A}
+#panel-cheese .nl-b-body a{color:#896D39;font-weight:700;text-decoration:underline}
+#panel-cheese .nl-m-pic{position:relative}
+#panel-cheese .nl-pic-frame{background:#896D39;padding:4px}
+#panel-cheese .nl-pic-frame img{display:block;width:100%;height:auto}
+#panel-cheese .nl-pic-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:100%;min-height:160px;padding:18px;border:2px dashed #C9B48A;border-radius:4px;background:#FBF8F1;color:#6f5523;font:600 15px Inter,sans-serif;text-align:center;cursor:pointer}
+#panel-cheese .nl-pic-empty b{font-size:28px;line-height:1;font-weight:400}
+#panel-cheese .nl-pic-empty small{font:400 12.5px Inter,sans-serif;opacity:.8}
+#panel-cheese .nl-pic-empty:hover,#panel-cheese .drag .nl-pic-empty{border-color:#E6B33C;background:#fdf6e4}
+#panel-cheese .nl-m-herop .nl-pic-empty{min-height:130px;background:rgba(245,247,242,.05);border-color:rgba(230,179,60,.6);color:#F5F7F2}
+#panel-cheese .nl-m-herop .nl-pic-empty:hover,#panel-cheese .nl-m-herop.drag .nl-pic-empty{background:rgba(230,179,60,.14)}
+#panel-cheese .nl-pic-empty:focus-visible{outline:2px solid #E6B33C;outline-offset:2px}
+#panel-cheese .nl-pic-busy{cursor:progress}
+#panel-cheese .drag .nl-pic-frame{outline:3px solid #E6B33C;outline-offset:2px}
+#panel-cheese .nl-pic-acts{position:absolute;right:12px;bottom:12px;display:flex;gap:6px;opacity:0;transition:opacity .12s}
+#panel-cheese .nl-m-pic:hover .nl-pic-acts,#panel-cheese .nl-m-herop:hover .nl-pic-acts,#panel-cheese .nl-pic-acts:focus-within{opacity:1}
+#panel-cheese .nl-pic-acts button{background:#06273A;color:#fff;border:0;border-radius:6px;padding:8px 12px;font:600 12.5px Inter,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+#panel-cheese .nl-pic-acts button:hover{background:#0B3550}
+#panel-cheese .nl-b-cap{margin:10px 0 0;font:italic 400 14px/1.45 'Nunito Sans',Inter,sans-serif;color:#5E6773;text-align:center;word-break:break-word}
+#panel-cheese .nl-pk{display:flex;gap:16px;align-items:center;background:#F7F4EC;border-left:6px solid #E6B33C;padding:16px 18px 16px 16px;color:#2E3A46}
+#panel-cheese .nl-pk-cal{flex:none;width:70px;text-align:center;background:#fff;border:1px solid #E2DACA}
+#panel-cheese .nl-pk-cal span{display:block;padding:5px 0;background:#06273A;color:#fff;font:800 11px/1 'Nunito Sans',Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase}
+#panel-cheese .nl-pk-cal b{display:block;padding-top:4px;font:800 34px/1.1 'Barlow Condensed','Arial Narrow',sans-serif;color:#06273A}
+#panel-cheese .nl-pk-cal em{display:block;padding:2px 0 7px;font:800 10px/1 'Nunito Sans',Inter,sans-serif;font-style:normal;letter-spacing:.12em;text-transform:uppercase;color:#5E6773}
+#panel-cheese .nl-pk-txt b{display:block;font:700 24px/1.08 'Barlow Condensed','Arial Narrow',sans-serif;text-transform:uppercase;color:#06273A}
+#panel-cheese .nl-pk-txt span{display:block;margin-top:6px;font:400 15px/1.5 'Nunito Sans',Inter,sans-serif}
+#panel-cheese .nl-pk-txt i{font-style:normal;background:#EFE6CF;border-radius:3px;padding:0 4px}
+#panel-cheese .nl-pk-none{font-size:14px;color:#5E6773}
+#panel-cheese .nl-b-note{margin-top:6px;font:400 12px Inter,sans-serif;color:#8a929b;text-align:right}
+#panel-cheese .nl-b-empty{padding:18px;text-align:center;color:#8a929b;font-size:14px}
+#panel-cheese .nl-m-add{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:4px 0 26px;padding:14px 0;border-top:1px dashed #E2DACA;border-bottom:1px dashed #E2DACA}
+#panel-cheese .nl-add-b{background:#fff;border:1.5px solid #06273A;color:#06273A;font:700 13.5px Inter,sans-serif;padding:9px 18px;cursor:pointer}
+#panel-cheese .nl-add-b:hover{background:#06273A;color:#fff}
+#panel-cheese .nl-add-b:focus-visible{outline:2px solid #E6B33C;outline-offset:2px}
+#panel-cheese .nl-m-btn{text-align:center;user-select:none}
+#panel-cheese .nl-m-btn span{display:inline-block;padding:15px 28px;background:#E6B33C;color:#06273A;font:800 12.5px/1.2 'Nunito Sans',Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase}
+#panel-cheese .nl-m-foot{display:flex;gap:16px;align-items:center;background:#F5F7F2;color:#5E6773;padding:18px 24px;font-size:12.5px;line-height:1.45;user-select:none}
+#panel-cheese .nl-m-foot img{flex:none;width:120px;height:auto}
+@media(hover:none){#panel-cheese .nl-b-tools,#panel-cheese .nl-pic-acts{opacity:1}}
+@media(max-width:640px){
+  #panel-cheese .nl-mailwrap{border-radius:8px}
+  #panel-cheese .nl-m-top{padding:18px 14px 14px}
+  #panel-cheese .nl-m-nav{margin:0 14px;font-size:12.5px;letter-spacing:.6px}
+  #panel-cheese .nl-m-nav span{padding:9px 2px}
+  #panel-cheese .nl-m-hero{padding:22px 14px 20px}
+  #panel-cheese .nl-m-eye{font-size:11px;letter-spacing:.14em}
+  #panel-cheese .nl-m-h1{font-size:34px}
+  #panel-cheese .nl-m-card{margin:0 10px 18px;padding:26px 16px 22px}
+  #panel-cheese .nl-b-tools{right:-8px}
+  #panel-cheese .nl-b-fmt{position:static;margin:0 0 10px;flex-wrap:wrap;white-space:normal;box-shadow:none}
+  #panel-cheese .nl-pk{gap:12px;padding:14px 12px}
+  #panel-cheese .nl-pk-txt b{font-size:21px}
+  #panel-cheese .nl-m-foot{flex-direction:column;align-items:flex-start;padding:16px 14px}
+}
 @media(max-width:1100px){
   #panel-cheese .nl-grid{grid-template-columns:minmax(0,1fr)}
   #panel-cheese .nl-side{position:static}
@@ -4268,7 +4349,6 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   #panel-cheese .nl-row{grid-template-columns:1fr;gap:6px}
   #panel-cheese .nl-row-s{white-space:normal}
   #panel-cheese .nl-stats b{font-size:20px}
-  #panel-cheese .nl-edit{min-height:300px;padding:14px}
 }
 </style>
 <style id="cccp-style">
@@ -11717,8 +11797,14 @@ function editClub(c,onSaved){
 /* ====== NEWSLETTER — monthly email to Cheese Club members (club-newsletter edge function) ======
    Members are the Square club's club_members (active + paused by default, one email per address).
    Drafts, preview, test, schedule and send all go through club-newsletter; photos go to the public
-   email-assets bucket. */
-const NL={list:null,cur:null,failed:[],dirty:false,body:null,draw:0,aud:null,audKey:'',audSeq:0,audT:0,poll:0,range:null,src:false,testTo:'',pdfBusy:false};
+   email-assets bucket.
+   THE TEMPLATE (2026-11-08, Maverick: "a pre-built template that resembles the website with our logos and
+   coloring … the ability to enter text and pictures. that's all we need"): the editor IS the email — the
+   club site's look (navy, GREYS logo, menu band, brass picture frames, gold button) — and staff click to
+   type the headline and the words, click to add pictures, add / move / remove text and picture blocks.
+   It's saved as club_newsletters.design ({v:1, headline, hero, blocks}); the function draws the real email
+   from it. Older newsletters (body_html only) open converted into blocks. */
+const NL={list:null,cur:null,failed:[],dirty:false,body:null,draw:0,aud:null,audKey:'',audSeq:0,audT:0,poll:0,range:null,testTo:'',pdfBusy:false,fonts:false};
 try{NL.testTo=localStorage.getItem('ccnl_test_to')||'';}catch(e){}
 const nlCall=(action,p)=>ccFnJson('club-newsletter',Object.assign({action},p||{}));
 const NL_WORD={draft:'Draft',scheduled:'Scheduled',sending:'Sending',sent:'Sent',canceled:'Stopped'};
@@ -11741,15 +11827,64 @@ function nlAudText(a){
   if((a.shops||[]).length)parts.push(a.shops.map(s=>s==='memphis'?'Memphis':'Nashville').join(' & ')+' pickup');
   return parts.join(' · ');
 }
-const NL_TEMPLATE=`<h2>Hi {{first_name}},</h2>
-<p>Your {{month}} box is ready <b>{{pickup}}</b> at Greys {{shop}} — or come by any time later that week.</p>
-<h3>This month's cheeses</h3>
-<ul><li><b>Cheese name</b> — where it's from, the milk, and what it tastes like.</li><li><b>Cheese name</b> — …</li><li><b>Cheese name</b> — …</li></ul>
-<h3>Pair it with</h3>
-<p>A wine, beer or snack from the shop that goes with this month's box.</p>
-<h3>News from the shop</h3>
-<p>Classes, events and new arrivals worth knowing about.</p>
-<p>See you at pickup!<br>— The GREYS crew</p>`;
+// the GREYS logo the email uses (club site; made from the site's wordmark fonts)
+const NL_LOGO='https://cheeseclub.greyscheese.com/email-logo.png', NL_LOGO_INK='https://cheeseclub.greyscheese.com/email-logo-ink.png';
+// the monthly template a new newsletter starts as — staff swap in the words and pictures
+const NL_MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const nlMonthName=m=>/^\d{4}-\d{2}/.test(m||'')?NL_MONTHS[+String(m).slice(5,7)-1]:'';
+// the headline names the box month ("Your December box"); while it's still that line it follows the month field
+const nlAutoHead=m=>nlMonthName(m)?'Your '+nlMonthName(m)+' box':'Your {{month}} box';
+const NL_AUTO_HEAD=new RegExp('^Your ('+NL_MONTHS.join('|')+'|\\{\\{month\\}\\}) box$');
+function nlTemplate(month){
+  return {v:1,headline:nlAutoHead(month),hero:null,blocks:[
+    {t:'text',title:'',html:'<p>Hi {{first_name}},</p><p>Here’s what’s in your {{month}} box, and a few things worth knowing.</p>'},
+    {t:'pickup'},
+    {t:'text',title:'This month’s cheeses',html:'<ul><li><b>Cheese name</b> — where it’s from, the milk, and what it tastes like.</li><li><b>Cheese name</b> — …</li><li><b>Cheese name</b> — …</li></ul>'},
+    {t:'photo',url:'',caption:''},
+    {t:'text',title:'Pair it with',html:'<p>A wine, beer or snack from the shop that goes with this month’s box.</p>'},
+    {t:'text',title:'News from the shop',html:'<p>Classes, events and new arrivals worth knowing about.</p>'},
+    {t:'text',title:'',html:'<p>See you at pickup!<br>— The GREYS crew</p>'}
+  ]};
+}
+const nlCopy=o=>JSON.parse(JSON.stringify(o));
+const nlPlain=h=>String(h||'').replace(/<[^>]*>/g,' ').replace(/&nbsp;/gi,' ').replace(/\s+/g,' ').trim();
+// a design as the function expects it (and the same "is anything written?" rule)
+function nlDesignOut(d){
+  d=d||nlTemplate();
+  return {v:1,headline:String(d.headline||'').trim(),hero:d.hero&&d.hero.url?{url:d.hero.url}:null,
+    blocks:(d.blocks||[]).map(b=>b.t==='text'?{t:'text',title:String(b.title||'').trim(),html:String(b.html||'')}:b.t==='photo'?{t:'photo',url:b.url||'',caption:String(b.caption||'').trim()}:{t:'pickup'})};
+}
+function nlDesignWritten(d){
+  if(!d)return false;
+  if(String(d.headline||'').trim()||(d.hero&&d.hero.url))return true;
+  return (d.blocks||[]).some(b=>(b.t==='text'&&(String(b.title||'').trim()||nlPlain(b.html)))||(b.t==='photo'&&b.url));
+}
+// an older newsletter (HTML) → blocks: headings start a text block, photos become picture blocks
+function nlFromHtml(html){
+  const d={v:1,headline:'',hero:null,blocks:[]};let cur=null;
+  const text=()=>{if(!cur){cur={t:'text',title:'',html:''};d.blocks.push(cur);}return cur;};
+  const t=document.createElement('template');t.innerHTML=nlClean(html||'');
+  [...t.content.childNodes].forEach(n=>{
+    if(n.nodeType===3){if(n.textContent.trim())text().html+='<p>'+esc(n.textContent.trim())+'</p>';return;}
+    if(n.nodeType!==1)return;
+    const tag=n.tagName;
+    if(tag==='H2'||tag==='H3'){cur={t:'text',title:n.textContent.trim().slice(0,160),html:''};d.blocks.push(cur);return;}
+    if(tag==='HR'){cur=null;return;}
+    if(tag==='IMG'){d.blocks.push({t:'photo',url:n.getAttribute('src')||'',caption:''});cur=null;return;}
+    const imgs=[...n.querySelectorAll('img')].map(i=>{i.remove();return i.getAttribute('src')||'';});
+    if(n.textContent.trim())text().html+=(tag==='UL'||tag==='OL'||tag==='P')?n.outerHTML:'<p>'+n.innerHTML+'</p>';
+    imgs.forEach(u=>{d.blocks.push({t:'photo',url:u,caption:''});cur=null;});
+  });
+  if(!d.blocks.length)d.blocks.push({t:'text',title:'',html:''});
+  return d;
+}
+// words pasted into a text block keep only what the email keeps: paragraphs, bold / italic, links, lists
+function nlCleanText(html){
+  const t=document.createElement('template');t.innerHTML=nlClean(html);
+  t.content.querySelectorAll('img,hr').forEach(x=>x.remove());
+  t.content.querySelectorAll('h2,h3,blockquote').forEach(x=>{const p=document.createElement('p');if(/^H/.test(x.tagName)){const b=document.createElement('b');while(x.firstChild)b.appendChild(x.firstChild);p.appendChild(b);}else{while(x.firstChild)p.appendChild(x.firstChild);}x.replaceWith(p);});
+  return t.innerHTML.replace(/<p>(\s|&nbsp;|<br>)*<\/p>/gi,'').trim();
+}
 
 // paste from Google Docs / Word / web pages: keep the structure, drop their styling
 function nlClean(html){
@@ -11826,10 +11961,14 @@ function nlList(){
 }
 async function nlOpen(id){
   clearTimeout(NL.poll);NL.draw++;
-  if(!id){NL.cur={id:null,status:'draft',month:NL.list.default_month,subject:'',preheader:'',body_html:'',audience:{who:'current',clubs:[],shops:[]}};NL.failed=[];NL.dirty=false;NL.src=false;return nlEditor();}
+  if(!id){NL.cur={id:null,status:'draft',month:NL.list.default_month,subject:'Your {{month}} Cheese Club box',preheader:'',body_html:'',design:nlTemplate(NL.list.default_month),audience:{who:'current',clubs:[],shops:[]}};NL.failed=[];NL.dirty=false;return nlEditor();}
   NL.body.innerHTML='';NL.body.append($(`<div class="muted" style="padding:6px 2px">Loading…</div>`));
-  try{const d=await nlCall('get',{id});NL.cur=d.newsletter;NL.failed=d.failed||[];NL.dirty=false;NL.src=false;nlEditor();}
-  catch(e){toast(e.message,true);NL.cur=null;drawNewsletter(NL.body);}
+  try{
+    const d=await nlCall('get',{id});NL.cur=d.newsletter;NL.failed=d.failed||[];NL.dirty=false;
+    // an older newsletter written as HTML opens as blocks in the template (saved that way on the next save)
+    if(!NL.cur.design&&['draft','scheduled'].includes(NL.cur.status))NL.cur.design=NL.cur.body_html?nlFromHtml(NL.cur.body_html):nlTemplate(NL.cur.month);
+    nlEditor();
+  }catch(e){toast(e.message,true);NL.cur=null;drawNewsletter(NL.body);}
 }
 function nlBack(){
   if(NL.dirty&&!confirm('Leave without saving your changes?'))return;
@@ -11849,27 +11988,12 @@ function nlEditor(){
         <label class="fld nl-f-subj"><span>Subject</span><input data-f="subject" maxlength="200" placeholder="Your {{month}} box is here"></label>
       </div>
       <label class="fld"><span>Preview text <small class="muted">— shows next to the subject in the inbox</small></span><input data-f="preheader" maxlength="200" placeholder="What's inside and when to pick it up"></label>
-      <div class="nl-tools" role="toolbar" aria-label="Formatting">
-        <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
-        <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
-        <button type="button" data-cmd="h2" title="Big heading">Heading</button>
-        <button type="button" data-cmd="h3" title="Small section title">Section</button>
-        <button type="button" data-cmd="p" title="Normal text">Text</button>
-        <button type="button" data-cmd="ul" title="Bulleted list">• List</button>
-        <button type="button" data-cmd="ol" title="Numbered list">1. List</button>
-        <button type="button" data-cmd="link" title="Add a link">Link</button>
-        <button type="button" data-cmd="photo" title="Add a photo">Photo</button>
-        <button type="button" data-cmd="hr" title="Divider line">Line</button>
-        <select data-merge aria-label="Insert a member detail"><option value="">+ Member detail</option><option value="{{first_name}}">First name</option><option value="{{club}}">Their club</option><option value="{{pickup}}">Pickup date</option><option value="{{month}}">Month</option><option value="{{shop}}">Their shop</option></select>
-        <button type="button" data-cmd="template" title="Start from the monthly template">Template</button>
-        <button type="button" data-cmd="src" title="Edit the HTML">HTML</button>
-      </div>
-      <div class="nl-edit" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Newsletter text" data-ed></div>
-      <textarea class="nl-src" data-src aria-label="Newsletter HTML" hidden></textarea>
+      <div class="nl-tpl-head"><p class="muted"><b>Click any words to change them. Click a picture spot to add a photo.</b> The logo, colors, menu, button and footer are already set.</p><button type="button" class="btn btn-ghost btn-sm" data-restart>Start over</button></div>
+      <div class="nl-mailwrap" data-mailwrap>${nlCanvasHtml()}</div>
       <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" data-file hidden>
       <div class="nl-pdf" data-pdf></div>
       <input type="file" accept="application/pdf,.pdf" data-pdffile hidden>
-      <p class="muted nl-hint">Member details like <code>{{first_name}}</code> and <code>{{pickup}}</code> are filled in for each person when it sends. With a PDF attached, the text is optional — it's the note that goes with it (leave it empty and a short one is added).</p>
+      <p class="muted nl-hint">Member details like <code>{{first_name}}</code> and <code>{{month}}</code> are filled in for each person when it sends, and so is the pickup box (their shop and this month's pickup day). Use <b>Preview</b> to see the finished email. With a PDF attached, the words are optional.</p>
     </div>
     <div class="nl-side">
       <div class="card nl-card">
@@ -11895,12 +12019,11 @@ function nlEditor(){
   </div>`);
   body.append(top,grid);
   const q=s=>grid.querySelector(s);
-  const ed=q('[data-ed]'),src=q('[data-src]'),file=q('[data-file]');
   q('[data-f="month"]').value=String(n.month||'').slice(0,7);
   q('[data-f="subject"]').value=n.subject||'';
   q('[data-f="preheader"]').value=n.preheader||'';
-  ed.innerHTML=n.body_html||'';
   q('[data-testto]').value=NL.testTo;
+  if(!n.design)n.design=nlTemplate(n.month);
   grid.querySelectorAll('[data-f]').forEach(i=>i.addEventListener('input',()=>{NL.dirty=true;}));
   // who gets it
   grid.querySelector(`input[name="nlwho"][value="${a.who==='active'?'active':'current'}"]`).checked=true;
@@ -11933,22 +12056,13 @@ function nlEditor(){
       catch(e){toast(e.message,true);}
     });
   }
-  // editor
-  try{document.execCommand('defaultParagraphSeparator',false,'p');document.execCommand('styleWithCSS',false,false);}catch(e){}
-  if(!ed.innerHTML.trim())ed.innerHTML='<p><br></p>';
-  ed.addEventListener('input',()=>{NL.dirty=true;});
-  const keep=()=>{const s=window.getSelection();if(s&&s.rangeCount&&ed.contains(s.anchorNode))NL.range=s.getRangeAt(0).cloneRange();};
-  ['keyup','mouseup','input','focus'].forEach(ev=>ed.addEventListener(ev,keep));
-  const restore=()=>{ed.focus();const s=window.getSelection();if(NL.range&&ed.contains(NL.range.startContainer)){s.removeAllRanges();s.addRange(NL.range);}else{const r=document.createRange();r.selectNodeContents(ed);r.collapse(false);s.removeAllRanges();s.addRange(r);}};
-  const insertHtml=h=>{restore();document.execCommand('insertHTML',false,h);NL.dirty=true;keep();};
-  ed.addEventListener('paste',e=>{
-    const cd=e.clipboardData;if(!cd)return;e.preventDefault();
-    const h=cd.getData('text/html'),t=cd.getData('text/plain');
-    if(h)insertHtml(nlClean(h)||esc(t));
-    else insertHtml(t.split(/\r?\n\s*\r?\n/).map(p=>'<p>'+esc(p).replace(/\r?\n/g,'<br>')+'</p>').join(''));
+  // the email: words + pictures in the template
+  nlCanvasWire(grid);
+  q('[data-restart]').addEventListener('click',()=>{
+    if(nlDesignWritten(NL.cur.design)&&!confirm('Start over with the monthly template? What you have written here will be replaced.'))return;
+    NL.cur.design=nlTemplate(nlMonthIso());NL.dirty=true;nlCanvasFill();toast('Started over with the template.');
   });
-  ed.addEventListener('drop',e=>{if(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length){e.preventDefault();const f=e.dataTransfer.files[0];if(nlIsPdf(f))nlPdfAttach(f);else nlPhoto(f,insertHtml);}});
-  file.addEventListener('change',()=>{const f=file.files&&file.files[0];file.value='';if(f)nlPhoto(f,insertHtml);});
+  q('[data-f="month"]').addEventListener('input',nlMonthBits);
   // the PDF: attach / replace / remove, or drop one on the box
   const pbox=q('[data-pdf]'),pfile=q('[data-pdffile]');
   pbox.addEventListener('click',e=>{
@@ -11960,35 +12074,6 @@ function nlEditor(){
   pbox.addEventListener('dragleave',()=>pbox.classList.remove('drag'));
   pbox.addEventListener('drop',e=>{e.preventDefault();pbox.classList.remove('drag');const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)nlPdfAttach(f);});
   nlPdfDraw();
-  const merge=q('[data-merge]');
-  merge.addEventListener('change',()=>{const v=merge.value;merge.value='';if(v){restore();document.execCommand('insertText',false,v);NL.dirty=true;keep();}});
-  q('.nl-tools').addEventListener('mousedown',e=>{if(e.target.closest('button'))e.preventDefault();});
-  q('.nl-tools').addEventListener('click',e=>{
-    const b=e.target.closest('button[data-cmd]');if(!b)return;const c=b.dataset.cmd;
-    if(c==='src'){nlToggleSrc(ed,src,b);return;}
-    if(NL.src){toast('Switch back from HTML to use the formatting buttons.',true);return;}
-    if(c==='photo'){keep();file.click();return;}
-    if(c==='template'){
-      if(ed.textContent.trim()&&!confirm('Replace what you have written with the monthly template?'))return;
-      ed.innerHTML=NL_TEMPLATE;NL.dirty=true;return;
-    }
-    restore();
-    if(c==='bold'||c==='italic')document.execCommand(c);
-    else if(c==='h2'||c==='h3'||c==='p')document.execCommand('formatBlock',false,'<'+c+'>');
-    else if(c==='ul')document.execCommand('insertUnorderedList');
-    else if(c==='ol')document.execCommand('insertOrderedList');
-    else if(c==='hr')document.execCommand('insertHorizontalRule');
-    else if(c==='link'){
-      const sel=window.getSelection(),txt=sel?String(sel):'';
-      let url=prompt('Link to (web address or email):','https://');
-      if(!url)return;url=url.trim();
-      if(/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(url))url='mailto:'+url;
-      else if(!/^(https?:|mailto:)/i.test(url))url='https://'+url.replace(/^\/+/,'');
-      restore();
-      if(txt)document.execCommand('createLink',false,url);else document.execCommand('insertHTML',false,'<a href="'+esc(url)+'">'+esc(url.replace(/^mailto:/,''))+'</a>');
-    }
-    NL.dirty=true;keep();
-  });
   // actions
   q('[data-save]').addEventListener('click',()=>nlSave(false));
   q('[data-preview]').addEventListener('click',()=>nlPreview());
@@ -12053,14 +12138,194 @@ async function nlPdfAttach(f){
   }catch(e){toast(e.message,true);}
   finally{NL.pdfBusy=false;nlPdfDraw();}
 }
-function nlToggleSrc(ed,src,btn){
-  if(!NL.src){src.value=ed.innerHTML.replace(/<\/(p|h2|h3|ul|ol|li|blockquote)>/gi,'</$1>\n').trim();ed.hidden=true;src.hidden=false;NL.src=true;btn.classList.add('on');src.oninput=()=>{NL.dirty=true;};src.focus();}
-  else{ed.innerHTML=src.value;src.hidden=true;ed.hidden=false;NL.src=false;btn.classList.remove('on');NL.dirty=true;}
+/* ---- the template editor: the email itself — words to click, picture spots, + Text / + Picture ---- */
+function nlFonts(){ // the club site's fonts, loaded the first time the editor opens
+  if(NL.fonts)return;NL.fonts=true;
+  const l=document.createElement('link');l.rel='stylesheet';
+  l.href='https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Nunito+Sans:ital,wght@0,400;0,700;0,800;1,400&display=swap';
+  document.head.appendChild(l);
 }
-async function nlPhoto(f,insertHtml){
-  toast('Uploading photo…');
-  try{const url=await nlUpload(f);insertHtml('<img src="'+esc(url)+'" alt="">');toast('Photo added.');}
-  catch(e){toast(e.message,true);}
+function nlCanvasHtml(){
+  nlFonts();
+  return `<div class="nl-mail" data-mail>
+    <div class="nl-m-top"><img class="nl-m-logo" src="${NL_LOGO}" alt="GREYS Fine Cheeses - Charcuterie - Wine" width="300" height="92"></div>
+    <div class="nl-m-nav" aria-hidden="true"><span>Order &amp; Shop</span><span>Book &amp; Reserve</span><span>Info &amp; FAQ</span></div>
+    <div class="nl-m-hero">
+      <div class="nl-m-eye" data-eye></div>
+      <div class="nl-m-h1 nl-ce" contenteditable="true" role="textbox" aria-label="Headline" data-ph="Write a headline" data-one data-headline></div>
+      <div class="nl-m-herop" data-hero></div>
+    </div>
+    <div class="nl-m-card">
+      <div class="nl-m-blocks" data-blocks></div>
+      <div class="nl-m-add" data-add></div>
+      <div class="nl-m-btn" aria-hidden="true"><span>Manage my membership</span></div>
+    </div>
+    <div class="nl-m-foot" aria-hidden="true"><img src="${NL_LOGO_INK}" alt="" width="170" height="52"><span>Both shops’ addresses and phone numbers, Instagram, Facebook and each member’s unsubscribe link go here.</span></div>
+  </div>`;
+}
+const nlMonthIso=()=>{const e=NL.body&&NL.body.querySelector('[data-f="month"]'),v=e?e.value:'';return /^\d{4}-\d{2}$/.test(v)?v+'-01':'';};
+// pickup = the second Wednesday (the function uses the box month's real pickup day; Preview shows it)
+function nlPickupDay(m){const [y,mo]=m.split('-').map(Number),dow=new Date(Date.UTC(y,mo-1,1)).getUTCDay();return new Date(Date.UTC(y,mo-1,1+((3-dow+7)%7)+7));}
+function nlPickupInner(m){
+  if(!m)return '<div class="nl-pk-none">Pick the box month above and the pickup day shows here.</div>';
+  const d=nlPickupDay(m),f=o=>d.toLocaleDateString('en-US',Object.assign({timeZone:'UTC'},o));
+  return `<div class="nl-pk-cal" aria-hidden="true"><span>${esc(f({month:'short'}))}</span><b>${d.getUTCDate()}</b><em>Pickup</em></div><div class="nl-pk-txt"><b>Pickup ${esc(f({weekday:'long',month:'long',day:'numeric'}))}</b><span>Your ${esc(f({month:'long'}))} box is ready at GREYS <i>their shop</i> — or any time later that week.</span></div>`;
+}
+function nlMonthBits(){
+  const g=NL.body;if(!g)return;const m=nlMonthIso();
+  const d=NL.cur&&NL.cur.design,h=g.querySelector('[data-headline]');
+  if(d&&NL_AUTO_HEAD.test(String(d.headline||'').trim())&&m&&d.headline!==nlAutoHead(m)){d.headline=nlAutoHead(m);if(h)h.textContent=d.headline;}
+  const eye=g.querySelector('[data-eye]');
+  if(eye)eye.textContent='The GREYS Cheese Club'+(m?' · '+new Date(m+'T12:00:00Z').toLocaleDateString('en-US',{timeZone:'UTC',month:'long',year:'numeric'}):'');
+  g.querySelectorAll('[data-pk]').forEach(el=>{el.innerHTML=nlPickupInner(m);});
+}
+function nlPicHtml(url,busy,hero){
+  if(busy)return '<div class="nl-pic-empty nl-pic-busy" role="status"><span>Uploading the picture…</span></div>';
+  if(!url)return `<button type="button" class="nl-pic-empty" data-pick><b aria-hidden="true">+</b><span>${hero?'Add a top picture':'Add a picture'}</span><small>${hero?'Optional — the big picture under the headline':'Click, or drop a photo here'}</small></button>`;
+  return `<div class="nl-pic-frame"><img src="${esc(url)}" alt=""></div><div class="nl-pic-acts"><button type="button" data-pick>Change picture</button>${hero?'<button type="button" data-unhero>Remove</button>':''}</div>`;
+}
+function nlBlockHtml(b,i,n){
+  const what=b.t==='photo'?'picture':b.t==='pickup'?'pickup box':'text';
+  const tools=`<div class="nl-b-tools"><button type="button" data-mv="-1" title="Move up" aria-label="Move this ${what} up"${i===0?' disabled':''}>↑</button><button type="button" data-mv="1" title="Move down" aria-label="Move this ${what} down"${i===n-1?' disabled':''}>↓</button><button type="button" data-rm title="Remove" aria-label="Remove this ${what}">✕</button></div>`;
+  if(b.t==='text')return `<div class="nl-b nl-b-text${String(b.title||'').trim()?' has-title':''}" data-i="${i}">${tools}
+    <div class="nl-b-fmt" role="toolbar" aria-label="Text style"><button type="button" data-fmt="bold" title="Bold"><b>B</b></button><button type="button" data-fmt="italic" title="Italic"><i>I</i></button><button type="button" data-fmt="link" title="Add a link">Link</button><button type="button" data-fmt="ul" title="Bulleted list">• List</button><select data-merge aria-label="Add a member detail"><option value="">+ Member detail</option><option value="{{first_name}}">First name</option><option value="{{club}}">Their club</option><option value="{{pickup}}">Pickup day</option><option value="{{month}}">Month</option><option value="{{shop}}">Their shop</option></select></div>
+    <i class="nl-b-rule" aria-hidden="true"></i><div class="nl-b-title nl-ce" contenteditable="true" role="textbox" aria-label="Title" data-ph="+ Title (optional)" data-one data-title></div>
+    <div class="nl-b-body nl-ce" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Words" data-ph="Write here…" data-body></div></div>`;
+  if(b.t==='photo')return `<div class="nl-b nl-b-photo" data-i="${i}">${tools}<div class="nl-m-pic" data-pic>${nlPicHtml(b.url,NL.busyPic===b,false)}</div>
+    <div class="nl-b-cap nl-ce" contenteditable="true" role="textbox" aria-label="Caption" data-ph="+ Caption (optional)" data-one data-cap></div></div>`;
+  return `<div class="nl-b nl-b-pickup" data-i="${i}">${tools}<div class="nl-pk" data-pk>${nlPickupInner(nlMonthIso())}</div><div class="nl-b-note">Filled in for each member — their shop and this month’s pickup day.</div></div>`;
+}
+function nlHeroDraw(){const el=NL.body&&NL.body.querySelector('[data-hero]');if(el)el.innerHTML=nlPicHtml(NL.cur.design.hero&&NL.cur.design.hero.url,NL.busyPic==='hero',true);}
+// one picture spot (so an upload finishing doesn't redraw the block someone is typing in)
+function nlPicDraw(target){
+  if(target==='hero')return nlHeroDraw();
+  const i=NL.cur&&NL.cur.design?NL.cur.design.blocks.indexOf(target):-1;if(i<0)return;
+  const el=NL.body&&NL.body.querySelector(`.nl-b[data-i="${i}"] [data-pic]`);if(el)el.innerHTML=nlPicHtml(target.url,NL.busyPic===target,false);
+}
+function nlBlocksDraw(focusI){
+  const g=NL.body,d=NL.cur.design,box=g&&g.querySelector('[data-blocks]');if(!box)return;
+  box.innerHTML=d.blocks.length?d.blocks.map((b,i)=>nlBlockHtml(b,i,d.blocks.length)).join(''):'<div class="nl-b-empty">Add words or a picture with the buttons below.</div>';
+  box.querySelectorAll('.nl-b').forEach(el=>{
+    const b=d.blocks[+el.dataset.i];
+    if(b.t==='text'){el.querySelector('[data-title]').textContent=b.title||'';el.querySelector('[data-body]').innerHTML=b.html||'';}
+    else if(b.t==='photo')el.querySelector('[data-cap]').textContent=b.caption||'';
+  });
+  const pk=d.blocks.some(b=>b.t==='pickup');
+  g.querySelector('[data-add]').innerHTML='<button type="button" class="nl-add-b" data-add-text>+ Text</button><button type="button" class="nl-add-b" data-add-photo>+ Picture</button>'+(pk?'':'<button type="button" class="nl-add-b" data-add-pickup>+ Pickup box</button>');
+  if(focusI!=null){const el=box.querySelector(`.nl-b[data-i="${focusI}"]`);if(el){el.scrollIntoView({block:'nearest'});const f=el.querySelector('[data-body],[data-pick],[data-cap]');if(f)f.focus();}}
+}
+function nlCanvasFill(){
+  if(!NL.body||!NL.cur||!NL.cur.design)return;
+  const h=NL.body.querySelector('[data-headline]');if(h)h.textContent=NL.cur.design.headline||'';
+  nlHeroDraw();nlBlocksDraw();nlMonthBits();
+}
+async function nlPicUpload(f,target){
+  if(!target)return;
+  if(NL.busyPic){toast('One picture at a time — wait for the last one to finish.',true);return;}
+  NL.busyPic=target;nlPicDraw(target);
+  try{
+    const url=await nlUpload(f);
+    if(target==='hero')NL.cur.design.hero={url};else target.url=url;
+    NL.dirty=true;toast('Picture added.');
+  }catch(e){toast(e.message,true);}
+  finally{NL.busyPic=null;if(NL.cur&&NL.cur.design)nlPicDraw(target);}
+}
+function nlCanvasWire(grid){
+  const wrap=grid.querySelector('[data-mailwrap]'),file=grid.querySelector('[data-file]');
+  NL.range=null;NL.rangeHost=null;NL.pickFor=null;NL.busyPic=null;
+  try{document.execCommand('defaultParagraphSeparator',false,'p');document.execCommand('styleWithCSS',false,false);}catch(e){}
+  nlCanvasFill();
+  const blockOf=el=>{const b=el&&el.closest('.nl-b');return b?NL.cur.design.blocks[+b.dataset.i]:null;};
+  const one=t=>t.textContent.replace(/\s+/g,' ');
+  // typing goes straight into the design
+  wrap.addEventListener('input',e=>{
+    const t=e.target,d=NL.cur.design;
+    if(t.matches('[data-headline]'))d.headline=one(t);
+    else if(t.matches('[data-title]')){const b=blockOf(t);if(!b)return;b.title=one(t);t.closest('.nl-b').classList.toggle('has-title',!!b.title.trim());}
+    else if(t.matches('[data-cap]')){const b=blockOf(t);if(b)b.caption=one(t);}
+    else if(t.matches('[data-body]')){const b=blockOf(t);if(b)b.html=t.innerHTML;}
+    else return;
+    NL.dirty=true;
+  });
+  // where the cursor is, for the style buttons
+  const keep=()=>{const s=window.getSelection();if(!s||!s.rangeCount)return;const r=s.getRangeAt(0),n=r.startContainer,host=(n.nodeType===1?n:n.parentElement);const ce=host&&host.closest('.nl-ce');if(ce&&wrap.contains(ce)){NL.range=r.cloneRange();NL.rangeHost=ce;}};
+  ['keyup','mouseup','input','focusin'].forEach(ev=>wrap.addEventListener(ev,keep));
+  const restore=host=>{
+    if(!host)return;host.focus();const s=window.getSelection();
+    if(NL.range&&host.contains(NL.range.startContainer)){s.removeAllRanges();s.addRange(NL.range);}
+    else{const r=document.createRange();r.selectNodeContents(host);r.collapse(false);s.removeAllRanges();s.addRange(r);}
+  };
+  const bodyFor=el=>{const blk=el.closest('.nl-b');return NL.rangeHost&&blk.contains(NL.rangeHost)?NL.rangeHost:blk.querySelector('[data-body]');};
+  // one-line spots (headline, titles, captions): Enter does nothing, pasting brings plain words
+  wrap.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches&&e.target.matches('[data-one]'))e.preventDefault();});
+  wrap.addEventListener('paste',e=>{
+    const t=e.target.nodeType===1?e.target:e.target.parentElement,ce=t&&t.closest('.nl-ce'),cd=e.clipboardData;if(!ce||!cd)return;
+    e.preventDefault();
+    const h=cd.getData('text/html'),txt=cd.getData('text/plain');
+    if(ce.matches('[data-one]')){document.execCommand('insertText',false,txt.replace(/\s+/g,' ').trim());return;}
+    if(h)document.execCommand('insertHTML',false,nlCleanText(h)||esc(txt));
+    else document.execCommand('insertHTML',false,txt.split(/\r?\n\s*\r?\n/).map(p=>'<p>'+esc(p).replace(/\r?\n/g,'<br>')+'</p>').join(''));
+  });
+  wrap.addEventListener('mousedown',e=>{if(e.target.closest('.nl-b-fmt button,.nl-b-tools button'))e.preventDefault();});
+  wrap.addEventListener('change',e=>{
+    const sel=e.target.closest('[data-merge]');if(!sel)return;const v=sel.value;sel.value='';if(!v)return;
+    restore(bodyFor(sel));document.execCommand('insertText',false,v);NL.dirty=true;keep();
+  });
+  wrap.addEventListener('click',e=>{
+    const t=e.target,d=NL.cur.design;
+    const fmt=t.closest('[data-fmt]');
+    if(fmt){
+      const host=bodyFor(fmt),c=fmt.dataset.fmt;
+      if(c==='link'){
+        restore(host);const sel=window.getSelection(),txt=sel?String(sel):'',saved=sel&&sel.rangeCount?sel.getRangeAt(0).cloneRange():null;
+        let url=prompt('Link to (web address or email):','https://');
+        if(!url||!url.trim()||url.trim()==='https://')return;url=url.trim();
+        if(/^[^@\s/]+@[^@\s]+\.[^@\s]+$/.test(url))url='mailto:'+url;
+        else if(!/^(https?:|mailto:)/i.test(url))url='https://'+url.replace(/^\/+/,'');
+        host.focus();if(saved){sel.removeAllRanges();sel.addRange(saved);}
+        if(txt)document.execCommand('createLink',false,url);else document.execCommand('insertHTML',false,'<a href="'+esc(url)+'">'+esc(url.replace(/^mailto:/,''))+'</a>');
+      }else{
+        restore(host);
+        if(c==='bold'||c==='italic')document.execCommand(c);else if(c==='ul')document.execCommand('insertUnorderedList');
+      }
+      const b=blockOf(host);if(b&&host.matches('[data-body]'))b.html=host.innerHTML;NL.dirty=true;keep();return;
+    }
+    const mv=t.closest('[data-mv]');
+    if(mv){
+      const i=+mv.closest('.nl-b').dataset.i,dir=+mv.dataset.mv,j=i+dir;if(j<0||j>=d.blocks.length)return;
+      [d.blocks[i],d.blocks[j]]=[d.blocks[j],d.blocks[i]];NL.dirty=true;nlBlocksDraw();
+      const el=wrap.querySelector(`.nl-b[data-i="${j}"] [data-mv="${dir}"]`),alt=wrap.querySelector(`.nl-b[data-i="${j}"] [data-mv="${-dir}"]`);
+      (el&&!el.disabled?el:alt).focus();return;
+    }
+    const rm=t.closest('[data-rm]');
+    if(rm){
+      const i=+rm.closest('.nl-b').dataset.i,b=d.blocks[i];
+      const has=(b.t==='text'&&(String(b.title||'').trim()||nlPlain(b.html)))||(b.t==='photo'&&b.url);
+      if(has&&!confirm(b.t==='photo'?'Remove this picture?':'Remove this text?'))return;
+      d.blocks.splice(i,1);NL.dirty=true;nlBlocksDraw();return;
+    }
+    if(t.closest('[data-add-text]')){d.blocks.push({t:'text',title:'',html:''});NL.dirty=true;nlBlocksDraw(d.blocks.length-1);return;}
+    if(t.closest('[data-add-photo]')){const b={t:'photo',url:'',caption:''};d.blocks.push(b);NL.dirty=true;nlBlocksDraw();NL.pickFor=b;file.click();return;}
+    if(t.closest('[data-add-pickup]')){d.blocks.splice(Math.min(1,d.blocks.length),0,{t:'pickup'});NL.dirty=true;nlBlocksDraw();return;}
+    const pick=t.closest('[data-pick]');
+    if(pick){NL.pickFor=pick.closest('[data-hero]')?'hero':blockOf(pick);file.click();return;}
+    if(t.closest('[data-unhero]')){d.hero=null;NL.dirty=true;nlHeroDraw();return;}
+  });
+  file.addEventListener('change',()=>{const f=file.files&&file.files[0],to=NL.pickFor;file.value='';NL.pickFor=null;if(f&&to)nlPicUpload(f,to);});
+  // drop a photo on a picture spot (or anywhere: it's added at the end); a PDF goes to the PDF box
+  const spotOf=el=>el&&el.closest&&el.closest('[data-hero],[data-pic]');
+  wrap.addEventListener('dragover',e=>{
+    if(!e.dataTransfer||![...e.dataTransfer.types].includes('Files'))return;e.preventDefault();
+    const s=spotOf(e.target);wrap.querySelectorAll('.drag').forEach(x=>{if(x!==s)x.classList.remove('drag');});if(s)s.classList.add('drag');
+  });
+  wrap.addEventListener('dragleave',e=>{const s=spotOf(e.target);if(s&&!s.contains(e.relatedTarget))s.classList.remove('drag');});
+  wrap.addEventListener('drop',e=>{
+    const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(!f)return;e.preventDefault();
+    const s=spotOf(e.target);wrap.querySelectorAll('.drag').forEach(x=>x.classList.remove('drag'));
+    if(nlIsPdf(f)){nlPdfAttach(f);return;}
+    if(s){nlPicUpload(f,s.matches('[data-hero]')?'hero':blockOf(s));return;}
+    const b={t:'photo',url:'',caption:''};NL.cur.design.blocks.push(b);NL.dirty=true;nlBlocksDraw();nlPicUpload(f,b);
+  });
 }
 function nlAudience(){
   const g=NL.body,club=[...g.querySelectorAll('[data-club]')].filter(x=>x.checked).map(x=>x.dataset.club);
@@ -12070,26 +12335,29 @@ function nlAudience(){
 }
 function nlCollect(){
   const g=NL.body,v=s=>{const e=g.querySelector(s);return e?e.value:'';};
-  const ed=g.querySelector('[data-ed]'),src=g.querySelector('[data-src]');
-  const html=NL.src?src.value:ed.innerHTML;
   const p=NL.cur||{};
-  return {id:p.id||undefined,month:v('[data-f="month"]'),subject:v('[data-f="subject"]').trim(),preheader:v('[data-f="preheader"]').trim(),body_html:/^(\s|<p><br><\/p>)*$/i.test(html)?'':html,audience:nlAudience(),pdf_url:p.pdf_url||'',pdf_name:p.pdf_name||'',pdf_bytes:p.pdf_bytes||0};
+  return {id:p.id||undefined,month:v('[data-f="month"]'),subject:v('[data-f="subject"]').trim(),preheader:v('[data-f="preheader"]').trim(),body_html:'',design:nlDesignOut(p.design),audience:nlAudience(),pdf_url:p.pdf_url||'',pdf_name:p.pdf_name||'',pdf_bytes:p.pdf_bytes||0};
 }
 function nlHasContent(){
   const c=nlCollect();
   if(!c.subject){toast('Add a subject first.',true);NL.body.querySelector('[data-f="subject"]').focus();return false;}
   if(NL.pdfBusy){toast('Wait for the PDF to finish uploading.',true);return false;}
-  if(!c.body_html.replace(/<[^>]*>/g,'').replace(/&nbsp;/gi,' ').trim()&&!c.pdf_url){toast('Write the newsletter or attach a PDF first.',true);return false;}
+  if(NL.busyPic){toast('Wait for the picture to finish uploading.',true);return false;}
+  if(!nlDesignWritten(c.design)&&!c.pdf_url){toast('Write the newsletter or attach a PDF first.',true);return false;}
   return true;
 }
 async function nlSave(quiet){
   const c=nlCollect();
-  if(!quiet&&!c.subject&&!c.body_html&&!c.pdf_url){toast('Nothing to save yet.',true);return false;}
+  if(!quiet&&!c.subject&&!nlDesignWritten(c.design)&&!c.pdf_url){toast('Nothing to save yet.',true);return false;}
   if(NL.pdfBusy){toast('Wait for the PDF to finish uploading.',true);return false;}
+  if(NL.busyPic){toast('Wait for the picture to finish uploading.',true);return false;}
   if(quiet&&NL.cur.id&&!NL.dirty)return true;
   const b=NL.body.querySelector('[data-save]');if(b){b.disabled=true;b.textContent='Saving…';}
   try{
+    const mine=NL.cur.design;
     const d=await nlCall('save',c);NL.cur=Object.assign({},NL.cur,d.newsletter);NL.dirty=false;
+    // a quiet save (before schedule / send) keeps the open editor's own copy; Save draft redraws from what was saved
+    if(quiet&&mine)NL.cur.design=mine;
     if(!quiet){toast('Draft saved.');nlEditor();}
     return true;
   }catch(e){toast(e.message,true);return false;}
@@ -12157,7 +12425,7 @@ function nlSent(){
   const pv=$(`<button type="button" class="btn btn-ghost btn-sm">See the email</button>`);pv.addEventListener('click',nlPreviewSaved);acts.append(pv);
   const dup=$(`<button type="button" class="btn btn-ghost btn-sm">Copy into a new draft</button>`);
   dup.addEventListener('click',async()=>{
-    try{const d=await nlCall('save',{month:NL.list?NL.list.default_month:n.month,subject:n.subject,preheader:n.preheader,body_html:n.body_html,audience:n.audience});NL.cur=d.newsletter;NL.dirty=false;toast('Copied into a new draft.'+(n.pdf_url?' Attach this month’s PDF.':''));nlEditor();}
+    try{const d=await nlCall('save',{month:NL.list?NL.list.default_month:n.month,subject:n.subject,preheader:n.preheader,body_html:'',design:nlDesignOut(n.design||nlFromHtml(n.body_html||'')),audience:n.audience});NL.cur=d.newsletter;NL.dirty=false;toast('Copied into a new draft.'+(n.pdf_url?' Attach this month’s PDF.':''));nlEditor();}
     catch(e){toast(e.message,true);}
   });
   acts.append(dup);
@@ -12181,7 +12449,7 @@ function nlSent(){
 }
 function nlPreviewSaved(){
   const n=NL.cur;
-  nlPreview({id:n.id,month:String(n.month||'').slice(0,7),subject:n.subject||'',preheader:n.preheader||'',body_html:n.body_html||'',audience:n.audience||{},pdf_url:n.pdf_url||'',pdf_name:n.pdf_name||'',pdf_bytes:n.pdf_bytes||0});
+  nlPreview({id:n.id,month:String(n.month||'').slice(0,7),subject:n.subject||'',preheader:n.preheader||'',body_html:n.body_html||'',design:n.design||null,audience:n.audience||{},pdf_url:n.pdf_url||'',pdf_name:n.pdf_name||'',pdf_bytes:n.pdf_bytes||0});
 }
 
 /* ====== COMPS — prepaid & comp memberships (square-club comp_* actions) ======
