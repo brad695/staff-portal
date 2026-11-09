@@ -12247,10 +12247,19 @@ const nlAutoHead=m=>nlMonthName(m)?'Your '+nlMonthName(m)+' box':'Your {{month}}
 const NL_AUTO_HEAD=new RegExp('^Your ('+NL_MONTHS.join('|')+'|\\{\\{month\\}\\}) box$');
 // Maverick 2026-11-08: "set the template to cheese name, then description then a picture" — one set per cheese
 // (a box is three or four cheeses; + Cheese adds another). Left empty, a set simply isn't in the email.
+// Then: "add the pickup date part back … remove the pairing and news from the shop from the first one and add
+// the cheeses" → greeting, pickup box, the cheeses, sign-off.
 const nlCheese=()=>[{t:'text',title:'',html:''},{t:'photo',url:'',caption:''}];
 function nlTemplate(month){
-  return {v:1,headline:nlAutoHead(month),hero:null,blocks:[...nlCheese(),...nlCheese(),...nlCheese()]};
+  return {v:1,headline:nlAutoHead(month),hero:null,blocks:[
+    {t:'text',title:'',html:'<p>Hi {{first_name}},</p><p>Here’s what’s in your {{month}} box.</p>'},
+    {t:'pickup'},
+    ...nlCheese(),...nlCheese(),...nlCheese(),
+    {t:'text',title:'',html:'<p>See you at pickup!<br>— The GREYS crew</p>'}
+  ]};
 }
+// where a new cheese goes: after the last cheese's picture (so it lands before the sign-off), else at the end
+function nlCheeseAt(bl){for(let i=bl.length-1;i>=0;i--)if(bl[i].t==='photo'&&bl[i-1]&&bl[i-1].t==='text')return i+1;return bl.length;}
 const nlCopy=o=>JSON.parse(JSON.stringify(o));
 const nlPlain=h=>String(h||'').replace(/<[^>]*>/g,' ').replace(/&nbsp;/gi,' ').replace(/\s+/g,' ').trim();
 // a design as the function expects it (and the same "is anything written?" rule)
@@ -12711,10 +12720,10 @@ function nlCanvasWire(grid){
       if(has&&!confirm(b.t==='photo'?'Remove this picture?':'Remove this text?'))return;
       d.blocks.splice(i,1);NL.dirty=true;nlBlocksDraw();return;
     }
-    if(t.closest('[data-add-cheese]')){d.blocks.push(...nlCheese());NL.dirty=true;nlBlocksDraw(d.blocks.length-2);return;}
+    if(t.closest('[data-add-cheese]')){const at=nlCheeseAt(d.blocks);d.blocks.splice(at,0,...nlCheese());NL.dirty=true;nlBlocksDraw(at);return;}
     if(t.closest('[data-add-text]')){d.blocks.push({t:'text',title:'',html:''});NL.dirty=true;nlBlocksDraw(d.blocks.length-1);return;}
     if(t.closest('[data-add-photo]')){const b={t:'photo',url:'',caption:''};d.blocks.push(b);NL.dirty=true;nlBlocksDraw();NL.pickFor=b;file.click();return;}
-    if(t.closest('[data-add-pickup]')){d.blocks.unshift({t:'pickup'});NL.dirty=true;nlBlocksDraw();return;}
+    if(t.closest('[data-add-pickup]')){let at=d.blocks.findIndex((b,i)=>b.t==='text'&&d.blocks[i+1]&&d.blocks[i+1].t==='photo');if(at<0)at=0;d.blocks.splice(at,0,{t:'pickup'});NL.dirty=true;nlBlocksDraw();return;}
     const pick=t.closest('[data-pick]');
     if(pick){NL.pickFor=pick.closest('[data-hero]')?'hero':blockOf(pick);file.click();return;}
     if(t.closest('[data-unhero]')){d.hero=null;NL.dirty=true;nlHeroDraw();return;}
