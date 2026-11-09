@@ -216,10 +216,11 @@
         <div class="swiper-wrapper">
           <div class="swiper-slide">
             <div class="card d-flex flex-row align-items-end border-0 large jarallax-keep-img">
-              <img src="/shop-theme/greys/hero-1.webp" alt="Smiling woman in the Brie Right Back tee at a cheese counter" class="img-fluid jarallax-img">
+              <!-- Moos Mooing at the Moon on a model, made in Higgsfield 2026-11-09 (served from Higgsfield's CDN) -->
+              <img src="https://d8j0ntlcm91z4.cloudfront.net/user_3JcgAsOyWW5UgwGsmOwA10k3oCD/hf_20261109_191610_ddb89c3a-3463-44ff-92b8-418cf61ac8d0.webp" alt="Smiling woman in the Moos Mooing at the Moon tee in a cheese shop" class="img-fluid jarallax-img">
               <div class="cart-concern p-3 m-3 p-lg-5 m-lg-5">
                 <h2 class="card-title display-3 light">Melt, Age &amp; Puns</h2>
-                <a href="#featured-products"
+                <a href="#featured-products" data-act="item" data-slug="moos-mooing-at-the-moon"
                   class="text-uppercase light mt-3 d-inline-block text-hover fw-bold light-border">Shop Now</a>
               </div>
             </div>
@@ -850,7 +851,7 @@
     var t = e.target.closest && e.target.closest('[data-act]');
     if (!t) return;
     var a = t.getAttribute('data-act'), i = Number(t.getAttribute('data-i'));
-    if (a === 'item') { e.preventDefault(); if (S.cat) openItem(t.getAttribute('data-slug')); }
+    if (a === 'item') { var sl = t.getAttribute('data-slug'); if (S.cat && bySlug[sl]) { e.preventDefault(); openItem(sl); } } // not for sale: the link's own href
     else if (a === 'close-modal') closeModal(false);
     else if (a === 'mqty' && S.modal) { S.modal.qty = Math.max(1, Math.min(MAXQ, S.modal.qty + Number(t.getAttribute('data-v')))); renderModal(false); }
     else if (a === 'add' && S.modal) addFromModal();
