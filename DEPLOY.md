@@ -73,7 +73,8 @@ If Twilio secrets are missing, everything still works — texts are just skipped
 
 Moved in from the `tee-stores` repo (Next.js + Stripe test mode). Same six Greys designs, now paid through **Square** and printed + shipped by **Printful**.
 
-- **Shop:** `/shop` (`shop.html`) — wears the greyscheese.com header/footer (`site-chrome.js`, loaded from orderonline.greyscheese.com so there's still one copy of the menu); the header's top-right slot is the cart. Sizes sit on each card; cart lives in the browser; checkout = contact + US address + Square card form.
+- **Shop:** `/shop` (`shop.html`) — wears the greyscheese.com header/footer (`site-chrome.js`, loaded from orderonline.greyscheese.com so there's still one copy of the menu); the header's top-right slot is the bag. The front page is the old tee-greys look (photo slider, parallax photos, product rows); tapping a shirt opens the online-ordering item window (pick a size), and the bag + checkout are the online-ordering drawer. Cart lives in the browser; checkout = contact + US address + Square card form.
+- **Theme:** `shop-theme/` is TemplatesJungle's free "Stylish" template (Bootstrap 5, Swiper, jarallax) with the Greys photos in `shop-theme/greys/`. Its free license needs the **"Store design by TemplatesJungle"** link at the bottom of the page — keep it.
 - **Console:** Manager console → Online Ordering → **👕 Shirt Shop** (`shop-admin.html`): switches, orders, Printful hookup, prices/on-sale.
 - **Function:** `supabase/functions/shirt-shop` (deploy with `verify_jwt = false`). Actions `catalog · quote · pay · status · sweep · printful_hook` + console admin actions. Its header explains the whole flow.
 - **Tables:** `supabase/sql/2026-11-08_shirt_shop.sql` — `shirt_products`, `shirt_variants`, `shirt_orders`, the `site_content` row `shirt_shop`, and the `shirt-orders-sweep` cron (cancels unpaid checkouts after 30 min).

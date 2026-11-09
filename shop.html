@@ -19,293 +19,388 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="preconnect" href="https://vdvtrevhqalmjwhjhjug.supabase.co" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=League+Spartan:wght@600;700;800&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,900;1,900&family=Source+Sans+Pro:wght@400;600;700;900&family=Instrument+Sans:wght@400;500;600;700&family=League+Spartan:wght@600;700;800&display=swap" />
+<link rel="stylesheet" href="/shop-theme/css/vendor.css" />
+<link rel="stylesheet" href="/shop-theme/style.css" />
 <!--
   shop.html — the GREYS shirt shop (moved in from the tee-stores repo, 2026-11-08).
     LIVE     https://staff.greyscheese.com/shop
-    STAGING  https://greys-staff-portal-staging.onrender.com/shop   (always Square sandbox)
-  Catalog, prices, shipping and tax come from the `shirt-shop` Edge Function (supabase/functions/shirt-shop);
-  orders are paid through Square (Web Payments SDK card form) and printed + shipped by Printful.
-  Sandbox vs real cards is decided by the function (site_content 'shirt_shop'.live + the page's origin), never here;
-  the page shows a test bar whenever the function says sandbox.
-  Header + footer: the shared greyscheese.com chrome (site-chrome.js from the Greys-Sites repo, loaded from the order
-  site so there is still ONE copy of the menu). Its top-right slot is the cart button.
+    STAGING  https://greys-staff-portal-staging.onrender.com/shop.html   (always Square sandbox)
+  LOOK (Maverick, 2026-11-08: "the front page exactly the same with our header and footer … the item pages can match
+  our online ordering site exactly"):
+    · front page = the tee-greys.onrender.com page: TemplatesJungle "Stylish" home sections (hero slider + parallax
+      photos, coupon band, Featured Shirts, collections, Latest Drops), its CSS/JS in /shop-theme (unchanged files),
+      between the greyscheese.com header + footer (site-chrome.js, loaded from the order site: one copy of the menu).
+      The template's license needs its credit link to templatesjungle.com kept — it sits just above our footer.
+    · item window, bag and checkout = orderonline.greyscheese.com's own (order.html): same markup + CSS, scoped .os.
+  Catalog, prices, shipping and tax come from the `shirt-shop` Edge Function; cards are paid through Square (Web
+  Payments SDK) and orders are printed + shipped by Printful. Sandbox vs real cards is decided by the function.
   Local testing: http://localhost:PORT/shop.html?fn=http://localhost:8787 points the page at a local function.
 -->
 <style>
-  :root{--navy:#06273A;--navy2:#0e4a6b;--gold:#E6B33C;--paper:#FAF8F4;--card:#FFFFFF;--ink:#1C1A17;--brass:#896D39;
-    --muted:#5F584F;--rule:#E7E0D5;--soft:#F3EFE8;--red:#A4262C;--green:#2F6B3A;
+  :root{--bg:#faf8f4;--ink:#1c1a17;--navy:#06273A;--navy2:#0e4a6b;--gold:#e6b33c;--cream:#fbf1d9;--brass:#896D39;
+    --line:#ebe5dc;--line2:#e7e0d5;--line3:#ddd6cb;--rule:#f1ece4;--soft:#f3efe8;--card:#ffffff;
+    --muted:#6b645c;--muted2:#5c554d;--sub:#4d473f;--green:#2f6b3a;--red:#a4262c;
     --fb:'Instrument Sans',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
     --fd:'League Spartan','Instrument Sans',ui-sans-serif,system-ui,sans-serif;}
-  *,*::before,*::after{box-sizing:border-box}
-  html{-webkit-text-size-adjust:100%}
-  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--fb);font-size:16px;line-height:1.5}
-  img{display:block;max-width:100%}
-  button,input,select{font:inherit;color:inherit}
-  [hidden]{display:none !important}
-  .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-  :focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+  body.locked{overflow:hidden}
+  [hidden]{display:none!important}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
-  .s-wrap{max-width:1120px;margin:0 auto;padding:0 20px}
-  #shop{outline:none}
-
-  /* bars */
-  .s-bar{margin:18px 0 0;padding:10px 14px;border-radius:8px;font-size:14px;line-height:1.45}
-  .s-bar.test{background:#FDF1D3;color:#4A3A12;border:1px solid #F0D58E}
-  .s-bar.pause{background:#F7E4E4;color:#6B1B1F;border:1px solid #E8C2C2}
-
-  /* intro */
-  .s-intro{padding:44px 0 8px;max-width:680px}
-  .s-intro h1{font-family:var(--fd);font-weight:800;font-size:clamp(34px,5.4vw,52px);line-height:1.02;letter-spacing:-.015em;margin:0 0 14px;color:var(--navy)}
-  .s-lede{font-size:19px;line-height:1.5;margin:0 0 10px;color:var(--ink)}
-  .s-facts{font-size:15px;color:var(--muted);margin:0}
-
-  /* grid of shirts */
-  .s-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:40px 28px;padding:34px 0 18px}
-  .s-card{display:flex;flex-direction:column;scroll-margin-top:24px}
-  .s-photo{display:block;width:100%;padding:0;border:0;background:#E9E6E1;border-radius:14px;overflow:hidden;cursor:zoom-in;aspect-ratio:1/1}
-  .s-photo img{width:100%;height:100%;object-fit:cover}
-  /* the counter label: a cheesemonger's card propped in front of each shirt */
-  .s-label{position:relative;margin:-30px 14px 0;padding:18px 18px 16px;background:var(--card);border:1px solid var(--rule);border-radius:4px;
-    box-shadow:inset 0 0 0 4px var(--card),inset 0 0 0 5px var(--navy);flex:1;display:flex;flex-direction:column;padding-bottom:10px}
-  .s-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
-  .s-name{font-family:var(--fd);font-weight:800;font-size:23px;line-height:1.08;letter-spacing:-.01em;margin:0;color:var(--navy)}
-  .s-price{font-family:var(--fd);font-weight:700;font-size:21px;color:var(--navy);white-space:nowrap}
-  .s-kind{margin:6px 0 0;font-size:14px;font-weight:600;color:var(--brass)}
-  .s-note{margin:8px 0 14px;font-size:15px;color:var(--muted);flex:1}
-  .s-sizes{border:0;margin:0 0 12px;padding:0;display:flex;flex-wrap:wrap;gap:6px}
-  .s-sizes label{position:relative;flex:1 1 0;min-width:46px}
-  .s-sizes input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
-  .s-sizes span{display:flex;align-items:center;justify-content:center;height:44px;border:1.5px solid #CFC6B8;border-radius:8px;font-weight:600;font-size:15px;background:#fff;color:var(--ink)}
-  .s-sizes input:checked + span{background:var(--navy);border-color:var(--navy);color:#fff}
-  .s-sizes input:focus-visible + span{outline:3px solid var(--gold);outline-offset:2px}
-  .s-sizes input:disabled + span{color:#AFA79B;background:var(--soft);text-decoration:line-through;cursor:not-allowed}
-  .s-sizes label:hover input:not(:disabled):not(:checked) + span{border-color:var(--navy)}
-  .s-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 20px;border:0;border-radius:10px;
-    background:var(--navy);color:#fff;font-weight:600;font-size:16px;cursor:pointer;text-decoration:none}
-  .s-btn:hover{background:var(--navy2)}
-  .s-btn[disabled]{opacity:.55;cursor:not-allowed}
-  .s-btn.wide{width:100%}
-  .s-btn.ghost{background:transparent;color:var(--navy);border:1.5px solid var(--navy)}
-  .s-btn.ghost:hover{background:var(--soft)}
-  .s-btn.added{background:var(--green)}
-  .s-msg{margin:8px 0 0;font-size:14px;min-height:1.45em;color:var(--muted)}
-  .s-msg.bad{color:var(--red)}
-  .s-fit{margin:0 0 6px;font-size:14px;color:var(--muted)}
-
-  /* loading + errors */
-  .s-skel .s-photo{background:linear-gradient(90deg,#ECE8E2,#F4F1EC,#ECE8E2);background-size:200% 100%;animation:sk 1.4s linear infinite;cursor:default}
-  .s-skel .s-label{min-height:210px}
-  @keyframes sk{to{background-position:-200% 0}}
-  .s-oops{padding:28px 0 60px;max-width:560px}
-  .s-oops p{margin:0 0 14px}
-
-  /* track */
-  .s-track{margin:30px 0 0;padding:22px 0 0;border-top:1px solid var(--rule)}
-  .s-track summary{cursor:pointer;font-weight:600;color:var(--navy);display:inline-block;padding:6px 0}
-  .s-track form{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 0;align-items:flex-end}
-  .s-track .s-f{margin:0;flex:1 1 180px}
-  .s-tres{margin:14px 0 0;font-size:15px}
-
-  /* cart bar (sticky) */
-  .s-cartbar{position:sticky;bottom:0;z-index:30;margin-top:28px;background:var(--navy);color:#fff;padding:10px 0 calc(10px + env(safe-area-inset-bottom))}
-  .s-cartbar .s-wrap{display:flex;align-items:center;justify-content:space-between;gap:14px}
-  .s-cartbar p{margin:0;font-weight:600}
-  .s-cartbar .s-btn{background:var(--gold);color:var(--navy);min-height:44px}
-  .s-cartbar .s-btn:hover{background:#F0C252}
-
-  /* header cart button (site-chrome's top-right slot) */
-  .gx-site #gx-mine .s-count{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;margin-left:2px;border-radius:11px;background:var(--gold);color:var(--navy);font:700 13px/1 var(--fb)}
+  /* the greyscheese.com header + footer keep their own colors under the template's global p / li / a rules */
+  .gx-site p,.gx-site li{color:inherit}
+  .gx-site a{transition:none}
+  .gx-site #gx-mine .cnt{min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--gold);color:var(--navy);font:700 12px/22px var(--fb);text-align:center}
   .s-fallhead{background:var(--navy);color:#F5F7F2;padding:16px 20px;display:flex;align-items:center;justify-content:space-between}
-  .s-fallhead a{color:#F5F7F2;text-decoration:none;font:800 30px/1 var(--fd);letter-spacing:.02em}
-  .s-fallhead button{background:none;border:1px solid #F5F7F2;color:#F5F7F2;border-radius:8px;padding:8px 14px;cursor:pointer}
+  .s-fallhead a{color:#F5F7F2;font:800 30px/1 var(--fd)}
+  .s-fallhead button{background:none;border:1px solid #F5F7F2;color:#F5F7F2;border-radius:10px;padding:8px 14px;cursor:pointer;font:600 15px var(--fb)}
 
-  /* cart drawer */
-  .s-scrim{position:fixed;inset:0;background:rgba(6,39,58,.42);z-index:80}
-  .s-drawer{position:fixed;top:0;right:0;bottom:0;z-index:81;width:min(440px,100%);background:var(--paper);display:flex;flex-direction:column;
-    box-shadow:-12px 0 40px rgba(6,39,58,.18);transform:translateX(0);transition:transform .22s ease}
-  .s-drawer.closed{transform:translateX(104%)}
-  .s-dhead{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--rule)}
-  .s-dhead h2{margin:0;font-family:var(--fd);font-weight:800;font-size:24px;color:var(--navy)}
-  .s-x{width:44px;height:44px;border:0;background:none;border-radius:8px;cursor:pointer;font-size:26px;line-height:1;color:var(--navy)}
-  .s-x:hover{background:var(--soft)}
-  .s-dbody{flex:1;overflow:auto;padding:6px 20px}
-  .s-dfoot{padding:16px 20px calc(16px + env(safe-area-inset-bottom));border-top:1px solid var(--rule);background:var(--card)}
-  .s-row{display:flex;justify-content:space-between;gap:12px;margin:0 0 4px}
-  .s-row.total{font-weight:700;font-size:18px;margin:10px 0 0;padding-top:10px;border-top:1px solid var(--rule)}
-  .s-small{font-size:14px;color:var(--muted);margin:2px 0 12px}
-  .s-empty{padding:30px 0;color:var(--muted)}
-  .s-line{display:grid;grid-template-columns:64px 1fr auto;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--rule)}
-  .s-line img{width:64px;height:64px;border-radius:8px;object-fit:cover;background:#E9E6E1}
-  .s-line b{display:block;font-weight:600;line-height:1.25}
-  .s-line small{display:block;color:var(--muted);font-size:14px}
-  .s-qty{display:inline-flex;align-items:center;gap:2px;margin-top:6px;border:1.5px solid #CFC6B8;border-radius:8px}
-  .s-qty button{width:36px;height:34px;border:0;background:none;cursor:pointer;font-size:18px;color:var(--navy)}
-  .s-qty button:disabled{color:#BDB5A8;cursor:default}
-  .s-qty span{min-width:22px;text-align:center;font-weight:600}
-  .s-rm{border:0;background:none;padding:6px 0 0;color:var(--muted);font-size:14px;text-decoration:underline;cursor:pointer;display:block;margin-left:auto}
-  .s-lp{text-align:right;font-weight:600;white-space:nowrap}
+  /* strips (the order site's) */
+  #testbar{background:#fde7a8;color:#3d2e0d;font:13.5px/1.45 var(--fb);text-align:center;padding:8px 16px}
+  #testbar b{color:#06273A}
+  #pausebar{background:#f7e2de;color:#7c1f15;font:600 14px/1.4 var(--fb);text-align:center;padding:9px 16px}
 
-  /* checkout */
-  .s-back{border:0;background:none;padding:10px 0;color:var(--navy);font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
-  .s-co h1,.s-done h1{font-family:var(--fd);font-weight:800;font-size:clamp(30px,4.4vw,42px);line-height:1.05;margin:6px 0 22px;color:var(--navy);letter-spacing:-.01em}
-  .s-cogrid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:40px;align-items:start;padding-bottom:40px}
-  .s-co fieldset{border:0;margin:0 0 26px;padding:0}
-  .s-co legend{font-family:var(--fd);font-weight:700;font-size:21px;color:var(--navy);padding:0;margin:0 0 12px}
-  .s-pair{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
-  .s-trio{display:grid;grid-template-columns:1.4fr 1fr .8fr;gap:0 14px}
-  .s-f{display:block;margin:0 0 14px}
-  .s-f span{display:block;font-size:14px;font-weight:600;margin:0 0 6px}
-  .s-f em{font-style:normal;font-weight:400;color:var(--muted)}
-  .s-f input,.s-f select{width:100%;height:48px;padding:0 14px;border:1.5px solid #D9D1C4;border-radius:10px;background:#fff;font-size:16px}
-  .s-f input:focus,.s-f select:focus{border-color:var(--navy);outline:none;box-shadow:0 0 0 3px rgba(230,179,60,.45)}
-  .s-f input[aria-invalid="true"],.s-f select[aria-invalid="true"]{border-color:var(--red)}
-  #sq-card{min-height:90px}
-  .s-cardnote{font-size:14px;color:var(--muted);margin:6px 0 0}
-  .s-payerr{margin:0 0 14px;color:var(--red);font-weight:600}
-  .s-payerr:empty{display:none}
-  .s-fine{font-size:14px;color:var(--muted);margin:12px 0 0}
-  .s-fine a{color:var(--navy)}
-  .s-sum{position:sticky;top:20px;background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:20px}
-  .s-sum h2{margin:0 0 6px;font-family:var(--fd);font-weight:700;font-size:21px;color:var(--navy)}
-  .s-sum .s-line{grid-template-columns:52px 1fr auto;padding:10px 0}
-  .s-sum .s-line img{width:52px;height:52px}
-  .s-sum .s-rows{margin-top:12px}
-  .s-pending{color:var(--muted)}
+  /* template product cards open the item window */
+  .product-card .card-img{cursor:pointer}
+  .product-store .ph{aspect-ratio:1/1;background:#F1F1F0}
+  .shop-oops{width:100%;padding:10px 12px 30px;font-family:var(--fb);color:var(--sub)}
+  .shop-oops button{margin-left:8px;height:40px;padding:0 16px;border:0;border-radius:10px;background:var(--navy);color:#fff;font-weight:600;cursor:pointer}
+  .tj-credit{margin:48px 0 0;text-align:center;font:12px/1.4 var(--fb);color:#7A7A7A}
+  .tj-credit a{color:#111;text-decoration:underline}
 
-  /* done */
-  .s-done{padding:40px 0 30px;max-width:640px}
-  .s-done p{margin:0 0 12px;font-size:17px}
-  .s-done .s-sum{position:static;margin:20px 0 22px}
-
-  /* zoom */
-  .s-zoom{border:0;padding:0;background:transparent;max-width:min(92vw,820px);width:100%}
-  .s-zoom::backdrop{background:rgba(6,39,58,.7)}
-  .s-zoom img{width:100%;border-radius:14px;background:#E9E6E1}
-  .s-zoom .s-x{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.9)}
-
-  @media (max-width:980px){
-    .s-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-    .s-cogrid{grid-template-columns:1fr;gap:10px}
-    .s-sum{position:static;order:-1}
-  }
-  @media (max-width:620px){
-    .s-wrap{padding:0 16px}
-    .s-intro{padding-top:30px}
-    .s-lede{font-size:17px}
-    .s-grid{grid-template-columns:1fr;gap:34px}
-    .s-pair,.s-trio{grid-template-columns:1fr}
-    .s-trio .s-f:last-child{max-width:200px}
-  }
-  @media (prefers-reduced-motion:reduce){
-    .s-drawer{transition:none}
-    .s-skel .s-photo{animation:none}
+  /* ---------- the order site's item window, bag and checkout (order.html), scoped to .os ---------- */
+  .os{font-family:var(--fb);color:var(--ink);font-weight:400;line-height:1.4;-webkit-font-smoothing:antialiased}
+  .os *,.os *::before,.os *::after{box-sizing:border-box}
+  .os p,.os li{color:inherit}
+  .os a{color:var(--navy);text-decoration:underline}
+  .os button{font-family:inherit;color:inherit;line-height:1.2}
+  .os button:focus-visible,.os a:focus-visible,.os input:focus-visible,.os select:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+  .os svg{flex-shrink:0}
+  .os h2{margin:0;font-family:var(--fd);font-weight:700;font-size:34px;line-height:1.08;letter-spacing:-.01em;color:var(--navy)}
+  .os .o-row{display:flex;align-items:center;gap:8px}
+  .os .overlay{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:32px}
+  .os .scrim{position:absolute;inset:0;width:100%;height:100%;border:0;padding:0;background:rgba(20,18,15,.5);cursor:pointer}
+  .os .dialog{position:relative;width:680px;max-width:100%;max-height:calc(100vh - 64px);display:flex;flex-direction:column;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 40px 90px -30px rgba(6,39,58,.55)}
+  .os .xbtn{width:42px;height:42px;border:0;border-radius:999px;background:#fff;color:var(--ink);box-shadow:0 2px 10px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .os .dialog .xbtn{position:absolute;top:14px;right:14px;z-index:2}
+  .os .dlg-scroll{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain}
+  .os .dlg-img{display:block;width:100%;height:auto;aspect-ratio:1/1;object-fit:cover;background:var(--soft)}
+  .os .dialog.split{width:min(820px,calc(100vw - 64px))}
+  .os .dlg-split{display:flex;align-items:stretch}
+  .os .dlg-colA{flex:0 0 340px;width:340px;border-right:1px solid #efe9e0}
+  .os .dlg-colB{flex:1 1 auto;min-width:0}
+  .os .split .dlg-top{padding:24px 64px 14px 24px}
+  .os .split .dlg-top h2{font-size:26px}
+  .os .split .dlg-top p{font-size:14px}
+  .os .split .dlg-body{padding:16px 24px 20px;gap:18px}
+  .os .split legend{margin-bottom:8px;font-size:14px}
+  .os .split .opts{grid-template-columns:1fr;gap:6px}
+  .os .split .opt{min-height:38px;padding:6px 12px;gap:10px;border-radius:10px}
+  .os .split .opt .nm{font-size:14px}
+  .os .split .opt .pr{font-size:13px}
+  .os .dlg-top{padding:24px 72px 20px 28px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid #efe9e0}
+  .os .tag{align-self:flex-start;font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--cream);color:var(--navy)}
+  .os .dlg-top h2{font-size:32px;line-height:1.08}
+  .os .dlg-top p{margin:0;font-size:15px;line-height:1.55;color:var(--muted2)}
+  .os .dlg-body{padding:24px 28px 28px;display:flex;flex-direction:column;gap:28px}
+  .os fieldset{margin:0;padding:0;border:0;min-width:0}
+  .os legend{float:none;width:auto;padding:0;margin:0 0 12px;display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;line-height:1.4;color:var(--ink)}
+  .os .req{font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--soft);color:var(--muted2)}
+  .os .req.need{background:#fbe3c2;color:#6a3d00}
+  .os .opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .os .opt{display:flex;align-items:center;gap:12px;min-height:52px;margin:0;padding:10px 14px;border:1px solid var(--line3);border-radius:12px;cursor:pointer;background:#fff}
+  .os .opt.on{border-color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy);background:#f7f5f0}
+  .os .opt.off{opacity:.5;cursor:not-allowed}
+  .os .opt input{width:18px;height:18px;margin:0;accent-color:var(--navy);flex-shrink:0}
+  .os .opt .nm{flex:1;font-size:15px;font-weight:500}
+  .os .opt .pr{font-size:14px;color:var(--muted2);white-space:nowrap}
+  .os .minmsg{margin:0;font-size:14px;color:var(--muted)}
+  .os .dlg-foot{display:flex;align-items:center;gap:16px;padding:16px 28px 20px;border-top:1px solid #efe9e0;background:#fff}
+  .os .qty{display:flex;align-items:center;gap:4px;padding:4px;border:1px solid var(--line2);border-radius:12px}
+  .os .qty button{width:40px;height:40px;border:0;border-radius:9px;background:#f6f2ec;color:var(--navy);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .os .qty button:disabled{opacity:.4;cursor:default}
+  .os .qty b{min-width:34px;text-align:center;font-size:16px}
+  .os .qty.sm{gap:2px;padding:2px;border-radius:10px}
+  .os .qty.sm button{width:32px;height:32px;border-radius:8px}
+  .os .qty.sm b{min-width:28px;font-size:14px}
+  .os .primary{flex:1;height:52px;border:0;border-radius:14px;font-size:16px;font-weight:700;background:var(--navy);color:#fff;cursor:pointer}
+  .os .primary:disabled{background:#e7e2da;color:#8a8278;cursor:default}
+  .os .drawer-wrap{position:fixed;inset:0;z-index:70}
+  .os .drawer-wrap .scrim{background:rgba(20,18,15,.45)}
+  .os aside.drawer{position:absolute;top:0;right:0;bottom:0;width:460px;max-width:100%;display:flex;flex-direction:column;background:#fff;box-shadow:-30px 0 70px -30px rgba(6,39,58,.5)}
+  .os .dr-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 24px;border-bottom:1px solid #efe9e0}
+  .os .dr-head h2{font-size:26px}
+  .os .rbtn{width:40px;height:40px;border-radius:999px;border:1px solid var(--line2);background:#fff;color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .os .dr-body{flex:1 1 auto;overflow-y:auto;padding:20px 24px 24px;display:flex;flex-direction:column;gap:18px;overscroll-behavior:contain}
+  .os .lines{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+  .os .lines li{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--rule)}
+  .os .lines img{display:block;width:64px;height:64px;flex-shrink:0;border-radius:12px;object-fit:cover;background:var(--soft)}
+  .os .lines .mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+  .os .lines .nm{font-size:15px;font-weight:600}
+  .os .lines .dt{font-size:13px;line-height:1.45;color:var(--muted)}
+  .os .lines .acts{display:flex;align-items:center;gap:12px;margin-top:2px}
+  .os .linkbtn{border:0;background:none;padding:0;font-size:13px;font-weight:600;color:var(--navy);text-decoration:underline;cursor:pointer}
+  .os .lines .amt{font-size:15px;font-weight:600;white-space:nowrap}
+  .os .lineerr{font-size:13px;font-weight:600;color:var(--red)}
+  .os .empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:48px 16px;color:var(--muted)}
+  .os .empty .ic{width:56px;height:56px;border-radius:999px;background:var(--soft);color:var(--navy);display:flex;align-items:center;justify-content:center}
+  .os .empty b{font-size:17px;color:var(--ink)}
+  .os .ghostbtn{height:44px;padding:0 18px;border:1px solid var(--line3);border-radius:12px;background:#fff;color:var(--ink);font-size:15px;font-weight:600;cursor:pointer}
+  .os .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .os .grid3{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1.25fr) minmax(0,.85fr);gap:10px}
+  .os .lbl{display:flex;flex-direction:column;gap:6px;margin:0;font-size:13px;font-weight:600;color:var(--sub)}
+  .os .lbl em{font-style:normal;font-weight:500;color:var(--muted)}
+  .os input[type=text],.os input[type=tel],.os input[type=email],.os select{width:100%;height:46px;margin:0;padding:0 14px;border:1px solid var(--line3);border-radius:12px;font:inherit;font-size:15px;font-weight:400;color:var(--ink);background:#fff}
+  .os input.bad,.os select.bad{border-color:var(--red);box-shadow:0 0 0 1px var(--red)}
+  .os .ttl{font-size:15px;font-weight:700}
+  .os #sq-card{min-height:52px}
+  .os .cardload{height:52px;display:flex;align-items:center;padding:0 14px;border:1px dashed var(--line3);border-radius:12px;color:var(--muted);font-size:14px}
+  .os .secure{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+  .os .dr-foot{border-top:1px solid #efe9e0;padding:16px 24px 22px;display:flex;flex-direction:column;gap:8px;background:#fff}
+  .os .dr-foot .ln{display:flex;justify-content:space-between;font-size:14px;color:var(--sub)}
+  .os .dr-foot .tot{display:flex;justify-content:space-between;font-size:17px;font-weight:700;color:var(--ink);padding-top:4px}
+  .os .dr-foot .primary{flex:none;margin-top:8px;height:54px}
+  .os .formerr{padding:10px 12px;border-radius:10px;background:#f7e2de;color:#7c1f15;font-size:14px;line-height:1.45}
+  .os .fine{text-align:center;font-size:12px;color:var(--muted)}
+  .os .done{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding:32px 8px}
+  .os .done .ok{width:68px;height:68px;border-radius:999px;background:#e7f1e9;color:var(--green);display:flex;align-items:center;justify-content:center}
+  .os .done h3{margin:6px 0 0;font-family:var(--fd);font-weight:700;font-size:30px;line-height:1.1;color:var(--navy)}
+  .os .done .big{font-size:18px;font-weight:700;color:var(--ink)}
+  .os .done .muted{font-size:15px;color:var(--sub)}
+  .os .done .code{font-family:var(--fd);font-size:22px;font-weight:700;letter-spacing:.06em;color:var(--navy);background:var(--cream);padding:6px 14px;border-radius:10px}
+  .os .testnote{font-size:13px;color:#6a3d00;background:#fde7a8;padding:8px 12px;border-radius:10px}
+  #floatbar{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:35;display:none}
+  #floatbar.show{display:block}
+  #floatbar button{width:100%;height:56px;border:0;border-radius:16px;background:var(--navy);color:#fff;font:700 16px var(--fb);display:flex;align-items:center;justify-content:space-between;padding:0 18px;box-shadow:0 18px 40px -16px rgba(6,39,58,.7);cursor:pointer}
+  #floatbar .o-row{display:flex;align-items:center;gap:8px}
+  @media (min-width:721px){ #floatbar{left:auto;right:24px;bottom:24px;width:360px} }
+  body.staging #floatbar{bottom:calc(46px + env(safe-area-inset-bottom))}
+  body.staging .os .dr-foot,body.staging .os .dlg-foot{padding-bottom:46px}
+  @media (max-width:720px){
+    .os .overlay{padding:0;align-items:flex-end}
+    .os .dialog{width:100%;max-height:92vh;border-radius:22px 22px 0 0}
+    .os .dlg-top{padding:20px 20px 16px} .os .dlg-top h2{font-size:26px}
+    .os .dlg-body{padding:20px;gap:24px}
+    .os .opts{grid-template-columns:1fr}
+    .os .dlg-foot{padding:12px 16px calc(14px + env(safe-area-inset-bottom))}
+    .os aside.drawer{width:100%}
+    .os .dr-head{padding:14px 16px} .os .dr-body{padding:16px} .os .dr-foot{padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
+    .os .grid3{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} .os .grid3 .lbl:first-child{grid-column:1/-1}
+    body.staging #floatbar{bottom:calc(58px + env(safe-area-inset-bottom))}
+    body.staging .os .dr-foot,body.staging .os .dlg-foot{padding-bottom:calc(58px + env(safe-area-inset-bottom))}
+    body.hasbar .tj-credit{padding-bottom:84px}
   }
 </style>
 </head>
 <body>
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol xmlns="http://www.w3.org/2000/svg" id="quick-view" viewBox="0 0 24 24">
+      <path fill="currentColor"
+        d="M10 18a7.952 7.952 0 0 0 4.897-1.688l4.396 4.396l1.414-1.414l-4.396-4.396A7.952 7.952 0 0 0 18 10c0-4.411-3.589-8-8-8s-8 3.589-8 8s3.589 8 8 8zm0-14c3.309 0 6 2.691 6 6s-2.691 6-6 6s-6-2.691-6-6s2.691-6 6-6z" />
+    </symbol>
+  <symbol xmlns="http://www.w3.org/2000/svg" id="shopping-carriage" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M5 22H19C20.103 22 21 21.103 21 20V9C21 8.73478 20.8946 8.48043 20.7071 8.29289C20.5196 8.10536 20.2652 8 20 8H17V7C17 4.243 14.757 2 12 2C9.243 2 7 4.243 7 7V8H4C3.73478 8 3.48043 8.10536 3.29289 8.29289C3.10536 8.48043 3 8.73478 3 9V20C3 21.103 3.897 22 5 22ZM9 7C9 5.346 10.346 4 12 4C13.654 4 15 5.346 15 7V8H9V7ZM5 10H7V12H9V10H15V12H17V10H19L19.002 20H5V10Z"
+        fill="black" />
+    </symbol>
+</svg>
 <div id="gx-header"></div>
 <script src="https://orderonline.greyscheese.com/site-chrome.js" data-main="shop" data-mine="button" onerror="window.__gxFailed=1"></script>
+<div id="testbar" role="status" hidden></div>
+<div id="pausebar" role="status" hidden></div>
 
 <main id="shop" tabindex="-1">
-  <div class="s-wrap">
-    <p class="s-bar test" id="testbar" hidden></p>
-    <p class="s-bar pause" id="pausebar" role="status" hidden></p>
-
-    <div id="v-shop">
-      <section class="s-intro" aria-labelledby="s-h1">
-        <h1 id="s-h1">Shirts from the cheese counter</h1>
-        <p class="s-lede">Six cheese puns we couldn’t keep behind the counter. Each shirt is printed when you order it and ships anywhere in the US.</p>
-        <p class="s-facts" id="facts"></p>
-      </section>
-      <div class="s-grid" id="grid" aria-live="polite" aria-busy="true"></div>
-      <p class="s-fit">Unisex fit — order your usual size.</p>
-      <details class="s-track" id="track">
-        <summary>Track an order</summary>
-        <form id="trackform" novalidate>
-          <label class="s-f"><span>Order code</span><input name="code" autocomplete="off" autocapitalize="characters" placeholder="T7K2QX" maxlength="8" /></label>
-          <label class="s-f"><span>Email</span><input name="email" type="email" autocomplete="email" inputmode="email" /></label>
-          <button class="s-btn ghost" type="submit">Look up</button>
-        </form>
-        <div class="s-tres" id="trackres" role="status" aria-live="polite"></div>
-      </details>
-    </div>
-
-    <section class="s-co" id="v-checkout" hidden aria-labelledby="co-h1">
-      <button type="button" class="s-back" data-act="shop">Back to the shirts</button>
-      <h1 id="co-h1">Checkout</h1>
-      <div class="s-cogrid">
-        <form id="coform" novalidate>
-          <fieldset>
-            <legend>Contact</legend>
-            <label class="s-f"><span>Name</span><input name="name" autocomplete="name" required /></label>
-            <div class="s-pair">
-              <label class="s-f"><span>Email</span><input name="email" type="email" autocomplete="email" inputmode="email" required /></label>
-              <label class="s-f"><span>Phone <em>(optional, for the carrier)</em></span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" /></label>
+  <section id="intro" class="position-relative mt-4">
+    <div class="container-lg">
+      <div class="swiper main-swiper">
+        <div class="swiper-wrapper">
+          <div class="swiper-slide">
+            <div class="card d-flex flex-row align-items-end border-0 large jarallax-keep-img">
+              <img src="/shop-theme/greys/hero-1.webp" alt="Smiling woman in the Brie Right Back tee at a cheese counter" class="img-fluid jarallax-img">
+              <div class="cart-concern p-3 m-3 p-lg-5 m-lg-5">
+                <h2 class="card-title display-3 light">Melt, Age &amp; Puns</h2>
+                <a href="#featured-products"
+                  class="text-uppercase light mt-3 d-inline-block text-hover fw-bold light-border">Shop Now</a>
+              </div>
             </div>
-          </fieldset>
-          <fieldset>
-            <legend>Ship to</legend>
-            <label class="s-f"><span>Street address</span><input name="address1" autocomplete="address-line1" required /></label>
-            <label class="s-f"><span>Apartment, suite <em>(optional)</em></span><input name="address2" autocomplete="address-line2" /></label>
-            <div class="s-trio">
-              <label class="s-f"><span>City</span><input name="city" autocomplete="address-level2" required /></label>
-              <label class="s-f"><span>State</span><select name="state_code" autocomplete="address-level1" required><option value="">Choose…</option></select></label>
-              <label class="s-f"><span>ZIP</span><input name="zip" autocomplete="postal-code" inputmode="numeric" maxlength="10" required /></label>
+          </div>
+          <div class="swiper-slide">
+            <div class="row g-4">
+              <div class="col-lg-12 mb-4">
+                <div class="card d-flex flex-row align-items-end border-0 jarallax-keep-img">
+                  <img src="/shop-theme/greys/hero-2.webp" alt="Man in the Up to No Gouda tee in a kitchen" class="img-fluid jarallax-img">
+                  <div class="cart-concern p-3 m-3 p-lg-5 m-lg-5">
+                    <h2 class="card-title style-2 display-4 light">Cave Wear</h2>
+                    <a href="#featured-products"
+                      class="text-uppercase light mt-3 d-inline-block text-hover fw-bold light-border">Shop Now</a>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-12">
+                <div class="card d-flex flex-row align-items-end border-0 jarallax-keep-img">
+                  <img src="/shop-theme/greys/hero-3.webp" alt="Woman in the Cheddar Late Than Never tee by a cheese board" class="img-fluid jarallax-img">
+                  <div class="cart-concern p-3 m-3 p-lg-5 m-lg-5">
+                    <h2 class="card-title style-2 display-4 light">Wheel Tees</h2>
+                    <a href="#featured-products"
+                      class="text-uppercase light mt-3 d-inline-block text-hover fw-bold light-border">Shop Now</a>
+                  </div>
+                </div>
+              </div>
             </div>
-            <p class="s-small">We ship to US addresses only.</p>
-          </fieldset>
-          <fieldset>
-            <legend>Pay</legend>
-            <div id="sq-card"></div>
-            <p class="s-cardnote" id="cardnote"></p>
-          </fieldset>
-          <p class="s-payerr" id="payerr" role="alert"></p>
-          <button class="s-btn wide" type="submit" id="paybtn" disabled>Pay</button>
-          <p class="s-fine">Your card is charged when you place the order. Questions about an order? Email <a href="mailto:info@greyscheese.com">info@greyscheese.com</a>.</p>
-        </form>
-        <aside class="s-sum" aria-labelledby="sum-h"><h2 id="sum-h">Order summary</h2><div id="sumlines"></div><div class="s-rows" id="sumrows"></div></aside>
+          </div>
+          <div class="swiper-slide">
+            <div class="card d-flex flex-row align-items-end border-0 large jarallax-keep-img">
+              <img src="/shop-theme/greys/hero-4.webp" alt="Man in the Curd Snack Emergency tee in a cheese cave" class="img-fluid jarallax-img">
+              <div class="cart-concern p-3 m-3 p-lg-5 m-lg-5">
+                <h2 class="card-title display-3 light">Shirts for the Counter</h2>
+                <a href="#featured-products"
+                  class="text-uppercase light mt-3 d-inline-block text-hover fw-bold light-border">Shop Now</a>
+              </div>
+            </div>
+          </div>
+          <div class="swiper-slide">
+            <div class="row g-4">
+              <div class="col-lg-12 mb-4">
+                <div class="card d-flex flex-row align-items-end border-0 jarallax-keep-img">
+                  <img src="/shop-theme/greys/hero-5.webp" alt="Laughing woman in the Wheel Me Another tee" class="img-fluid jarallax-img">
+                  <div class="cart-concern p-3 m-3 p-lg-5 m-lg-5">
+                    <h2 class="card-title style-2 display-4 light">Brie Tees</h2>
+                    <a href="#featured-products"
+                      class="text-uppercase light mt-3 d-inline-block text-hover fw-bold light-border">Shop Now</a>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-12">
+                <div class="card d-flex flex-row align-items-end border-0 jarallax-keep-img">
+                  <img src="/shop-theme/greys/hero-6.webp" alt="Man in the Cave Aged to Perfection tee among cheese wheels" class="img-fluid jarallax-img">
+                  <div class="cart-concern p-3 m-3 p-lg-5 m-lg-5">
+                    <h2 class="card-title style-2 display-4 light">Curd Tees</h2>
+                    <a href="#featured-products"
+                      class="text-uppercase light mt-3 d-inline-block text-hover fw-bold light-border">Shop Now</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-    </section>
-
-    <section class="s-done" id="v-done" hidden aria-labelledby="done-h1" tabindex="-1"></section>
-  </div>
-  <div class="s-cartbar" id="cartbar" hidden>
-    <div class="s-wrap"><p id="cartbar-txt"></p><button type="button" class="s-btn" data-act="cart">View cart</button></div>
-  </div>
+      <div class="swiper-pagination"></div>
+    </div>
+  </section>
+  <section class="discount-coupon py-2 my-2 py-md-5 my-md-5">
+    <div class="container">
+      <div class="bg-gray coupon position-relative p-5">
+        <div class="bold-text position-absolute">GOUDA</div>
+        <div class="row justify-content-between align-items-center">
+          <div class="col-lg-7 col-md-12 mb-3">
+            <div class="coupon-header">
+              <h2 class="display-7">Puns Aged to Perfection</h2>
+              <p class="m-0">Original cheese wordplay about wheels, caves and melt, printed to order for counter regulars.</p>
+            </div>
+          </div>
+          <div class="col-lg-3 col-md-12">
+            <div class="btn-wrap">
+              <a href="#featured-products" class="btn btn-black btn-medium text-uppercase hvr-sweep-to-right">Shop now</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section id="featured-products" class="product-store">
+    <div class="container-md">
+      <div class="display-header d-flex align-items-center justify-content-between">
+        <h2 class="section-title text-uppercase">Featured Shirts</h2>
+        <div class="btn-right">
+          <a href="#latest-products" class="d-inline-block text-uppercase text-hover fw-bold">View all</a>
+        </div>
+      </div>
+      <div class="product-content padding-small">
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-5" id="featured-row" aria-busy="true"></div>
+      </div>
+    </div>
+  </section>
+  <section id="collection-products" class="py-2 my-2 py-md-5 my-md-5">
+    <div class="container-md">
+      <div class="row">
+        <div class="col-lg-6 col-md-6 mb-4">
+          <div class="collection-card card border-0 d-flex flex-row align-items-end jarallax-keep-img">
+            <img src="/shop-theme/greys/collection-1.webp" alt="Folded Greys tees stacked beside a wedge of cheese" class="border-rounded-10 img-fluid jarallax-img">
+            <div class="card-detail p-3 m-3 p-lg-5 m-lg-5">
+              <h3 class="card-title display-3">
+                <a href="#featured-products">Cave Collection</a>
+              </h3>
+              <a href="#featured-products" class="text-uppercase mt-3 d-inline-block text-hover fw-bold">Shop Now</a>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6 col-md-6">
+          <div class="collection-card card border-0 d-flex flex-row jarallax-keep-img">
+            <img src="/shop-theme/greys/collection-2.webp" alt="Greys tees hanging on a rail above a cheese wheel" class="border-rounded-10 img-fluid jarallax-img">
+            <div class="card-detail p-3 m-3 p-lg-5 m-lg-5">
+              <h3 class="card-title display-3">
+                <a href="#latest-products">Counter Collection</a>
+              </h3>
+              <a href="#featured-products" class="text-uppercase mt-3 d-inline-block text-hover fw-bold">Shop Now</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section id="latest-products" class="product-store py-2 my-2 py-md-5 my-md-5 pt-0">
+    <div class="container-md">
+      <div class="display-header d-flex align-items-center justify-content-between">
+        <h2 class="section-title text-uppercase">Latest Drops</h2>
+        <div class="btn-right">
+          <a href="#featured-products" class="d-inline-block text-uppercase text-hover fw-bold">View all</a>
+        </div>
+      </div>
+      <div class="product-content padding-small">
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-5" id="latest-row" aria-busy="true"></div>
+      </div>
+    </div>
+  </section>
+  <p class="tj-credit">Store design by <a href="https://templatesjungle.com/" target="_blank" rel="noopener">TemplatesJungle</a></p>
 </main>
 
-<div class="s-scrim" id="scrim" hidden></div>
-<aside class="s-drawer closed" id="cart" role="dialog" aria-modal="true" aria-labelledby="cart-h" hidden>
-  <div class="s-dhead"><h2 id="cart-h">Your cart</h2><button type="button" class="s-x" data-act="close-cart" aria-label="Close cart">×</button></div>
-  <div class="s-dbody" id="cartlines"></div>
-  <div class="s-dfoot" id="cartfoot"></div>
-</aside>
-
-<dialog class="s-zoom" id="zoom" aria-label="Shirt photo">
-  <img id="zoomimg" alt="" />
-  <button type="button" class="s-x" data-act="close-zoom" aria-label="Close photo">×</button>
-</dialog>
-
 <div id="gx-footer"></div>
-<noscript><p style="padding:20px;max-width:600px;margin:0 auto">The shirt shop needs JavaScript. Email <a href="mailto:info@greyscheese.com">info@greyscheese.com</a> to order.</p></noscript>
+<div id="modal" class="os"></div>
+<div id="drawer" class="os"></div>
+<div id="floatbar"></div>
+<noscript><p style="padding:20px;max-width:600px;margin:0 auto">The shirt shop needs JavaScript. Email info@greyscheese.com to order.</p></noscript>
 
+<!-- the Stylish template's own scripts (Bootstrap, Swiper slider, jarallax parallax), unchanged -->
+<script src="/shop-theme/js/jquery-1.11.0.min.js"></script>
+<script src="/shop-theme/js/plugins.js"></script>
+<script src="/shop-theme/js/script.js"></script>
 <script>
 (function () {
   'use strict';
   var FN = 'https://vdvtrevhqalmjwhjhjug.supabase.co/functions/v1/shirt-shop';
   var Q = new URLSearchParams(location.search);
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && Q.get('fn')) FN = Q.get('fn').replace(/\/$/, '') + '/shirt-shop';
-  var KEY = 'greys.shirts.cart';
-  var EMAIL = 'info@greyscheese.com';
+  var KEY = 'greys.shirts.cart', CONTACT = 'greys.shirts.contact', EMAIL = 'info@greyscheese.com', MAXQ = 10;
 
-  // ---------------- small helpers ----------------
+  // ---------------- icons + utils (the order site's) ----------------
+  function svg(size, sw, inner) {
+    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + sw +
+      '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + inner + '</svg>';
+  }
+  var I = {
+    plus: svg(16, 2.2, '<path d="M12 5v14M5 12h14"/>'),
+    minus: svg(16, 2.2, '<path d="M5 12h14"/>'),
+    x: svg(18, 2, '<path d="M6 6l12 12M18 6L6 18"/>'),
+    bag: svg(20, 1.8, '<path d="M5 8h14l-1.2 12.1a1 1 0 0 1-1 .9H7.2a1 1 0 0 1-1-.9L5 8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>'),
+    checkLg: svg(32, 2.2, '<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
+    back: svg(18, 2, '<path d="M15 6l-6 6 6 6"/>'),
+    lock: svg(14, 1.8, '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>')
+  };
   function $(s, r) { return (r || document).querySelector(s); }
-  function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-  function money(c) { return '$' + (c / 100).toFixed(2); }
-  function price(c) { return c % 100 === 0 ? '$' + c / 100 : money(c); }
-  function uuid() { return (crypto.randomUUID && crypto.randomUUID()) || ('a' + Date.now().toString(36) + Math.random().toString(36).slice(2)); }
+  function money(c) { return '$' + (Math.round(c) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function usd(c) { return c % 100 === 0 ? '$' + c / 100 : money(c); } // the template's card prices read "$28"
+  function uuid() { return (window.crypto && crypto.randomUUID && crypto.randomUUID()) || ('a' + Date.now().toString(36) + Math.random().toString(36).slice(2)); }
   var store = {
     get: function (k) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (_) { return null; } },
     set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) { } }
@@ -319,7 +414,7 @@
     }
     try { d = await r.json(); } catch (_) { }
     if (!r.ok || d.ok === false) {
-      var e = new Error(d.error || 'Something went wrong. Please try again, or email ' + EMAIL + '.');
+      var e = new Error(d.error || 'Something went wrong — please try again, or email ' + EMAIL + '.');
       e.status = r.status; e.data = d; throw e;
     }
     return d;
@@ -327,353 +422,368 @@
 
   // ---------------- state ----------------
   var S = {
-    cat: null,            // catalog response
-    cart: (store.get(KEY) || []).filter(function (l) { return l && typeof l.v === 'string' && l.q > 0; }),
-    step: 'shop',         // shop | checkout | done
-    picked: {},           // slug -> variant id
-    quote: null, quoting: false, quoteSeq: 0,
-    paying: false, payErr: '', attempt: uuid(), done: null,
-    cardState: 'idle', cardErr: ''
+    cat: null, cart: (store.get(KEY) || []).filter(function (l) { return l && typeof l.v === 'string' && l.q > 0; }),
+    modal: null, drawer: false, step: 'cart', quote: null, quoting: false, quoteErr: '', quoteSeq: 0,
+    paying: false, payErr: '', attempt: uuid(), done: null, just: '', pushed: false
   };
-  var byVariant = {};     // variant id -> { p, v }
+  var byVariant = {}, bySlug = {}, justTimer = null;
+  var payments = null, card = null, cardState = 'idle', cardErr = '', sdkPromise = null;
   function saveCart() { store.set(KEY, S.cart); }
-  function cartItems() {
-    return S.cart.map(function (l) { var hit = byVariant[l.v]; return hit ? { p: hit.p, v: hit.v, q: l.q } : null; }).filter(Boolean);
-  }
-  function cartCount() { return cartItems().reduce(function (a, l) { return a + l.q; }, 0); }
-  function cartSub() { return cartItems().reduce(function (a, l) { return a + l.q * l.v.price_cents; }, 0); }
-  function apiLines() { return cartItems().map(function (l) { return { variant_id: l.v.id, qty: l.q }; }); }
+  function lines() { return S.cart.map(function (l, i) { var h = byVariant[l.v]; return h ? { i: i, p: h.p, v: h.v, q: l.q } : null; }).filter(Boolean); }
+  function count() { return lines().reduce(function (a, l) { return a + l.q; }, 0); }
+  function sub() { return lines().reduce(function (a, l) { return a + l.q * l.v.price_cents; }, 0); }
+  function apiLines() { return lines().map(function (l) { return { variant_id: l.v.id, qty: l.q }; }); }
   function testMode() { return !!(S.cat && S.cat.env === 'sandbox'); }
   function accepting() { return !!(S.cat && S.cat.accepting); }
+  function lock(on) { document.body.classList.toggle('locked', !!on); }
 
-  // ---------------- header cart button ----------------
-  var I = { bag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 8h14l-1.2 12H6.2z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>' };
-  function cartButton() {
-    var n = cartCount(), label = 'Cart';
-    var gm = $('#gx-mine');
+  // ---------------- header slot, floating bar, strips ----------------
+  if (window.__gxFailed || !window.__gxChrome) {
+    $('#gx-header').innerHTML = '<div class="s-fallhead"><a href="https://www.greyscheese.com">GREYS</a><button type="button" id="s-fallcart" data-act="cart">Your order</button></div>';
+  }
+  function renderChrome() {
+    var n = count(), gm = $('#gx-mine');
     if (gm) {
       gm.hidden = false;
       gm.setAttribute('data-act', 'cart');
-      gm.setAttribute('aria-label', n ? 'Open cart, ' + n + (n === 1 ? ' shirt' : ' shirts') : 'Open cart, empty');
-      gm.innerHTML = I.bag + '<span>' + label + '</span>' + (n ? '<span class="s-count">' + n + '</span>' : '');
+      gm.setAttribute('aria-label', n ? 'Your order, ' + n + (n === 1 ? ' shirt' : ' shirts') : 'Your order, empty');
+      gm.innerHTML = I.bag + '<span>' + esc(S.just || 'Your order') + '</span>' + (n ? '<span class="cnt">' + n + '</span>' : '');
       if (window.GreysChrome && GreysChrome.setMine) GreysChrome.setMine(n > 0);
     }
-    var fb = $('#s-fallcart');
-    if (fb) fb.textContent = 'Cart' + (n ? ' (' + n + ')' : '');
-    var bar = $('#cartbar');
-    bar.hidden = !(n && S.step === 'shop');
-    if (n) $('#cartbar-txt').textContent = n + (n === 1 ? ' shirt' : ' shirts') + ' · ' + money(cartSub());
+    var fc = $('#s-fallcart'); if (fc) fc.textContent = (S.just || 'Your order') + (n ? ' · ' + n : '');
+    renderFloat();
   }
-  // site-chrome.js didn't load (offline, blocked): a plain header so the page still works
-  if (window.__gxFailed || !window.__gxChrome) {
-    var hb = document.getElementById('gx-header');
-    hb.innerHTML = '<div class="s-fallhead"><a href="https://www.greyscheese.com">GREYS</a><button type="button" id="s-fallcart" data-act="cart">Cart</button></div>';
-  }
-
-  // ---------------- catalog ----------------
-  function skeleton() {
-    var h = '';
-    for (var i = 0; i < 6; i++) h += '<div class="s-card s-skel" aria-hidden="true"><div class="s-photo"></div><div class="s-label"></div></div>';
-    $('#grid').innerHTML = h;
-  }
-  async function loadCatalog() {
-    skeleton();
-    try {
-      S.cat = await api('catalog', {});
-    } catch (e) {
-      $('#grid').setAttribute('aria-busy', 'false');
-      $('#grid').outerHTML = '<div class="s-oops" id="grid"><p>' + esc(e.message) + '</p><button type="button" class="s-btn" data-act="reload">Try again</button></div>';
-      return;
-    }
-    byVariant = {};
-    S.cat.products.forEach(function (p) { p.variants.forEach(function (v) { byVariant[v.id] = { p: p, v: v }; }); });
-    var before = S.cart.length;
-    S.cart = S.cart.filter(function (l) { return byVariant[l.v]; });
-    if (S.cart.length !== before) saveCart();
-    renderBars();
-    renderFacts();
-    renderGrid();
-    cartButton();
-    fillStates();
-    var slug = decodeURIComponent((location.hash || '').slice(1));
-    if (slug === 'checkout' && cartCount()) goCheckout(true);
-    else if (slug && document.getElementById(slug)) setTimeout(function () { document.getElementById(slug).scrollIntoView({ block: 'start' }); }, 50);
-    if (Q.has('cart') && cartCount()) openCart();
+  function renderFloat() {
+    var n = count(), fb = $('#floatbar'), show = n > 0 && !S.drawer && !S.modal;
+    fb.classList.toggle('show', show);
+    document.body.classList.toggle('hasbar', show);
+    fb.innerHTML = show ? '<button type="button" data-act="cart"><span class="o-row">' + I.bag + '<span>View your order · ' + n + '</span></span><span>' + money(sub()) + '</span></button>' : '';
   }
   function renderBars() {
     var tb = $('#testbar');
     tb.hidden = !testMode();
-    if (testMode()) tb.innerHTML = '<b>Test mode.</b> Cards aren’t charged and nothing ships. Use card <b>4111 1111 1111 1111</b>, any future date, CVV <b>111</b>, ZIP <b>11111</b>.';
+    if (testMode()) tb.innerHTML = '<b>Test mode</b> — Square sandbox. Nothing is charged and nothing ships. Use card <b>4111 1111 1111 1111</b>, any future date, CVV <b>111</b>, ZIP <b>11111</b>.';
     var pb = $('#pausebar');
     pb.hidden = accepting();
     if (!accepting()) pb.textContent = S.cat.message || 'The shirt shop is taking a short break.';
     var sb = document.getElementById('staging-bar');
-    if (sb) sb.textContent = testMode() ? 'STAGING — Square sandbox: test cards only, nothing is charged.' : 'STAGING — this copy takes REAL card payments.';
+    if (sb) sb.textContent = testMode() ? 'STAGING · Square SANDBOX — test cards only, nothing is charged.' : 'STAGING · this copy takes REAL card payments.';
   }
-  function renderFacts() {
-    var sh = S.cat.shipping, prices = {};
-    S.cat.products.forEach(function (p) { p.variants.forEach(function (v) { prices[v.size] = v.price_cents; }); });
-    var base = S.cat.products.length ? S.cat.products[0].price_cents : 0;
-    var t = price(base) + ' each' + (prices.XXL && prices.XXL !== base ? ', ' + price(prices.XXL) + ' for XXL' : '') + '. ';
-    if (sh.first_cents === 0) t += 'Shipping is free.';
-    else {
-      t += 'Shipping is ' + price(sh.first_cents) + (sh.each_cents ? ' for the first shirt and ' + price(sh.each_cents) + ' for each one after' : ' per order') + '.';
-      if (sh.free_over_cents > 0) t += ' Free over ' + price(sh.free_over_cents) + '.';
-    }
-    $('#facts').textContent = t;
-  }
-  function renderGrid() {
-    var g = $('#grid');
-    g.setAttribute('aria-busy', 'false');
-    if (!S.cat.products.length) { g.innerHTML = '<p class="s-empty">No shirts right now — check back soon.</p>'; return; }
-    g.innerHTML = S.cat.products.map(function (p) {
-      var sizes = p.variants.map(function (v) {
-        var off = !v.available;
-        return '<label><input type="radio" name="size-' + esc(p.slug) + '" value="' + esc(v.id) + '"' + (off ? ' disabled' : '') +
-          (S.picked[p.slug] === v.id ? ' checked' : '') + ' aria-label="' + esc(v.size) + (v.price_cents !== p.price_cents ? ', ' + price(v.price_cents) : '') + (off ? ', unavailable' : '') + '" />' +
-          '<span aria-hidden="true">' + esc(v.size) + '</span></label>';
-      }).join('');
-      var shown = S.picked[p.slug] && byVariant[S.picked[p.slug]] ? byVariant[S.picked[p.slug]].v.price_cents : p.price_cents;
-      return '<article class="s-card" id="' + esc(p.slug) + '" aria-labelledby="n-' + esc(p.slug) + '">' +
-        '<button type="button" class="s-photo" data-act="zoom" data-slug="' + esc(p.slug) + '" aria-label="Bigger photo of ' + esc(p.name) + '">' +
-        '<img src="' + esc(p.image) + '" alt="' + esc(p.name) + ' t-shirt' + (p.tagline ? ': ' + esc(p.tagline) : '') + '" width="900" height="900" loading="lazy" decoding="async" /></button>' +
-        '<div class="s-label">' +
-        '<div class="s-top"><h2 class="s-name" id="n-' + esc(p.slug) + '">' + esc(p.name) + '</h2><span class="s-price" data-price="' + esc(p.slug) + '">' + price(shown) + '</span></div>' +
-        (p.tagline ? '<p class="s-kind">' + esc(p.tagline) + '</p>' : '') +
-        '<p class="s-note">' + esc(p.description) + '</p>' +
-        '<fieldset class="s-sizes" data-slug="' + esc(p.slug) + '"><legend class="sr">Size for ' + esc(p.name) + '</legend>' + sizes + '</fieldset>' +
-        '<button type="button" class="s-btn wide" data-act="add" data-slug="' + esc(p.slug) + '"' + (accepting() ? '' : ' disabled') + '>Add to cart</button>' +
-        '<p class="s-msg" data-msg="' + esc(p.slug) + '" aria-live="polite"></p>' +
-        '</div></article>';
-    }).join('');
-  }
-  function productBySlug(slug) { return S.cat.products.filter(function (p) { return p.slug === slug; })[0]; }
 
-  function addToCart(slug, btn) {
-    var p = productBySlug(slug), vid = S.picked[slug], msg = $('[data-msg="' + slug + '"]');
-    if (!p) return;
-    if (!vid || !byVariant[vid]) {
-      msg.textContent = 'Pick a size first.'; msg.className = 's-msg bad';
-      var first = $('.s-sizes[data-slug="' + slug + '"] input:not(:disabled)');
-      if (first) first.focus();
+  // ---------------- the template's product rows ----------------
+  function cardHTML(p) {
+    var s = esc(p.slug), n = esc(p.name);
+    return '<div class="col mb-4"><div class="product-card position-relative">' +
+      '<div class="card-img" data-act="item" data-slug="' + s + '"><img src="' + esc(p.image) + '" alt="' + n + ' t-shirt" class="product-image img-fluid" loading="lazy">' +
+      '<div class="cart-concern position-absolute d-flex justify-content-center"><div class="cart-button d-flex gap-2 justify-content-center align-items-center">' +
+      '<button type="button" class="btn btn-light" data-act="item" data-slug="' + s + '" aria-label="Add ' + n + ' to your order"><svg class="shopping-carriage"><use xlink:href="#shopping-carriage"></use></svg></button>' +
+      '<button type="button" class="btn btn-light" data-act="item" data-slug="' + s + '" aria-label="View ' + n + '"><svg class="quick-view"><use xlink:href="#quick-view"></use></svg></button>' +
+      '</div></div></div>' +
+      '<div class="card-detail d-flex justify-content-between align-items-center mt-3"><h3 class="card-title fs-6 fw-normal m-0"><a href="#' + s + '" data-act="item" data-slug="' + s + '">' + n + '</a></h3>' +
+      '<span class="card-price fw-bold">' + usd(p.price_cents) + '</span></div></div></div>';
+  }
+  function placeholders() {
+    var h = '';
+    for (var i = 0; i < 5; i++) h += '<div class="col mb-4"><div class="product-card"><div class="ph"></div><div class="card-detail mt-3">&nbsp;</div></div></div>';
+    $('#featured-row').innerHTML = h; $('#latest-row').innerHTML = h;
+  }
+  function renderRows() {
+    var ps = S.cat.products, feat = ps.slice(0, 5), late = [];
+    for (var i = 5; i < 10 && ps.length; i++) late.push(ps[i % ps.length]); // the template fills 10 cards in catalog order, wrapping round
+    $('#featured-row').innerHTML = feat.length ? feat.map(cardHTML).join('') : '<p class="shop-oops">No shirts right now — check back soon.</p>';
+    $('#latest-row').innerHTML = late.map(cardHTML).join('');
+    $('#featured-row').setAttribute('aria-busy', 'false'); $('#latest-row').setAttribute('aria-busy', 'false');
+  }
+  async function loadCatalog() {
+    placeholders();
+    try { S.cat = await api('catalog', {}); }
+    catch (e) {
+      $('#featured-row').innerHTML = '<p class="shop-oops">' + esc(e.message) + '<button type="button" data-act="reload">Try again</button></p>';
+      $('#latest-row').innerHTML = '';
       return;
     }
-    var line = S.cart.filter(function (l) { return l.v === vid; })[0];
-    if (line) {
-      if (line.q >= 10) { msg.textContent = 'Up to 10 of each shirt per order.'; msg.className = 's-msg bad'; return; }
-      line.q++;
-    } else S.cart.push({ v: vid, q: 1 });
+    byVariant = {}; bySlug = {};
+    S.cat.products.forEach(function (p) { bySlug[p.slug] = p; p.variants.forEach(function (v) { byVariant[v.id] = { p: p, v: v }; }); });
+    var before = S.cart.length;
+    S.cart = S.cart.filter(function (l) { return byVariant[l.v]; });
+    if (S.cart.length !== before) saveCart();
+    renderBars(); renderRows(); renderChrome();
+    if (location.hash === '#checkout' && count()) { history.replaceState(null, '', location.pathname + location.search); openDrawer(); goCheckout(); }
+  }
+
+  // ---------------- item window (the order site's) ----------------
+  function openItem(slug, editIdx) {
+    var p = bySlug[slug];
+    if (!p) return;
+    var line = editIdx != null ? S.cart[editIdx] : null;
+    S.modal = { slug: slug, v: line ? line.v : null, qty: line ? line.q : 1, edit: editIdx != null ? editIdx : null, tried: false, from: document.activeElement };
+    pushLayer(); lock(true); renderModal(true); renderFloat();
+  }
+  function renderModal(focus) {
+    var box = $('#modal'), mm = S.modal;
+    if (!mm) { box.innerHTML = ''; return; }
+    var p = bySlug[mm.slug];
+    if (!p) { closeModal(); return; }
+    var v = mm.v && byVariant[mm.v] ? byVariant[mm.v].v : null;
+    var wide = !!(window.matchMedia && window.matchMedia('(min-width:721px)').matches);
+    var sizes = '<fieldset><legend>Choose a size<span class="req' + (mm.tried && !v ? ' need' : '') + '">Required</span></legend><div class="opts">' + p.variants.map(function (x) {
+      var on = x.id === mm.v, off = !x.available;
+      return '<label class="opt' + (on ? ' on' : '') + (off ? ' off' : '') + '"><input type="radio" name="size" data-act="size" data-v="' + esc(x.id) + '"' + (on ? ' checked' : '') + (off ? ' disabled' : '') + '>' +
+        '<span class="nm">' + esc(x.size) + (off ? ' <em style="font-style:normal;color:var(--muted)">· unavailable</em>' : '') + '</span><span class="pr">' + money(x.price_cents) + '</span></label>';
+    }).join('') + '</div></fieldset><p class="minmsg">Unisex fit — order your usual size. Printed to order; it ships in 2–5 business days.</p>';
+    var unit = v ? v.price_cents : p.price_cents;
+    var label = !v ? 'Choose a size' : (mm.edit != null ? 'Update order · ' : 'Add to order · ') + money(unit * mm.qty);
+    var img = '<img class="dlg-img" src="' + esc(p.image) + '" alt="' + esc(p.name) + ' t-shirt">';
+    var top = '<div class="dlg-top">' + (p.tagline ? '<span class="tag">' + esc(p.tagline) + '</span>' : '') + '<h2>' + esc(p.name) + '</h2>' + (p.description ? '<p>' + esc(p.description) + '</p>' : '') + '</div>';
+    var sc = box.querySelector('.dlg-scroll'), scrollTop = sc ? sc.scrollTop : 0;
+    box.innerHTML = '<div class="overlay"><button type="button" class="scrim" aria-label="Close" data-act="close-modal"></button>' +
+      '<div class="dialog has-img' + (wide ? ' split' : '') + '" role="dialog" aria-modal="true" aria-label="' + esc(p.name) + '"><button type="button" class="xbtn" aria-label="Close" data-act="close-modal">' + I.x + '</button>' +
+      '<div class="dlg-scroll' + (wide ? ' dlg-split' : '') + '">' +
+      (wide ? '<div class="dlg-colA">' + img + '</div><div class="dlg-colB">' + top + '<div class="dlg-body">' + sizes + '</div></div>' : img + top + '<div class="dlg-body">' + sizes + '</div>') + '</div>' +
+      '<div class="dlg-foot"><div class="qty" role="group" aria-label="Quantity"><button type="button" aria-label="Fewer" data-act="mqty" data-v="-1"' + (mm.qty <= 1 ? ' disabled' : '') + '>' + I.minus + '</button>' +
+      '<b aria-live="polite">' + mm.qty + '</b><button type="button" aria-label="More" data-act="mqty" data-v="1"' + (mm.qty >= MAXQ ? ' disabled' : '') + '>' + I.plus + '</button></div>' +
+      '<button type="button" class="primary" data-act="add"' + (accepting() ? '' : ' disabled') + '>' + esc(accepting() ? label : 'Ordering is paused') + '</button></div></div></div>';
+    var nsc = box.querySelector('.dlg-scroll');
+    if (nsc && !focus) nsc.scrollTop = scrollTop;
+    if (focus) { var x = box.querySelector('.xbtn'); if (x) x.focus(); }
+  }
+  function addFromModal() {
+    var mm = S.modal, v = mm.v && byVariant[mm.v];
+    if (!v) {
+      mm.tried = true; renderModal(false);
+      var need = document.querySelector('#modal .req.need');
+      if (need && need.scrollIntoView) need.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return;
+    }
+    if (mm.edit != null) S.cart.splice(mm.edit, 1);
+    var same = S.cart.filter(function (l) { return l.v === mm.v; })[0];
+    if (same) same.q = Math.min(MAXQ, same.q + mm.qty);
+    else if (mm.edit != null) S.cart.splice(mm.edit, 0, { v: mm.v, q: mm.qty });
+    else S.cart.push({ v: mm.v, q: mm.qty });
     saveCart();
-    cartButton();
-    msg.className = 's-msg';
-    msg.textContent = p.name + ', ' + byVariant[vid].v.size + ' — added to your cart.';
-    btn.classList.add('added'); btn.textContent = 'Added to cart';
-    clearTimeout(btn._t);
-    btn._t = setTimeout(function () { btn.classList.remove('added'); btn.textContent = 'Add to cart'; }, 1800);
+    var wasEdit = mm.edit != null;
+    closeModal(false);
+    S.just = wasEdit ? 'Updated' : 'Added to your order';
+    clearTimeout(justTimer); justTimer = setTimeout(function () { S.just = ''; renderChrome(); }, 2600);
+    S.quote = null;
+    renderChrome();
+    if (S.drawer) renderDrawer();
+  }
+  function closeModal(fromPop) {
+    var mm = S.modal;
+    S.modal = null; renderModal();
+    if (!S.drawer) lock(false);
+    if (!fromPop) popLayer();
+    renderFloat();
+    if (mm && mm.from && mm.from.focus && document.contains(mm.from)) mm.from.focus();
   }
 
-  // ---------------- cart drawer ----------------
-  var lastFocus = null;
-  function openCart() {
-    if (!S.cat) return;
-    lastFocus = document.activeElement;
-    renderCart();
-    var d = $('#cart');
-    d.hidden = false; $('#scrim').hidden = false;
-    document.body.style.overflow = 'hidden';
-    requestAnimationFrame(function () { d.classList.remove('closed'); $('.s-x', d).focus(); });
-  }
-  function closeCart() {
-    var d = $('#cart');
-    if (d.hidden) return;
-    d.classList.add('closed'); $('#scrim').hidden = true;
-    document.body.style.overflow = '';
-    setTimeout(function () { if (d.classList.contains('closed')) d.hidden = true; }, 240);
-    if (lastFocus && lastFocus.focus) lastFocus.focus();
-  }
-  function lineHtml(l, editable) {
-    return '<div class="s-line"><img src="' + esc(l.p.image) + '" alt="" />' +
-      '<div><b>' + esc(l.p.name) + '</b><small>Size ' + esc(l.v.size) + (editable ? '' : ' × ' + l.q) + '</small>' +
-      (editable ? '<div class="s-qty" role="group" aria-label="Quantity of ' + esc(l.p.name) + ', ' + esc(l.v.size) + '">' +
-        '<button type="button" data-act="qty" data-v="' + esc(l.v.id) + '" data-d="-1" aria-label="One fewer"' + (l.q <= 1 ? ' disabled' : '') + '>−</button>' +
-        '<span aria-live="polite">' + l.q + '</span>' +
-        '<button type="button" data-act="qty" data-v="' + esc(l.v.id) + '" data-d="1" aria-label="One more"' + (l.q >= 10 ? ' disabled' : '') + '>+</button></div>' : '') +
-      '</div><div class="s-lp">' + money(l.q * l.v.price_cents) +
-      (editable ? '<button type="button" class="s-rm" data-act="rm" data-v="' + esc(l.v.id) + '">Remove</button>' : '') + '</div></div>';
-  }
-  function renderCart() {
-    var items = cartItems();
-    $('#cartlines').innerHTML = items.length ? items.map(function (l) { return lineHtml(l, true); }).join('')
-      : '<p class="s-empty">Your cart is empty. Pick a shirt and a size to start.</p>';
-    $('#cartfoot').innerHTML = items.length
-      ? '<div class="s-row"><span>Subtotal</span><b>' + money(cartSub()) + '</b></div><p class="s-small">Shipping and tax are added at checkout.</p>' +
-        '<button type="button" class="s-btn wide" data-act="checkout"' + (accepting() ? '' : ' disabled') + '>Check out</button>'
-      : '<button type="button" class="s-btn wide ghost" data-act="close-cart">Keep shopping</button>';
-  }
-  function setQty(vid, d) {
-    var line = S.cart.filter(function (l) { return l.v === vid; })[0];
-    if (!line) return;
-    line.q = Math.max(1, Math.min(10, line.q + d));
-    saveCart(); cartButton(); renderCart();
-    var again = $('[data-act="qty"][data-v="' + vid + '"][data-d="' + d + '"]');
-    if (again && !again.disabled) again.focus();
-    else { var other = $('[data-act="qty"][data-v="' + vid + '"]:not([disabled])'); if (other) other.focus(); }
-  }
-  function removeLine(vid) {
-    S.cart = S.cart.filter(function (l) { return l.v !== vid; });
-    saveCart(); cartButton(); renderCart();
-    var next = $('#cart [data-act="rm"]') || $('#cart [data-act="close-cart"]');
-    if (next) next.focus();
-  }
-  // keep keyboard focus inside the open drawer
-  document.addEventListener('keydown', function (e) {
-    var d = $('#cart');
-    if (d.hidden) return;
-    if (e.key === 'Escape') { closeCart(); return; }
-    if (e.key !== 'Tab') return;
-    var f = $$('button:not([disabled]),a[href],input,select', d).filter(function (x) { return x.offsetParent !== null; });
-    if (!f.length) return;
-    if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
-    else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
-  });
-
-  // ---------------- views ----------------
-  function show(step) {
-    S.step = step;
-    $('#v-shop').hidden = step !== 'shop';
-    $('#v-checkout').hidden = step !== 'checkout';
-    $('#v-done').hidden = step !== 'done';
-    cartButton();
-  }
-  function goShop(fromPop) {
-    destroyCard();
-    show('shop');
-    if (!fromPop && location.hash) history.pushState({ step: 'shop' }, '', location.pathname + location.search);
-    window.scrollTo(0, 0);
-  }
-  function goCheckout(replace) {
-    if (!cartCount() || !accepting()) return;
-    closeCart();
-    show('checkout');
-    S.payErr = ''; $('#payerr').textContent = '';
-    if (replace) history.replaceState({ step: 'checkout' }, '', '#checkout');
-    else history.pushState({ step: 'checkout' }, '', '#checkout');
-    window.scrollTo(0, 0);
-    $('#co-h1').setAttribute('tabindex', '-1'); $('#co-h1').focus({ preventScroll: true });
-    renderSummary();
-    requote();
-    mountCard();
-  }
+  // phones: Back closes the window / bag instead of leaving the page
+  function pushLayer() { if (S.pushed) return; try { history.pushState({ shopLayer: 1 }, ''); S.pushed = true; } catch (_) { } }
+  function popLayer() { if (S.modal || S.drawer || !S.pushed) return; S.pushed = false; try { history.back(); } catch (_) { } }
   window.addEventListener('popstate', function () {
-    if (location.hash === '#checkout' && S.step !== 'checkout' && cartCount()) goCheckout(true);
-    else if (location.hash !== '#checkout' && S.step === 'checkout') goShop(true);
+    S.pushed = false;
+    if (S.modal) closeModal(true);
+    if (S.drawer) closeDrawer(true);
   });
 
-  // ---------------- checkout ----------------
-  function fillStates() {
-    var sel = $('#coform select[name="state_code"]');
-    if (sel.options.length > 1) return;
-    var st = S.cat.states || {};
-    Object.keys(st).sort(function (a, b) { return st[a] < st[b] ? -1 : 1; }).forEach(function (k) {
-      var o = document.createElement('option'); o.value = k; o.textContent = st[k]; sel.appendChild(o);
-    });
-    var saved = store.get('greys.shirts.contact');
-    if (saved) Object.keys(saved).forEach(function (k) { var el = $('#coform [name="' + k + '"]'); if (el && !el.value) el.value = saved[k]; });
+  // ---------------- bag → checkout → done (the order site's drawer) ----------------
+  function openDrawer() {
+    S.drawer = true;
+    if (S.step === 'done' && !S.done) S.step = 'cart';
+    pushLayer(); lock(true); renderDrawer(); renderFloat();
+    var c = document.querySelector('#drawer .dr-head .rbtn:last-child'); if (c) c.focus();
   }
-  function form() {
-    var f = {};
-    $$('#coform input, #coform select').forEach(function (el) { if (el.name) f[el.name] = el.value.trim(); });
-    return f;
+  function closeDrawer(fromPop) {
+    S.drawer = false;
+    if (S.step === 'done') { S.step = 'cart'; S.done = null; }
+    destroyCard();
+    $('#drawer').innerHTML = '';
+    if (!S.modal) lock(false);
+    if (!fromPop) popLayer();
+    renderFloat();
+  }
+  function renderDrawer() {
+    var box = $('#drawer');
+    if (!S.drawer) { box.innerHTML = ''; return; }
+    var title = S.step === 'checkout' ? 'Checkout' : S.step === 'done' ? 'Thank you' : 'Your order';
+    if (!box.querySelector('aside.drawer')) {
+      box.innerHTML = '<div class="drawer-wrap"><button type="button" class="scrim" aria-label="Close your order" data-act="close-cart"></button>' +
+        '<aside class="drawer" aria-label="Your order" role="dialog" aria-modal="true"><div class="dr-head"></div><div class="dr-body"></div><div class="dr-foot"></div></aside></div>';
+    }
+    box.querySelector('.dr-head').innerHTML = '<div class="o-row" style="gap:10px">' +
+      (S.step === 'checkout' ? '<button type="button" class="rbtn" aria-label="Back to your order" data-act="back">' + I.back + '</button>' : '') +
+      '<h2>' + title + '</h2></div><button type="button" class="rbtn" aria-label="Close" data-act="close-cart">' + I.x + '</button>';
+    var body = box.querySelector('.dr-body');
+    if (S.step === 'checkout') {
+      if (!body.querySelector('#co-form')) { body.innerHTML = checkoutHTML(); body.scrollTop = 0; mountCard(); }
+      updateCheckout();
+    } else {
+      destroyCard();
+      body.innerHTML = S.step === 'done' ? doneHTML() : cartHTML();
+    }
+    renderFoot();
+  }
+  function cartHTML() {
+    if (!S.cart.length) {
+      return '<div class="empty"><span class="ic">' + I.bag + '</span><b>Your order is empty</b><span style="font-size:14px">Pick a shirt and a size to get started.</span>' +
+        '<button type="button" class="ghostbtn" data-act="close-cart">Browse the shirts</button></div>';
+    }
+    return '<ul class="lines">' + S.cart.map(function (l, i) {
+      var h = byVariant[l.v];
+      if (!h) return '<li><div class="mid"><span class="lineerr">This shirt isn’t available anymore.</span><div class="acts"><button type="button" class="linkbtn" data-act="lremove" data-i="' + i + '">Remove</button></div></div></li>';
+      return '<li><img src="' + esc(h.p.image) + '" alt="">' +
+        '<div class="mid"><span class="nm">' + esc(h.p.name) + '</span><span class="dt">Size ' + esc(h.v.size) + '</span>' +
+        '<div class="acts"><div class="qty sm" role="group" aria-label="Quantity"><button type="button" aria-label="' + (l.q === 1 ? 'Remove' : 'One less') + '" data-act="lqty" data-i="' + i + '" data-v="-1">' + I.minus + '</button><b>' + l.q + '</b>' +
+        '<button type="button" aria-label="One more" data-act="lqty" data-i="' + i + '" data-v="1"' + (l.q >= MAXQ ? ' disabled' : '') + '>' + I.plus + '</button></div>' +
+        '<button type="button" class="linkbtn" data-act="ledit" data-i="' + i + '">Edit</button></div></div>' +
+        '<span class="amt">' + money(l.q * h.v.price_cents) + '</span></li>';
+    }).join('') + '</ul>';
+  }
+  function checkoutHTML() {
+    var c = store.get(CONTACT) || {}, st = (S.cat && S.cat.states) || {};
+    var opts = Object.keys(st).sort(function (a, b) { return st[a] < st[b] ? -1 : 1; })
+      .map(function (k) { return '<option value="' + esc(k) + '"' + (c.state_code === k ? ' selected' : '') + '>' + esc(st[k]) + '</option>'; }).join('');
+    function f(k) { return esc(c[k] || ''); }
+    return '<div id="co-form" style="display:flex;flex-direction:column;gap:18px">' +
+      '<fieldset style="display:flex;flex-direction:column;gap:10px"><legend>Contact</legend>' +
+      '<label class="lbl">Name<input type="text" id="co-name" autocomplete="name" placeholder="First and last name" maxlength="80" value="' + f('name') + '"></label>' +
+      '<div class="grid2"><label class="lbl">Email<input type="email" id="co-email" autocomplete="email" placeholder="For your receipt" maxlength="200" value="' + f('email') + '"></label>' +
+      '<label class="lbl"><span>Mobile <em>(optional)</em></span><input type="tel" id="co-phone" autocomplete="tel" placeholder="(901) 555-0123" maxlength="40" value="' + f('phone') + '"></label></div></fieldset>' +
+      '<fieldset style="display:flex;flex-direction:column;gap:10px"><legend>Ship to</legend>' +
+      '<label class="lbl">Street address<input type="text" id="co-a1" autocomplete="address-line1" maxlength="120" value="' + f('address1') + '"></label>' +
+      '<label class="lbl"><span>Apartment, suite <em>(optional)</em></span><input type="text" id="co-a2" autocomplete="address-line2" maxlength="120" value="' + f('address2') + '"></label>' +
+      '<div class="grid3"><label class="lbl">City<input type="text" id="co-city" autocomplete="address-level2" maxlength="80" value="' + f('city') + '"></label>' +
+      '<label class="lbl">State<select id="co-state" autocomplete="address-level1"><option value="">Choose…</option>' + opts + '</select></label>' +
+      '<label class="lbl">ZIP<input type="text" id="co-zip" autocomplete="postal-code" inputmode="numeric" maxlength="10" value="' + f('zip') + '"></label></div>' +
+      '<span class="secure">We ship to US addresses only.</span></fieldset>' +
+      '<div style="display:flex;flex-direction:column;gap:10px"><span class="ttl">Payment</span>' +
+      '<div id="sq-card"></div><div id="card-status"></div>' +
+      '<span class="secure">' + I.lock + '<span>Card details go straight to Square’s secure payment form.</span></span></div></div>';
+  }
+  function updateCheckout() {
+    var cs = $('#card-status');
+    if (cs) cs.innerHTML = cardState === 'error' ? '<div class="formerr">' + esc(cardErr) + ' <button type="button" class="linkbtn" data-act="card-retry">Try again</button></div>' : '';
+    var sq = $('#sq-card');
+    if (sq && cardState === 'loading' && !sq.querySelector('iframe') && !sq.querySelector('.cardload')) sq.innerHTML = '<div class="cardload">Loading secure card form…</div>';
+  }
+  function doneHTML() {
+    var d = S.done;
+    if (!d) return '';
+    var s = d.ship_to || {};
+    return '<div class="done"><span class="ok">' + I.checkLg + '</span><h3>Order placed</h3>' +
+      (d.env === 'sandbox' ? '<span class="testnote">Test order — Square sandbox. No card was charged and nothing will ship.</span>' : '') +
+      '<span class="code">' + esc(d.code) + '</span>' +
+      '<span class="big">Shipping to ' + esc(s.city) + ', ' + esc(s.state_code) + '</span>' +
+      '<span class="muted">' + esc(s.name) + ' · ' + esc(s.address1) + (s.address2 ? ', ' + esc(s.address2) : '') + '</span>' +
+      '<span class="muted">' + money(d.total_cents) + (d.card ? ' · ' + esc(d.card) : '') + '</span>' +
+      '<span style="font-size:14px;color:var(--muted);max-width:340px">Each shirt is printed to order and usually ships in 2–5 business days. ' +
+      (d.email_sent ? 'A confirmation is on its way to your email, and we’ll send tracking when it ships.' : 'Keep this code — we’ll email tracking when it ships.') + '</span>' +
+      (d.receipt_url && /^https:\/\//.test(d.receipt_url) ? '<a href="' + esc(d.receipt_url) + '" target="_blank" rel="noopener">View receipt</a>' : '') +
+      '<button type="button" class="primary" style="flex:none;height:48px;padding:0 22px;margin-top:10px" data-act="close-cart">Keep shopping</button></div>';
+  }
+  function renderFoot() {
+    var foot = document.querySelector('#drawer .dr-foot');
+    if (!foot) return;
+    if (S.step === 'done' || (!S.cart.length && S.step === 'cart')) { foot.innerHTML = ''; foot.hidden = true; return; }
+    foot.hidden = false;
+    var h = '', q = S.quote;
+    if (S.step === 'cart') {
+      var why = !S.cat ? 'Loading…' : !accepting() ? 'Ordering is paused' : !count() ? 'Your order is empty' : '';
+      h += '<div class="ln"><span>Subtotal</span><span>' + money(sub()) + '</span></div>' +
+        '<div class="ln"><span>Shipping &amp; tax</span><span>At checkout</span></div>' +
+        '<button type="button" class="primary" data-act="checkout"' + (why ? ' disabled' : '') + '>' + (why || 'Go to checkout · ' + money(sub())) + '</button>';
+    } else {
+      var known = q && q.tax_known;
+      h += '<div class="ln"><span>Subtotal</span><span>' + money(q ? q.subtotal_cents : sub()) + '</span></div>' +
+        '<div class="ln"><span>Shipping</span><span>' + (q ? (q.shipping_cents ? money(q.shipping_cents) : 'Free') : S.quoting ? '…' : '—') + '</span></div>' +
+        '<div class="ln"><span>Tax</span><span>' + (known ? money(q.tax_cents) : S.quoting ? '…' : 'Pick your state') + '</span></div>' +
+        '<div class="tot"><span>Total</span><span>' + (q ? money(q.total_cents) : '…') + '</span></div>';
+      if (S.payErr) h += '<div class="formerr" role="alert">' + esc(S.payErr) + '</div>';
+      else if (S.quoteErr) h += '<div class="formerr" role="alert">' + esc(S.quoteErr) + '</div>';
+      var dis = S.paying || S.quoting || !known || cardState !== 'ready' || !accepting();
+      h += '<button type="button" class="primary" data-act="pay"' + (dis ? ' disabled' : '') + '>' +
+        (S.paying ? 'Placing your order…' : !q && S.quoting ? 'Checking your total…' : cardState === 'loading' ? 'Loading card form…' : known ? 'Place order · ' + money(q.total_cents) : 'Place order') + '</button>';
+      if (testMode()) h += '<span class="fine">Test mode — nothing is charged.</span>';
+    }
+    foot.innerHTML = h;
+  }
+  function goCheckout() {
+    if (!count() || !accepting()) return;
+    S.step = 'checkout'; S.payErr = ''; S.quoteErr = '';
+    renderDrawer(); requote();
+  }
+  function fieldVals() {
+    function v(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
+    return { name: v('co-name'), email: v('co-email'), phone: v('co-phone'), address1: v('co-a1'), address2: v('co-a2'), city: v('co-city'), state_code: v('co-state'), zip: v('co-zip') };
   }
   var qTimer = null;
-  function requote() { clearTimeout(qTimer); qTimer = setTimeout(doQuote, 200); }
+  function requote() { clearTimeout(qTimer); qTimer = setTimeout(doQuote, 150); }
   async function doQuote() {
-    if (S.step !== 'checkout' || !cartCount()) return;
+    if (S.step !== 'checkout' || !count()) return;
     var seq = ++S.quoteSeq;
-    S.quoting = true; renderSummary();
+    S.quoting = true; S.quoteErr = ''; renderFoot();
     try {
-      var q = await api('quote', { lines: apiLines(), state_code: form().state_code });
+      var q = await api('quote', { lines: apiLines(), state_code: fieldVals().state_code });
       if (seq !== S.quoteSeq) return;
       S.quote = q;
     } catch (e) {
       if (seq !== S.quoteSeq) return;
-      S.quote = null;
+      S.quote = null; S.quoteErr = e.message;
       if (e.status === 409 && e.data && e.data.gone) dropGone(e.data.gone);
-      S.payErr = e.message; $('#payerr').textContent = e.message;
     }
-    S.quoting = false; renderSummary();
+    S.quoting = false; renderFoot();
   }
   function dropGone(ids) {
     S.cart = S.cart.filter(function (l) { return ids.indexOf(l.v) < 0; });
-    saveCart(); cartButton();
-    if (!cartCount()) goShop();
-  }
-  function renderSummary() {
-    $('#sumlines').innerHTML = cartItems().map(function (l) { return lineHtml(l, false); }).join('');
-    var q = S.quote, sub = cartSub(), rows = '';
-    rows += '<div class="s-row"><span>Subtotal</span><span>' + money(q ? q.subtotal_cents : sub) + '</span></div>';
-    rows += '<div class="s-row"><span>Shipping</span><span>' + (q ? (q.shipping_cents ? money(q.shipping_cents) : 'Free') : '<span class="s-pending">…</span>') + '</span></div>';
-    var taxTxt = !q ? '<span class="s-pending">…</span>' : !q.tax_known ? '<span class="s-pending">Added when you pick a state</span>' : (q.tax_cents ? money(q.tax_cents) : '$0.00');
-    rows += '<div class="s-row"><span>Tax</span><span>' + taxTxt + '</span></div>';
-    rows += '<div class="s-row total"><span>Total</span><span>' + (q ? money(q.total_cents) : '<span class="s-pending">…</span>') + '</span></div>';
-    $('#sumrows').innerHTML = rows;
-    updatePay();
-  }
-  function updatePay() {
-    var b = $('#paybtn'), q = S.quote;
-    var ready = q && q.tax_known && !S.quoting && !S.paying && S.cardState === 'ready' && accepting();
-    b.disabled = !ready;
-    b.textContent = S.paying ? 'Placing your order…' : q && q.tax_known ? 'Pay ' + money(q.total_cents) : 'Pay';
-    var note = $('#cardnote');
-    note.textContent = S.cardState === 'loading' ? 'Loading the secure card form…' : S.cardState === 'error' ? S.cardErr :
-      testMode() ? 'Test mode: use 4111 1111 1111 1111, any future date, CVV 111, ZIP 11111.' : 'Card details go straight to Square; we never see them.';
-    note.style.color = S.cardState === 'error' ? 'var(--red)' : '';
+    saveCart(); renderChrome();
+    if (!S.cart.length) { S.step = 'cart'; renderDrawer(); }
   }
 
-  // Square Web Payments SDK (same approach as the order site)
-  var sdkPromise = null, payments = null, card = null;
+  // ---------------- Square card form (the order site's) ----------------
   function loadSdk(src) {
     if (window.Square) return Promise.resolve(window.Square);
     if (sdkPromise) return sdkPromise;
     sdkPromise = new Promise(function (resolve, reject) {
       var s = document.createElement('script');
-      var timer = setTimeout(function () { sdkPromise = null; reject(new Error('Square is taking too long to load. Refresh to try again.')); }, 15000);
+      var timer = setTimeout(function () { sdkPromise = null; reject(new Error('Square is taking too long to load.')); }, 15000);
       s.src = src; s.async = true;
-      s.onload = function () { clearTimeout(timer); window.Square ? resolve(window.Square) : (sdkPromise = null, reject(new Error('Square’s card form didn’t start.'))); };
-      s.onerror = function () { clearTimeout(timer); sdkPromise = null; reject(new Error('Couldn’t reach Square. Check your connection and refresh.')); };
+      s.onload = function () { clearTimeout(timer); window.Square ? resolve(window.Square) : (sdkPromise = null, reject(new Error('Square’s payment form didn’t start.'))); };
+      s.onerror = function () { clearTimeout(timer); sdkPromise = null; reject(new Error('Couldn’t reach Square. Check your connection.')); };
       document.head.appendChild(s);
     });
     return sdkPromise;
   }
   async function mountCard() {
-    if (S.cardState === 'loading' || S.cardState === 'ready') return;
-    S.cardState = 'loading'; S.cardErr = ''; updatePay();
+    if (!S.cat || cardState === 'loading' || cardState === 'ready') return;
+    cardState = 'loading'; cardErr = ''; updateCheckout(); renderFoot();
     try {
       var pay = S.cat.pay || {};
-      if (!pay.app_id || !pay.location_id) throw new Error('Card payments aren’t switched on yet. Email ' + EMAIL + ' to order.');
+      if (!pay.app_id || !pay.location_id) throw new Error('Card payments aren’t switched on yet.');
       var Square = await loadSdk(pay.script_src);
       payments = Square.payments(pay.app_id, pay.location_id);
       var c = await payments.card({
         style: {
-          '.input-container': { borderColor: '#D9D1C4', borderRadius: '10px' },
+          '.input-container': { borderColor: '#ddd6cb', borderRadius: '12px' },
           '.input-container.is-focus': { borderColor: '#06273A' },
-          '.message-text': { color: '#5F584F' },
-          input: { fontSize: '16px', color: '#1C1A17' }
+          '.message-text': { color: '#6b645c' },
+          input: { fontSize: '15px', color: '#1c1a17' }
         }
       });
-      if (S.step !== 'checkout') { try { c.destroy(); } catch (_) { } S.cardState = 'idle'; return; }
-      $('#sq-card').innerHTML = '';
+      var host = $('#sq-card');
+      if (!host || S.step !== 'checkout') { try { c.destroy(); } catch (_) { } cardState = 'idle'; return; }
+      host.innerHTML = '';
       await c.attach('#sq-card');
-      card = c; S.cardState = 'ready';
+      card = c; cardState = 'ready';
     } catch (e) {
-      S.cardState = 'error'; S.cardErr = (e && e.message) || 'The card form didn’t load. Refresh to try again.';
+      cardState = 'error'; cardErr = (e && e.message) || 'The card form didn’t load.';
     }
-    updatePay();
+    updateCheckout(); renderFoot();
   }
   function destroyCard() {
     if (card) { try { card.destroy(); } catch (_) { } }
     card = null;
-    if (S.cardState !== 'loading') S.cardState = 'idle';
+    if (cardState !== 'loading') cardState = 'idle';
   }
   function cardMessage(r) {
     var e = (r && r.errors && r.errors[0]) || null;
@@ -684,163 +794,110 @@
     if (e.field === 'postalCode') return 'Check the billing ZIP.';
     return e.message || 'That card couldn’t be read.';
   }
-  function check(f) {
+  function checkFields(c) {
     var bad = [];
-    function need(name, ok, msg) {
-      var el = $('#coform [name="' + name + '"]');
-      el.setAttribute('aria-invalid', ok ? 'false' : 'true');
-      if (!ok) bad.push({ el: el, msg: msg });
-    }
-    need('name', f.name.length >= 2, 'Please add your name.');
-    need('email', /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email), 'Please check your email address.');
-    var digits = f.phone.replace(/\D/g, '');
-    need('phone', !f.phone || digits.length === 10 || (digits.length === 11 && digits[0] === '1'), 'Please check your phone number, or leave it blank.');
-    need('address1', !!f.address1, 'Please add your street address.');
-    need('city', !!f.city, 'Please add your city.');
-    need('state_code', !!f.state_code, 'Please pick your state.');
-    need('zip', /^\d{5}(-\d{4})?$/.test(f.zip), 'Please check your ZIP code.');
+    function need(id, ok, msg) { var el = document.getElementById(id); if (el) el.classList.toggle('bad', !ok); if (!ok) bad.push({ el: el, msg: msg }); }
+    var digits = c.phone.replace(/\D/g, '');
+    need('co-name', c.name.length >= 2, 'Please add your name.');
+    need('co-email', /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.email), 'Please check your email address.');
+    need('co-phone', !c.phone || digits.length === 10 || (digits.length === 11 && digits[0] === '1'), 'Please check your mobile number, or leave it blank.');
+    need('co-a1', !!c.address1, 'Please add your street address.');
+    need('co-city', !!c.city, 'Please add your city.');
+    need('co-state', !!c.state_code, 'Please pick your state.');
+    need('co-zip', /^\d{5}(-\d{4})?$/.test(c.zip), 'Please check your ZIP code.');
     return bad;
   }
   async function placeOrder() {
-    var f = form(), bad = check(f);
-    if (bad.length) { S.payErr = bad[0].msg; $('#payerr').textContent = bad[0].msg; bad[0].el.focus(); return; }
+    var c = fieldVals(), bad = checkFields(c);
+    if (bad.length) { S.payErr = bad[0].msg; renderFoot(); if (bad[0].el) bad[0].el.focus(); return; }
     if (!card || !S.quote || S.paying) return;
-    store.set('greys.shirts.contact', { name: f.name, email: f.email, phone: f.phone, address1: f.address1, address2: f.address2, city: f.city, state_code: f.state_code, zip: f.zip });
-    S.paying = true; S.payErr = ''; $('#payerr').textContent = ''; updatePay();
+    if (S.quote.state_code !== c.state_code) { requote(); return; } // the address changed since the total was figured
+    store.set(CONTACT, c);
+    S.paying = true; S.payErr = ''; renderFoot();
     try {
       var expected = S.quote.total_cents;
       var r = await card.tokenize();
       if (!r || r.status !== 'OK') throw Object.assign(new Error(cardMessage(r)), { status: 400 });
       var vt = '';
       try {
-        var parts = f.name.split(/\s+/);
+        var parts = c.name.split(/\s+/);
         var v = await payments.verifyBuyer(r.token, {
           amount: (expected / 100).toFixed(2), currencyCode: 'USD', intent: 'CHARGE',
-          billingContact: { givenName: parts[0], familyName: parts.slice(1).join(' '), email: f.email, phone: f.phone || undefined }
+          billingContact: { givenName: parts[0], familyName: parts.slice(1).join(' '), email: c.email, phone: c.phone || undefined }
         });
         vt = (v && v.token) || '';
       } catch (_) { /* no 3-D Secure challenge needed */ }
       var d = await api('pay', {
         lines: apiLines(), attempt: S.attempt, expected_total_cents: expected, source_id: r.token, verification_token: vt,
-        customer: { name: f.name, email: f.email, phone: f.phone },
-        ship_to: { name: f.name, address1: f.address1, address2: f.address2, city: f.city, state_code: f.state_code, zip: f.zip, country_code: 'US' }
+        customer: { name: c.name, email: c.email, phone: c.phone },
+        ship_to: { name: c.name, address1: c.address1, address2: c.address2, city: c.city, state_code: c.state_code, zip: c.zip, country_code: 'US' }
       });
-      S.done = d; S.cart = []; saveCart(); S.quote = null; S.attempt = uuid();
-      destroyCard();
-      renderDone();
-      show('done');
-      history.replaceState({ step: 'done' }, '', location.pathname + location.search);
-      window.scrollTo(0, 0);
-      $('#v-done').focus();
+      S.done = d; S.step = 'done'; S.cart = []; saveCart(); S.quote = null; S.attempt = uuid();
+      destroyCard(); renderDrawer(); renderChrome();
     } catch (e) {
       S.payErr = e.message || 'Something went wrong. Nothing was charged.';
-      $('#payerr').textContent = S.payErr;
-      if (e.status === 409) {
-        if (e.data && e.data.gone) dropGone(e.data.gone);
-        S.quote = null; requote();
-      }
+      if (e.status === 409) { if (e.data && e.data.gone) dropGone(e.data.gone); S.quote = null; requote(); }
     }
-    S.paying = false; updatePay();
+    S.paying = false;
+    if (S.step === 'checkout') renderFoot();
   }
-  function renderDone() {
-    var d = S.done, first = (d.ship_to && d.ship_to.name || '').split(' ')[0];
-    var lines = (d.lines || []).map(function (l) {
-      return '<div class="s-line"><img src="' + esc(l.image) + '" alt="" /><div><b>' + esc(l.name) + '</b><small>Size ' + esc(l.size) + ' × ' + l.qty + '</small></div><div class="s-lp">' + money(l.unit_cents * l.qty) + '</div></div>';
-    }).join('');
-    var s = d.ship_to || {};
-    $('#v-done').innerHTML =
-      '<h1 id="done-h1">' + (first ? 'Thanks, ' + esc(first) + ' — your shirts are ordered.' : 'Your shirts are ordered.') + '</h1>' +
-      (d.env === 'sandbox' ? '<p class="s-bar test">This was a test order. No card was charged and nothing will ship.</p>' : '') +
-      '<p>Your order code is <b>' + esc(d.code) + '</b>. ' + (d.email_sent ? 'A confirmation is on its way to your inbox.' : 'Keep this code — it’s how you track your order.') + '</p>' +
-      '<p>Each shirt is printed when you order it and usually ships in 2–5 business days. We’ll email you the tracking link.</p>' +
-      '<div class="s-sum"><h2>Shipping to</h2><p class="s-small">' + esc(s.name) + '<br>' + esc(s.address1) + (s.address2 ? '<br>' + esc(s.address2) : '') + '<br>' + esc(s.city) + ', ' + esc(s.state_code) + ' ' + esc(s.zip) + '</p>' +
-      lines + '<div class="s-rows">' +
-      '<div class="s-row"><span>Subtotal</span><span>' + money(d.subtotal_cents) + '</span></div>' +
-      '<div class="s-row"><span>Shipping</span><span>' + (d.shipping_cents ? money(d.shipping_cents) : 'Free') + '</span></div>' +
-      (d.tax_cents ? '<div class="s-row"><span>Tax</span><span>' + money(d.tax_cents) + '</span></div>' : '') +
-      '<div class="s-row total"><span>Paid' + (d.card ? ' with ' + esc(d.card) : '') + '</span><span>' + money(d.total_cents) + '</span></div></div></div>' +
-      '<button type="button" class="s-btn ghost" data-act="shop">Back to the shirts</button>';
-  }
-
-  // ---------------- track an order ----------------
-  var STATUS = {
-    draft: 'Paid — getting ready to print.', pending: 'Paid — in the print queue.', inprocess: 'Being printed now.',
-    partial: 'Part of your order has shipped.', fulfilled: 'Shipped.', shipped: 'Shipped.',
-    onhold: 'We’re checking something with the printer — we’ll email you.', failed: 'We’re looking into a printing problem — we’ll email you.',
-    canceled: 'This order was canceled. Email ' + EMAIL + ' with questions.', skipped: 'Test order — nothing ships.', 'not sent': 'Paid — getting ready to print.'
-  };
-  async function track(e) {
-    e.preventDefault();
-    var fm = e.target, out = $('#trackres');
-    var code = fm.code.value.trim().toUpperCase(), email = fm.email.value.trim();
-    if (!code || !email) { out.textContent = 'Enter your order code and the email you used.'; return; }
-    out.textContent = 'Looking…';
-    try {
-      var d = await api('status', { code: code, email: email });
-      var o = d.order;
-      var h = '<p><b>' + esc(o.code) + '</b>: ' + esc(o.status === 'cancelled' ? 'Canceled.' : (STATUS[o.printful_status] || 'Paid — getting ready to print.')) + '</p>';
-      (o.tracking || []).forEach(function (t) {
-        h += '<p>' + esc(t.carrier || 'Tracking') + (t.number ? ' ' + esc(t.number) : '') + (t.url ? ' — <a href="' + esc(t.url) + '" target="_blank" rel="noopener">track the package</a>' : '') + '</p>';
-      });
-      out.innerHTML = h;
-    } catch (err) { out.textContent = err.message; }
-  }
-
-  // ---------------- zoom ----------------
-  function zoom(slug) {
-    var p = productBySlug(slug), dlg = $('#zoom');
-    if (!p) return;
-    $('#zoomimg').src = p.image; $('#zoomimg').alt = p.name + ' t-shirt';
-    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
-  }
-  $('#zoom').addEventListener('click', function (e) { if (e.target === this) this.close(); });
 
   // ---------------- events ----------------
   document.addEventListener('click', function (e) {
-    var t = e.target.closest('[data-act]');
+    var t = e.target.closest && e.target.closest('[data-act]');
     if (!t) return;
-    var a = t.getAttribute('data-act');
-    if (a === 'cart') { e.preventDefault(); openCart(); }
-    else if (a === 'close-cart') closeCart();
-    else if (a === 'add') addToCart(t.getAttribute('data-slug'), t);
-    else if (a === 'qty') setQty(t.getAttribute('data-v'), Number(t.getAttribute('data-d')));
-    else if (a === 'rm') removeLine(t.getAttribute('data-v'));
+    var a = t.getAttribute('data-act'), i = Number(t.getAttribute('data-i'));
+    if (a === 'item') { e.preventDefault(); if (S.cat) openItem(t.getAttribute('data-slug')); }
+    else if (a === 'close-modal') closeModal(false);
+    else if (a === 'mqty' && S.modal) { S.modal.qty = Math.max(1, Math.min(MAXQ, S.modal.qty + Number(t.getAttribute('data-v')))); renderModal(false); }
+    else if (a === 'add' && S.modal) addFromModal();
+    else if (a === 'cart') { e.preventDefault(); if (S.cat) openDrawer(); }
+    else if (a === 'close-cart') closeDrawer(false);
     else if (a === 'checkout') goCheckout();
-    else if (a === 'shop') goShop();
-    else if (a === 'zoom') zoom(t.getAttribute('data-slug'));
-    else if (a === 'close-zoom') $('#zoom').close();
+    else if (a === 'back') { S.step = 'cart'; S.payErr = ''; renderDrawer(); }
+    else if (a === 'lqty' && S.cart[i]) {
+      S.cart[i].q += Number(t.getAttribute('data-v'));
+      if (S.cart[i].q <= 0) S.cart.splice(i, 1); else S.cart[i].q = Math.min(MAXQ, S.cart[i].q);
+      saveCart(); S.quote = null; renderChrome(); renderDrawer();
+    }
+    else if (a === 'lremove' && S.cart[i]) { S.cart.splice(i, 1); saveCart(); renderChrome(); renderDrawer(); }
+    else if (a === 'ledit' && S.cart[i] && byVariant[S.cart[i].v]) openItem(byVariant[S.cart[i].v].p.slug, i);
+    else if (a === 'pay') placeOrder();
+    else if (a === 'card-retry') { destroyCard(); cardState = 'idle'; mountCard(); }
     else if (a === 'reload') loadCatalog();
   });
-  $('#scrim').addEventListener('click', closeCart);
   document.addEventListener('change', function (e) {
     var t = e.target;
-    if (t.matches('.s-sizes input')) {
-      var slug = t.closest('.s-sizes').getAttribute('data-slug');
-      S.picked[slug] = t.value;
-      var v = byVariant[t.value];
-      if (v) $('[data-price="' + slug + '"]').textContent = price(v.v.price_cents);
-      var msg = $('[data-msg="' + slug + '"]'); if (msg.classList.contains('bad')) { msg.textContent = ''; msg.className = 's-msg'; }
-    }
-    if (t.name === 'state_code' && t.closest('#coform')) { t.setAttribute('aria-invalid', 'false'); requote(); }
+    if (t.getAttribute && t.getAttribute('data-act') === 'size' && S.modal) { S.modal.v = t.getAttribute('data-v'); renderModal(false); }
+    if (t.id === 'co-state') { t.classList.remove('bad'); S.payErr = ''; requote(); }
   });
-  $('#coform').addEventListener('submit', function (e) { e.preventDefault(); placeOrder(); });
-  $('#coform').addEventListener('input', function (e) { if (e.target.getAttribute('aria-invalid') === 'true') e.target.setAttribute('aria-invalid', 'false'); });
-  $('#trackform').addEventListener('submit', track);
-  // another tab changed the cart
-  window.addEventListener('storage', function (e) {
+  document.addEventListener('input', function (e) { if (e.target.classList && e.target.classList.contains('bad')) e.target.classList.remove('bad'); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { if (S.modal) closeModal(false); else if (S.drawer) closeDrawer(false); return; }
+    if (e.key !== 'Tab') return;
+    var layer = S.modal ? $('#modal .dialog') : S.drawer ? $('#drawer aside.drawer') : null; // keep focus inside an open window
+    if (!layer) return;
+    var f = Array.prototype.slice.call(layer.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),select,iframe')).filter(function (x) { return x.offsetParent !== null; });
+    if (!f.length) return;
+    if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+  });
+  if (window.matchMedia) { // re-draw an open item window when the screen crosses the computer / phone width
+    var mq = window.matchMedia('(min-width:721px)'), onMq = function () { if (S.modal) renderModal(false); };
+    if (mq.addEventListener) mq.addEventListener('change', onMq); else if (mq.addListener) mq.addListener(onMq);
+  }
+  window.addEventListener('storage', function (e) { // another tab changed the cart
     if (e.key !== KEY) return;
-    S.cart = (store.get(KEY) || []);
-    cartButton();
-    if (!$('#cart').hidden) renderCart();
-    if (S.step === 'checkout') { renderSummary(); requote(); }
+    S.cart = store.get(KEY) || []; renderChrome();
+    if (S.drawer && S.step === 'cart') renderDrawer();
   });
 
-  cartButton();
+  renderChrome();
   loadCatalog();
 })();
 </script>
 
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
-<script>(function(){if(location.hostname.indexOf("staging")<0)return;document.title="[STAGING] "+document.title;var m=document.createElement("meta");m.name="robots";m.content="noindex";document.head.appendChild(m);var b=document.createElement("div");b.id="staging-bar";b.textContent="STAGING — test copy.";b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#c62828;color:#fff;font:600 12px/1.2 system-ui,sans-serif;text-align:center;padding:5px 8px;pointer-events:none;opacity:.92";document.body.appendChild(b);})();</script>
+<script>(function(){if(location.hostname.indexOf("staging")<0)return;document.title="[STAGING] "+document.title;document.body.classList.add("staging");var m=document.createElement("meta");m.name="robots";m.content="noindex";document.head.appendChild(m);var b=document.createElement("div");b.id="staging-bar";b.textContent="STAGING — test copy.";b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#c62828;color:#fff;font:600 12px/1.2 system-ui,sans-serif;text-align:center;padding:5px 8px;pointer-events:none;opacity:.92";document.body.appendChild(b);})();</script>
 </body>
 </html>
