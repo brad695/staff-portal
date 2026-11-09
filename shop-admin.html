@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>GREYS · Shirt Shop admin</title>
+<link rel="icon" href="/favicon.ico" sizes="any" />
+<!--
+  shop-admin.html — the manager console's 👕 Shirt Shop tab (manager.html embeds it like the Order Pad).
+  Signed-in console admins only: it reuses the console's Supabase session (same site, same browser storage).
+    Switches   site_content 'shirt_shop' (RLS: is_app_admin may write) — live cards, pause, Printful mode, shipping, tax
+    Orders     shirt-shop function, admin_orders / admin_retry / admin_confirm
+    Printful   admin_printful_setup (webhook) / admin_printful_sync (match products by name + size)
+    Shirts     shirt_products / shirt_variants (RLS: is_app_admin may write) — price, on/off, Printful link status
+-->
+<style>
+  :root{--navy:#06273A;--gold:#E6B33C;--paper:#FAF8F4;--ink:#1C1A17;--muted:#5F584F;--rule:#E7E0D5;--soft:#F3EFE8;--red:#A4262C;--green:#2F6B3A}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+  .wrap{max-width:1100px;margin:0 auto;padding:16px}
+  h1{font-size:22px;margin:0}
+  h2{font-size:17px;margin:0 0 10px;color:var(--navy)}
+  a{color:var(--navy)}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .card{background:#fff;border:1px solid var(--rule);border-radius:12px;padding:16px;margin:0 0 14px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 18px}
+  label.f{display:block;font-size:13px;font-weight:600}
+  label.f input,label.f select{display:block;width:100%;margin-top:4px;height:40px;padding:0 10px;border:1.5px solid #D9D1C4;border-radius:8px;font:inherit;background:#fff}
+  .tog{display:flex;gap:10px;align-items:flex-start;font-size:14px}
+  .tog input{width:20px;height:20px;margin:2px 0 0;accent-color:var(--navy)}
+  .tog small{display:block;color:var(--muted);font-weight:400}
+  .btn{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 14px;border:0;border-radius:8px;background:var(--navy);color:#fff;font:600 14px system-ui,sans-serif;cursor:pointer;text-decoration:none;white-space:nowrap}
+  .btn.ghost{background:#fff;color:var(--navy);border:1.5px solid var(--navy)}
+  .btn.sm{min-height:30px;padding:0 10px;font-size:13px}
+  .btn[disabled]{opacity:.5;cursor:default}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .msg{font-size:14px;color:var(--muted)}
+  .msg.bad{color:var(--red)} .msg.good{color:var(--green)}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--rule)}
+  td{padding:8px;border-bottom:1px solid var(--rule);vertical-align:top}
+  .pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:600;background:var(--soft);color:var(--ink)}
+  .pill.test{background:#FDF1D3;color:#6B5212}
+  .pill.ok{background:#E3F1E5;color:var(--green)}
+  .pill.warn{background:#F7E4E4;color:var(--red)}
+  .pill.draft{background:#E6EEF6;color:var(--navy)}
+  .nowrap{white-space:nowrap}
+  .muted{color:var(--muted)}
+  .empty{padding:18px 8px;color:var(--muted)}
+  .steps{margin:0 0 12px;padding-left:20px;color:var(--muted);font-size:14px}
+  .scroll{overflow-x:auto}
+  .gate{max-width:520px;margin:60px auto;text-align:center}
+  @media (max-width:700px){ .hide-sm{display:none} }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="msg">Loading…</p></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function () {
+  'use strict';
+  var SB_URL = 'https://vdvtrevhqalmjwhjhjug.supabase.co';
+  var SB_KEY = 'sb_publishable_LnlevWReed7K8cFk_f_Mxg_UywktQ5_';
+  var FN = SB_URL + '/functions/v1/shirt-shop';
+  var sb = window.supabase.createClient(SB_URL, SB_KEY);
+  var A = { session: null, settings: null, orders: [], products: [], showTest: false, report: null };
+
+  function $(s) { return document.querySelector(s); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function money(c) { return '$' + ((Number(c) || 0) / 100).toFixed(2); }
+  function when(iso) { return iso ? new Date(iso).toLocaleString('en-US', { timeZone: 'America/Chicago', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''; }
+  async function token() {
+    var d = await sb.auth.getSession();
+    A.session = d && d.data && d.data.session;
+    return A.session ? A.session.access_token : null;
+  }
+  async function fn(action, body) {
+    var t = await token();
+    var r = await fetch(FN + '?action=' + action, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (t || SB_KEY) }, body: JSON.stringify(body || {}) });
+    var d = {}; try { d = await r.json(); } catch (_) { }
+    if (!r.ok || d.ok === false) throw new Error(d.error || 'Request failed (' + r.status + ')');
+    return d;
+  }
+  function say(id, text, kind) { var el = $(id); if (el) { el.textContent = text; el.className = 'msg' + (kind ? ' ' + kind : ''); } }
+
+  // ---------------- load ----------------
+  async function start() {
+    if (!(await token())) {
+      $('#app').innerHTML = '<div class="gate"><h1>Shirt Shop</h1><p class="msg">Sign in to the <a href="/manager" target="_top">manager console</a> first, then open the 👕 Shirt Shop tab.</p></div>';
+      return;
+    }
+    await Promise.all([loadSettings(), loadOrders(), loadProducts()]);
+    render();
+  }
+  async function loadSettings() {
+    var r = await sb.from('site_content').select('data').eq('key', 'shirt_shop').maybeSingle();
+    A.settings = (r.data && r.data.data) || {};
+  }
+  async function loadOrders() {
+    try { A.orders = (await fn('admin_orders', { limit: 100 })).orders || []; A.ordersErr = ''; }
+    catch (e) { A.orders = []; A.ordersErr = e.message; }
+  }
+  async function loadProducts() {
+    var r = await sb.from('shirt_products').select('id, slug, name, price_cents, active, sort_order, blank, shirt_variants(id, size, price_cents, active, printful_sync_variant_id, printful_variant_id, print_file_url, sort_order)').eq('shop', 'greys').order('sort_order');
+    A.products = r.data || [];
+    A.productsErr = r.error ? r.error.message : '';
+  }
+
+  // ---------------- render ----------------
+  function render() {
+    var s = A.settings || {};
+    var tax = (s.tax_rates && s.tax_rates.TN) || '';
+    var h = '';
+    h += '<div class="top"><h1>👕 Shirt Shop</h1><a class="btn ghost" href="/shop.html" target="_blank" rel="noopener">Open the shop ↗</a></div>';
+
+    // switches
+    h += '<div class="card"><h2>Switches</h2><div class="grid">' +
+      '<label class="tog"><input type="checkbox" id="s-live"' + (s.live ? ' checked' : '') + ' /><span><b>Take real cards</b><small>Off: every checkout is a Square sandbox test. On: real cards at staff.greyscheese.com/shop (staging stays a test).</small></span></label>' +
+      '<label class="tog"><input type="checkbox" id="s-paused"' + (s.paused ? ' checked' : '') + ' /><span><b>Pause checkout</b><small>The shirts still show; nobody can pay.</small></span></label>' +
+      '<label class="f">Printful<select id="s-pf">' +
+        opt('draft', 'Draft — I confirm each order in Printful', s.printful || 'draft') +
+        opt('confirm', 'Confirm — print and ship automatically', s.printful || 'draft') +
+        opt('off', 'Off — just record the order', s.printful || 'draft') + '</select></label>' +
+      '<label class="f">Shipping, first shirt ($)<input id="s-ship1" inputmode="decimal" value="' + dollars(s.ship_first_cents, 600) + '" /></label>' +
+      '<label class="f">Shipping, each extra shirt ($)<input id="s-ship2" inputmode="decimal" value="' + dollars(s.ship_each_cents, 200) + '" /></label>' +
+      '<label class="f">Free shipping over ($, 0 = never)<input id="s-free" inputmode="decimal" value="' + dollars(s.free_ship_over_cents, 0) + '" /></label>' +
+      '<label class="f">Tennessee sales tax (%)<input id="s-tax" inputmode="decimal" value="' + esc(tax) + '" placeholder="9.75" /></label>' +
+      '</div><div class="row" style="margin-top:12px"><button class="btn" data-act="save">Save switches</button><span class="msg" id="m-save"></span></div></div>';
+
+    // orders
+    var list = A.orders.filter(function (o) { return A.showTest || o.env === 'production'; });
+    h += '<div class="card"><div class="row" style="justify-content:space-between"><h2>Orders</h2>' +
+      '<label class="tog" style="font-size:13px"><input type="checkbox" id="s-showtest"' + (A.showTest ? ' checked' : '') + ' />Show test orders</label></div>';
+    if (A.ordersErr) h += '<p class="msg bad">' + esc(A.ordersErr) + '</p>';
+    h += '<div class="scroll"><table><thead><tr><th>When</th><th>Order</th><th>Customer</th><th class="hide-sm">Shirts</th><th>Total</th><th>Printful</th><th></th></tr></thead><tbody>';
+    if (!list.length) h += '<tr><td colspan="7" class="empty">' + (A.orders.length ? 'Only test orders so far — tick “Show test orders”.' : 'No orders yet.') + '</td></tr>';
+    list.forEach(function (o) {
+      var shirts = (o.lines || []).map(function (l) { return l.qty + '× ' + esc(l.name) + ' ' + esc(l.size); }).join('<br>');
+      var tr = (o.tracking || []).map(function (t) { return t.url ? '<a href="' + esc(t.url) + '" target="_blank" rel="noopener">' + esc(t.carrier || 'Track') + '</a>' : esc(t.number); }).join(' ');
+      var act = '';
+      if (o.status === 'paid' && (!o.printful_order_id || o.printful_status === 'not sent' || o.printful_status === 'failed')) act = '<button class="btn sm" data-act="retry" data-code="' + esc(o.code) + '">Send to Printful</button>';
+      else if (o.status === 'paid' && o.env === 'production' && o.printful_status === 'draft') act = '<button class="btn sm" data-act="confirm" data-code="' + esc(o.code) + '">Print it</button>';
+      h += '<tr><td class="nowrap">' + esc(when(o.paid_at || o.created_at)) + '</td>' +
+        '<td class="nowrap"><b>' + esc(o.code) + '</b> ' + (o.env !== 'production' ? '<span class="pill test">Test</span>' : '') + (o.status !== 'paid' ? ' <span class="pill warn">' + esc(o.status) + '</span>' : '') + '</td>' +
+        '<td>' + esc(o.customer_name) + '<br><span class="muted">' + esc(o.email) + '</span><br><span class="muted">' + esc(o.ship_to ? o.ship_to.city + ', ' + o.ship_to.state_code : '') + '</span></td>' +
+        '<td class="hide-sm">' + shirts + '</td>' +
+        '<td class="nowrap">' + money(o.total_cents) + (o.printful_cost_cents ? '<br><span class="muted">Printful ' + money(o.printful_cost_cents) + '</span>' : '') + '</td>' +
+        '<td>' + pfPill(o) + (tr ? '<br>' + tr : '') + (o.printful_error ? '<br><span class="muted">' + esc(o.printful_error) + '</span>' : '') + '</td>' +
+        '<td>' + act + '<div class="msg" id="m-' + esc(o.code) + '"></div></td></tr>';
+    });
+    h += '</tbody></table></div><div class="row" style="margin-top:10px"><button class="btn ghost sm" data-act="refresh">Refresh</button></div></div>';
+
+    // Printful
+    h += '<div class="card"><h2>Printful</h2>' +
+      '<ol class="steps"><li>In Supabase → Edge Functions → Secrets, add <b>PRINTFUL_TOKEN</b> (Printful → Settings → API) and <b>PRINTFUL_HOOK_KEY</b> (any long random string).</li>' +
+      '<li>In Printful, make one product per design (the shirt listed below) with sizes S–2XL, named like the shirt here.</li>' +
+      '<li>Press <b>Match products</b>, then <b>Connect shipping updates</b>.</li></ol>' +
+      '<div class="row"><button class="btn" data-act="sync">Match products</button><button class="btn ghost" data-act="setup">Connect shipping updates</button><span class="msg" id="m-pf"></span></div>';
+    if (A.report) {
+      h += '<div class="scroll" style="margin-top:12px"><table><thead><tr><th>Shirt</th><th>Printful product</th><th>S</th><th>M</th><th>L</th><th>XL</th><th>XXL</th></tr></thead><tbody>' +
+        A.report.map(function (r) {
+          return '<tr><td>' + esc(r.product) + '</td><td>' + (r.printful ? esc(r.printful) : '<span class="pill warn">not found</span>') + '</td>' +
+            ['S', 'M', 'L', 'XL', 'XXL'].map(function (z) { return '<td>' + (r.sizes[z] ? '✓' : '—') + '</td>'; }).join('') + '</tr>';
+        }).join('') + '</tbody></table></div>';
+    }
+    h += '</div>';
+
+    // shirts
+    h += '<div class="card"><h2>Shirts</h2>';
+    if (A.productsErr) h += '<p class="msg bad">' + esc(A.productsErr) + '</p>';
+    h += '<div class="scroll"><table><thead><tr><th>Shirt</th><th class="hide-sm">Prints on</th><th>Price</th><th>Printful</th><th>On sale</th></tr></thead><tbody>' +
+      A.products.map(function (p) {
+        var vs = p.shirt_variants || [];
+        var linked = vs.filter(function (v) { return v.printful_sync_variant_id || (v.printful_variant_id && v.print_file_url); }).length;
+        return '<tr><td><b>' + esc(p.name) + '</b></td><td class="hide-sm muted">' + esc(p.blank || '') + '</td>' +
+          '<td class="nowrap">$<input data-price="' + esc(p.id) + '" value="' + (p.price_cents / 100).toFixed(2) + '" inputmode="decimal" style="width:70px;height:32px;border:1.5px solid #D9D1C4;border-radius:6px;padding:0 6px" /> <span class="muted">XXL +$3</span></td>' +
+          '<td>' + (linked === vs.length && vs.length ? '<span class="pill ok">' + linked + '/' + vs.length + ' sizes</span>' : '<span class="pill warn">' + linked + '/' + vs.length + ' sizes</span>') + '</td>' +
+          '<td><input type="checkbox" data-active="' + esc(p.id) + '"' + (p.active ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:#06273A" aria-label="' + esc(p.name) + ' on sale" /></td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div class="row" style="margin-top:10px"><button class="btn" data-act="save-shirts">Save shirts</button><span class="msg" id="m-shirts"></span></div>' +
+      '<p class="msg">Live sizes need a Printful link; until then the shop shows them as unavailable (test checkouts don’t need it).</p></div>';
+    $('#app').innerHTML = h;
+  }
+  function opt(v, label, cur) { return '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>' + label + '</option>'; }
+  function dollars(c, d) { var n = Number.isInteger(c) ? c : d; return (n / 100).toFixed(2); }
+  function cents(id) { var v = Number(String($(id).value).replace(/[$,\s]/g, '')); return Number.isFinite(v) && v >= 0 ? Math.round(v * 100) : NaN; }
+  function pfPill(o) {
+    var s = o.printful_status || '';
+    if (!s) return '<span class="muted">—</span>';
+    var cls = { shipped: 'ok', fulfilled: 'ok', pending: 'ok', inprocess: 'ok', draft: 'draft', skipped: 'test', 'not sent': 'warn', failed: 'warn', onhold: 'warn', canceled: 'warn' }[s] || '';
+    return '<span class="pill ' + cls + '">' + esc(s) + '</span>';
+  }
+
+  // ---------------- actions ----------------
+  async function saveSwitches() {
+    var ship1 = cents('#s-ship1'), ship2 = cents('#s-ship2'), free = cents('#s-free');
+    var tax = String($('#s-tax').value).trim();
+    if ([ship1, ship2, free].some(function (n) { return !Number.isFinite(n) || n > 100000; })) return say('#m-save', 'Check the shipping amounts.', 'bad');
+    if (tax && !(/^\d{1,2}(\.\d{1,4})?$/.test(tax) && Number(tax) < 20)) return say('#m-save', 'Tax should look like 9.75.', 'bad');
+    var live = $('#s-live').checked;
+    if (live && !(A.settings || {}).live && !confirm('Take real cards on the live shop?')) { $('#s-live').checked = false; return; }
+    var rates = Object.assign({}, (A.settings && A.settings.tax_rates) || {});
+    if (tax) rates.TN = tax; else delete rates.TN;
+    var data = Object.assign({}, A.settings || {}, {
+      live: live, paused: $('#s-paused').checked, printful: $('#s-pf').value,
+      ship_first_cents: ship1, ship_each_cents: ship2, free_ship_over_cents: free, tax_rates: rates
+    });
+    say('#m-save', 'Saving…');
+    var r = await sb.from('site_content').upsert({ key: 'shirt_shop', data: data, updated_at: new Date().toISOString(), updated_by: (A.session.user && A.session.user.email) || 'console' });
+    if (r.error) return say('#m-save', r.error.message, 'bad');
+    A.settings = data;
+    say('#m-save', 'Saved. The shop picks it up within a few seconds.', 'good');
+  }
+  async function saveShirts() {
+    say('#m-shirts', 'Saving…');
+    try {
+      for (var i = 0; i < A.products.length; i++) {
+        var p = A.products[i];
+        var el = document.querySelector('[data-price="' + p.id + '"]'), on = document.querySelector('[data-active="' + p.id + '"]').checked;
+        var c = Math.round(Number(String(el.value).replace(/[$,\s]/g, '')) * 100);
+        if (!Number.isFinite(c) || c < 100 || c > 50000) throw new Error('Check the price for ' + p.name + '.');
+        if (c === p.price_cents && on === p.active) continue;
+        var r = await sb.from('shirt_products').update({ price_cents: c, active: on, updated_at: new Date().toISOString() }).eq('id', p.id);
+        if (r.error) throw new Error(r.error.message);
+        if (c !== p.price_cents) {
+          for (var j = 0; j < (p.shirt_variants || []).length; j++) {
+            var v = p.shirt_variants[j];
+            var vr = await sb.from('shirt_variants').update({ price_cents: c + (v.size === 'XXL' ? 300 : 0) }).eq('id', v.id);
+            if (vr.error) throw new Error(vr.error.message);
+          }
+        }
+      }
+      await loadProducts(); render();
+      say('#m-shirts', 'Saved. The shop shows it within a minute.', 'good');
+    } catch (e) { say('#m-shirts', e.message, 'bad'); }
+  }
+  document.addEventListener('click', async function (e) {
+    var t = e.target.closest('[data-act]'); if (!t) return;
+    var a = t.getAttribute('data-act'), code = t.getAttribute('data-code');
+    if (a === 'save') return saveSwitches();
+    if (a === 'save-shirts') return saveShirts();
+    if (a === 'refresh') { await loadOrders(); return render(); }
+    t.disabled = true;
+    try {
+      if (a === 'retry' || a === 'confirm') {
+        if (a === 'confirm' && !confirm('Send ' + code + ' to Printful to print and ship? Printful charges for it.')) { t.disabled = false; return; }
+        say('#m-' + code, 'Working…');
+        var d = await fn(a === 'retry' ? 'admin_retry' : 'admin_confirm', { code: code });
+        await loadOrders(); render();
+        say('#m-' + code, 'Printful: ' + d.printful_status, 'good');
+      } else if (a === 'sync') {
+        say('#m-pf', 'Matching…');
+        var r = await fn('admin_printful_sync', {});
+        A.report = r.report; await loadProducts(); render();
+        say('#m-pf', 'Linked ' + r.saved + ' sizes.' + (r.printful_products.length ? '' : ' Printful has no products yet.'), 'good');
+      } else if (a === 'setup') {
+        say('#m-pf', 'Connecting…');
+        var s = await fn('admin_printful_setup', {});
+        say('#m-pf', 'Printful will send shipping updates' + (s.store ? ' for “' + s.store.name + '”' : '') + '.', 'good');
+      }
+    } catch (err) {
+      say(code ? '#m-' + code : '#m-pf', err.message, 'bad');
+    }
+    t.disabled = false;
+  });
+  document.addEventListener('change', function (e) { if (e.target.id === 's-showtest') { A.showTest = e.target.checked; render(); } });
+  start().catch(function (e) { $('#app').innerHTML = '<p class="msg bad">' + esc(e.message) + '</p>'; });
+})();
+</script>
+</body>
+</html>

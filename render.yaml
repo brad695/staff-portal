@@ -28,6 +28,12 @@ services:
       - type: rewrite
         source: /terms
         destination: /terms.html
+      - type: rewrite
+        source: /shop
+        destination: /shop.html
+      - type: rewrite
+        source: /shop-admin
+        destination: /shop-admin.html
     headers:
       - path: /*
         name: Cache-Control
@@ -62,6 +68,12 @@ services:
       - type: rewrite
         source: /terms
         destination: /terms.html
+      - type: rewrite
+        source: /shop
+        destination: /shop.html
+      - type: rewrite
+        source: /shop-admin
+        destination: /shop-admin.html
       - type: rewrite
         source: /calendar
         destination: /calendar.html

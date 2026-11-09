@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>GREYS — T-Shirts</title>
+<meta name="description" content="Cheese-pun t-shirts from GREYS Fine Cheeses, printed to order and shipped anywhere in the US." />
+<link rel="icon" href="/favicon.ico" sizes="any" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<meta name="theme-color" content="#06273A" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="GREYS Fine Cheeses" />
+<meta property="og:title" content="GREYS — T-Shirts" />
+<meta property="og:description" content="Six cheese puns, printed to order and shipped anywhere in the US." />
+<meta property="og:image" content="https://staff.greyscheese.com/shop-img/og.jpg" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preconnect" href="https://vdvtrevhqalmjwhjhjug.supabase.co" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=League+Spartan:wght@600;700;800&display=swap" />
+<!--
+  shop.html — the GREYS shirt shop (moved in from the tee-stores repo, 2026-11-08).
+    LIVE     https://staff.greyscheese.com/shop
+    STAGING  https://greys-staff-portal-staging.onrender.com/shop   (always Square sandbox)
+  Catalog, prices, shipping and tax come from the `shirt-shop` Edge Function (supabase/functions/shirt-shop);
+  orders are paid through Square (Web Payments SDK card form) and printed + shipped by Printful.
+  Sandbox vs real cards is decided by the function (site_content 'shirt_shop'.live + the page's origin), never here;
+  the page shows a test bar whenever the function says sandbox.
+  Header + footer: the shared greyscheese.com chrome (site-chrome.js from the Greys-Sites repo, loaded from the order
+  site so there is still ONE copy of the menu). Its top-right slot is the cart button.
+  Local testing: http://localhost:PORT/shop.html?fn=http://localhost:8787 points the page at a local function.
+-->
+<style>
+  :root{--navy:#06273A;--navy2:#0e4a6b;--gold:#E6B33C;--paper:#FAF8F4;--card:#FFFFFF;--ink:#1C1A17;--brass:#896D39;
+    --muted:#5F584F;--rule:#E7E0D5;--soft:#F3EFE8;--red:#A4262C;--green:#2F6B3A;
+    --fb:'Instrument Sans',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+    --fd:'League Spartan','Instrument Sans',ui-sans-serif,system-ui,sans-serif;}
+  *,*::before,*::after{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--fb);font-size:16px;line-height:1.5}
+  img{display:block;max-width:100%}
+  button,input,select{font:inherit;color:inherit}
+  [hidden]{display:none !important}
+  .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  :focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+
+  .s-wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+  #shop{outline:none}
+
+  /* bars */
+  .s-bar{margin:18px 0 0;padding:10px 14px;border-radius:8px;font-size:14px;line-height:1.45}
+  .s-bar.test{background:#FDF1D3;color:#4A3A12;border:1px solid #F0D58E}
+  .s-bar.pause{background:#F7E4E4;color:#6B1B1F;border:1px solid #E8C2C2}
+
+  /* intro */
+  .s-intro{padding:44px 0 8px;max-width:680px}
+  .s-intro h1{font-family:var(--fd);font-weight:800;font-size:clamp(34px,5.4vw,52px);line-height:1.02;letter-spacing:-.015em;margin:0 0 14px;color:var(--navy)}
+  .s-lede{font-size:19px;line-height:1.5;margin:0 0 10px;color:var(--ink)}
+  .s-facts{font-size:15px;color:var(--muted);margin:0}
+
+  /* grid of shirts */
+  .s-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:40px 28px;padding:34px 0 18px}
+  .s-card{display:flex;flex-direction:column;scroll-margin-top:24px}
+  .s-photo{display:block;width:100%;padding:0;border:0;background:#E9E6E1;border-radius:14px;overflow:hidden;cursor:zoom-in;aspect-ratio:1/1}
+  .s-photo img{width:100%;height:100%;object-fit:cover}
+  /* the counter label: a cheesemonger's card propped in front of each shirt */
+  .s-label{position:relative;margin:-30px 14px 0;padding:18px 18px 16px;background:var(--card);border:1px solid var(--rule);border-radius:4px;
+    box-shadow:inset 0 0 0 4px var(--card),inset 0 0 0 5px var(--navy);flex:1;display:flex;flex-direction:column;padding-bottom:10px}
+  .s-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .s-name{font-family:var(--fd);font-weight:800;font-size:23px;line-height:1.08;letter-spacing:-.01em;margin:0;color:var(--navy)}
+  .s-price{font-family:var(--fd);font-weight:700;font-size:21px;color:var(--navy);white-space:nowrap}
+  .s-kind{margin:6px 0 0;font-size:14px;font-weight:600;color:var(--brass)}
+  .s-note{margin:8px 0 14px;font-size:15px;color:var(--muted);flex:1}
+  .s-sizes{border:0;margin:0 0 12px;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+  .s-sizes label{position:relative;flex:1 1 0;min-width:46px}
+  .s-sizes input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+  .s-sizes span{display:flex;align-items:center;justify-content:center;height:44px;border:1.5px solid #CFC6B8;border-radius:8px;font-weight:600;font-size:15px;background:#fff;color:var(--ink)}
+  .s-sizes input:checked + span{background:var(--navy);border-color:var(--navy);color:#fff}
+  .s-sizes input:focus-visible + span{outline:3px solid var(--gold);outline-offset:2px}
+  .s-sizes input:disabled + span{color:#AFA79B;background:var(--soft);text-decoration:line-through;cursor:not-allowed}
+  .s-sizes label:hover input:not(:disabled):not(:checked) + span{border-color:var(--navy)}
+  .s-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 20px;border:0;border-radius:10px;
+    background:var(--navy);color:#fff;font-weight:600;font-size:16px;cursor:pointer;text-decoration:none}
+  .s-btn:hover{background:var(--navy2)}
+  .s-btn[disabled]{opacity:.55;cursor:not-allowed}
+  .s-btn.wide{width:100%}
+  .s-btn.ghost{background:transparent;color:var(--navy);border:1.5px solid var(--navy)}
+  .s-btn.ghost:hover{background:var(--soft)}
+  .s-btn.added{background:var(--green)}
+  .s-msg{margin:8px 0 0;font-size:14px;min-height:1.45em;color:var(--muted)}
+  .s-msg.bad{color:var(--red)}
+  .s-fit{margin:0 0 6px;font-size:14px;color:var(--muted)}
+
+  /* loading + errors */
+  .s-skel .s-photo{background:linear-gradient(90deg,#ECE8E2,#F4F1EC,#ECE8E2);background-size:200% 100%;animation:sk 1.4s linear infinite;cursor:default}
+  .s-skel .s-label{min-height:210px}
+  @keyframes sk{to{background-position:-200% 0}}
+  .s-oops{padding:28px 0 60px;max-width:560px}
+  .s-oops p{margin:0 0 14px}
+
+  /* track */
+  .s-track{margin:30px 0 0;padding:22px 0 0;border-top:1px solid var(--rule)}
+  .s-track summary{cursor:pointer;font-weight:600;color:var(--navy);display:inline-block;padding:6px 0}
+  .s-track form{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 0;align-items:flex-end}
+  .s-track .s-f{margin:0;flex:1 1 180px}
+  .s-tres{margin:14px 0 0;font-size:15px}
+
+  /* cart bar (sticky) */
+  .s-cartbar{position:sticky;bottom:0;z-index:30;margin-top:28px;background:var(--navy);color:#fff;padding:10px 0 calc(10px + env(safe-area-inset-bottom))}
+  .s-cartbar .s-wrap{display:flex;align-items:center;justify-content:space-between;gap:14px}
+  .s-cartbar p{margin:0;font-weight:600}
+  .s-cartbar .s-btn{background:var(--gold);color:var(--navy);min-height:44px}
+  .s-cartbar .s-btn:hover{background:#F0C252}
+
+  /* header cart button (site-chrome's top-right slot) */
+  .gx-site #gx-mine .s-count{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;margin-left:2px;border-radius:11px;background:var(--gold);color:var(--navy);font:700 13px/1 var(--fb)}
+  .s-fallhead{background:var(--navy);color:#F5F7F2;padding:16px 20px;display:flex;align-items:center;justify-content:space-between}
+  .s-fallhead a{color:#F5F7F2;text-decoration:none;font:800 30px/1 var(--fd);letter-spacing:.02em}
+  .s-fallhead button{background:none;border:1px solid #F5F7F2;color:#F5F7F2;border-radius:8px;padding:8px 14px;cursor:pointer}
+
+  /* cart drawer */
+  .s-scrim{position:fixed;inset:0;background:rgba(6,39,58,.42);z-index:80}
+  .s-drawer{position:fixed;top:0;right:0;bottom:0;z-index:81;width:min(440px,100%);background:var(--paper);display:flex;flex-direction:column;
+    box-shadow:-12px 0 40px rgba(6,39,58,.18);transform:translateX(0);transition:transform .22s ease}
+  .s-drawer.closed{transform:translateX(104%)}
+  .s-dhead{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--rule)}
+  .s-dhead h2{margin:0;font-family:var(--fd);font-weight:800;font-size:24px;color:var(--navy)}
+  .s-x{width:44px;height:44px;border:0;background:none;border-radius:8px;cursor:pointer;font-size:26px;line-height:1;color:var(--navy)}
+  .s-x:hover{background:var(--soft)}
+  .s-dbody{flex:1;overflow:auto;padding:6px 20px}
+  .s-dfoot{padding:16px 20px calc(16px + env(safe-area-inset-bottom));border-top:1px solid var(--rule);background:var(--card)}
+  .s-row{display:flex;justify-content:space-between;gap:12px;margin:0 0 4px}
+  .s-row.total{font-weight:700;font-size:18px;margin:10px 0 0;padding-top:10px;border-top:1px solid var(--rule)}
+  .s-small{font-size:14px;color:var(--muted);margin:2px 0 12px}
+  .s-empty{padding:30px 0;color:var(--muted)}
+  .s-line{display:grid;grid-template-columns:64px 1fr auto;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--rule)}
+  .s-line img{width:64px;height:64px;border-radius:8px;object-fit:cover;background:#E9E6E1}
+  .s-line b{display:block;font-weight:600;line-height:1.25}
+  .s-line small{display:block;color:var(--muted);font-size:14px}
+  .s-qty{display:inline-flex;align-items:center;gap:2px;margin-top:6px;border:1.5px solid #CFC6B8;border-radius:8px}
+  .s-qty button{width:36px;height:34px;border:0;background:none;cursor:pointer;font-size:18px;color:var(--navy)}
+  .s-qty button:disabled{color:#BDB5A8;cursor:default}
+  .s-qty span{min-width:22px;text-align:center;font-weight:600}
+  .s-rm{border:0;background:none;padding:6px 0 0;color:var(--muted);font-size:14px;text-decoration:underline;cursor:pointer;display:block;margin-left:auto}
+  .s-lp{text-align:right;font-weight:600;white-space:nowrap}
+
+  /* checkout */
+  .s-back{border:0;background:none;padding:10px 0;color:var(--navy);font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+  .s-co h1,.s-done h1{font-family:var(--fd);font-weight:800;font-size:clamp(30px,4.4vw,42px);line-height:1.05;margin:6px 0 22px;color:var(--navy);letter-spacing:-.01em}
+  .s-cogrid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:40px;align-items:start;padding-bottom:40px}
+  .s-co fieldset{border:0;margin:0 0 26px;padding:0}
+  .s-co legend{font-family:var(--fd);font-weight:700;font-size:21px;color:var(--navy);padding:0;margin:0 0 12px}
+  .s-pair{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+  .s-trio{display:grid;grid-template-columns:1.4fr 1fr .8fr;gap:0 14px}
+  .s-f{display:block;margin:0 0 14px}
+  .s-f span{display:block;font-size:14px;font-weight:600;margin:0 0 6px}
+  .s-f em{font-style:normal;font-weight:400;color:var(--muted)}
+  .s-f input,.s-f select{width:100%;height:48px;padding:0 14px;border:1.5px solid #D9D1C4;border-radius:10px;background:#fff;font-size:16px}
+  .s-f input:focus,.s-f select:focus{border-color:var(--navy);outline:none;box-shadow:0 0 0 3px rgba(230,179,60,.45)}
+  .s-f input[aria-invalid="true"],.s-f select[aria-invalid="true"]{border-color:var(--red)}
+  #sq-card{min-height:90px}
+  .s-cardnote{font-size:14px;color:var(--muted);margin:6px 0 0}
+  .s-payerr{margin:0 0 14px;color:var(--red);font-weight:600}
+  .s-payerr:empty{display:none}
+  .s-fine{font-size:14px;color:var(--muted);margin:12px 0 0}
+  .s-fine a{color:var(--navy)}
+  .s-sum{position:sticky;top:20px;background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:20px}
+  .s-sum h2{margin:0 0 6px;font-family:var(--fd);font-weight:700;font-size:21px;color:var(--navy)}
+  .s-sum .s-line{grid-template-columns:52px 1fr auto;padding:10px 0}
+  .s-sum .s-line img{width:52px;height:52px}
+  .s-sum .s-rows{margin-top:12px}
+  .s-pending{color:var(--muted)}
+
+  /* done */
+  .s-done{padding:40px 0 30px;max-width:640px}
+  .s-done p{margin:0 0 12px;font-size:17px}
+  .s-done .s-sum{position:static;margin:20px 0 22px}
+
+  /* zoom */
+  .s-zoom{border:0;padding:0;background:transparent;max-width:min(92vw,820px);width:100%}
+  .s-zoom::backdrop{background:rgba(6,39,58,.7)}
+  .s-zoom img{width:100%;border-radius:14px;background:#E9E6E1}
+  .s-zoom .s-x{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.9)}
+
+  @media (max-width:980px){
+    .s-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .s-cogrid{grid-template-columns:1fr;gap:10px}
+    .s-sum{position:static;order:-1}
+  }
+  @media (max-width:620px){
+    .s-wrap{padding:0 16px}
+    .s-intro{padding-top:30px}
+    .s-lede{font-size:17px}
+    .s-grid{grid-template-columns:1fr;gap:34px}
+    .s-pair,.s-trio{grid-template-columns:1fr}
+    .s-trio .s-f:last-child{max-width:200px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .s-drawer{transition:none}
+    .s-skel .s-photo{animation:none}
+  }
+</style>
+</head>
+<body>
+<div id="gx-header"></div>
+<script src="https://orderonline.greyscheese.com/site-chrome.js" data-main="shop" data-mine="button" onerror="window.__gxFailed=1"></script>
+
+<main id="shop" tabindex="-1">
+  <div class="s-wrap">
+    <p class="s-bar test" id="testbar" hidden></p>
+    <p class="s-bar pause" id="pausebar" role="status" hidden></p>
+
+    <div id="v-shop">
+      <section class="s-intro" aria-labelledby="s-h1">
+        <h1 id="s-h1">Shirts from the cheese counter</h1>
+        <p class="s-lede">Six cheese puns we couldn’t keep behind the counter. Each shirt is printed when you order it and ships anywhere in the US.</p>
+        <p class="s-facts" id="facts"></p>
+      </section>
+      <div class="s-grid" id="grid" aria-live="polite" aria-busy="true"></div>
+      <p class="s-fit">Unisex fit — order your usual size.</p>
+      <details class="s-track" id="track">
+        <summary>Track an order</summary>
+        <form id="trackform" novalidate>
+          <label class="s-f"><span>Order code</span><input name="code" autocomplete="off" autocapitalize="characters" placeholder="T7K2QX" maxlength="8" /></label>
+          <label class="s-f"><span>Email</span><input name="email" type="email" autocomplete="email" inputmode="email" /></label>
+          <button class="s-btn ghost" type="submit">Look up</button>
+        </form>
+        <div class="s-tres" id="trackres" role="status" aria-live="polite"></div>
+      </details>
+    </div>
+
+    <section class="s-co" id="v-checkout" hidden aria-labelledby="co-h1">
+      <button type="button" class="s-back" data-act="shop">Back to the shirts</button>
+      <h1 id="co-h1">Checkout</h1>
+      <div class="s-cogrid">
+        <form id="coform" novalidate>
+          <fieldset>
+            <legend>Contact</legend>
+            <label class="s-f"><span>Name</span><input name="name" autocomplete="name" required /></label>
+            <div class="s-pair">
+              <label class="s-f"><span>Email</span><input name="email" type="email" autocomplete="email" inputmode="email" required /></label>
+              <label class="s-f"><span>Phone <em>(optional, for the carrier)</em></span><input name="phone" type="tel" autocomplete="tel" inputmode="tel" /></label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Ship to</legend>
+            <label class="s-f"><span>Street address</span><input name="address1" autocomplete="address-line1" required /></label>
+            <label class="s-f"><span>Apartment, suite <em>(optional)</em></span><input name="address2" autocomplete="address-line2" /></label>
+            <div class="s-trio">
+              <label class="s-f"><span>City</span><input name="city" autocomplete="address-level2" required /></label>
+              <label class="s-f"><span>State</span><select name="state_code" autocomplete="address-level1" required><option value="">Choose…</option></select></label>
+              <label class="s-f"><span>ZIP</span><input name="zip" autocomplete="postal-code" inputmode="numeric" maxlength="10" required /></label>
+            </div>
+            <p class="s-small">We ship to US addresses only.</p>
+          </fieldset>
+          <fieldset>
+            <legend>Pay</legend>
+            <div id="sq-card"></div>
+            <p class="s-cardnote" id="cardnote"></p>
+          </fieldset>
+          <p class="s-payerr" id="payerr" role="alert"></p>
+          <button class="s-btn wide" type="submit" id="paybtn" disabled>Pay</button>
+          <p class="s-fine">Your card is charged when you place the order. Questions about an order? Email <a href="mailto:info@greyscheese.com">info@greyscheese.com</a>.</p>
+        </form>
+        <aside class="s-sum" aria-labelledby="sum-h"><h2 id="sum-h">Order summary</h2><div id="sumlines"></div><div class="s-rows" id="sumrows"></div></aside>
+      </div>
+    </section>
+
+    <section class="s-done" id="v-done" hidden aria-labelledby="done-h1" tabindex="-1"></section>
+  </div>
+  <div class="s-cartbar" id="cartbar" hidden>
+    <div class="s-wrap"><p id="cartbar-txt"></p><button type="button" class="s-btn" data-act="cart">View cart</button></div>
+  </div>
+</main>
+
+<div class="s-scrim" id="scrim" hidden></div>
+<aside class="s-drawer closed" id="cart" role="dialog" aria-modal="true" aria-labelledby="cart-h" hidden>
+  <div class="s-dhead"><h2 id="cart-h">Your cart</h2><button type="button" class="s-x" data-act="close-cart" aria-label="Close cart">×</button></div>
+  <div class="s-dbody" id="cartlines"></div>
+  <div class="s-dfoot" id="cartfoot"></div>
+</aside>
+
+<dialog class="s-zoom" id="zoom" aria-label="Shirt photo">
+  <img id="zoomimg" alt="" />
+  <button type="button" class="s-x" data-act="close-zoom" aria-label="Close photo">×</button>
+</dialog>
+
+<div id="gx-footer"></div>
+<noscript><p style="padding:20px;max-width:600px;margin:0 auto">The shirt shop needs JavaScript. Email <a href="mailto:info@greyscheese.com">info@greyscheese.com</a> to order.</p></noscript>
+
+<script>
+(function () {
+  'use strict';
+  var FN = 'https://vdvtrevhqalmjwhjhjug.supabase.co/functions/v1/shirt-shop';
+  var Q = new URLSearchParams(location.search);
+  if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && Q.get('fn')) FN = Q.get('fn').replace(/\/$/, '') + '/shirt-shop';
+  var KEY = 'greys.shirts.cart';
+  var EMAIL = 'info@greyscheese.com';
+
+  // ---------------- small helpers ----------------
+  function $(s, r) { return (r || document).querySelector(s); }
+  function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function money(c) { return '$' + (c / 100).toFixed(2); }
+  function price(c) { return c % 100 === 0 ? '$' + c / 100 : money(c); }
+  function uuid() { return (crypto.randomUUID && crypto.randomUUID()) || ('a' + Date.now().toString(36) + Math.random().toString(36).slice(2)); }
+  var store = {
+    get: function (k) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (_) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) { } }
+  };
+  async function api(action, body) {
+    var r, d = {};
+    try {
+      r = await fetch(FN + '?action=' + action, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+    } catch (_) {
+      var ne = new Error('We couldn’t reach the shop. Check your connection and try again.'); ne.status = 0; throw ne;
+    }
+    try { d = await r.json(); } catch (_) { }
+    if (!r.ok || d.ok === false) {
+      var e = new Error(d.error || 'Something went wrong. Please try again, or email ' + EMAIL + '.');
+      e.status = r.status; e.data = d; throw e;
+    }
+    return d;
+  }
+
+  // ---------------- state ----------------
+  var S = {
+    cat: null,            // catalog response
+    cart: (store.get(KEY) || []).filter(function (l) { return l && typeof l.v === 'string' && l.q > 0; }),
+    step: 'shop',         // shop | checkout | done
+    picked: {},           // slug -> variant id
+    quote: null, quoting: false, quoteSeq: 0,
+    paying: false, payErr: '', attempt: uuid(), done: null,
+    cardState: 'idle', cardErr: ''
+  };
+  var byVariant = {};     // variant id -> { p, v }
+  function saveCart() { store.set(KEY, S.cart); }
+  function cartItems() {
+    return S.cart.map(function (l) { var hit = byVariant[l.v]; return hit ? { p: hit.p, v: hit.v, q: l.q } : null; }).filter(Boolean);
+  }
+  function cartCount() { return cartItems().reduce(function (a, l) { return a + l.q; }, 0); }
+  function cartSub() { return cartItems().reduce(function (a, l) { return a + l.q * l.v.price_cents; }, 0); }
+  function apiLines() { return cartItems().map(function (l) { return { variant_id: l.v.id, qty: l.q }; }); }
+  function testMode() { return !!(S.cat && S.cat.env === 'sandbox'); }
+  function accepting() { return !!(S.cat && S.cat.accepting); }
+
+  // ---------------- header cart button ----------------
+  var I = { bag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 8h14l-1.2 12H6.2z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>' };
+  function cartButton() {
+    var n = cartCount(), label = 'Cart';
+    var gm = $('#gx-mine');
+    if (gm) {
+      gm.hidden = false;
+      gm.setAttribute('data-act', 'cart');
+      gm.setAttribute('aria-label', n ? 'Open cart, ' + n + (n === 1 ? ' shirt' : ' shirts') : 'Open cart, empty');
+      gm.innerHTML = I.bag + '<span>' + label + '</span>' + (n ? '<span class="s-count">' + n + '</span>' : '');
+      if (window.GreysChrome && GreysChrome.setMine) GreysChrome.setMine(n > 0);
+    }
+    var fb = $('#s-fallcart');
+    if (fb) fb.textContent = 'Cart' + (n ? ' (' + n + ')' : '');
+    var bar = $('#cartbar');
+    bar.hidden = !(n && S.step === 'shop');
+    if (n) $('#cartbar-txt').textContent = n + (n === 1 ? ' shirt' : ' shirts') + ' · ' + money(cartSub());
+  }
+  // site-chrome.js didn't load (offline, blocked): a plain header so the page still works
+  if (window.__gxFailed || !window.__gxChrome) {
+    var hb = document.getElementById('gx-header');
+    hb.innerHTML = '<div class="s-fallhead"><a href="https://www.greyscheese.com">GREYS</a><button type="button" id="s-fallcart" data-act="cart">Cart</button></div>';
+  }
+
+  // ---------------- catalog ----------------
+  function skeleton() {
+    var h = '';
+    for (var i = 0; i < 6; i++) h += '<div class="s-card s-skel" aria-hidden="true"><div class="s-photo"></div><div class="s-label"></div></div>';
+    $('#grid').innerHTML = h;
+  }
+  async function loadCatalog() {
+    skeleton();
+    try {
+      S.cat = await api('catalog', {});
+    } catch (e) {
+      $('#grid').setAttribute('aria-busy', 'false');
+      $('#grid').outerHTML = '<div class="s-oops" id="grid"><p>' + esc(e.message) + '</p><button type="button" class="s-btn" data-act="reload">Try again</button></div>';
+      return;
+    }
+    byVariant = {};
+    S.cat.products.forEach(function (p) { p.variants.forEach(function (v) { byVariant[v.id] = { p: p, v: v }; }); });
+    var before = S.cart.length;
+    S.cart = S.cart.filter(function (l) { return byVariant[l.v]; });
+    if (S.cart.length !== before) saveCart();
+    renderBars();
+    renderFacts();
+    renderGrid();
+    cartButton();
+    fillStates();
+    var slug = decodeURIComponent((location.hash || '').slice(1));
+    if (slug === 'checkout' && cartCount()) goCheckout(true);
+    else if (slug && document.getElementById(slug)) setTimeout(function () { document.getElementById(slug).scrollIntoView({ block: 'start' }); }, 50);
+    if (Q.has('cart') && cartCount()) openCart();
+  }
+  function renderBars() {
+    var tb = $('#testbar');
+    tb.hidden = !testMode();
+    if (testMode()) tb.innerHTML = '<b>Test mode.</b> Cards aren’t charged and nothing ships. Use card <b>4111 1111 1111 1111</b>, any future date, CVV <b>111</b>, ZIP <b>11111</b>.';
+    var pb = $('#pausebar');
+    pb.hidden = accepting();
+    if (!accepting()) pb.textContent = S.cat.message || 'The shirt shop is taking a short break.';
+    var sb = document.getElementById('staging-bar');
+    if (sb) sb.textContent = testMode() ? 'STAGING — Square sandbox: test cards only, nothing is charged.' : 'STAGING — this copy takes REAL card payments.';
+  }
+  function renderFacts() {
+    var sh = S.cat.shipping, prices = {};
+    S.cat.products.forEach(function (p) { p.variants.forEach(function (v) { prices[v.size] = v.price_cents; }); });
+    var base = S.cat.products.length ? S.cat.products[0].price_cents : 0;
+    var t = price(base) + ' each' + (prices.XXL && prices.XXL !== base ? ', ' + price(prices.XXL) + ' for XXL' : '') + '. ';
+    if (sh.first_cents === 0) t += 'Shipping is free.';
+    else {
+      t += 'Shipping is ' + price(sh.first_cents) + (sh.each_cents ? ' for the first shirt and ' + price(sh.each_cents) + ' for each one after' : ' per order') + '.';
+      if (sh.free_over_cents > 0) t += ' Free over ' + price(sh.free_over_cents) + '.';
+    }
+    $('#facts').textContent = t;
+  }
+  function renderGrid() {
+    var g = $('#grid');
+    g.setAttribute('aria-busy', 'false');
+    if (!S.cat.products.length) { g.innerHTML = '<p class="s-empty">No shirts right now — check back soon.</p>'; return; }
+    g.innerHTML = S.cat.products.map(function (p) {
+      var sizes = p.variants.map(function (v) {
+        var off = !v.available;
+        return '<label><input type="radio" name="size-' + esc(p.slug) + '" value="' + esc(v.id) + '"' + (off ? ' disabled' : '') +
+          (S.picked[p.slug] === v.id ? ' checked' : '') + ' aria-label="' + esc(v.size) + (v.price_cents !== p.price_cents ? ', ' + price(v.price_cents) : '') + (off ? ', unavailable' : '') + '" />' +
+          '<span aria-hidden="true">' + esc(v.size) + '</span></label>';
+      }).join('');
+      var shown = S.picked[p.slug] && byVariant[S.picked[p.slug]] ? byVariant[S.picked[p.slug]].v.price_cents : p.price_cents;
+      return '<article class="s-card" id="' + esc(p.slug) + '" aria-labelledby="n-' + esc(p.slug) + '">' +
+        '<button type="button" class="s-photo" data-act="zoom" data-slug="' + esc(p.slug) + '" aria-label="Bigger photo of ' + esc(p.name) + '">' +
+        '<img src="' + esc(p.image) + '" alt="' + esc(p.name) + ' t-shirt' + (p.tagline ? ': ' + esc(p.tagline) : '') + '" width="900" height="900" loading="lazy" decoding="async" /></button>' +
+        '<div class="s-label">' +
+        '<div class="s-top"><h2 class="s-name" id="n-' + esc(p.slug) + '">' + esc(p.name) + '</h2><span class="s-price" data-price="' + esc(p.slug) + '">' + price(shown) + '</span></div>' +
+        (p.tagline ? '<p class="s-kind">' + esc(p.tagline) + '</p>' : '') +
+        '<p class="s-note">' + esc(p.description) + '</p>' +
+        '<fieldset class="s-sizes" data-slug="' + esc(p.slug) + '"><legend class="sr">Size for ' + esc(p.name) + '</legend>' + sizes + '</fieldset>' +
+        '<button type="button" class="s-btn wide" data-act="add" data-slug="' + esc(p.slug) + '"' + (accepting() ? '' : ' disabled') + '>Add to cart</button>' +
+        '<p class="s-msg" data-msg="' + esc(p.slug) + '" aria-live="polite"></p>' +
+        '</div></article>';
+    }).join('');
+  }
+  function productBySlug(slug) { return S.cat.products.filter(function (p) { return p.slug === slug; })[0]; }
+
+  function addToCart(slug, btn) {
+    var p = productBySlug(slug), vid = S.picked[slug], msg = $('[data-msg="' + slug + '"]');
+    if (!p) return;
+    if (!vid || !byVariant[vid]) {
+      msg.textContent = 'Pick a size first.'; msg.className = 's-msg bad';
+      var first = $('.s-sizes[data-slug="' + slug + '"] input:not(:disabled)');
+      if (first) first.focus();
+      return;
+    }
+    var line = S.cart.filter(function (l) { return l.v === vid; })[0];
+    if (line) {
+      if (line.q >= 10) { msg.textContent = 'Up to 10 of each shirt per order.'; msg.className = 's-msg bad'; return; }
+      line.q++;
+    } else S.cart.push({ v: vid, q: 1 });
+    saveCart();
+    cartButton();
+    msg.className = 's-msg';
+    msg.textContent = p.name + ', ' + byVariant[vid].v.size + ' — added to your cart.';
+    btn.classList.add('added'); btn.textContent = 'Added to cart';
+    clearTimeout(btn._t);
+    btn._t = setTimeout(function () { btn.classList.remove('added'); btn.textContent = 'Add to cart'; }, 1800);
+  }
+
+  // ---------------- cart drawer ----------------
+  var lastFocus = null;
+  function openCart() {
+    if (!S.cat) return;
+    lastFocus = document.activeElement;
+    renderCart();
+    var d = $('#cart');
+    d.hidden = false; $('#scrim').hidden = false;
+    document.body.style.overflow = 'hidden';
+    requestAnimationFrame(function () { d.classList.remove('closed'); $('.s-x', d).focus(); });
+  }
+  function closeCart() {
+    var d = $('#cart');
+    if (d.hidden) return;
+    d.classList.add('closed'); $('#scrim').hidden = true;
+    document.body.style.overflow = '';
+    setTimeout(function () { if (d.classList.contains('closed')) d.hidden = true; }, 240);
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  function lineHtml(l, editable) {
+    return '<div class="s-line"><img src="' + esc(l.p.image) + '" alt="" />' +
+      '<div><b>' + esc(l.p.name) + '</b><small>Size ' + esc(l.v.size) + (editable ? '' : ' × ' + l.q) + '</small>' +
+      (editable ? '<div class="s-qty" role="group" aria-label="Quantity of ' + esc(l.p.name) + ', ' + esc(l.v.size) + '">' +
+        '<button type="button" data-act="qty" data-v="' + esc(l.v.id) + '" data-d="-1" aria-label="One fewer"' + (l.q <= 1 ? ' disabled' : '') + '>−</button>' +
+        '<span aria-live="polite">' + l.q + '</span>' +
+        '<button type="button" data-act="qty" data-v="' + esc(l.v.id) + '" data-d="1" aria-label="One more"' + (l.q >= 10 ? ' disabled' : '') + '>+</button></div>' : '') +
+      '</div><div class="s-lp">' + money(l.q * l.v.price_cents) +
+      (editable ? '<button type="button" class="s-rm" data-act="rm" data-v="' + esc(l.v.id) + '">Remove</button>' : '') + '</div></div>';
+  }
+  function renderCart() {
+    var items = cartItems();
+    $('#cartlines').innerHTML = items.length ? items.map(function (l) { return lineHtml(l, true); }).join('')
+      : '<p class="s-empty">Your cart is empty. Pick a shirt and a size to start.</p>';
+    $('#cartfoot').innerHTML = items.length
+      ? '<div class="s-row"><span>Subtotal</span><b>' + money(cartSub()) + '</b></div><p class="s-small">Shipping and tax are added at checkout.</p>' +
+        '<button type="button" class="s-btn wide" data-act="checkout"' + (accepting() ? '' : ' disabled') + '>Check out</button>'
+      : '<button type="button" class="s-btn wide ghost" data-act="close-cart">Keep shopping</button>';
+  }
+  function setQty(vid, d) {
+    var line = S.cart.filter(function (l) { return l.v === vid; })[0];
+    if (!line) return;
+    line.q = Math.max(1, Math.min(10, line.q + d));
+    saveCart(); cartButton(); renderCart();
+    var again = $('[data-act="qty"][data-v="' + vid + '"][data-d="' + d + '"]');
+    if (again && !again.disabled) again.focus();
+    else { var other = $('[data-act="qty"][data-v="' + vid + '"]:not([disabled])'); if (other) other.focus(); }
+  }
+  function removeLine(vid) {
+    S.cart = S.cart.filter(function (l) { return l.v !== vid; });
+    saveCart(); cartButton(); renderCart();
+    var next = $('#cart [data-act="rm"]') || $('#cart [data-act="close-cart"]');
+    if (next) next.focus();
+  }
+  // keep keyboard focus inside the open drawer
+  document.addEventListener('keydown', function (e) {
+    var d = $('#cart');
+    if (d.hidden) return;
+    if (e.key === 'Escape') { closeCart(); return; }
+    if (e.key !== 'Tab') return;
+    var f = $$('button:not([disabled]),a[href],input,select', d).filter(function (x) { return x.offsetParent !== null; });
+    if (!f.length) return;
+    if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+  });
+
+  // ---------------- views ----------------
+  function show(step) {
+    S.step = step;
+    $('#v-shop').hidden = step !== 'shop';
+    $('#v-checkout').hidden = step !== 'checkout';
+    $('#v-done').hidden = step !== 'done';
+    cartButton();
+  }
+  function goShop(fromPop) {
+    destroyCard();
+    show('shop');
+    if (!fromPop && location.hash) history.pushState({ step: 'shop' }, '', location.pathname + location.search);
+    window.scrollTo(0, 0);
+  }
+  function goCheckout(replace) {
+    if (!cartCount() || !accepting()) return;
+    closeCart();
+    show('checkout');
+    S.payErr = ''; $('#payerr').textContent = '';
+    if (replace) history.replaceState({ step: 'checkout' }, '', '#checkout');
+    else history.pushState({ step: 'checkout' }, '', '#checkout');
+    window.scrollTo(0, 0);
+    $('#co-h1').setAttribute('tabindex', '-1'); $('#co-h1').focus({ preventScroll: true });
+    renderSummary();
+    requote();
+    mountCard();
+  }
+  window.addEventListener('popstate', function () {
+    if (location.hash === '#checkout' && S.step !== 'checkout' && cartCount()) goCheckout(true);
+    else if (location.hash !== '#checkout' && S.step === 'checkout') goShop(true);
+  });
+
+  // ---------------- checkout ----------------
+  function fillStates() {
+    var sel = $('#coform select[name="state_code"]');
+    if (sel.options.length > 1) return;
+    var st = S.cat.states || {};
+    Object.keys(st).sort(function (a, b) { return st[a] < st[b] ? -1 : 1; }).forEach(function (k) {
+      var o = document.createElement('option'); o.value = k; o.textContent = st[k]; sel.appendChild(o);
+    });
+    var saved = store.get('greys.shirts.contact');
+    if (saved) Object.keys(saved).forEach(function (k) { var el = $('#coform [name="' + k + '"]'); if (el && !el.value) el.value = saved[k]; });
+  }
+  function form() {
+    var f = {};
+    $$('#coform input, #coform select').forEach(function (el) { if (el.name) f[el.name] = el.value.trim(); });
+    return f;
+  }
+  var qTimer = null;
+  function requote() { clearTimeout(qTimer); qTimer = setTimeout(doQuote, 200); }
+  async function doQuote() {
+    if (S.step !== 'checkout' || !cartCount()) return;
+    var seq = ++S.quoteSeq;
+    S.quoting = true; renderSummary();
+    try {
+      var q = await api('quote', { lines: apiLines(), state_code: form().state_code });
+      if (seq !== S.quoteSeq) return;
+      S.quote = q;
+    } catch (e) {
+      if (seq !== S.quoteSeq) return;
+      S.quote = null;
+      if (e.status === 409 && e.data && e.data.gone) dropGone(e.data.gone);
+      S.payErr = e.message; $('#payerr').textContent = e.message;
+    }
+    S.quoting = false; renderSummary();
+  }
+  function dropGone(ids) {
+    S.cart = S.cart.filter(function (l) { return ids.indexOf(l.v) < 0; });
+    saveCart(); cartButton();
+    if (!cartCount()) goShop();
+  }
+  function renderSummary() {
+    $('#sumlines').innerHTML = cartItems().map(function (l) { return lineHtml(l, false); }).join('');
+    var q = S.quote, sub = cartSub(), rows = '';
+    rows += '<div class="s-row"><span>Subtotal</span><span>' + money(q ? q.subtotal_cents : sub) + '</span></div>';
+    rows += '<div class="s-row"><span>Shipping</span><span>' + (q ? (q.shipping_cents ? money(q.shipping_cents) : 'Free') : '<span class="s-pending">…</span>') + '</span></div>';
+    var taxTxt = !q ? '<span class="s-pending">…</span>' : !q.tax_known ? '<span class="s-pending">Added when you pick a state</span>' : (q.tax_cents ? money(q.tax_cents) : '$0.00');
+    rows += '<div class="s-row"><span>Tax</span><span>' + taxTxt + '</span></div>';
+    rows += '<div class="s-row total"><span>Total</span><span>' + (q ? money(q.total_cents) : '<span class="s-pending">…</span>') + '</span></div>';
+    $('#sumrows').innerHTML = rows;
+    updatePay();
+  }
+  function updatePay() {
+    var b = $('#paybtn'), q = S.quote;
+    var ready = q && q.tax_known && !S.quoting && !S.paying && S.cardState === 'ready' && accepting();
+    b.disabled = !ready;
+    b.textContent = S.paying ? 'Placing your order…' : q && q.tax_known ? 'Pay ' + money(q.total_cents) : 'Pay';
+    var note = $('#cardnote');
+    note.textContent = S.cardState === 'loading' ? 'Loading the secure card form…' : S.cardState === 'error' ? S.cardErr :
+      testMode() ? 'Test mode: use 4111 1111 1111 1111, any future date, CVV 111, ZIP 11111.' : 'Card details go straight to Square; we never see them.';
+    note.style.color = S.cardState === 'error' ? 'var(--red)' : '';
+  }
+
+  // Square Web Payments SDK (same approach as the order site)
+  var sdkPromise = null, payments = null, card = null;
+  function loadSdk(src) {
+    if (window.Square) return Promise.resolve(window.Square);
+    if (sdkPromise) return sdkPromise;
+    sdkPromise = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      var timer = setTimeout(function () { sdkPromise = null; reject(new Error('Square is taking too long to load. Refresh to try again.')); }, 15000);
+      s.src = src; s.async = true;
+      s.onload = function () { clearTimeout(timer); window.Square ? resolve(window.Square) : (sdkPromise = null, reject(new Error('Square’s card form didn’t start.'))); };
+      s.onerror = function () { clearTimeout(timer); sdkPromise = null; reject(new Error('Couldn’t reach Square. Check your connection and refresh.')); };
+      document.head.appendChild(s);
+    });
+    return sdkPromise;
+  }
+  async function mountCard() {
+    if (S.cardState === 'loading' || S.cardState === 'ready') return;
+    S.cardState = 'loading'; S.cardErr = ''; updatePay();
+    try {
+      var pay = S.cat.pay || {};
+      if (!pay.app_id || !pay.location_id) throw new Error('Card payments aren’t switched on yet. Email ' + EMAIL + ' to order.');
+      var Square = await loadSdk(pay.script_src);
+      payments = Square.payments(pay.app_id, pay.location_id);
+      var c = await payments.card({
+        style: {
+          '.input-container': { borderColor: '#D9D1C4', borderRadius: '10px' },
+          '.input-container.is-focus': { borderColor: '#06273A' },
+          '.message-text': { color: '#5F584F' },
+          input: { fontSize: '16px', color: '#1C1A17' }
+        }
+      });
+      if (S.step !== 'checkout') { try { c.destroy(); } catch (_) { } S.cardState = 'idle'; return; }
+      $('#sq-card').innerHTML = '';
+      await c.attach('#sq-card');
+      card = c; S.cardState = 'ready';
+    } catch (e) {
+      S.cardState = 'error'; S.cardErr = (e && e.message) || 'The card form didn’t load. Refresh to try again.';
+    }
+    updatePay();
+  }
+  function destroyCard() {
+    if (card) { try { card.destroy(); } catch (_) { } }
+    card = null;
+    if (S.cardState !== 'loading') S.cardState = 'idle';
+  }
+  function cardMessage(r) {
+    var e = (r && r.errors && r.errors[0]) || null;
+    if (!e) return 'That card couldn’t be read. Check the details and try again.';
+    if (e.field === 'cardNumber') return 'Check the card number.';
+    if (e.field === 'expirationDate') return 'Check the expiration date.';
+    if (e.field === 'cvv') return 'Check the security code.';
+    if (e.field === 'postalCode') return 'Check the billing ZIP.';
+    return e.message || 'That card couldn’t be read.';
+  }
+  function check(f) {
+    var bad = [];
+    function need(name, ok, msg) {
+      var el = $('#coform [name="' + name + '"]');
+      el.setAttribute('aria-invalid', ok ? 'false' : 'true');
+      if (!ok) bad.push({ el: el, msg: msg });
+    }
+    need('name', f.name.length >= 2, 'Please add your name.');
+    need('email', /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email), 'Please check your email address.');
+    var digits = f.phone.replace(/\D/g, '');
+    need('phone', !f.phone || digits.length === 10 || (digits.length === 11 && digits[0] === '1'), 'Please check your phone number, or leave it blank.');
+    need('address1', !!f.address1, 'Please add your street address.');
+    need('city', !!f.city, 'Please add your city.');
+    need('state_code', !!f.state_code, 'Please pick your state.');
+    need('zip', /^\d{5}(-\d{4})?$/.test(f.zip), 'Please check your ZIP code.');
+    return bad;
+  }
+  async function placeOrder() {
+    var f = form(), bad = check(f);
+    if (bad.length) { S.payErr = bad[0].msg; $('#payerr').textContent = bad[0].msg; bad[0].el.focus(); return; }
+    if (!card || !S.quote || S.paying) return;
+    store.set('greys.shirts.contact', { name: f.name, email: f.email, phone: f.phone, address1: f.address1, address2: f.address2, city: f.city, state_code: f.state_code, zip: f.zip });
+    S.paying = true; S.payErr = ''; $('#payerr').textContent = ''; updatePay();
+    try {
+      var expected = S.quote.total_cents;
+      var r = await card.tokenize();
+      if (!r || r.status !== 'OK') throw Object.assign(new Error(cardMessage(r)), { status: 400 });
+      var vt = '';
+      try {
+        var parts = f.name.split(/\s+/);
+        var v = await payments.verifyBuyer(r.token, {
+          amount: (expected / 100).toFixed(2), currencyCode: 'USD', intent: 'CHARGE',
+          billingContact: { givenName: parts[0], familyName: parts.slice(1).join(' '), email: f.email, phone: f.phone || undefined }
+        });
+        vt = (v && v.token) || '';
+      } catch (_) { /* no 3-D Secure challenge needed */ }
+      var d = await api('pay', {
+        lines: apiLines(), attempt: S.attempt, expected_total_cents: expected, source_id: r.token, verification_token: vt,
+        customer: { name: f.name, email: f.email, phone: f.phone },
+        ship_to: { name: f.name, address1: f.address1, address2: f.address2, city: f.city, state_code: f.state_code, zip: f.zip, country_code: 'US' }
+      });
+      S.done = d; S.cart = []; saveCart(); S.quote = null; S.attempt = uuid();
+      destroyCard();
+      renderDone();
+      show('done');
+      history.replaceState({ step: 'done' }, '', location.pathname + location.search);
+      window.scrollTo(0, 0);
+      $('#v-done').focus();
+    } catch (e) {
+      S.payErr = e.message || 'Something went wrong. Nothing was charged.';
+      $('#payerr').textContent = S.payErr;
+      if (e.status === 409) {
+        if (e.data && e.data.gone) dropGone(e.data.gone);
+        S.quote = null; requote();
+      }
+    }
+    S.paying = false; updatePay();
+  }
+  function renderDone() {
+    var d = S.done, first = (d.ship_to && d.ship_to.name || '').split(' ')[0];
+    var lines = (d.lines || []).map(function (l) {
+      return '<div class="s-line"><img src="' + esc(l.image) + '" alt="" /><div><b>' + esc(l.name) + '</b><small>Size ' + esc(l.size) + ' × ' + l.qty + '</small></div><div class="s-lp">' + money(l.unit_cents * l.qty) + '</div></div>';
+    }).join('');
+    var s = d.ship_to || {};
+    $('#v-done').innerHTML =
+      '<h1 id="done-h1">' + (first ? 'Thanks, ' + esc(first) + ' — your shirts are ordered.' : 'Your shirts are ordered.') + '</h1>' +
+      (d.env === 'sandbox' ? '<p class="s-bar test">This was a test order. No card was charged and nothing will ship.</p>' : '') +
+      '<p>Your order code is <b>' + esc(d.code) + '</b>. ' + (d.email_sent ? 'A confirmation is on its way to your inbox.' : 'Keep this code — it’s how you track your order.') + '</p>' +
+      '<p>Each shirt is printed when you order it and usually ships in 2–5 business days. We’ll email you the tracking link.</p>' +
+      '<div class="s-sum"><h2>Shipping to</h2><p class="s-small">' + esc(s.name) + '<br>' + esc(s.address1) + (s.address2 ? '<br>' + esc(s.address2) : '') + '<br>' + esc(s.city) + ', ' + esc(s.state_code) + ' ' + esc(s.zip) + '</p>' +
+      lines + '<div class="s-rows">' +
+      '<div class="s-row"><span>Subtotal</span><span>' + money(d.subtotal_cents) + '</span></div>' +
+      '<div class="s-row"><span>Shipping</span><span>' + (d.shipping_cents ? money(d.shipping_cents) : 'Free') + '</span></div>' +
+      (d.tax_cents ? '<div class="s-row"><span>Tax</span><span>' + money(d.tax_cents) + '</span></div>' : '') +
+      '<div class="s-row total"><span>Paid' + (d.card ? ' with ' + esc(d.card) : '') + '</span><span>' + money(d.total_cents) + '</span></div></div></div>' +
+      '<button type="button" class="s-btn ghost" data-act="shop">Back to the shirts</button>';
+  }
+
+  // ---------------- track an order ----------------
+  var STATUS = {
+    draft: 'Paid — getting ready to print.', pending: 'Paid — in the print queue.', inprocess: 'Being printed now.',
+    partial: 'Part of your order has shipped.', fulfilled: 'Shipped.', shipped: 'Shipped.',
+    onhold: 'We’re checking something with the printer — we’ll email you.', failed: 'We’re looking into a printing problem — we’ll email you.',
+    canceled: 'This order was canceled. Email ' + EMAIL + ' with questions.', skipped: 'Test order — nothing ships.', 'not sent': 'Paid — getting ready to print.'
+  };
+  async function track(e) {
+    e.preventDefault();
+    var fm = e.target, out = $('#trackres');
+    var code = fm.code.value.trim().toUpperCase(), email = fm.email.value.trim();
+    if (!code || !email) { out.textContent = 'Enter your order code and the email you used.'; return; }
+    out.textContent = 'Looking…';
+    try {
+      var d = await api('status', { code: code, email: email });
+      var o = d.order;
+      var h = '<p><b>' + esc(o.code) + '</b>: ' + esc(o.status === 'cancelled' ? 'Canceled.' : (STATUS[o.printful_status] || 'Paid — getting ready to print.')) + '</p>';
+      (o.tracking || []).forEach(function (t) {
+        h += '<p>' + esc(t.carrier || 'Tracking') + (t.number ? ' ' + esc(t.number) : '') + (t.url ? ' — <a href="' + esc(t.url) + '" target="_blank" rel="noopener">track the package</a>' : '') + '</p>';
+      });
+      out.innerHTML = h;
+    } catch (err) { out.textContent = err.message; }
+  }
+
+  // ---------------- zoom ----------------
+  function zoom(slug) {
+    var p = productBySlug(slug), dlg = $('#zoom');
+    if (!p) return;
+    $('#zoomimg').src = p.image; $('#zoomimg').alt = p.name + ' t-shirt';
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+  }
+  $('#zoom').addEventListener('click', function (e) { if (e.target === this) this.close(); });
+
+  // ---------------- events ----------------
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-act]');
+    if (!t) return;
+    var a = t.getAttribute('data-act');
+    if (a === 'cart') { e.preventDefault(); openCart(); }
+    else if (a === 'close-cart') closeCart();
+    else if (a === 'add') addToCart(t.getAttribute('data-slug'), t);
+    else if (a === 'qty') setQty(t.getAttribute('data-v'), Number(t.getAttribute('data-d')));
+    else if (a === 'rm') removeLine(t.getAttribute('data-v'));
+    else if (a === 'checkout') goCheckout();
+    else if (a === 'shop') goShop();
+    else if (a === 'zoom') zoom(t.getAttribute('data-slug'));
+    else if (a === 'close-zoom') $('#zoom').close();
+    else if (a === 'reload') loadCatalog();
+  });
+  $('#scrim').addEventListener('click', closeCart);
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.matches('.s-sizes input')) {
+      var slug = t.closest('.s-sizes').getAttribute('data-slug');
+      S.picked[slug] = t.value;
+      var v = byVariant[t.value];
+      if (v) $('[data-price="' + slug + '"]').textContent = price(v.v.price_cents);
+      var msg = $('[data-msg="' + slug + '"]'); if (msg.classList.contains('bad')) { msg.textContent = ''; msg.className = 's-msg'; }
+    }
+    if (t.name === 'state_code' && t.closest('#coform')) { t.setAttribute('aria-invalid', 'false'); requote(); }
+  });
+  $('#coform').addEventListener('submit', function (e) { e.preventDefault(); placeOrder(); });
+  $('#coform').addEventListener('input', function (e) { if (e.target.getAttribute('aria-invalid') === 'true') e.target.setAttribute('aria-invalid', 'false'); });
+  $('#trackform').addEventListener('submit', track);
+  // another tab changed the cart
+  window.addEventListener('storage', function (e) {
+    if (e.key !== KEY) return;
+    S.cart = (store.get(KEY) || []);
+    cartButton();
+    if (!$('#cart').hidden) renderCart();
+    if (S.step === 'checkout') { renderSummary(); requote(); }
+  });
+
+  cartButton();
+  loadCatalog();
+})();
+</script>
+
+<!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
+<script>(function(){if(location.hostname.indexOf("staging")<0)return;document.title="[STAGING] "+document.title;var m=document.createElement("meta");m.name="robots";m.content="noindex";document.head.appendChild(m);var b=document.createElement("div");b.id="staging-bar";b.textContent="STAGING — test copy.";b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#c62828;color:#fff;font:600 12px/1.2 system-ui,sans-serif;text-align:center;padding:5px 8px;pointer-events:none;opacity:.92";document.body.appendChild(b);})();</script>
+</body>
+</html>

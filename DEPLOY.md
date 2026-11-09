@@ -69,6 +69,18 @@ Staff add their own mobile number on **schedule.html → Notifications** (stored
 
 If Twilio secrets are missing, everything still works — texts are just skipped. **US compliance:** a regular local number needs A2P 10DLC registration (or use a verified toll-free number) before carriers reliably deliver; trial accounts can only text verified numbers.
 
+## Shirt shop (`shop.html`, 2026-11-08)
+
+Moved in from the `tee-stores` repo (Next.js + Stripe test mode). Same six Greys designs, now paid through **Square** and printed + shipped by **Printful**.
+
+- **Shop:** `/shop` (`shop.html`) — wears the greyscheese.com header/footer (`site-chrome.js`, loaded from orderonline.greyscheese.com so there's still one copy of the menu); the header's top-right slot is the cart. Sizes sit on each card; cart lives in the browser; checkout = contact + US address + Square card form.
+- **Console:** Manager console → Online Ordering → **👕 Shirt Shop** (`shop-admin.html`): switches, orders, Printful hookup, prices/on-sale.
+- **Function:** `supabase/functions/shirt-shop` (deploy with `verify_jwt = false`). Actions `catalog · quote · pay · status · sweep · printful_hook` + console admin actions. Its header explains the whole flow.
+- **Tables:** `supabase/sql/2026-11-08_shirt_shop.sql` — `shirt_products`, `shirt_variants`, `shirt_orders`, the `site_content` row `shirt_shop`, and the `shirt-orders-sweep` cron (cancels unpaid checkouts after 30 min).
+- **Test vs real cards:** every checkout is a Square **sandbox** test until **Take real cards** is on; even then staging stays sandbox. The page shows a test bar whenever it's sandbox.
+- **Printful:** a draft is made *before* the card is charged (a bad address is turned down with nothing charged). Then **Draft** mode leaves it for you to confirm, **Confirm** mode sends it to print. Each real order emails brad@greyscheese.com; shipping updates come back on the Printful webhook (tracking + a "shipped" email to the customer).
+- **Secrets** (Edge Functions → Secrets): reuses `SQUARE_TICKET_*` (live) and `SQUARE_ORDER_SANDBOX_*` / `SQUARE_EXP_SANDBOX_*`. New: `PRINTFUL_TOKEN` (+ `PRINTFUL_STORE_ID` for an account-level token) and `PRINTFUL_HOOK_KEY`. Optional: `SHIRT_SQUARE_LOCATION_ID` (default Memphis), `SHIRT_LIVE_ORIGINS`, `SHIRT_ALERT_EMAIL`.
+
 ## Notes / follow-ups
 
 - **Edit protection:** the manager password is verified inside the Edge Function, so it never ships in the page. Reads are open to anyone with the URL (internal staff tool).

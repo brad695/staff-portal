@@ -650,6 +650,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab-head">Online Ordering</div>
     <div class="tab" onclick="mtab('ordering')">🛒 Online Ordering <span id="ooTabPill" class="oo-tabpill">OFF</span></div>
     <div class="tab" onclick="mtab('orderpad')">🧾 Order Pad</div>
+    <div class="tab" onclick="mtab('shirts')">👕 Shirt Shop</div>
     <div class="tab-head">Cheese Club</div>
     <div class="tab" onclick="ccTab(this,'members')">Members</div>
     <div class="tab" onclick="ccTab(this,'boxes')">Boxes</div>
@@ -726,6 +727,15 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       <h2>🧾 Order Pad</h2>
       <div class="hint">The counter tablet's order pad — same catalog, same orders, same Square Terminal. <a href="/order" target="_blank" rel="noopener">Open it full screen ↗</a> · Tapping <strong>Lock</strong> in it signs this browser out of the console too (they share one sign-in).</div>
       <iframe id="opFrame" class="jl-frame" title="Order Pad" data-src="/order"></iframe>
+    </div>
+  </div>
+  <!-- 👕 SHIRT SHOP (2026-11-08): the online shirt shop's switches, orders and Printful hookup — shop-admin.html, embedded
+       like the Order Pad. The shop itself is /shop (shop.html); payments + Printful run in the shirt-shop Edge Function. -->
+  <div id="panel-shirts" class="panel">
+    <div class="section-card">
+      <h2>👕 Shirt Shop</h2>
+      <div class="hint">The online shirt shop at <a href="/shop.html" target="_blank" rel="noopener">staff.greyscheese.com/shop ↗</a> — paid through Square, printed and shipped by Printful. <a href="/shop-admin.html" target="_blank" rel="noopener">Open full screen ↗</a></div>
+      <iframe id="shFrame" class="jl-frame" title="Shirt Shop" data-src="/shop-admin.html"></iframe>
     </div>
   </div>
   <div id="panel-inquiries" class="panel">
@@ -1836,6 +1846,7 @@ function mtab(name){
   if (name === 'timeoff') name = 'employees';   // Time Off & Swaps lives on the Employees tab now (2026-11-04)
   if (name === 'jamlabels') { const f = document.getElementById('jlFrame'); if (f && !f.src) f.src = f.dataset.src; }
   if (name === 'orderpad') { const f = document.getElementById('opFrame'); if (f && !f.src) f.src = f.dataset.src; }
+  if (name === 'shirts') { const f = document.getElementById('shFrame'); if (f && !f.src) f.src = f.dataset.src; }
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   const tab = document.querySelector('.tab[onclick*="'+name+'"]');
