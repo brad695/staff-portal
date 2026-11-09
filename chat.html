@@ -1463,9 +1463,12 @@ function renderView(){
     const every=Object.values(convos).filter(c=>isLead(c)&&c.joined);const f=S.leadFilter||'open';
     const kinds=KIND_ORDER.filter(t=>every.some(c=>c.client.tag===t));const kd=kinds.includes(S.leadKind)?S.leadKind:'all';
     const all=every.filter(c=>kd==='all'||c.client.tag===kd);
-    const n=k=>all.filter(c=>k==='all'||leadState(c.lead)===k).length;
+    // Open = every lead whose event is still ahead (paid / booked ones too, 2026-11-09) until its date has passed;
+    // an unread one stays under Open until someone reads it. Booked / Closed / All as before.
+    const inF=(c,k)=>k==='all'||(k==='open'?leadState(c.lead)!=='closed'||unread(c)>0:leadState(c.lead)===k);
+    const n=k=>all.filter(c=>inF(c,k)).length;
     const kchip=(k,l)=>`<button class="chip ${kd===k?'on':''}" data-lkind="${esc(k)}">${esc(l)}</button>`;
-    const list=all.filter(c=>f==='all'||leadState(c.lead)===f).sort((a,b)=>f==='closed'||f==='all'?(last(b)?.ts||b.created)-(last(a)?.ts||a.created):(a.lead.date||'9999').localeCompare(b.lead.date||'9999'));
+    const list=all.filter(c=>inF(c,f)).sort((a,b)=>f==='closed'||f==='all'?(last(b)?.ts||b.created)-(last(a)?.ts||a.created):(a.lead.date||'9999').localeCompare(b.lead.date||'9999'));
     const chip=(k,l)=>`<button class="chip ${f===k?'on':''}" data-lfil="${k}">${l} ${n(k)}</button>`;
     main.innerHTML=vhead('Leads',`<a class="btn sm" style="margin-left:auto" href="/manager#catering" target="_blank" rel="noopener">${ic('brief',14)}Manager console</a>`)
       +(kinds.length>1?`<div class="v-filters">${kchip('all','All kinds')}${kinds.map(t=>kchip(t,KIND_PL[t]||t)).join('')}</div>`:'')

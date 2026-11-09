@@ -2200,7 +2200,11 @@ function catRender(){
   const all = catAll();
   const unread = all.filter(x=>x.r.unread).length;
   const bd = document.getElementById('catBadge'); if(bd){ bd.textContent = unread; bd.style.display = unread ? '' : 'none'; }
-  const isOpen = x => !!x.r.unread || (x.stage!=='paid' && x.stage!=='lost'); // unread stays under Open until someone opens it
+  // Open (2026-11-09) = every lead but Lost until its event date has passed — signed / deposit paid / paid ones
+  // stay too; no date = stays until Lost. Unread stays under Open until someone opens it.
+  const catToday = new Date().toLocaleDateString('en-CA');
+  const catPast = x => { const d = String((x.inq ? x.r.preferred_date : x.r.event_date) || '').slice(0,10); return !!d && d < catToday; };
+  const isOpen = x => !!x.r.unread || (x.stage!=='lost' && !catPast(x));
   const kc = { all:0, catering:0, event:0, experience:0, table:0, donation:0, question:0 };
   all.filter(isOpen).forEach(x=>{ kc.all++; kc[x.kind]++; });
   const kd = document.getElementById('catKinds');
