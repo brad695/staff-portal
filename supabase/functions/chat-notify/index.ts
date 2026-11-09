@@ -1,7 +1,8 @@
 // chat-notify — phone / desktop notifications for Greys Chat (Web Push; verify_jwt = false).
 // Called by the chat_messages insert trigger (pg_net) with { id } and the x-chat-secret header
 // (app_secrets 'chat_notify_secret'). chat-api calls it with { test: emp_id, endpoint } for
-// "Send a test" in Preferences.
+// "Send a test" in Preferences. Since 2026-11-09 the catering_leads update trigger also calls it with
+// { stage: {lead, convo, from, to, by, by_emp} } every time a lead changes stage (see stagePush).
 //
 // Who gets one: everyone in a DM / group DM, people @mentioned (or @channel / @everyone), people
 // who started or replied in a thread, and the team on a client conversation when the client writes.
@@ -144,6 +145,70 @@ async function deliver(subs: Sub[], payloadFor: (emp: number) => unknown, v: { p
 
 const SUB_COLS = "id,emp_id,endpoint,p256dh,auth,fails";
 
+// A catering lead changed stage (chat_lead_update_trg → chat_stage_notify, 2026-11-09). Everyone on the lead's
+// conversation (the managers) hears about it, with the same skips as a message — muted, in chat right now,
+// no device — plus whoever moved it: the person in Greys Chat / the manager console, or the coworker whose own
+// reply / proposal / invoice just moved it (the newest staff message on the lead from the last 3 minutes).
+// The customer signing and Square payments come from nobody on staff, so everyone hears those.
+const STAGE_L: Record<string, string> = { new: "New", replied: "Replied", quoted: "Quoting", contract_sent: "Proposal sent", signed: "Signed",
+  invoiced: "Invoiced", deposit_paid: "Deposit paid", paid: "Paid", lost: "Lost" };
+const usd = (c: number) => "$" + (Math.round(Number(c) || 0) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+async function stagePush(s: any, v: { pub: string; jwk: JsonWebKey }) {
+  const to = String(s?.to || ""), lead = String(s?.lead || "");
+  if (!to || to === String(s?.from || "")) return { skipped: "no change" };
+  const { data: c } = await db.from("chat_convos").select("id,name,client_name").eq("id", String(s?.convo || "")).maybeSingle();
+  if (!c) return { skipped: "no conversation" };
+  const { data: mems } = await db.from("chat_members").select("emp_id,muted").eq("convo_id", c.id);
+  const want = new Set<number>((mems || []).filter((x) => !x.muted).map((x) => Number(x.emp_id)));
+  const byName = String(s?.by || "").trim();
+  let byEmp = Number(s?.by_emp) || 0, actor = "";
+  if (!byEmp && !byName && !["signed", "deposit_paid", "paid"].includes(to)) {
+    const { data: lm } = await db.from("chat_messages").select("emp_id").eq("convo_id", c.id).eq("author_kind", "staff")
+      .not("emp_id", "is", null).is("deleted_at", null).gte("created_at", new Date(Date.now() - 3 * 60e3).toISOString())
+      .order("created_at", { ascending: false }).limit(1);
+    if (lm?.[0]?.emp_id) byEmp = Number(lm[0].emp_id);
+  }
+  if (byEmp) want.delete(byEmp);
+  if (!want.size) return { sent: 0, reason: "nobody to notify" };
+
+  const ids = [...want];
+  const [{ data: profs }, { data: emps }, { data: subs }, { data: qs }] = await Promise.all([
+    db.from("chat_profiles").select("emp_id,focus_at").in("emp_id", ids),
+    db.from("portal_employees").select("id,name,active").in("id", [...new Set([...ids, ...(byEmp ? [byEmp] : [])])]),
+    db.from("chat_push_subs").select(SUB_COLS).in("emp_id", ids),
+    lead ? db.from("catering_quotes").select("status,total_cents,amount_paid_cents,signed_name").eq("lead_id", lead).neq("status", "canceled")
+      .order("created_at", { ascending: false }).limit(1) : Promise.resolve({ data: [] as any[] }),
+  ]);
+  const focus: Record<number, number> = {};
+  (profs || []).forEach((p) => { if (p.focus_at) focus[Number(p.emp_id)] = Date.parse(p.focus_at); });
+  const name: Record<number, string> = {}, active: Record<number, boolean> = {};
+  (emps || []).forEach((x) => { name[Number(x.id)] = x.name || ""; active[Number(x.id)] = !!x.active; });
+  const now = Date.now();
+  const targets = ((subs || []) as Sub[]).filter((x) => {
+    const e = Number(x.emp_id);
+    return want.has(e) && active[e] && !(focus[e] && now - focus[e] < ACTIVE_MS);
+  });
+  if (!targets.length) return { sent: 0, reason: "no away devices" };
+
+  const first = (n: string) => String(n || "").split(/\s+/)[0];
+  if (!byName && byEmp) actor = first(name[byEmp]);
+  const q: any = (qs || [])[0] || null, total = q?.total_cents ? " · " + usd(q.total_cents) : "";
+  const label = STAGE_L[to] || to.replace(/_/g, " ");
+  let body: string;
+  if (byName) body = byName.includes("@") ? `📌 Moved to ${label} · manager console` : `📌 ${first(byName)} moved it to ${label}`;
+  else if (to === "signed") body = `✍️ Contract signed${q?.signed_name ? " by " + q.signed_name : ""}${total}`;
+  else if (to === "deposit_paid") body = `💵 Deposit paid${q ? " · " + usd(q.amount_paid_cents || 0) + " of " + usd(q.total_cents || 0) : ""}`;
+  else if (to === "paid") body = `💰 Paid in full${total}`;
+  else if (to === "contract_sent") body = `📄 ${actor ? actor + " sent the proposal" : "Proposal sent"}${total}`;
+  else if (to === "invoiced") body = `🧾 ${actor ? actor + " sent the invoice" : "Invoice sent"}${total}`;
+  else if (to === "replied") body = `↩️ ${actor ? actor + " replied" : "Replied"}`;
+  else body = `📌 Moved to ${label}`;
+  // m is not a message id: a tap opens the lead's conversation (the app falls back to the conversation)
+  const payload = { t: c.name || c.client_name || "Catering lead", b: body, c: c.id, m: "stage-" + now, tag: "c" + c.id };
+  const r = await deliver(targets, () => payload, v);
+  return { ...r, devices: targets.length };
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("POST only", { status: 405 });
   const { data: sec } = await db.from("app_secrets").select("value").eq("name", "chat_notify_secret").maybeSingle();
@@ -162,6 +227,8 @@ Deno.serve(async (req) => {
     const r = await deliver((subs || []) as Sub[], () => ({ t: "Greys Chat", b: "Notifications are on for this device ✓", tag: "greys-test", m: "test-" + Date.now() }), v);
     return ok(r);
   }
+
+  if (b.stage) return ok(await stagePush(b.stage, v));
 
   const id = String(b.id || "");
   const { data: m } = await db.from("chat_messages")
