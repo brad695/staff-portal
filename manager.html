@@ -4323,6 +4323,13 @@ window.addEventListener('DOMContentLoaded', async ()=>{
 #panel-cheese .nl-b-text.has-title>.nl-b-rule{display:block}
 #panel-cheese .nl-b-title{margin:0 0 10px;font:700 28px/1.05 'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.01em;text-transform:uppercase;color:#06273A;word-break:break-word}
 #panel-cheese .nl-b-title:empty{margin:0 0 6px;font:400 13px/1.4 'Nunito Sans',Inter,sans-serif;text-transform:none;letter-spacing:0}
+/* a cheese (name → description → picture): its empty name looks like the name it will be */
+#panel-cheese .nl-b-cheese>.nl-b-rule{display:block}
+#panel-cheese .nl-b-cheese .nl-b-title:empty{margin:0 0 10px;font:700 28px/1.05 'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.01em;text-transform:uppercase}
+#panel-cheese .nl-b-cheese .nl-b-title:empty::before{color:#C3CAD0}
+#panel-cheese .nl-b-cheese{margin-bottom:14px}
+#panel-cheese .nl-add-b.nl-add-cheese{background:#06273A;color:#fff}
+#panel-cheese .nl-add-b.nl-add-cheese:hover{background:#0B3550}
 #panel-cheese .nl-b-body{min-height:1.6em;font:400 16px/1.6 'Nunito Sans',Inter,sans-serif;color:#2E3A46;word-break:break-word}
 #panel-cheese .nl-b-body p{margin:0 0 14px}
 #panel-cheese .nl-b-body>:last-child{margin-bottom:0}
@@ -12238,16 +12245,11 @@ const nlMonthName=m=>/^\d{4}-\d{2}/.test(m||'')?NL_MONTHS[+String(m).slice(5,7)-
 // the headline names the box month ("Your December box"); while it's still that line it follows the month field
 const nlAutoHead=m=>nlMonthName(m)?'Your '+nlMonthName(m)+' box':'Your {{month}} box';
 const NL_AUTO_HEAD=new RegExp('^Your ('+NL_MONTHS.join('|')+'|\\{\\{month\\}\\}) box$');
+// Maverick 2026-11-08: "set the template to cheese name, then description then a picture" — one set per cheese
+// (a box is three or four cheeses; + Cheese adds another). Left empty, a set simply isn't in the email.
+const nlCheese=()=>[{t:'text',title:'',html:''},{t:'photo',url:'',caption:''}];
 function nlTemplate(month){
-  return {v:1,headline:nlAutoHead(month),hero:null,blocks:[
-    {t:'text',title:'',html:'<p>Hi {{first_name}},</p><p>Here’s what’s in your {{month}} box, and a few things worth knowing.</p>'},
-    {t:'pickup'},
-    {t:'text',title:'This month’s cheeses',html:'<ul><li><b>Cheese name</b> — where it’s from, the milk, and what it tastes like.</li><li><b>Cheese name</b> — …</li><li><b>Cheese name</b> — …</li></ul>'},
-    {t:'photo',url:'',caption:''},
-    {t:'text',title:'Pair it with',html:'<p>A wine, beer or snack from the shop that goes with this month’s box.</p>'},
-    {t:'text',title:'News from the shop',html:'<p>Classes, events and new arrivals worth knowing about.</p>'},
-    {t:'text',title:'',html:'<p>See you at pickup!<br>— The GREYS crew</p>'}
-  ]};
+  return {v:1,headline:nlAutoHead(month),hero:null,blocks:[...nlCheese(),...nlCheese(),...nlCheese()]};
 }
 const nlCopy=o=>JSON.parse(JSON.stringify(o));
 const nlPlain=h=>String(h||'').replace(/<[^>]*>/g,' ').replace(/&nbsp;/gi,' ').replace(/\s+/g,' ').trim();
@@ -12582,19 +12584,21 @@ function nlMonthBits(){
   if(eye)eye.textContent='The GREYS Cheese Club'+(m?' · '+new Date(m+'T12:00:00Z').toLocaleDateString('en-US',{timeZone:'UTC',month:'long',year:'numeric'}):'');
   g.querySelectorAll('[data-pk]').forEach(el=>{el.innerHTML=nlPickupInner(m);});
 }
-function nlPicHtml(url,busy,hero){
+function nlPicHtml(url,busy,hero,cheese){
   if(busy)return '<div class="nl-pic-empty nl-pic-busy" role="status"><span>Uploading the picture…</span></div>';
-  if(!url)return `<button type="button" class="nl-pic-empty" data-pick><b aria-hidden="true">+</b><span>${hero?'Add a top picture':'Add a picture'}</span><small>${hero?'Optional — the big picture under the headline':'Click, or drop a photo here'}</small></button>`;
+  if(!url)return `<button type="button" class="nl-pic-empty" data-pick><b aria-hidden="true">+</b><span>${hero?'Add a top picture':cheese?'Add a picture of this cheese':'Add a picture'}</span><small>${hero?'Optional — the big picture under the headline':'Click, or drop a photo here'}</small></button>`;
   return `<div class="nl-pic-frame"><img src="${esc(url)}" alt=""></div><div class="nl-pic-acts"><button type="button" data-pick>Change picture</button>${hero?'<button type="button" data-unhero>Remove</button>':''}</div>`;
 }
 function nlBlockHtml(b,i,n){
+  const all=(NL.cur&&NL.cur.design&&NL.cur.design.blocks)||[];
+  const cheese=(b.t==='text'&&all[i+1]&&all[i+1].t==='photo')||(b.t==='photo'&&all[i-1]&&all[i-1].t==='text');
   const what=b.t==='photo'?'picture':b.t==='pickup'?'pickup box':'text';
   const tools=`<div class="nl-b-tools"><button type="button" data-mv="-1" title="Move up" aria-label="Move this ${what} up"${i===0?' disabled':''}>↑</button><button type="button" data-mv="1" title="Move down" aria-label="Move this ${what} down"${i===n-1?' disabled':''}>↓</button><button type="button" data-rm title="Remove" aria-label="Remove this ${what}">✕</button></div>`;
-  if(b.t==='text')return `<div class="nl-b nl-b-text${String(b.title||'').trim()?' has-title':''}" data-i="${i}">${tools}
+  if(b.t==='text')return `<div class="nl-b nl-b-text${cheese?' nl-b-cheese':''}${String(b.title||'').trim()?' has-title':''}" data-i="${i}">${tools}
     <div class="nl-b-fmt" role="toolbar" aria-label="Text style"><button type="button" data-fmt="bold" title="Bold"><b>B</b></button><button type="button" data-fmt="italic" title="Italic"><i>I</i></button><button type="button" data-fmt="link" title="Add a link">Link</button><button type="button" data-fmt="ul" title="Bulleted list">• List</button><select data-merge aria-label="Add a member detail"><option value="">+ Member detail</option><option value="{{first_name}}">First name</option><option value="{{club}}">Their club</option><option value="{{pickup}}">Pickup day</option><option value="{{month}}">Month</option><option value="{{shop}}">Their shop</option></select></div>
-    <i class="nl-b-rule" aria-hidden="true"></i><div class="nl-b-title nl-ce" contenteditable="true" role="textbox" aria-label="Title" data-ph="+ Title (optional)" data-one data-title></div>
-    <div class="nl-b-body nl-ce" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Words" data-ph="Write here…" data-body></div></div>`;
-  if(b.t==='photo')return `<div class="nl-b nl-b-photo" data-i="${i}">${tools}<div class="nl-m-pic" data-pic>${nlPicHtml(b.url,NL.busyPic===b,false)}</div>
+    <i class="nl-b-rule" aria-hidden="true"></i><div class="nl-b-title nl-ce" contenteditable="true" role="textbox" aria-label="${cheese?'Cheese name':'Title'}" data-ph="${cheese?'Cheese name':'+ Title (optional)'}" data-one data-title></div>
+    <div class="nl-b-body nl-ce" contenteditable="true" role="textbox" aria-multiline="true" aria-label="${cheese?'Description':'Words'}" data-ph="${cheese?'Description — where it’s from, the milk, what it tastes like':'Write here…'}" data-body></div></div>`;
+  if(b.t==='photo')return `<div class="nl-b nl-b-photo${cheese?' nl-b-cheesepic':''}" data-i="${i}">${tools}<div class="nl-m-pic" data-pic>${nlPicHtml(b.url,NL.busyPic===b,false,cheese)}</div>
     <div class="nl-b-cap nl-ce" contenteditable="true" role="textbox" aria-label="Caption" data-ph="+ Caption (optional)" data-one data-cap></div></div>`;
   return `<div class="nl-b nl-b-pickup" data-i="${i}">${tools}<div class="nl-pk" data-pk>${nlPickupInner(nlMonthIso())}</div><div class="nl-b-note">Filled in for each member — their shop and this month’s pickup day.</div></div>`;
 }
@@ -12603,7 +12607,7 @@ function nlHeroDraw(){const el=NL.body&&NL.body.querySelector('[data-hero]');if(
 function nlPicDraw(target){
   if(target==='hero')return nlHeroDraw();
   const i=NL.cur&&NL.cur.design?NL.cur.design.blocks.indexOf(target):-1;if(i<0)return;
-  const el=NL.body&&NL.body.querySelector(`.nl-b[data-i="${i}"] [data-pic]`);if(el)el.innerHTML=nlPicHtml(target.url,NL.busyPic===target,false);
+  const el=NL.body&&NL.body.querySelector(`.nl-b[data-i="${i}"] [data-pic]`),prev=NL.cur.design.blocks[i-1];if(el)el.innerHTML=nlPicHtml(target.url,NL.busyPic===target,false,!!prev&&prev.t==='text');
 }
 function nlBlocksDraw(focusI){
   const g=NL.body,d=NL.cur.design,box=g&&g.querySelector('[data-blocks]');if(!box)return;
@@ -12614,8 +12618,8 @@ function nlBlocksDraw(focusI){
     else if(b.t==='photo')el.querySelector('[data-cap]').textContent=b.caption||'';
   });
   const pk=d.blocks.some(b=>b.t==='pickup');
-  g.querySelector('[data-add]').innerHTML='<button type="button" class="nl-add-b" data-add-text>+ Text</button><button type="button" class="nl-add-b" data-add-photo>+ Picture</button>'+(pk?'':'<button type="button" class="nl-add-b" data-add-pickup>+ Pickup box</button>');
-  if(focusI!=null){const el=box.querySelector(`.nl-b[data-i="${focusI}"]`);if(el){el.scrollIntoView({block:'nearest'});const f=el.querySelector('[data-body],[data-pick],[data-cap]');if(f)f.focus();}}
+  g.querySelector('[data-add]').innerHTML='<button type="button" class="nl-add-b nl-add-cheese" data-add-cheese>+ Cheese</button><button type="button" class="nl-add-b" data-add-text>+ Text</button><button type="button" class="nl-add-b" data-add-photo>+ Picture</button>'+(pk?'':'<button type="button" class="nl-add-b" data-add-pickup>+ Pickup box</button>');
+  if(focusI!=null){const el=box.querySelector(`.nl-b[data-i="${focusI}"]`);if(el){el.scrollIntoView({block:'nearest'});const f=el.matches('.nl-b-cheese')?el.querySelector('[data-title]'):el.querySelector('[data-body],[data-pick],[data-cap]');if(f)f.focus();}}
 }
 function nlCanvasFill(){
   if(!NL.body||!NL.cur||!NL.cur.design)return;
@@ -12707,9 +12711,10 @@ function nlCanvasWire(grid){
       if(has&&!confirm(b.t==='photo'?'Remove this picture?':'Remove this text?'))return;
       d.blocks.splice(i,1);NL.dirty=true;nlBlocksDraw();return;
     }
+    if(t.closest('[data-add-cheese]')){d.blocks.push(...nlCheese());NL.dirty=true;nlBlocksDraw(d.blocks.length-2);return;}
     if(t.closest('[data-add-text]')){d.blocks.push({t:'text',title:'',html:''});NL.dirty=true;nlBlocksDraw(d.blocks.length-1);return;}
     if(t.closest('[data-add-photo]')){const b={t:'photo',url:'',caption:''};d.blocks.push(b);NL.dirty=true;nlBlocksDraw();NL.pickFor=b;file.click();return;}
-    if(t.closest('[data-add-pickup]')){d.blocks.splice(Math.min(1,d.blocks.length),0,{t:'pickup'});NL.dirty=true;nlBlocksDraw();return;}
+    if(t.closest('[data-add-pickup]')){d.blocks.unshift({t:'pickup'});NL.dirty=true;nlBlocksDraw();return;}
     const pick=t.closest('[data-pick]');
     if(pick){NL.pickFor=pick.closest('[data-hero]')?'hero':blockOf(pick);file.click();return;}
     if(t.closest('[data-unhero]')){d.hero=null;NL.dirty=true;nlHeroDraw();return;}
