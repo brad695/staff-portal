@@ -6928,7 +6928,7 @@ const EXP_SITE = "https://tickets.greyscheese.com/experiences";
 const EXP_MIN_NOTICE_DAYS = 7;
 const expBlank = () => ({ id: null, name: "", description: "", price_cents: 30000, per_person: false,
   duration_min: 90, min_party: 2, max_party: 8, tables_needed: 2, lead_time_min: EXP_MIN_NOTICE_DAYS * 1440, active: true,
-  sort_order: 99, image_url: "", bookable: true, info_url: "", price_unit_guests: null, options: null, price_label: "" });
+  sort_order: 99, image_url: "", bookable: true, info_url: "", price_unit_guests: null, options: null, price_label: "", includes: [] });
 // How an experience is priced, the same three ways rb_experience_quote() charges (2026-11-07):
 // per person, per group of N guests (price_unit_guests: "per table of 6", "per 2 guests"), or one
 // price per party. Choices (options) each carry their own price, charged the same way.
@@ -7216,6 +7216,11 @@ function ExperienceEdit({ x, count, onCancel, onSaved }) {
     const [nm, ...more] = String(o.label || "").split(" · ");
     return { key: o.key || "", name: nm, more: more.join(" · "), price: ((Number(o.price_cents) || 0) / 100).toString() };
   }));
+  // what the package includes (Maverick 2026-11-08: "experience packages need to have items listed being sold").
+  // per: "" = just list it, "party" = 1, "guest" = one for each guest. Paid bookings print these on the BEO menu.
+  const [incl, setIncl] = useState(() => (Array.isArray(x.includes) ? x.includes : []).map((i) => ({
+    item: String((i && i.item) || ""), per: i && (i.per === "guest" || i.per === "party") ? i.per : "" })));
+  const setInc = (i, patch) => setIncl(incl.map((o, k) => (k === i ? { ...o, ...patch } : o)));
   const [label, setLabel] = useState(x.price_label || "");
   const [duration, setDuration] = useState(String(x.duration_min || 90));
   const [minP, setMinP] = useState(String(x.min_party || 1));
@@ -7294,7 +7299,9 @@ function ExperienceEdit({ x, count, onCancel, onSaved }) {
       options: optsOut.length ? optsOut : null, price_label: label.trim() || suggested,
       duration_min: du, min_party: mn, max_party: mx, tables_needed: tb,
       lead_time_min: Math.max(EXP_MIN_NOTICE_DAYS, Math.ceil(Number(lead) || 0)) * 1440,
-      bookable, active, image_url: imageUrl || null, info_url: infoUrl.trim() || null };
+      bookable, active, image_url: imageUrl || null, info_url: infoUrl.trim() || null,
+      includes: incl.map((o) => ({ item: o.item.trim().slice(0, 120), per: o.per })).filter((o) => o.item)
+        .map((o) => (o.per ? { item: o.item, per: o.per } : { item: o.item })) };
     setBusy(true);
     const q = isNew
       ? db.from("rb_experience_types").insert({ ...row, sort_order: count + 1 })
@@ -7325,6 +7332,22 @@ function ExperienceEdit({ x, count, onCancel, onSaved }) {
 
       <label className="cc-label">Description</label>
       <textarea className="cc-input cc-textarea" value={desc} onChange={(e) => setDesc(e.target.value)} />
+
+      {/* Maverick 2026-11-08: the items the package includes (rb_experience_types.includes) */}
+      <label className="cc-label">What's included</label>
+      <p className="cc-hint" style={{ marginTop: 0 }}>One item per line, in the order the kitchen should see them. Paid bookings list these on the BEO menu, under the experience. "1 per guest" counts the party (a burner for each guest).</p>
+      {incl.map((o, i) => (
+        <div key={i} className="cc-incl-row" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 8 }}>
+          <input className="cc-input" style={{ margin: 0, flex: "1 1 160px", minWidth: 0 }} placeholder="e.g. Sliced raclette" value={o.item} onChange={(e) => setInc(i, { item: e.target.value })} />
+          <select className="cc-input" style={{ margin: 0, flex: "0 0 150px", width: 150 }} value={o.per} onChange={(e) => setInc(i, { per: e.target.value })}>
+            <option value="">Just list it</option>
+            <option value="party">1 per party</option>
+            <option value="guest">1 per guest</option>
+          </select>
+          <button className="cc-mini danger" onClick={() => setIncl(incl.filter((_, k) => k !== i))}>Remove</button>
+        </div>
+      ))}
+      <button className="cc-mini" onClick={() => setIncl([...incl, { item: "", per: "" }])}>＋ Add an item</button>
 
       <label className="cc-label">Experience image</label>
       {imageUrl ? (
