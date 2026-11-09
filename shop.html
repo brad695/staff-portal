@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>GREYS — T-Shirts</title>
+<meta name="description" content="Cheese-pun t-shirts from GREYS Fine Cheeses, printed to order and shipped anywhere in the US." />
+<link rel="icon" href="/favicon.ico" sizes="any" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<meta name="theme-color" content="#06273A" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="GREYS Fine Cheeses" />
+<meta property="og:title" content="GREYS — T-Shirts" />
+<meta property="og:description" content="Six cheese puns, printed to order and shipped anywhere in the US." />
+<meta property="og:image" content="https://staff.greyscheese.com/shop-img/og.jpg" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preconnect" href="https://vdvtrevhqalmjwhjhjug.supabase.co" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,900;1,900&family=Source+Sans+Pro:wght@400;600;700;900&family=Instrument+Sans:wght@400;500;600;700&family=League+Spartan:wght@600;700;800&display=swap" />
+<link rel="stylesheet" href="/shop-theme/css/vendor.css" />
+<link rel="stylesheet" href="/shop-theme/style.css" />
+<!--
+  shop.html — the GREYS shirt shop (moved in from the tee-stores repo, 2026-11-08).
+    LIVE     https://staff.greyscheese.com/shop
+    STAGING  https://greys-staff-portal-staging.onrender.com/shop.html   (always Square sandbox)
+  LOOK (Maverick, 2026-11-08: "the front page exactly the same with our header and footer … the item pages can match
+  our online ordering site exactly"):
+    · front page = the tee-greys.onrender.com page: TemplatesJungle "Stylish" home sections (hero slider + parallax
+      photos, coupon band, Featured Shirts, collections, Latest Drops), its CSS/JS in /shop-theme (unchanged files),
+      between the greyscheese.com header + footer (site-chrome.js, loaded from the order site: one copy of the menu).
+      The template's license needs its credit link to templatesjungle.com kept — it sits just above our footer.
+    · item window, bag and checkout = orderonline.greyscheese.com's own (order.html): same markup + CSS, scoped .os.
+  Catalog, prices, shipping and tax come from the `shirt-shop` Edge Function; cards are paid through Square (Web
+  Payments SDK) and orders are printed + shipped by Printful. Sandbox vs real cards is decided by the function.
+  Local testing: http://localhost:PORT/shop.html?fn=http://localhost:8787 points the page at a local function.
+-->
+<style>
+  :root{--bg:#faf8f4;--ink:#1c1a17;--navy:#06273A;--navy2:#0e4a6b;--gold:#e6b33c;--cream:#fbf1d9;--brass:#896D39;
+    --line:#ebe5dc;--line2:#e7e0d5;--line3:#ddd6cb;--rule:#f1ece4;--soft:#f3efe8;--card:#ffffff;
+    --muted:#6b645c;--muted2:#5c554d;--sub:#4d473f;--green:#2f6b3a;--red:#a4262c;
+    --fb:'Instrument Sans',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+    --fd:'League Spartan','Instrument Sans',ui-sans-serif,system-ui,sans-serif;}
+  body.locked{overflow:hidden}
+  [hidden]{display:none!important}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+  /* the greyscheese.com header + footer keep their own colors under the template's global p / li / a rules */
+  .gx-site p,.gx-site li{color:inherit}
+  .gx-site a{transition:none}
+  .gx-site #gx-mine .cnt{min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--gold);color:var(--navy);font:700 12px/22px var(--fb);text-align:center}
+  .s-fallhead{background:var(--navy);color:#F5F7F2;padding:16px 20px;display:flex;align-items:center;justify-content:space-between}
+  .s-fallhead a{color:#F5F7F2;font:800 30px/1 var(--fd)}
+  .s-fallhead button{background:none;border:1px solid #F5F7F2;color:#F5F7F2;border-radius:10px;padding:8px 14px;cursor:pointer;font:600 15px var(--fb)}
+
+  /* strips (the order site's) */
+  #testbar{background:#fde7a8;color:#3d2e0d;font:13.5px/1.45 var(--fb);text-align:center;padding:8px 16px}
+  #testbar b{color:#06273A}
+  #pausebar{background:#f7e2de;color:#7c1f15;font:600 14px/1.4 var(--fb);text-align:center;padding:9px 16px}
+
+  /* template product cards open the item window */
+  .product-card .card-img{cursor:pointer}
+  .product-store .ph{aspect-ratio:1/1;background:#F1F1F0}
+  .shop-oops{width:100%;padding:10px 12px 30px;font-family:var(--fb);color:var(--sub)}
+  .shop-oops button{margin-left:8px;height:40px;padding:0 16px;border:0;border-radius:10px;background:var(--navy);color:#fff;font-weight:600;cursor:pointer}
+  .tj-credit{margin:48px 0 0;text-align:center;font:12px/1.4 var(--fb);color:#7A7A7A}
+  .tj-credit a{color:#111;text-decoration:underline}
+
+  /* ---------- the order site's item window, bag and checkout (order.html), scoped to .os ---------- */
+  .os{font-family:var(--fb);color:var(--ink);font-weight:400;line-height:1.4;-webkit-font-smoothing:antialiased}
+  .os *,.os *::before,.os *::after{box-sizing:border-box}
+  .os p,.os li{color:inherit}
+  .os a{color:var(--navy);text-decoration:underline}
+  .os button{font-family:inherit;color:inherit;line-height:1.2}
+  .os button:focus-visible,.os a:focus-visible,.os input:focus-visible,.os select:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+  .os svg{flex-shrink:0}
+  .os h2{margin:0;font-family:var(--fd);font-weight:700;font-size:34px;line-height:1.08;letter-spacing:-.01em;color:var(--navy)}
+  .os .o-row{display:flex;align-items:center;gap:8px}
+  .os .overlay{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:32px}
+  .os .scrim{position:absolute;inset:0;width:100%;height:100%;border:0;padding:0;background:rgba(20,18,15,.5);cursor:pointer}
+  .os .dialog{position:relative;width:680px;max-width:100%;max-height:calc(100vh - 64px);display:flex;flex-direction:column;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 40px 90px -30px rgba(6,39,58,.55)}
+  .os .xbtn{width:42px;height:42px;border:0;border-radius:999px;background:#fff;color:var(--ink);box-shadow:0 2px 10px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .os .dialog .xbtn{position:absolute;top:14px;right:14px;z-index:2}
+  .os .dlg-scroll{flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain}
+  .os .dlg-img{display:block;width:100%;height:auto;aspect-ratio:1/1;object-fit:cover;background:var(--soft)}
+  .os .dialog.split{width:min(820px,calc(100vw - 64px))}
+  .os .dlg-split{display:flex;align-items:stretch}
+  .os .dlg-colA{flex:0 0 340px;width:340px;border-right:1px solid #efe9e0}
+  .os .dlg-colB{flex:1 1 auto;min-width:0}
+  .os .split .dlg-top{padding:24px 64px 14px 24px}
+  .os .split .dlg-top h2{font-size:26px}
+  .os .split .dlg-top p{font-size:14px}
+  .os .split .dlg-body{padding:16px 24px 20px;gap:18px}
+  .os .split legend{margin-bottom:8px;font-size:14px}
+  .os .split .opts{grid-template-columns:1fr;gap:6px}
+  .os .split .opt{min-height:38px;padding:6px 12px;gap:10px;border-radius:10px}
+  .os .split .opt .nm{font-size:14px}
+  .os .split .opt .pr{font-size:13px}
+  .os .dlg-top{padding:24px 72px 20px 28px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid #efe9e0}
+  .os .tag{align-self:flex-start;font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--cream);color:var(--navy)}
+  .os .dlg-top h2{font-size:32px;line-height:1.08}
+  .os .dlg-top p{margin:0;font-size:15px;line-height:1.55;color:var(--muted2)}
+  .os .dlg-body{padding:24px 28px 28px;display:flex;flex-direction:column;gap:28px}
+  .os fieldset{margin:0;padding:0;border:0;min-width:0}
+  .os legend{float:none;width:auto;padding:0;margin:0 0 12px;display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;line-height:1.4;color:var(--ink)}
+  .os .req{font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--soft);color:var(--muted2)}
+  .os .req.need{background:#fbe3c2;color:#6a3d00}
+  .os .opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .os .opt{display:flex;align-items:center;gap:12px;min-height:52px;margin:0;padding:10px 14px;border:1px solid var(--line3);border-radius:12px;cursor:pointer;background:#fff}
+  .os .opt.on{border-color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy);background:#f7f5f0}
+  .os .opt.off{opacity:.5;cursor:not-allowed}
+  .os .opt input{width:18px;height:18px;margin:0;accent-color:var(--navy);flex-shrink:0}
+  .os .opt .nm{flex:1;font-size:15px;font-weight:500}
+  .os .opt .pr{font-size:14px;color:var(--muted2);white-space:nowrap}
+  .os .minmsg{margin:0;font-size:14px;color:var(--muted)}
+  .os .dlg-foot{display:flex;align-items:center;gap:16px;padding:16px 28px 20px;border-top:1px solid #efe9e0;background:#fff}
+  .os .qty{display:flex;align-items:center;gap:4px;padding:4px;border:1px solid var(--line2);border-radius:12px}
+  .os .qty button{width:40px;height:40px;border:0;border-radius:9px;background:#f6f2ec;color:var(--navy);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .os .qty button:disabled{opacity:.4;cursor:default}
+  .os .qty b{min-width:34px;text-align:center;font-size:16px}
+  .os .qty.sm{gap:2px;padding:2px;border-radius:10px}
+  .os .qty.sm button{width:32px;height:32px;border-radius:8px}
+  .os .qty.sm b{min-width:28px;font-size:14px}
+  .os .primary{flex:1;height:52px;border:0;border-radius:14px;font-size:16px;font-weight:700;background:var(--navy);color:#fff;cursor:pointer}
+  .os .primary:disabled{background:#e7e2da;color:#8a8278;cursor:default}
+  .os .drawer-wrap{position:fixed;inset:0;z-index:70}
+  .os .drawer-wrap .scrim{background:rgba(20,18,15,.45)}
+  .os aside.drawer{position:absolute;top:0;right:0;bottom:0;width:460px;max-width:100%;display:flex;flex-direction:column;background:#fff;box-shadow:-30px 0 70px -30px rgba(6,39,58,.5)}
+  .os .dr-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 24px;border-bottom:1px solid #efe9e0}
+  .os .dr-head h2{font-size:26px}
+  .os .rbtn{width:40px;height:40px;border-radius:999px;border:1px solid var(--line2);background:#fff;color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .os .dr-body{flex:1 1 auto;overflow-y:auto;padding:20px 24px 24px;display:flex;flex-direction:column;gap:18px;overscroll-behavior:contain}
+  .os .lines{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+  .os .lines li{display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--rule)}
+  .os .lines img{display:block;width:64px;height:64px;flex-shrink:0;border-radius:12px;object-fit:cover;background:var(--soft)}
+  .os .lines .mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+  .os .lines .nm{font-size:15px;font-weight:600}
+  .os .lines .dt{font-size:13px;line-height:1.45;color:var(--muted)}
+  .os .lines .acts{display:flex;align-items:center;gap:12px;margin-top:2px}
+  .os .linkbtn{border:0;background:none;padding:0;font-size:13px;font-weight:600;color:var(--navy);text-decoration:underline;cursor:pointer}
+  .os .lines .amt{font-size:15px;font-weight:600;white-space:nowrap}
+  .os .lineerr{font-size:13px;font-weight:600;color:var(--red)}
+  .os .empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:48px 16px;color:var(--muted)}
+  .os .empty .ic{width:56px;height:56px;border-radius:999px;background:var(--soft);color:var(--navy);display:flex;align-items:center;justify-content:center}
+  .os .empty b{font-size:17px;color:var(--ink)}
+  .os .ghostbtn{height:44px;padding:0 18px;border:1px solid var(--line3);border-radius:12px;background:#fff;color:var(--ink);font-size:15px;font-weight:600;cursor:pointer}
+  .os .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .os .grid3{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1.25fr) minmax(0,.85fr);gap:10px}
+  .os .lbl{display:flex;flex-direction:column;gap:6px;margin:0;font-size:13px;font-weight:600;color:var(--sub)}
+  .os .lbl em{font-style:normal;font-weight:500;color:var(--muted)}
+  .os input[type=text],.os input[type=tel],.os input[type=email],.os select{width:100%;height:46px;margin:0;padding:0 14px;border:1px solid var(--line3);border-radius:12px;font:inherit;font-size:15px;font-weight:400;color:var(--ink);background:#fff}
+  .os input.bad,.os select.bad{border-color:var(--red);box-shadow:0 0 0 1px var(--red)}
+  .os .ttl{font-size:15px;font-weight:700}
+  .os #sq-card{min-height:52px}
+  .os .cardload{height:52px;display:flex;align-items:center;padding:0 14px;border:1px dashed var(--line3);border-radius:12px;color:var(--muted);font-size:14px}
+  .os .secure{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+  .os .dr-foot{border-top:1px solid #efe9e0;padding:16px 24px 22px;display:flex;flex-direction:column;gap:8px;background:#fff}
+  .os .dr-foot .ln{display:flex;justify-content:space-between;font-size:14px;color:var(--sub)}
+  .os .dr-foot .tot{display:flex;justify-content:space-between;font-size:17px;font-weight:700;color:var(--ink);padding-top:4px}
+  .os .dr-foot .primary{flex:none;margin-top:8px;height:54px}
+  .os .formerr{padding:10px 12px;border-radius:10px;background:#f7e2de;color:#7c1f15;font-size:14px;line-height:1.45}
+  .os .fine{text-align:center;font-size:12px;color:var(--muted)}
+  .os .done{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding:32px 8px}
+  .os .done .ok{width:68px;height:68px;border-radius:999px;background:#e7f1e9;color:var(--green);display:flex;align-items:center;justify-content:center}
+  .os .done h3{margin:6px 0 0;font-family:var(--fd);font-weight:700;font-size:30px;line-height:1.1;color:var(--navy)}
+  .os .done .big{font-size:18px;font-weight:700;color:var(--ink)}
+  .os .done .muted{font-size:15px;color:var(--sub)}
+  .os .done .code{font-family:var(--fd);font-size:22px;font-weight:700;letter-spacing:.06em;color:var(--navy);background:var(--cream);padding:6px 14px;border-radius:10px}
+  .os .testnote{font-size:13px;color:#6a3d00;background:#fde7a8;padding:8px 12px;border-radius:10px}
+  #floatbar{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:35;display:none}
+  #floatbar.show{display:block}
+  #floatbar button{width:100%;height:56px;border:0;border-radius:16px;background:var(--navy);color:#fff;font:700 16px var(--fb);display:flex;align-items:center;justify-content:space-between;padding:0 18px;box-shadow:0 18px 40px -16px rgba(6,39,58,.7);cursor:pointer}
+  #floatbar .o-row{display:flex;align-items:center;gap:8px}
+  @media (min-width:721px){ #floatbar{left:auto;right:24px;bottom:24px;width:360px} }
+  body.staging #floatbar{bottom:calc(46px + env(safe-area-inset-bottom))}
+  body.staging .os .dr-foot,body.staging .os .dlg-foot{padding-bottom:46px}
+  @media (max-width:720px){
+    .os .overlay{padding:0;align-items:flex-end}
+    .os .dialog{width:100%;max-height:92vh;border-radius:22px 22px 0 0}
+    .os .dlg-top{padding:20px 20px 16px} .os .dlg-top h2{font-size:26px}
+    .os .dlg-body{padding:20px;gap:24px}
+    .os .opts{grid-template-columns:1fr}
+    .os .dlg-foot{padding:12px 16px calc(14px + env(safe-area-inset-bottom))}
+    .os aside.drawer{width:100%}
+    .os .dr-head{padding:14px 16px} .os .dr-body{padding:16px} .os .dr-foot{padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
+    .os .grid3{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} .os .grid3 .lbl:first-child{grid-column:1/-1}
+    body.staging #floatbar{bottom:calc(58px + env(safe-area-inset-bottom))}
+    body.staging .os .dr-foot,body.staging .os .dlg-foot{padding-bottom:calc(58px + env(safe-area-inset-bottom))}
+    body.hasbar .tj-credit{padding-bottom:84px}
+  }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol xmlns="http://www.w3.org/2000/svg" id="quick-view" viewBox="0 0 24 24">
+      <path fill="currentColor"
+        d="M10 18a7.952 7.952 0 0 0 4.897-1.688l4.396 4.396l1.414-1.414l-4.396-4.396A7.952 7.952 0 0 0 18 10c0-4.411-3.589-8-8-8s-8 3.589-8 8s3.589 8 8 8zm0-14c3.309 0 6 2.691 6 6s-2.691 6-6 6s-6-2.691-6-6s2.691-6 6-6z" />
+    </symbol>
+  <symbol xmlns="http://www.w3.org/2000/svg" id="shopping-carriage" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M5 22H19C20.103 22 21 21.103 21 20V9C21 8.73478 20.8946 8.48043 20.7071 8.29289C20.5196 8.10536 20.2652 8 20 8H17V7C17 4.243 14.757 2 12 2C9.243 2 7 4.243 7 7V8H4C3.73478 8 3.48043 8.10536 3.29289 8.29289C3.10536 8.48043 3 8.73478 3 9V20C3 21.103 3.897 22 5 22ZM9 7C9 5.346 10.346 4 12 4C13.654 4 15 5.346 15 7V8H9V7ZM5 10H7V12H9V10H15V12H17V10H19L19.002 20H5V10Z"
+        fill="black" />
+    </symbol>
+</svg>
+<div id="gx-header"></div>
+<script src="https://orderonline.greyscheese.com/site-chrome.js" data-main="shop" data-mine="button" onerror="window.__gxFailed=1"></script>
+<div id="testbar" role="status" hidden></div>
+<div id="pausebar" role="status" hidden></div>
+
+<main id="shop" tabindex="-1">
+  <section id="intro" class="position-relative mt-4">
+    <div class="container-lg">
+      <div class="swiper main-swiper">
+        <div class="swiper-wrapper">
+          <div class="swiper-slide">
+            <div class="card d-flex flex-row align-items-end border-0 large jarallax-keep-img">
+              <img src="/shop-theme/greys/hero-1.webp" alt="Smiling woman in the Brie Right Back tee at a cheese counter" class="img-fluid jarallax-img">
+              <div class="cart-concern p-3 m-3 p-lg-5 m-lg-5">
+                <h2 class="card-title display-3 light">Melt, Age &amp; Puns</h2>
+                <a href="#featured-products"
+                  class="text-uppercase light mt-3 d-inline-block text-hover fw-bold light-border">Shop Now</a>
+              </div>
+            </div>
+          </div>
+          <div class="swiper-slide">
+            <div class="row g-4">
+              <div class="col-lg-12 mb-4">
+                <div class="card d-flex flex-row align-items-end border-0 jarallax-keep-img">
+                  <img src="/shop-theme/greys/hero-2.webp" alt="Man in the Up to No Gouda tee in a kitchen" class="img-fluid jarallax-img">
+                  <div class="cart-concern p-3 m-3 p-lg-5 m-lg-5">
+                    <h2 class="card-title style-2 display-4 light">Cave Wear</h2>
+                    <a href="#featured-products"
+                      class="text-uppercase light mt-3 d-inline-block text-hover fw-bold light-border">Shop Now</a>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-12">
+                <div class="card d-flex flex-row align-items-end border-0 jarallax-keep-img">
+                  <img src="/shop-theme/greys/hero-3.webp" alt="Woman in the Cheddar Late Than Never tee by a cheese board" class="img-fluid jarallax-img">
+                  <div class="cart-concern p-3 m-3 p-lg-5 m-lg-5">
+                    <h2 class="card-title style-2 display-4 light">Wheel Tees</h2>
+                    <a href="#featured-products"
+                      class="text-uppercase light mt-3 d-inline-block text-hover fw-bold light-border">Shop Now</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="swiper-slide">
+            <div class="card d-flex flex-row align-items-end border-0 large jarallax-keep-img">
+              <img src="/shop-theme/greys/hero-4.webp" alt="Man in the Curd Snack Emergency tee in a cheese cave" class="img-fluid jarallax-img">
+              <div class="cart-concern p-3 m-3 p-lg-5 m-lg-5">
+                <h2 class="card-title display-3 light">Shirts for the Counter</h2>
+                <a href="#featured-products"
+                  class="text-uppercase light mt-3 d-inline-block text-hover fw-bold light-border">Shop Now</a>
+              </div>
+            </div>
+          </div>
+          <div class="swiper-slide">
+            <div class="row g-4">
+              <div class="col-lg-12 mb-4">
+                <div class="card d-flex flex-row align-items-end border-0 jarallax-keep-img">
+                  <img src="/shop-theme/greys/hero-5.webp" alt="Laughing woman in the Wheel Me Another tee" class="img-fluid jarallax-img">
+                  <div class="cart-concern p-3 m-3 p-lg-5 m-lg-5">
+                    <h2 class="card-title style-2 display-4 light">Brie Tees</h2>
+                    <a href="#featured-products"
+                      class="text-uppercase light mt-3 d-inline-block text-hover fw-bold light-border">Shop Now</a>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-12">
+                <div class="card d-flex flex-row align-items-end border-0 jarallax-keep-img">
+                  <img src="/shop-theme/greys/hero-6.webp" alt="Man in the Cave Aged to Perfection tee among cheese wheels" class="img-fluid jarallax-img">
+                  <div class="cart-concern p-3 m-3 p-lg-5 m-lg-5">
+                    <h2 class="card-title style-2 display-4 light">Curd Tees</h2>
+                    <a href="#featured-products"
+                      class="text-uppercase light mt-3 d-inline-block text-hover fw-bold light-border">Shop Now</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="swiper-pagination"></div>
+    </div>
+  </section>
+  <section class="discount-coupon py-2 my-2 py-md-5 my-md-5">
+    <div class="container">
+      <div class="bg-gray coupon position-relative p-5">
+        <div class="bold-text position-absolute">GOUDA</div>
+        <div class="row justify-content-between align-items-center">
+          <div class="col-lg-7 col-md-12 mb-3">
+            <div class="coupon-header">
+              <h2 class="display-7">Puns Aged to Perfection</h2>
+              <p class="m-0">Original cheese wordplay about wheels, caves and melt, printed to order for counter regulars.</p>
+            </div>
+          </div>
+          <div class="col-lg-3 col-md-12">
+            <div class="btn-wrap">
+              <a href="#featured-products" class="btn btn-black btn-medium text-uppercase hvr-sweep-to-right">Shop now</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section id="featured-products" class="product-store">
+    <div class="container-md">
+      <div class="display-header d-flex align-items-center justify-content-between">
+        <h2 class="section-title text-uppercase">Featured Shirts</h2>
+        <div class="btn-right">
+          <a href="#latest-products" id="feat-all" class="d-inline-block text-uppercase text-hover fw-bold">View all</a>
+        </div>
+      </div>
+      <div class="product-content padding-small">
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-5" id="featured-row" aria-busy="true"></div>
+      </div>
+    </div>
+  </section>
+  <section id="collection-products" class="py-2 my-2 py-md-5 my-md-5">
+    <div class="container-md">
+      <div class="row">
+        <div class="col-lg-6 col-md-6 mb-4">
+          <div class="collection-card card border-0 d-flex flex-row align-items-end jarallax-keep-img">
+            <img src="/shop-theme/greys/collection-1.webp" alt="Folded Greys tees stacked beside a wedge of cheese" class="border-rounded-10 img-fluid jarallax-img">
+            <div class="card-detail p-3 m-3 p-lg-5 m-lg-5">
+              <h3 class="card-title display-3">
+                <a href="#featured-products">Cave Collection</a>
+              </h3>
+              <a href="#featured-products" class="text-uppercase mt-3 d-inline-block text-hover fw-bold">Shop Now</a>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6 col-md-6">
+          <div class="collection-card card border-0 d-flex flex-row jarallax-keep-img">
+            <img src="/shop-theme/greys/collection-2.webp" alt="Greys tees hanging on a rail above a cheese wheel" class="border-rounded-10 img-fluid jarallax-img">
+            <div class="card-detail p-3 m-3 p-lg-5 m-lg-5">
+              <h3 class="card-title display-3">
+                <a href="#latest-products">Counter Collection</a>
+              </h3>
+              <a href="#featured-products" class="text-uppercase mt-3 d-inline-block text-hover fw-bold">Shop Now</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section id="latest-products" class="product-store py-2 my-2 py-md-5 my-md-5 pt-0">
+    <div class="container-md">
+      <div class="display-header d-flex align-items-center justify-content-between">
+        <h2 class="section-title text-uppercase">Latest Drops</h2>
+        <div class="btn-right">
+          <a href="#featured-products" class="d-inline-block text-uppercase text-hover fw-bold">View all</a>
+        </div>
+      </div>
+      <div class="product-content padding-small">
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-5" id="latest-row" aria-busy="true"></div>
+      </div>
+    </div>
+  </section>
+  <p class="tj-credit">Store design by <a href="https://templatesjungle.com/" target="_blank" rel="noopener">TemplatesJungle</a></p>
+</main>
+
+<div id="gx-footer"></div>
+<div id="modal" class="os"></div>
+<div id="drawer" class="os"></div>
+<div id="floatbar"></div>
+<noscript><p style="padding:20px;max-width:600px;margin:0 auto">The shirt shop needs JavaScript. Email info@greyscheese.com to order.</p></noscript>
+
+<!-- the Stylish template's own scripts (Bootstrap, Swiper slider, jarallax parallax), unchanged -->
+<script src="/shop-theme/js/jquery-1.11.0.min.js"></script>
+<script src="/shop-theme/js/plugins.js"></script>
+<script src="/shop-theme/js/script.js"></script>
+<script>
+(function () {
+  'use strict';
+  var FN = 'https://vdvtrevhqalmjwhjhjug.supabase.co/functions/v1/shirt-shop';
+  var Q = new URLSearchParams(location.search);
+  if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && Q.get('fn')) FN = Q.get('fn').replace(/\/$/, '') + '/shirt-shop';
+  var KEY = 'greys.shirts.cart', CONTACT = 'greys.shirts.contact', EMAIL = 'info@greyscheese.com', MAXQ = 10;
+
+  // ---------------- icons + utils (the order site's) ----------------
+  function svg(size, sw, inner) {
+    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + sw +
+      '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + inner + '</svg>';
+  }
+  var I = {
+    plus: svg(16, 2.2, '<path d="M12 5v14M5 12h14"/>'),
+    minus: svg(16, 2.2, '<path d="M5 12h14"/>'),
+    x: svg(18, 2, '<path d="M6 6l12 12M18 6L6 18"/>'),
+    bag: svg(20, 1.8, '<path d="M5 8h14l-1.2 12.1a1 1 0 0 1-1 .9H7.2a1 1 0 0 1-1-.9L5 8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>'),
+    checkLg: svg(32, 2.2, '<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
+    back: svg(18, 2, '<path d="M15 6l-6 6 6 6"/>'),
+    lock: svg(14, 1.8, '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>')
+  };
+  function $(s, r) { return (r || document).querySelector(s); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function money(c) { return '$' + (Math.round(c) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function usd(c) { return c % 100 === 0 ? '$' + c / 100 : money(c); } // the template's card prices read "$28"
+  function uuid() { return (window.crypto && crypto.randomUUID && crypto.randomUUID()) || ('a' + Date.now().toString(36) + Math.random().toString(36).slice(2)); }
+  var store = {
+    get: function (k) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (_) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) { } }
+  };
+  async function api(action, body) {
+    var r, d = {};
+    try {
+      r = await fetch(FN + '?action=' + action, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+    } catch (_) {
+      var ne = new Error('We couldn’t reach the shop. Check your connection and try again.'); ne.status = 0; throw ne;
+    }
+    try { d = await r.json(); } catch (_) { }
+    if (!r.ok || d.ok === false) {
+      var e = new Error(d.error || 'Something went wrong — please try again, or email ' + EMAIL + '.');
+      e.status = r.status; e.data = d; throw e;
+    }
+    return d;
+  }
+
+  // ---------------- state ----------------
+  var S = {
+    cat: null, cart: (store.get(KEY) || []).filter(function (l) { return l && typeof l.v === 'string' && l.q > 0; }),
+    modal: null, drawer: false, step: 'cart', quote: null, quoting: false, quoteErr: '', quoteSeq: 0,
+    paying: false, payErr: '', attempt: uuid(), done: null, just: '', pushed: false
+  };
+  var byVariant = {}, bySlug = {}, justTimer = null;
+  var payments = null, card = null, cardState = 'idle', cardErr = '', sdkPromise = null;
+  function saveCart() { store.set(KEY, S.cart); }
+  function lines() { return S.cart.map(function (l, i) { var h = byVariant[l.v]; return h ? { i: i, p: h.p, v: h.v, q: l.q } : null; }).filter(Boolean); }
+  function count() { return lines().reduce(function (a, l) { return a + l.q; }, 0); }
+  function sub() { return lines().reduce(function (a, l) { return a + l.q * l.v.price_cents; }, 0); }
+  function apiLines() { return lines().map(function (l) { return { variant_id: l.v.id, qty: l.q }; }); }
+  function testMode() { return !!(S.cat && S.cat.env === 'sandbox'); }
+  function accepting() { return !!(S.cat && S.cat.accepting); }
+  function lock(on) { document.body.classList.toggle('locked', !!on); }
+
+  // ---------------- header slot, floating bar, strips ----------------
+  if (window.__gxFailed || !window.__gxChrome) {
+    $('#gx-header').innerHTML = '<div class="s-fallhead"><a href="https://www.greyscheese.com">GREYS</a><button type="button" id="s-fallcart" data-act="cart">Your order</button></div>';
+  }
+  function renderChrome() {
+    var n = count(), gm = $('#gx-mine');
+    if (gm) {
+      gm.hidden = false;
+      gm.setAttribute('data-act', 'cart');
+      gm.setAttribute('aria-label', n ? 'Your order, ' + n + (n === 1 ? ' shirt' : ' shirts') : 'Your order, empty');
+      gm.innerHTML = I.bag + '<span>' + esc(S.just || 'Your order') + '</span>' + (n ? '<span class="cnt">' + n + '</span>' : '');
+      if (window.GreysChrome && GreysChrome.setMine) GreysChrome.setMine(n > 0);
+    }
+    var fc = $('#s-fallcart'); if (fc) fc.textContent = (S.just || 'Your order') + (n ? ' · ' + n : '');
+    renderFloat();
+  }
+  function renderFloat() {
+    var n = count(), fb = $('#floatbar'), show = n > 0 && !S.drawer && !S.modal;
+    fb.classList.toggle('show', show);
+    document.body.classList.toggle('hasbar', show);
+    fb.innerHTML = show ? '<button type="button" data-act="cart"><span class="o-row">' + I.bag + '<span>View your order · ' + n + '</span></span><span>' + money(sub()) + '</span></button>' : '';
+  }
+  function renderBars() {
+    var tb = $('#testbar');
+    tb.hidden = !testMode();
+    if (testMode()) tb.innerHTML = '<b>Test mode</b> — Square sandbox. Nothing is charged and nothing ships. Use card <b>4111 1111 1111 1111</b>, any future date, CVV <b>111</b>, ZIP <b>11111</b>.';
+    var pb = $('#pausebar');
+    pb.hidden = accepting();
+    if (!accepting()) pb.textContent = S.cat.message || 'The shirt shop is taking a short break.';
+    var sb = document.getElementById('staging-bar');
+    if (sb) sb.textContent = testMode() ? 'STAGING · Square SANDBOX — test cards only, nothing is charged.' : 'STAGING · this copy takes REAL card payments.';
+  }
+
+  // ---------------- the template's product rows ----------------
+  function cardHTML(p) {
+    var s = esc(p.slug), n = esc(p.name);
+    return '<div class="col mb-4"><div class="product-card position-relative">' +
+      '<div class="card-img" data-act="item" data-slug="' + s + '"><img src="' + esc(p.image) + '" alt="' + n + ' t-shirt" class="product-image img-fluid" loading="lazy">' +
+      '<div class="cart-concern position-absolute d-flex justify-content-center"><div class="cart-button d-flex gap-2 justify-content-center align-items-center">' +
+      '<button type="button" class="btn btn-light" data-act="item" data-slug="' + s + '" aria-label="Add ' + n + ' to your order"><svg class="shopping-carriage"><use xlink:href="#shopping-carriage"></use></svg></button>' +
+      '<button type="button" class="btn btn-light" data-act="item" data-slug="' + s + '" aria-label="View ' + n + '"><svg class="quick-view"><use xlink:href="#quick-view"></use></svg></button>' +
+      '</div></div></div>' +
+      '<div class="card-detail d-flex justify-content-between align-items-center mt-3"><h3 class="card-title fs-6 fw-normal m-0"><a href="#' + s + '" data-act="item" data-slug="' + s + '">' + n + '</a></h3>' +
+      '<span class="card-price fw-bold">' + usd(p.price_cents) + '</span></div></div></div>';
+  }
+  function placeholders() {
+    var h = '';
+    for (var i = 0; i < 5; i++) h += '<div class="col mb-4"><div class="product-card"><div class="ph"></div><div class="card-detail mt-3">&nbsp;</div></div></div>';
+    $('#featured-row').innerHTML = h; $('#latest-row').innerHTML = h;
+  }
+  function renderRows() {
+    var ps = S.cat.products, feat = ps.slice(0, 5), late = [];
+    // the template shows two rows of 5, wrapping round the catalog; 5 shirts or fewer get one row, no repeats
+    if (ps.length > 5) for (var i = 5; i < 10; i++) late.push(ps[i % ps.length]);
+    $('#featured-row').innerHTML = feat.length ? feat.map(cardHTML).join('') : '<p class="shop-oops">No shirts right now — check back soon.</p>';
+    $('#featured-row').classList.toggle('justify-content-center', ps.length > 0 && ps.length < 5);
+    $('#latest-row').innerHTML = late.map(cardHTML).join('');
+    $('#latest-products').hidden = !late.length; $('#feat-all').hidden = !late.length;
+    $('#featured-row').setAttribute('aria-busy', 'false'); $('#latest-row').setAttribute('aria-busy', 'false');
+  }
+  async function loadCatalog() {
+    placeholders();
+    try { S.cat = await api('catalog', {}); }
+    catch (e) {
+      $('#featured-row').innerHTML = '<p class="shop-oops">' + esc(e.message) + '<button type="button" data-act="reload">Try again</button></p>';
+      $('#latest-row').innerHTML = '';
+      return;
+    }
+    byVariant = {}; bySlug = {};
+    S.cat.products.forEach(function (p) { bySlug[p.slug] = p; p.variants.forEach(function (v) { byVariant[v.id] = { p: p, v: v }; }); });
+    var before = S.cart.length;
+    S.cart = S.cart.filter(function (l) { return byVariant[l.v]; });
+    if (S.cart.length !== before) saveCart();
+    renderBars(); renderRows(); renderChrome();
+    if (location.hash === '#checkout' && count()) { history.replaceState(null, '', location.pathname + location.search); openDrawer(); goCheckout(); }
+  }
+
+  // ---------------- item window (the order site's) ----------------
+  function openItem(slug, editIdx) {
+    var p = bySlug[slug];
+    if (!p) return;
+    var line = editIdx != null ? S.cart[editIdx] : null;
+    S.modal = { slug: slug, v: line ? line.v : null, qty: line ? line.q : 1, edit: editIdx != null ? editIdx : null, tried: false, from: document.activeElement };
+    pushLayer(); lock(true); renderModal(true); renderFloat();
+  }
+  function renderModal(focus) {
+    var box = $('#modal'), mm = S.modal;
+    if (!mm) { box.innerHTML = ''; return; }
+    var p = bySlug[mm.slug];
+    if (!p) { closeModal(); return; }
+    var v = mm.v && byVariant[mm.v] ? byVariant[mm.v].v : null;
+    var wide = !!(window.matchMedia && window.matchMedia('(min-width:721px)').matches);
+    var sizes = '<fieldset><legend>Choose a size<span class="req' + (mm.tried && !v ? ' need' : '') + '">Required</span></legend><div class="opts">' + p.variants.map(function (x) {
+      var on = x.id === mm.v, off = !x.available;
+      return '<label class="opt' + (on ? ' on' : '') + (off ? ' off' : '') + '"><input type="radio" name="size" data-act="size" data-v="' + esc(x.id) + '"' + (on ? ' checked' : '') + (off ? ' disabled' : '') + '>' +
+        '<span class="nm">' + esc(x.size) + (off ? ' <em style="font-style:normal;color:var(--muted)">· unavailable</em>' : '') + '</span><span class="pr">' + money(x.price_cents) + '</span></label>';
+    }).join('') + '</div></fieldset><p class="minmsg">Unisex fit — order your usual size. Printed to order; it ships in 2–5 business days.</p>';
+    var unit = v ? v.price_cents : p.price_cents;
+    var label = !v ? 'Choose a size' : (mm.edit != null ? 'Update order · ' : 'Add to order · ') + money(unit * mm.qty);
+    var img = '<img class="dlg-img" src="' + esc(p.image) + '" alt="' + esc(p.name) + ' t-shirt">';
+    var top = '<div class="dlg-top">' + (p.tagline ? '<span class="tag">' + esc(p.tagline) + '</span>' : '') + '<h2>' + esc(p.name) + '</h2>' + (p.description ? '<p>' + esc(p.description) + '</p>' : '') + '</div>';
+    var sc = box.querySelector('.dlg-scroll'), scrollTop = sc ? sc.scrollTop : 0;
+    box.innerHTML = '<div class="overlay"><button type="button" class="scrim" aria-label="Close" data-act="close-modal"></button>' +
+      '<div class="dialog has-img' + (wide ? ' split' : '') + '" role="dialog" aria-modal="true" aria-label="' + esc(p.name) + '"><button type="button" class="xbtn" aria-label="Close" data-act="close-modal">' + I.x + '</button>' +
+      '<div class="dlg-scroll' + (wide ? ' dlg-split' : '') + '">' +
+      (wide ? '<div class="dlg-colA">' + img + '</div><div class="dlg-colB">' + top + '<div class="dlg-body">' + sizes + '</div></div>' : img + top + '<div class="dlg-body">' + sizes + '</div>') + '</div>' +
+      '<div class="dlg-foot"><div class="qty" role="group" aria-label="Quantity"><button type="button" aria-label="Fewer" data-act="mqty" data-v="-1"' + (mm.qty <= 1 ? ' disabled' : '') + '>' + I.minus + '</button>' +
+      '<b aria-live="polite">' + mm.qty + '</b><button type="button" aria-label="More" data-act="mqty" data-v="1"' + (mm.qty >= MAXQ ? ' disabled' : '') + '>' + I.plus + '</button></div>' +
+      '<button type="button" class="primary" data-act="add"' + (accepting() ? '' : ' disabled') + '>' + esc(accepting() ? label : 'Ordering is paused') + '</button></div></div></div>';
+    var nsc = box.querySelector('.dlg-scroll');
+    if (nsc && !focus) nsc.scrollTop = scrollTop;
+    if (focus) { var x = box.querySelector('.xbtn'); if (x) x.focus(); }
+  }
+  function addFromModal() {
+    var mm = S.modal, v = mm.v && byVariant[mm.v];
+    if (!v) {
+      mm.tried = true; renderModal(false);
+      var need = document.querySelector('#modal .req.need');
+      if (need && need.scrollIntoView) need.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return;
+    }
+    if (mm.edit != null) S.cart.splice(mm.edit, 1);
+    var same = S.cart.filter(function (l) { return l.v === mm.v; })[0];
+    if (same) same.q = Math.min(MAXQ, same.q + mm.qty);
+    else if (mm.edit != null) S.cart.splice(mm.edit, 0, { v: mm.v, q: mm.qty });
+    else S.cart.push({ v: mm.v, q: mm.qty });
+    saveCart();
+    var wasEdit = mm.edit != null;
+    closeModal(false);
+    S.just = wasEdit ? 'Updated' : 'Added to your order';
+    clearTimeout(justTimer); justTimer = setTimeout(function () { S.just = ''; renderChrome(); }, 2600);
+    S.quote = null;
+    renderChrome();
+    if (S.drawer) renderDrawer();
+  }
+  function closeModal(fromPop) {
+    var mm = S.modal;
+    S.modal = null; renderModal();
+    if (!S.drawer) lock(false);
+    if (!fromPop) popLayer();
+    renderFloat();
+    if (mm && mm.from && mm.from.focus && document.contains(mm.from)) mm.from.focus();
+  }
+
+  // phones: Back closes the window / bag instead of leaving the page
+  function pushLayer() { if (S.pushed) return; try { history.pushState({ shopLayer: 1 }, ''); S.pushed = true; } catch (_) { } }
+  function popLayer() { if (S.modal || S.drawer || !S.pushed) return; S.pushed = false; try { history.back(); } catch (_) { } }
+  window.addEventListener('popstate', function () {
+    S.pushed = false;
+    if (S.modal) closeModal(true);
+    if (S.drawer) closeDrawer(true);
+  });
+
+  // ---------------- bag → checkout → done (the order site's drawer) ----------------
+  function openDrawer() {
+    S.drawer = true;
+    if (S.step === 'done' && !S.done) S.step = 'cart';
+    pushLayer(); lock(true); renderDrawer(); renderFloat();
+    var c = document.querySelector('#drawer .dr-head .rbtn:last-child'); if (c) c.focus();
+  }
+  function closeDrawer(fromPop) {
+    S.drawer = false;
+    if (S.step === 'done') { S.step = 'cart'; S.done = null; }
+    destroyCard();
+    $('#drawer').innerHTML = '';
+    if (!S.modal) lock(false);
+    if (!fromPop) popLayer();
+    renderFloat();
+  }
+  function renderDrawer() {
+    var box = $('#drawer');
+    if (!S.drawer) { box.innerHTML = ''; return; }
+    var title = S.step === 'checkout' ? 'Checkout' : S.step === 'done' ? 'Thank you' : 'Your order';
+    if (!box.querySelector('aside.drawer')) {
+      box.innerHTML = '<div class="drawer-wrap"><button type="button" class="scrim" aria-label="Close your order" data-act="close-cart"></button>' +
+        '<aside class="drawer" aria-label="Your order" role="dialog" aria-modal="true"><div class="dr-head"></div><div class="dr-body"></div><div class="dr-foot"></div></aside></div>';
+    }
+    box.querySelector('.dr-head').innerHTML = '<div class="o-row" style="gap:10px">' +
+      (S.step === 'checkout' ? '<button type="button" class="rbtn" aria-label="Back to your order" data-act="back">' + I.back + '</button>' : '') +
+      '<h2>' + title + '</h2></div><button type="button" class="rbtn" aria-label="Close" data-act="close-cart">' + I.x + '</button>';
+    var body = box.querySelector('.dr-body');
+    if (S.step === 'checkout') {
+      if (!body.querySelector('#co-form')) { body.innerHTML = checkoutHTML(); body.scrollTop = 0; mountCard(); }
+      updateCheckout();
+    } else {
+      destroyCard();
+      body.innerHTML = S.step === 'done' ? doneHTML() : cartHTML();
+    }
+    renderFoot();
+  }
+  function cartHTML() {
+    if (!S.cart.length) {
+      return '<div class="empty"><span class="ic">' + I.bag + '</span><b>Your order is empty</b><span style="font-size:14px">Pick a shirt and a size to get started.</span>' +
+        '<button type="button" class="ghostbtn" data-act="close-cart">Browse the shirts</button></div>';
+    }
+    return '<ul class="lines">' + S.cart.map(function (l, i) {
+      var h = byVariant[l.v];
+      if (!h) return '<li><div class="mid"><span class="lineerr">This shirt isn’t available anymore.</span><div class="acts"><button type="button" class="linkbtn" data-act="lremove" data-i="' + i + '">Remove</button></div></div></li>';
+      return '<li><img src="' + esc(h.p.image) + '" alt="">' +
+        '<div class="mid"><span class="nm">' + esc(h.p.name) + '</span><span class="dt">Size ' + esc(h.v.size) + '</span>' +
+        '<div class="acts"><div class="qty sm" role="group" aria-label="Quantity"><button type="button" aria-label="' + (l.q === 1 ? 'Remove' : 'One less') + '" data-act="lqty" data-i="' + i + '" data-v="-1">' + I.minus + '</button><b>' + l.q + '</b>' +
+        '<button type="button" aria-label="One more" data-act="lqty" data-i="' + i + '" data-v="1"' + (l.q >= MAXQ ? ' disabled' : '') + '>' + I.plus + '</button></div>' +
+        '<button type="button" class="linkbtn" data-act="ledit" data-i="' + i + '">Edit</button></div></div>' +
+        '<span class="amt">' + money(l.q * h.v.price_cents) + '</span></li>';
+    }).join('') + '</ul>';
+  }
+  function checkoutHTML() {
+    var c = store.get(CONTACT) || {}, st = (S.cat && S.cat.states) || {};
+    var opts = Object.keys(st).sort(function (a, b) { return st[a] < st[b] ? -1 : 1; })
+      .map(function (k) { return '<option value="' + esc(k) + '"' + (c.state_code === k ? ' selected' : '') + '>' + esc(st[k]) + '</option>'; }).join('');
+    function f(k) { return esc(c[k] || ''); }
+    return '<div id="co-form" style="display:flex;flex-direction:column;gap:18px">' +
+      '<fieldset style="display:flex;flex-direction:column;gap:10px"><legend>Contact</legend>' +
+      '<label class="lbl">Name<input type="text" id="co-name" autocomplete="name" placeholder="First and last name" maxlength="80" value="' + f('name') + '"></label>' +
+      '<div class="grid2"><label class="lbl">Email<input type="email" id="co-email" autocomplete="email" placeholder="For your receipt" maxlength="200" value="' + f('email') + '"></label>' +
+      '<label class="lbl"><span>Mobile <em>(optional)</em></span><input type="tel" id="co-phone" autocomplete="tel" placeholder="(901) 555-0123" maxlength="40" value="' + f('phone') + '"></label></div></fieldset>' +
+      '<fieldset style="display:flex;flex-direction:column;gap:10px"><legend>Ship to</legend>' +
+      '<label class="lbl">Street address<input type="text" id="co-a1" autocomplete="address-line1" maxlength="120" value="' + f('address1') + '"></label>' +
+      '<label class="lbl"><span>Apartment, suite <em>(optional)</em></span><input type="text" id="co-a2" autocomplete="address-line2" maxlength="120" value="' + f('address2') + '"></label>' +
+      '<div class="grid3"><label class="lbl">City<input type="text" id="co-city" autocomplete="address-level2" maxlength="80" value="' + f('city') + '"></label>' +
+      '<label class="lbl">State<select id="co-state" autocomplete="address-level1"><option value="">Choose…</option>' + opts + '</select></label>' +
+      '<label class="lbl">ZIP<input type="text" id="co-zip" autocomplete="postal-code" inputmode="numeric" maxlength="10" value="' + f('zip') + '"></label></div>' +
+      '<span class="secure">We ship to US addresses only.</span></fieldset>' +
+      '<div style="display:flex;flex-direction:column;gap:10px"><span class="ttl">Payment</span>' +
+      '<div id="sq-card"></div><div id="card-status"></div>' +
+      '<span class="secure">' + I.lock + '<span>Card details go straight to Square’s secure payment form.</span></span></div></div>';
+  }
+  function updateCheckout() {
+    var cs = $('#card-status');
+    if (cs) cs.innerHTML = cardState === 'error' ? '<div class="formerr">' + esc(cardErr) + ' <button type="button" class="linkbtn" data-act="card-retry">Try again</button></div>' : '';
+    var sq = $('#sq-card');
+    if (sq && cardState === 'loading' && !sq.querySelector('iframe') && !sq.querySelector('.cardload')) sq.innerHTML = '<div class="cardload">Loading secure card form…</div>';
+  }
+  function doneHTML() {
+    var d = S.done;
+    if (!d) return '';
+    var s = d.ship_to || {};
+    return '<div class="done"><span class="ok">' + I.checkLg + '</span><h3>Order placed</h3>' +
+      (d.env === 'sandbox' ? '<span class="testnote">Test order — Square sandbox. No card was charged and nothing will ship.</span>' : '') +
+      '<span class="code">' + esc(d.code) + '</span>' +
+      '<span class="big">Shipping to ' + esc(s.city) + ', ' + esc(s.state_code) + '</span>' +
+      '<span class="muted">' + esc(s.name) + ' · ' + esc(s.address1) + (s.address2 ? ', ' + esc(s.address2) : '') + '</span>' +
+      '<span class="muted">' + money(d.total_cents) + (d.card ? ' · ' + esc(d.card) : '') + '</span>' +
+      '<span style="font-size:14px;color:var(--muted);max-width:340px">Each shirt is printed to order and usually ships in 2–5 business days. ' +
+      (d.email_sent ? 'A confirmation is on its way to your email, and we’ll send tracking when it ships.' : 'Keep this code — we’ll email tracking when it ships.') + '</span>' +
+      (d.receipt_url && /^https:\/\//.test(d.receipt_url) ? '<a href="' + esc(d.receipt_url) + '" target="_blank" rel="noopener">View receipt</a>' : '') +
+      '<button type="button" class="primary" style="flex:none;height:48px;padding:0 22px;margin-top:10px" data-act="close-cart">Keep shopping</button></div>';
+  }
+  function renderFoot() {
+    var foot = document.querySelector('#drawer .dr-foot');
+    if (!foot) return;
+    if (S.step === 'done' || (!S.cart.length && S.step === 'cart')) { foot.innerHTML = ''; foot.hidden = true; return; }
+    foot.hidden = false;
+    var h = '', q = S.quote;
+    if (S.step === 'cart') {
+      var why = !S.cat ? 'Loading…' : !accepting() ? 'Ordering is paused' : !count() ? 'Your order is empty' : '';
+      h += '<div class="ln"><span>Subtotal</span><span>' + money(sub()) + '</span></div>' +
+        '<div class="ln"><span>Shipping &amp; tax</span><span>At checkout</span></div>' +
+        '<button type="button" class="primary" data-act="checkout"' + (why ? ' disabled' : '') + '>' + (why || 'Go to checkout · ' + money(sub())) + '</button>';
+    } else {
+      var known = q && q.tax_known;
+      h += '<div class="ln"><span>Subtotal</span><span>' + money(q ? q.subtotal_cents : sub()) + '</span></div>' +
+        '<div class="ln"><span>Shipping</span><span>' + (q ? (q.shipping_cents ? money(q.shipping_cents) : 'Free') : S.quoting ? '…' : '—') + '</span></div>' +
+        '<div class="ln"><span>Tax</span><span>' + (known ? money(q.tax_cents) : S.quoting ? '…' : 'Pick your state') + '</span></div>' +
+        '<div class="tot"><span>Total</span><span>' + (q ? money(q.total_cents) : '…') + '</span></div>';
+      if (S.payErr) h += '<div class="formerr" role="alert">' + esc(S.payErr) + '</div>';
+      else if (S.quoteErr) h += '<div class="formerr" role="alert">' + esc(S.quoteErr) + '</div>';
+      var dis = S.paying || S.quoting || !known || cardState !== 'ready' || !accepting();
+      h += '<button type="button" class="primary" data-act="pay"' + (dis ? ' disabled' : '') + '>' +
+        (S.paying ? 'Placing your order…' : !q && S.quoting ? 'Checking your total…' : cardState === 'loading' ? 'Loading card form…' : known ? 'Place order · ' + money(q.total_cents) : 'Place order') + '</button>';
+      if (testMode()) h += '<span class="fine">Test mode — nothing is charged.</span>';
+    }
+    foot.innerHTML = h;
+  }
+  function goCheckout() {
+    if (!count() || !accepting()) return;
+    S.step = 'checkout'; S.payErr = ''; S.quoteErr = '';
+    renderDrawer(); requote();
+  }
+  function fieldVals() {
+    function v(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
+    return { name: v('co-name'), email: v('co-email'), phone: v('co-phone'), address1: v('co-a1'), address2: v('co-a2'), city: v('co-city'), state_code: v('co-state'), zip: v('co-zip') };
+  }
+  var qTimer = null;
+  function requote() { clearTimeout(qTimer); qTimer = setTimeout(doQuote, 150); }
+  async function doQuote() {
+    if (S.step !== 'checkout' || !count()) return;
+    var seq = ++S.quoteSeq;
+    S.quoting = true; S.quoteErr = ''; renderFoot();
+    try {
+      var q = await api('quote', { lines: apiLines(), state_code: fieldVals().state_code });
+      if (seq !== S.quoteSeq) return;
+      S.quote = q;
+    } catch (e) {
+      if (seq !== S.quoteSeq) return;
+      S.quote = null; S.quoteErr = e.message;
+      if (e.status === 409 && e.data && e.data.gone) dropGone(e.data.gone);
+    }
+    S.quoting = false; renderFoot();
+  }
+  function dropGone(ids) {
+    S.cart = S.cart.filter(function (l) { return ids.indexOf(l.v) < 0; });
+    saveCart(); renderChrome();
+    if (!S.cart.length) { S.step = 'cart'; renderDrawer(); }
+  }
+
+  // ---------------- Square card form (the order site's) ----------------
+  function loadSdk(src) {
+    if (window.Square) return Promise.resolve(window.Square);
+    if (sdkPromise) return sdkPromise;
+    sdkPromise = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      var timer = setTimeout(function () { sdkPromise = null; reject(new Error('Square is taking too long to load.')); }, 15000);
+      s.src = src; s.async = true;
+      s.onload = function () { clearTimeout(timer); window.Square ? resolve(window.Square) : (sdkPromise = null, reject(new Error('Square’s payment form didn’t start.'))); };
+      s.onerror = function () { clearTimeout(timer); sdkPromise = null; reject(new Error('Couldn’t reach Square. Check your connection.')); };
+      document.head.appendChild(s);
+    });
+    return sdkPromise;
+  }
+  async function mountCard() {
+    if (!S.cat || cardState === 'loading' || cardState === 'ready') return;
+    cardState = 'loading'; cardErr = ''; updateCheckout(); renderFoot();
+    try {
+      var pay = S.cat.pay || {};
+      if (!pay.app_id || !pay.location_id) throw new Error('Card payments aren’t switched on yet.');
+      var Square = await loadSdk(pay.script_src);
+      payments = Square.payments(pay.app_id, pay.location_id);
+      var c = await payments.card({
+        style: {
+          '.input-container': { borderColor: '#ddd6cb', borderRadius: '12px' },
+          '.input-container.is-focus': { borderColor: '#06273A' },
+          '.message-text': { color: '#6b645c' },
+          input: { fontSize: '15px', color: '#1c1a17' }
+        }
+      });
+      var host = $('#sq-card');
+      if (!host || S.step !== 'checkout') { try { c.destroy(); } catch (_) { } cardState = 'idle'; return; }
+      host.innerHTML = '';
+      await c.attach('#sq-card');
+      card = c; cardState = 'ready';
+    } catch (e) {
+      cardState = 'error'; cardErr = (e && e.message) || 'The card form didn’t load.';
+    }
+    updateCheckout(); renderFoot();
+  }
+  function destroyCard() {
+    if (card) { try { card.destroy(); } catch (_) { } }
+    card = null;
+    if (cardState !== 'loading') cardState = 'idle';
+  }
+  function cardMessage(r) {
+    var e = (r && r.errors && r.errors[0]) || null;
+    if (!e) return 'That card couldn’t be read. Check the details and try again.';
+    if (e.field === 'cardNumber') return 'Check the card number.';
+    if (e.field === 'expirationDate') return 'Check the expiration date.';
+    if (e.field === 'cvv') return 'Check the security code.';
+    if (e.field === 'postalCode') return 'Check the billing ZIP.';
+    return e.message || 'That card couldn’t be read.';
+  }
+  function checkFields(c) {
+    var bad = [];
+    function need(id, ok, msg) { var el = document.getElementById(id); if (el) el.classList.toggle('bad', !ok); if (!ok) bad.push({ el: el, msg: msg }); }
+    var digits = c.phone.replace(/\D/g, '');
+    need('co-name', c.name.length >= 2, 'Please add your name.');
+    need('co-email', /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.email), 'Please check your email address.');
+    need('co-phone', !c.phone || digits.length === 10 || (digits.length === 11 && digits[0] === '1'), 'Please check your mobile number, or leave it blank.');
+    need('co-a1', !!c.address1, 'Please add your street address.');
+    need('co-city', !!c.city, 'Please add your city.');
+    need('co-state', !!c.state_code, 'Please pick your state.');
+    need('co-zip', /^\d{5}(-\d{4})?$/.test(c.zip), 'Please check your ZIP code.');
+    return bad;
+  }
+  async function placeOrder() {
+    var c = fieldVals(), bad = checkFields(c);
+    if (bad.length) { S.payErr = bad[0].msg; renderFoot(); if (bad[0].el) bad[0].el.focus(); return; }
+    if (!card || !S.quote || S.paying) return;
+    if (S.quote.state_code !== c.state_code) { requote(); return; } // the address changed since the total was figured
+    store.set(CONTACT, c);
+    S.paying = true; S.payErr = ''; renderFoot();
+    try {
+      var expected = S.quote.total_cents;
+      var r = await card.tokenize();
+      if (!r || r.status !== 'OK') throw Object.assign(new Error(cardMessage(r)), { status: 400 });
+      var vt = '';
+      try {
+        var parts = c.name.split(/\s+/);
+        var v = await payments.verifyBuyer(r.token, {
+          amount: (expected / 100).toFixed(2), currencyCode: 'USD', intent: 'CHARGE',
+          billingContact: { givenName: parts[0], familyName: parts.slice(1).join(' '), email: c.email, phone: c.phone || undefined }
+        });
+        vt = (v && v.token) || '';
+      } catch (_) { /* no 3-D Secure challenge needed */ }
+      var d = await api('pay', {
+        lines: apiLines(), attempt: S.attempt, expected_total_cents: expected, source_id: r.token, verification_token: vt,
+        customer: { name: c.name, email: c.email, phone: c.phone },
+        ship_to: { name: c.name, address1: c.address1, address2: c.address2, city: c.city, state_code: c.state_code, zip: c.zip, country_code: 'US' }
+      });
+      S.done = d; S.step = 'done'; S.cart = []; saveCart(); S.quote = null; S.attempt = uuid();
+      destroyCard(); renderDrawer(); renderChrome();
+    } catch (e) {
+      S.payErr = e.message || 'Something went wrong. Nothing was charged.';
+      if (e.status === 409) { if (e.data && e.data.gone) dropGone(e.data.gone); S.quote = null; requote(); }
+    }
+    S.paying = false;
+    if (S.step === 'checkout') renderFoot();
+  }
+
+  // ---------------- events ----------------
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest && e.target.closest('[data-act]');
+    if (!t) return;
+    var a = t.getAttribute('data-act'), i = Number(t.getAttribute('data-i'));
+    if (a === 'item') { e.preventDefault(); if (S.cat) openItem(t.getAttribute('data-slug')); }
+    else if (a === 'close-modal') closeModal(false);
+    else if (a === 'mqty' && S.modal) { S.modal.qty = Math.max(1, Math.min(MAXQ, S.modal.qty + Number(t.getAttribute('data-v')))); renderModal(false); }
+    else if (a === 'add' && S.modal) addFromModal();
+    else if (a === 'cart') { e.preventDefault(); if (S.cat) openDrawer(); }
+    else if (a === 'close-cart') closeDrawer(false);
+    else if (a === 'checkout') goCheckout();
+    else if (a === 'back') { S.step = 'cart'; S.payErr = ''; renderDrawer(); }
+    else if (a === 'lqty' && S.cart[i]) {
+      S.cart[i].q += Number(t.getAttribute('data-v'));
+      if (S.cart[i].q <= 0) S.cart.splice(i, 1); else S.cart[i].q = Math.min(MAXQ, S.cart[i].q);
+      saveCart(); S.quote = null; renderChrome(); renderDrawer();
+    }
+    else if (a === 'lremove' && S.cart[i]) { S.cart.splice(i, 1); saveCart(); renderChrome(); renderDrawer(); }
+    else if (a === 'ledit' && S.cart[i] && byVariant[S.cart[i].v]) openItem(byVariant[S.cart[i].v].p.slug, i);
+    else if (a === 'pay') placeOrder();
+    else if (a === 'card-retry') { destroyCard(); cardState = 'idle'; mountCard(); }
+    else if (a === 'reload') loadCatalog();
+  });
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.getAttribute && t.getAttribute('data-act') === 'size' && S.modal) { S.modal.v = t.getAttribute('data-v'); renderModal(false); }
+    if (t.id === 'co-state') { t.classList.remove('bad'); S.payErr = ''; requote(); }
+  });
+  document.addEventListener('input', function (e) { if (e.target.classList && e.target.classList.contains('bad')) e.target.classList.remove('bad'); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { if (S.modal) closeModal(false); else if (S.drawer) closeDrawer(false); return; }
+    if (e.key !== 'Tab') return;
+    var layer = S.modal ? $('#modal .dialog') : S.drawer ? $('#drawer aside.drawer') : null; // keep focus inside an open window
+    if (!layer) return;
+    var f = Array.prototype.slice.call(layer.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),select,iframe')).filter(function (x) { return x.offsetParent !== null; });
+    if (!f.length) return;
+    if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+  });
+  if (window.matchMedia) { // re-draw an open item window when the screen crosses the computer / phone width
+    var mq = window.matchMedia('(min-width:721px)'), onMq = function () { if (S.modal) renderModal(false); };
+    if (mq.addEventListener) mq.addEventListener('change', onMq); else if (mq.addListener) mq.addListener(onMq);
+  }
+  window.addEventListener('storage', function (e) { // another tab changed the cart
+    if (e.key !== KEY) return;
+    S.cart = store.get(KEY) || []; renderChrome();
+    if (S.drawer && S.step === 'cart') renderDrawer();
+  });
+
+  renderChrome();
+  loadCatalog();
+})();
+</script>
+
+<!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
+<script>(function(){if(location.hostname.indexOf("staging")<0)return;document.title="[STAGING] "+document.title;document.body.classList.add("staging");var m=document.createElement("meta");m.name="robots";m.content="noindex";document.head.appendChild(m);var b=document.createElement("div");b.id="staging-bar";b.textContent="STAGING — test copy.";b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#c62828;color:#fff;font:600 12px/1.2 system-ui,sans-serif;text-align:center;padding:5px 8px;pointer-events:none;opacity:.92";document.body.appendChild(b);})();</script>
+</body>
+</html>
