@@ -7393,9 +7393,11 @@ async function expStaffCall(action, body) {
   return d;
 }
 
+// What the card paid: the price + 20% gratuity + sales tax since 2026-11-10 (paid_cents); the price alone before.
+const expCharged = (r) => (r.paid_cents ?? r.total_cents) || 0;
 function ExpCancelPanel({ r, onDone, onClose }) {
-  const paid = r.payment_status === "paid" || (r.payment_status === "refunded" && (r.refunded_cents || 0) < (r.total_cents || 0));
-  const left = (r.total_cents || 0) - (r.refunded_cents || 0);
+  const paid = r.payment_status === "paid" || (r.payment_status === "refunded" && (r.refunded_cents || 0) < expCharged(r));
+  const left = expCharged(r) - (r.refunded_cents || 0);
   const [mode, setMode] = useState(paid ? "refund_full" : "cancel"); // refund_full | refund_part | refund_keep | cancel
   const [amt, setAmt] = useState((left / 100).toFixed(2));
   const [reason, setReason] = useState("");
@@ -7456,7 +7458,7 @@ function ExperienceBookings({ x, onBack, onEdit }) {
   const load = async () => {
     setErr("");
     let q = db.from("rb_reservations")
-      .select("id, code, guest_name, email, phone, party_size, starts_at, ends_at, status, payment_status, total_cents, refunded_cents, notes, hold_expires_at, inquiry_id, external_id, created_at, cancel_reason, experience_type_id, rb_experience_types(name)")
+      .select("id, code, guest_name, email, phone, party_size, starts_at, ends_at, status, payment_status, total_cents, paid_cents, gratuity_cents, tax_cents, refunded_cents, notes, hold_expires_at, inquiry_id, external_id, created_at, cancel_reason, experience_type_id, rb_experience_types(name)")
       .eq("kind", "experience").order("starts_at", { ascending: true }).limit(1000);
     if (x) q = q.eq("experience_type_id", x.id);
     const { data, error } = await q;
@@ -7492,7 +7494,7 @@ function ExperienceBookings({ x, onBack, onEdit }) {
     : r.status === "pending" ? ["Hold expired", "#6b7280"]
     : r.status === "cancelled" ? ["Cancelled" + refundNote(r) + (r.cancel_reason ? " — " + r.cancel_reason : ""), "#6b7280"]
     : [r.status + (r.payment_status === "paid" ? " · paid" : ""), "#374151"];
-  const canAct = (r) => r.status !== "cancelled" || ((r.payment_status === "paid" || r.payment_status === "refunded") && (r.refunded_cents || 0) < (r.total_cents || 0));
+  const canAct = (r) => r.status !== "cancelled" || ((r.payment_status === "paid" || r.payment_status === "refunded") && (r.refunded_cents || 0) < expCharged(r));
 
   return (
     <div>
@@ -7505,7 +7507,7 @@ function ExperienceBookings({ x, onBack, onEdit }) {
         {x && onEdit && <div className="cc-dash-btns"><button className="cc-btn cc-btn-ghost" onClick={onEdit}>Edit experience</button></div>}
       </div>
       <p className="cc-hint" style={{ marginTop: 0 }}>
-        <b>{paidUp.length}</b> upcoming booked · <b>{up.length - paidUp.length}</b> on hold · <b>{money(paidUp.reduce((s, r) => s + (r.total_cents || 0) - (r.refunded_cents || 0), 0))}</b> upcoming paid
+        <b>{paidUp.length}</b> upcoming booked · <b>{up.length - paidUp.length}</b> on hold · <b>{money(paidUp.reduce((s, r) => s + expCharged(r) - (r.refunded_cents || 0), 0))}</b> upcoming paid
       </p>
       <div className="cc-dash-btns" style={{ margin: "10px 0 12px", flexWrap: "wrap" }}>
         {[["upcoming", "Upcoming"], ["past", "Past"], ["cancelled", "Cancelled / expired"], ["all", "All"]].map(([k, l]) => (
@@ -7530,7 +7532,8 @@ function ExperienceBookings({ x, onBack, onEdit }) {
                 {r.notes && <span className="cc-td-sub">📝 {r.notes}</span>}
                 {q && <a className="cc-td-sub" href="#inquiries" style={{ fontWeight: 700 }} onClick={(e) => { e.preventDefault(); window.inqOpenById && window.inqOpenById(q.id); }}>💬 Open the conversation (#{q.code} · {q.stage.replace("_", " ")}) →</a>}
               </span>
-              <span className="cc-mono">👥 {r.party_size}<br />{money(r.total_cents || 0)}</span>
+              <span className="cc-mono">👥 {r.party_size}<br />{money(r.paid_cents != null ? r.paid_cents : r.total_cents || 0)}
+                {r.paid_cents != null && (r.gratuity_cents || r.tax_cents) ? <><br /><span className="cc-td-sub" title={money(r.total_cents || 0) + " + gratuity " + money(r.gratuity_cents || 0) + " + tax " + money(r.tax_cents || 0)}>incl. gratuity + tax</span></> : null}</span>
               <span style={{ color: col, fontWeight: 700, fontSize: 13 }}>{st}</span>
               <span className="cc-mono">{(tables[r.id] || []).join(", ") || "—"}<br /><span className="cc-td-sub">#{r.code}</span>
                 {canAct(r) && open !== r.id && <><br /><button className="cc-mini danger" style={{ marginTop: 6 }} onClick={() => { setOpen(r.id); setFlash(""); }}>{r.status === "cancelled" ? "Refund" : r.status === "pending" && r.payment_status !== "paid" ? "Release hold" : "Cancel / refund"}</button></>}

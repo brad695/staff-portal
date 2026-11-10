@@ -12,7 +12,7 @@
 // Catering leads (2026-10-12): every catering_leads row has a client conversation (chat_convos.lead_id)
 // with all managers on it; DB triggers mirror messages both ways with catering_messages (see
 // sql/2026-10-12_chat_catering_leads.sql). Here: lead details on boot/convo (managers only),
-// lead_stage, and lead emails sent in the catering format.
+// lead_stage, and lead emails; every outbound email (client, lead, inquiry) uses the one brand shell (brandShell).
 // Experience inquiries (2026-10-12): the same for every inquiries row (chat_convos.inquiry_id, see
 // sql/2026-10-12_chat_experience_inquiries.sql) — managers get the inquiry + its held/booked reservation as `inq`,
 // lead_stage moves it, emails go out in the inquiries look with its "[#CODE]" subject. A booking link sent from
@@ -40,7 +40,8 @@ const STAGES = ["new", "replied", "quoted", "contract_sent", "signed", "invoiced
 const INQ_REPLY_TO = Deno.env.get("INQUIRY_REPLY_TO") || "brad@greyscheese.com";
 const ISTAGES = ["new", "replied", "link_sent", "booked", "lost"];
 const INQ_COLS = "id,code,name,email,phone,location,experience_type_id,experience_name,preferred_date,preferred_time,party_size,stage,unread,last_message_at,created_at,reservation_id,reservation_code,hold_expires_at,option_label,event_address,details";
-const RES_COLS = "id,code,status,payment_status,total_cents,refunded_cents,starts_at";
+// paid_cents: what the card paid (price + 20% gratuity + tax) since 2026-11-10; total_cents is the price
+const RES_COLS = "id,code,status,payment_status,total_cents,paid_cents,refunded_cents,starts_at";
 const LEAD_COLS = "id,code,name,email,phone,company,location,event_date,event_time,guests,fulfillment,address,occasion,budget,stage,unread,last_message_at,created_at,beo_rev";
 const QUOTE_COLS = "lead_id,status,total_cents,deposit_pct,amount_paid_cents,invoice_status,invoice_url,invoice_number,sent_at,viewed_at,signed_at,signed_name,invoice_only,balance_due_date,deposit_paid_at,paid_at,created_at";
 
@@ -264,32 +265,44 @@ async function mail(to: string, subject: string, html: string, from: string, rep
     return d.ok ? { ok: true } : { ok: false, err: "Email didn't send. Try again." };
   } catch (e) { return { ok: false, err: String(e) }; }
 }
+// Brand email chrome (Maverick 2026-10-12, same as the catering + inquiries fns): cream canvas, white
+// card, navy header band with the GREYS wordmark + gold rule, signature, shop footer. Inline styles only.
+const NAVY = "#06273A", GOLD = "#e6b33c", INK = "#221E1B", MUTE = "#6E6353", CREAM = "#F6F1E7", LINE = "#E6DFD0";
+function brandShell(html: string, fromName: string, files: any[]) {
+  return `<div style="background:${CREAM};padding:28px 12px;font-family:Georgia,'Times New Roman',serif;color:${INK}">
+    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px;margin:0 auto;background:#FFFFFF;border:1px solid ${LINE};border-collapse:separate">
+      <tr><td style="background:${NAVY};padding:26px 32px 20px;border-bottom:4px solid ${GOLD}">
+        <div style="font:800 30px/1 'League Spartan','Arial Black',Arial,sans-serif;letter-spacing:.12em;color:#FFFFFF">GREYS</div>
+        <div style="font:700 10.5px/1.4 'League Spartan',Arial,sans-serif;letter-spacing:.22em;color:${GOLD};margin-top:7px;text-transform:uppercase">Fine Cheeses &nbsp;&middot;&nbsp; Charcuterie &nbsp;&middot;&nbsp; Wine</div>
+      </td></tr>
+      <tr><td style="padding:30px 32px 10px;font-size:16px;line-height:1.6;color:${INK}">${html}${fileList(files)}
+        <p style="margin:24px 0 0">${escH(fromName)}<br><span style="font:13px Arial,sans-serif;color:${MUTE}">GREYS Fine Cheeses</span></p>
+      </td></tr>
+      <tr><td style="padding:18px 32px 26px">
+        <div style="height:1px;background:${LINE};margin-bottom:18px"></div>
+        <p style="margin:0 0 10px;font:13px/1.5 Arial,sans-serif;color:${MUTE}">Questions? Just reply to this email and we'll pick the conversation right back up.</p>
+        <p style="margin:0;font:11.5px/1.7 Arial,sans-serif;color:${MUTE};letter-spacing:.02em">
+          <b style="color:${NAVY}">GREYS Fine Cheeses</b><br>
+          Memphis (901) 440-4739 &nbsp;&middot;&nbsp; Nashville (615) 900-4739<br>
+          <a href="https://greyscheese.com" style="color:${NAVY};text-decoration:none">greyscheese.com</a>
+        </p>
+      </td></tr>
+    </table></div>`;
+}
 async function sendEmail(to: string, subject: string, html: string, fromName: string, replyTo: string, files: any[] = []) {
   if (!to) return { ok: false, err: "That client has no email address." };
-  const body = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1d1c1d">${html}${fileList(files)}</div>
-    <p style="margin-top:24px;color:#6b7280;font-size:13px">${escH(fromName)}<br>GREYS Fine Cheeses · greyscheese.com</p>`;
-  return mail(to, subject, body, `${fromName} at GREYS <${CHAT_FROM}>`, replyTo || CHAT_FROM);
+  return mail(to, subject, brandShell(html, fromName, files), `${fromName} at GREYS <${CHAT_FROM}>`, replyTo || CHAT_FROM);
 }
-// a catering lead gets the same branded email as the rest of its thread (catering function's look)
+// a catering lead: same look, the catering From/Reply-To so the thread stays in one place
 async function sendLeadEmail(to: string, subject: string, html: string, fromName: string, files: any[] = []) {
   if (!to) return { ok: false, err: "This lead has no email address." };
-  const body = `<div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;color:#221E1B;line-height:1.55">
-     <div style="background:#06273A;color:#FFFFFF;padding:14px 18px;margin-bottom:18px;font:700 22px Georgia,serif;letter-spacing:.04em">GREYS <span style="font:400 12px Arial;color:#FFFFFF">Fine Cheeses · Charcuterie · Wine</span></div>
-     <div style="font-size:16px">${html}</div>${fileList(files)}
-     <p style="margin-top:22px">${escH(fromName)}<br><span style="font:13px Arial;color:#6E6353">GREYS Fine Cheeses · greyscheese.com</span></p>
-     <p style="font:12px Arial;color:#6E6353;margin-top:28px">Just reply to this email to keep the conversation going.</p></div>`;
-  return mail(to, subject, body, `${fromName} at GREYS <${LEAD_FROM_ADDR}>`, LEAD_REPLY_TO);
+  return mail(to, subject, brandShell(html, fromName, files), `${fromName} at GREYS <${LEAD_FROM_ADDR}>`, LEAD_REPLY_TO);
 }
 const leadSubject = (code: string) => `Re: Your GREYS catering question [#${code}]`;
-// an experience inquiry: the inquiries function's look (gold rule) and subject, so the reply comes back the same way
+// an experience inquiry: same look, the inquiries Reply-To and subject, so the reply comes back the same way
 async function sendInqEmail(to: string, subject: string, html: string, fromName: string, files: any[] = []) {
   if (!to) return { ok: false, err: "This inquiry has no email address." };
-  const body = `<div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;color:#221E1B;line-height:1.55">
-     <div style="font:700 22px Georgia,serif;letter-spacing:.04em;border-bottom:2px solid #E0A21C;padding-bottom:8px;margin-bottom:18px">GREYS <span style="font:400 12px Arial">Fine Cheeses · Charcuterie · Wine</span></div>
-     <div style="font-size:16px">${html}</div>${fileList(files)}
-     <p style="margin-top:22px">${escH(fromName)}<br><span style="font:13px Arial;color:#6E6353">GREYS Fine Cheeses · greyscheese.com</span></p>
-     <p style="font:12px Arial;color:#6E6353;margin-top:28px">Just reply to this email to keep the conversation going.</p></div>`;
-  return mail(to, subject, body, `${fromName} at GREYS <${LEAD_FROM_ADDR}>`, INQ_REPLY_TO);
+  return mail(to, subject, brandShell(html, fromName, files), `${fromName} at GREYS <${LEAD_FROM_ADDR}>`, INQ_REPLY_TO);
 }
 const inqSubject = (q: any) => `Re: Your GREYS ${str(q.experience_name).trim() || "experience"} question [#${q.code}]`;
 

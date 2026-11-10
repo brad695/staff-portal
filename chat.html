@@ -863,7 +863,7 @@ function mapInq(q){const d=q.details||{},r=q.res;
     guests:q.party_size,exp:q.experience_name||'',typeId:q.experience_type_id||'',opt:q.option_label||'',addr:q.event_address||'',stage:q.stage||'new',unread:!!q.unread,
     event:d.kind==='event',occ:d.occasion||'',diet:Array.isArray(d.dietary)?d.dietary:[],answers:Array.isArray(d.answers)?d.answers:[],contact:d.contact_pref||'',
     resId:q.reservation_id||'',resCode:q.reservation_code||'',hold:q.hold_expires_at||'',
-    res:r?{code:r.code||'',status:r.status||'',pay:r.payment_status||'',total:r.total_cents||0,refunded:r.refunded_cents||0,starts:r.starts_at}:null};}
+    res:r?{code:r.code||'',status:r.status||'',pay:r.payment_status||'',total:(r.paid_cents??r.total_cents)||0,refunded:r.refunded_cents||0,starts:r.starts_at}:null};}
 const isLead=c=>!!(c&&c.lead);
 const isInq=c=>isLead(c)&&c.lead.kind==='exp';
 const money=c=>'$'+(Math.round(c)/100).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
