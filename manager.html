@@ -4206,203 +4206,267 @@ window.addEventListener('DOMContentLoaded', async ()=>{
 
 </style>
 <style id="ccnl-style">
-/* Cheese Club → Newsletter (club-newsletter edge function) */
-#panel-cheese .nl-head{margin-bottom:16px}
-#panel-cheese .nl-head-row{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
-#panel-cheese .nl-head-row>div{flex:1;min-width:240px}
-#panel-cheese .nl-head h3{font-size:20px;margin:0 0 4px}
-#panel-cheese .nl-head p{margin:0;font-size:14px}
-#panel-cheese .nl-note{margin-top:14px;background:#fdf6e4;border:1px solid #f1dfb1;border-radius:10px;padding:10px 14px;font-size:13.5px;color:#6b5113}
-#panel-cheese .nl-note.nl-err{background:#fbeeec;border-color:#efc9c3;color:#8c3b2e}
-#panel-cheese .nl-nudge{margin-top:12px;font-size:14px;color:var(--ink);background:#eef4ef;border:1px solid #d3e4d8;border-radius:10px;padding:10px 14px}
-#panel-cheese .nl-list{display:flex;flex-direction:column;gap:8px}
-#panel-cheese .nl-row{display:grid;grid-template-columns:150px 1fr auto;gap:14px;align-items:center;width:100%;text-align:left;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font:inherit;color:var(--ink);cursor:pointer;box-shadow:var(--shadow)}
-#panel-cheese .nl-row:hover{border-color:#c9d6cc}
-#panel-cheese .nl-row:focus-visible{outline:2px solid var(--green);outline-offset:2px}
-#panel-cheese .nl-row-m{font-weight:600;font-size:14px}
-#panel-cheese .nl-row-s{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#4a545e}
-#panel-cheese .nl-pill{display:inline-block;padding:4px 10px;border-radius:999px;font:600 12px Inter,sans-serif;white-space:nowrap;background:#eef1f6;color:#46546e}
-#panel-cheese .nl-pill.nl-draft{background:#efece6;color:#6f6557}
-#panel-cheese .nl-pill.nl-scheduled{background:#e7eefb;color:#2f4f8f}
-#panel-cheese .nl-pill.nl-sending{background:#fdf3e2;color:#92400e}
-#panel-cheese .nl-pill.nl-sent{background:#e6f3e7;color:#2f7d3a}
-#panel-cheese .nl-pill.nl-canceled{background:#f2e3e1;color:#9a4034}
-#panel-cheese .nl-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
-#panel-cheese .nl-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start}
-#panel-cheese .nl-compose{padding:20px}
-#panel-cheese .nl-fields{display:grid;grid-template-columns:170px 1fr;gap:12px}
-#panel-cheese .nl-compose label.fld span small{font-weight:400}
-#panel-cheese .nl-hint{font-size:12.5px;margin:10px 0 0}
-#panel-cheese .nl-hint code{font-size:12px;background:var(--alt);padding:1px 5px;border-radius:5px}
-#panel-cheese .nl-pdf{margin-top:14px;border:1.5px dashed var(--line);border-radius:10px;padding:12px 14px;background:var(--alt);transition:border-color .15s,background .15s}
-#panel-cheese .nl-pdf.has{border-style:solid;background:#fff}
-#panel-cheese .nl-pdf.drag{border-color:var(--green);background:#eef4ef}
-#panel-cheese .nl-pdf-empty{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-#panel-cheese .nl-pdf-empty .muted{font-size:13px;flex:1;min-width:200px;line-height:1.45}
-#panel-cheese .nl-pdf-file{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-#panel-cheese .nl-pdf-ico{flex:none;width:38px;height:46px;border-radius:5px;background:#896D39;color:#fff;font:700 11px Inter,sans-serif;letter-spacing:.05em;display:grid;place-items:center}
-#panel-cheese .nl-pdf-meta{flex:1;min-width:160px}
-#panel-cheese .nl-pdf-meta a{font-weight:600;color:var(--ink);word-break:break-word}
-#panel-cheese .nl-pdf-meta small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px;line-height:1.4}
-#panel-cheese .nl-pdf-acts{display:flex;gap:6px;flex-wrap:wrap}
-#panel-cheese .nl-row-pdf{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;background:#f3ebdd;color:#6f5523;font:600 11px Inter,sans-serif;vertical-align:1px}
-#panel-cheese .nl-sent-pdf{font-size:14px;margin:-6px 0 14px}
-#panel-cheese .nl-sent-pdf a{font-weight:600}
-#panel-cheese .nl-side{display:flex;flex-direction:column;gap:14px;position:sticky;top:88px}
-#panel-cheese .nl-card{padding:18px}
-#panel-cheese .nl-card h4{font-size:16px;margin:0 0 10px}
-#panel-cheese .nl-opt{display:flex;gap:9px;align-items:flex-start;font-size:14px;margin:0 0 8px;cursor:pointer}
-#panel-cheese .nl-opt input{width:auto;margin-top:3px;accent-color:var(--green)}
-#panel-cheese .nl-opt small{display:block;color:var(--muted);font-size:12px}
-#panel-cheese .nl-sub{font:600 12px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
-#panel-cheese .nl-checks{display:flex;flex-direction:column;gap:6px}
-#panel-cheese .nl-chk{display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer}
-#panel-cheese .nl-chk input{width:auto;accent-color:var(--green)}
-#panel-cheese .nl-count{margin-top:14px;padding:10px 12px;background:var(--alt);border-radius:10px;font-size:14px}
-#panel-cheese .nl-people{margin-top:10px;font-size:13px}
-#panel-cheese .nl-people summary{cursor:pointer;color:var(--green);font-weight:600}
-#panel-cheese .nl-people>div,#panel-cheese .nl-sent .nl-people .nl-person{max-height:220px;overflow:auto}
-#panel-cheese .nl-person{padding:6px 0;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:4px 8px}
-#panel-cheese .nl-person small{flex-basis:100%;color:var(--muted)}
-#panel-cheese .nl-row2{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-#panel-cheese .nl-fld{margin:0 0 14px}
-#panel-cheese .nl-lbl{display:block;font-weight:600;font-size:13px;margin-bottom:6px}
-#panel-cheese .nl-inline{display:flex;gap:8px;align-items:stretch}
-#panel-cheese .nl-inline input{flex:1;min-width:0}
-#panel-cheese .nl-inline .btn{flex:none}
-#panel-cheese .nl-sched .btn{margin-top:8px}
-#panel-cheese .nl-go{width:100%;margin-top:4px}
-#panel-cheese .nl-del{width:100%;margin-top:10px}
-#panel-cheese .nl-sent h3{font-size:22px;margin:0 0 4px}
-#panel-cheese .nl-sent>p{font-size:14px;margin:0 0 14px}
-#panel-cheese .nl-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 14px}
-#panel-cheese .nl-stats div{background:var(--alt);border-radius:10px;padding:12px 14px}
-#panel-cheese .nl-stats b{display:block;font:600 24px Archivo,Georgia,serif}
-#panel-cheese .nl-stats span{font-size:12px;color:var(--muted)}
-#panel-cheese .nl-bar{height:8px;background:var(--alt);border-radius:99px;overflow:hidden;margin:4px 0 6px}
-#panel-cheese .nl-bar i{display:block;height:100%;background:var(--green);transition:width .4s}
-#panel-cheese .nl-overlay{position:fixed;inset:0;background:rgba(31,42,45,.5);z-index:150;display:grid;place-items:center;padding:16px}
-#panel-cheese .nl-pv{background:#fff;border-radius:14px;width:min(760px,100%);height:min(88vh,980px);display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow)}
-#panel-cheese .nl-pv-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line)}
-#panel-cheese .nl-pv-sub{font-size:12.5px;min-width:0;flex:1 1 200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#panel-cheese .nl-pv-sp{flex:0 0 0}
-#panel-cheese .nl-pv-frame{flex:1;background:#F3EFE6;display:flex;justify-content:center;overflow:auto}
-#panel-cheese .nl-pv-frame iframe{border:0;width:100%;height:100%;background:#fff;transition:width .2s}
+/* Cheese Club → Newsletter (club-newsletter edge function). Scoped :is(#panel-cheese,.ce-root) since 2026-11-09 so the
+   class email editor (Tickets → a class → ✉ Email the class, .ce-root) uses the same editor styles. */
+:is(#panel-cheese,.ce-root) .nl-head{margin-bottom:16px}
+:is(#panel-cheese,.ce-root) .nl-head-row{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+:is(#panel-cheese,.ce-root) .nl-head-row>div{flex:1;min-width:240px}
+:is(#panel-cheese,.ce-root) .nl-head h3{font-size:20px;margin:0 0 4px}
+:is(#panel-cheese,.ce-root) .nl-head p{margin:0;font-size:14px}
+:is(#panel-cheese,.ce-root) .nl-note{margin-top:14px;background:#fdf6e4;border:1px solid #f1dfb1;border-radius:10px;padding:10px 14px;font-size:13.5px;color:#6b5113}
+:is(#panel-cheese,.ce-root) .nl-note.nl-err{background:#fbeeec;border-color:#efc9c3;color:#8c3b2e}
+:is(#panel-cheese,.ce-root) .nl-nudge{margin-top:12px;font-size:14px;color:var(--ink);background:#eef4ef;border:1px solid #d3e4d8;border-radius:10px;padding:10px 14px}
+:is(#panel-cheese,.ce-root) .nl-list{display:flex;flex-direction:column;gap:8px}
+:is(#panel-cheese,.ce-root) .nl-row{display:grid;grid-template-columns:150px 1fr auto;gap:14px;align-items:center;width:100%;text-align:left;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font:inherit;color:var(--ink);cursor:pointer;box-shadow:var(--shadow)}
+:is(#panel-cheese,.ce-root) .nl-row:hover{border-color:#c9d6cc}
+:is(#panel-cheese,.ce-root) .nl-row:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+:is(#panel-cheese,.ce-root) .nl-row-m{font-weight:600;font-size:14px}
+:is(#panel-cheese,.ce-root) .nl-row-s{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#4a545e}
+:is(#panel-cheese,.ce-root) .nl-pill{display:inline-block;padding:4px 10px;border-radius:999px;font:600 12px Inter,sans-serif;white-space:nowrap;background:#eef1f6;color:#46546e}
+:is(#panel-cheese,.ce-root) .nl-pill.nl-draft{background:#efece6;color:#6f6557}
+:is(#panel-cheese,.ce-root) .nl-pill.nl-scheduled{background:#e7eefb;color:#2f4f8f}
+:is(#panel-cheese,.ce-root) .nl-pill.nl-sending{background:#fdf3e2;color:#92400e}
+:is(#panel-cheese,.ce-root) .nl-pill.nl-sent{background:#e6f3e7;color:#2f7d3a}
+:is(#panel-cheese,.ce-root) .nl-pill.nl-canceled{background:#f2e3e1;color:#9a4034}
+:is(#panel-cheese,.ce-root) .nl-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+:is(#panel-cheese,.ce-root) .nl-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start}
+:is(#panel-cheese,.ce-root) .nl-compose{padding:20px}
+:is(#panel-cheese,.ce-root) .nl-fields{display:grid;grid-template-columns:170px 1fr;gap:12px}
+:is(#panel-cheese,.ce-root) .nl-compose label.fld span small{font-weight:400}
+:is(#panel-cheese,.ce-root) .nl-hint{font-size:12.5px;margin:10px 0 0}
+:is(#panel-cheese,.ce-root) .nl-hint code{font-size:12px;background:var(--alt);padding:1px 5px;border-radius:5px}
+:is(#panel-cheese,.ce-root) .nl-pdf{margin-top:14px;border:1.5px dashed var(--line);border-radius:10px;padding:12px 14px;background:var(--alt);transition:border-color .15s,background .15s}
+:is(#panel-cheese,.ce-root) .nl-pdf.has{border-style:solid;background:#fff}
+:is(#panel-cheese,.ce-root) .nl-pdf.drag{border-color:var(--green);background:#eef4ef}
+:is(#panel-cheese,.ce-root) .nl-pdf-empty{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+:is(#panel-cheese,.ce-root) .nl-pdf-empty .muted{font-size:13px;flex:1;min-width:200px;line-height:1.45}
+:is(#panel-cheese,.ce-root) .nl-pdf-file{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+:is(#panel-cheese,.ce-root) .nl-pdf-ico{flex:none;width:38px;height:46px;border-radius:5px;background:#896D39;color:#fff;font:700 11px Inter,sans-serif;letter-spacing:.05em;display:grid;place-items:center}
+:is(#panel-cheese,.ce-root) .nl-pdf-meta{flex:1;min-width:160px}
+:is(#panel-cheese,.ce-root) .nl-pdf-meta a{font-weight:600;color:var(--ink);word-break:break-word}
+:is(#panel-cheese,.ce-root) .nl-pdf-meta small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px;line-height:1.4}
+:is(#panel-cheese,.ce-root) .nl-pdf-acts{display:flex;gap:6px;flex-wrap:wrap}
+:is(#panel-cheese,.ce-root) .nl-row-pdf{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;background:#f3ebdd;color:#6f5523;font:600 11px Inter,sans-serif;vertical-align:1px}
+:is(#panel-cheese,.ce-root) .nl-sent-pdf{font-size:14px;margin:-6px 0 14px}
+:is(#panel-cheese,.ce-root) .nl-sent-pdf a{font-weight:600}
+:is(#panel-cheese,.ce-root) .nl-side{display:flex;flex-direction:column;gap:14px;position:sticky;top:88px}
+:is(#panel-cheese,.ce-root) .nl-card{padding:18px}
+:is(#panel-cheese,.ce-root) .nl-card h4{font-size:16px;margin:0 0 10px}
+:is(#panel-cheese,.ce-root) .nl-opt{display:flex;gap:9px;align-items:flex-start;font-size:14px;margin:0 0 8px;cursor:pointer}
+:is(#panel-cheese,.ce-root) .nl-opt input{width:auto;margin-top:3px;accent-color:var(--green)}
+:is(#panel-cheese,.ce-root) .nl-opt small{display:block;color:var(--muted);font-size:12px}
+:is(#panel-cheese,.ce-root) .nl-sub{font:600 12px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+:is(#panel-cheese,.ce-root) .nl-checks{display:flex;flex-direction:column;gap:6px}
+:is(#panel-cheese,.ce-root) .nl-chk{display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer}
+:is(#panel-cheese,.ce-root) .nl-chk input{width:auto;accent-color:var(--green)}
+:is(#panel-cheese,.ce-root) .nl-count{margin-top:14px;padding:10px 12px;background:var(--alt);border-radius:10px;font-size:14px}
+:is(#panel-cheese,.ce-root) .nl-people{margin-top:10px;font-size:13px}
+:is(#panel-cheese,.ce-root) .nl-people summary{cursor:pointer;color:var(--green);font-weight:600}
+:is(#panel-cheese,.ce-root) .nl-people>div,:is(#panel-cheese,.ce-root) .nl-sent .nl-people .nl-person{max-height:220px;overflow:auto}
+:is(#panel-cheese,.ce-root) .nl-person{padding:6px 0;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:4px 8px}
+:is(#panel-cheese,.ce-root) .nl-person small{flex-basis:100%;color:var(--muted)}
+:is(#panel-cheese,.ce-root) .nl-row2{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+:is(#panel-cheese,.ce-root) .nl-fld{margin:0 0 14px}
+:is(#panel-cheese,.ce-root) .nl-lbl{display:block;font-weight:600;font-size:13px;margin-bottom:6px}
+:is(#panel-cheese,.ce-root) .nl-inline{display:flex;gap:8px;align-items:stretch}
+:is(#panel-cheese,.ce-root) .nl-inline input{flex:1;min-width:0}
+:is(#panel-cheese,.ce-root) .nl-inline .btn{flex:none}
+:is(#panel-cheese,.ce-root) .nl-sched .btn{margin-top:8px}
+:is(#panel-cheese,.ce-root) .nl-go{width:100%;margin-top:4px}
+:is(#panel-cheese,.ce-root) .nl-del{width:100%;margin-top:10px}
+:is(#panel-cheese,.ce-root) .nl-sent h3{font-size:22px;margin:0 0 4px}
+:is(#panel-cheese,.ce-root) .nl-sent>p{font-size:14px;margin:0 0 14px}
+:is(#panel-cheese,.ce-root) .nl-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 14px}
+:is(#panel-cheese,.ce-root) .nl-stats div{background:var(--alt);border-radius:10px;padding:12px 14px}
+:is(#panel-cheese,.ce-root) .nl-stats b{display:block;font:600 24px Archivo,Georgia,serif}
+:is(#panel-cheese,.ce-root) .nl-stats span{font-size:12px;color:var(--muted)}
+:is(#panel-cheese,.ce-root) .nl-bar{height:8px;background:var(--alt);border-radius:99px;overflow:hidden;margin:4px 0 6px}
+:is(#panel-cheese,.ce-root) .nl-bar i{display:block;height:100%;background:var(--green);transition:width .4s}
+:is(#panel-cheese,.ce-root) .nl-overlay{position:fixed;inset:0;background:rgba(31,42,45,.5);z-index:150;display:grid;place-items:center;padding:16px}
+:is(#panel-cheese,.ce-root) .nl-pv{background:#fff;border-radius:14px;width:min(760px,100%);height:min(88vh,980px);display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow)}
+:is(#panel-cheese,.ce-root) .nl-pv-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line)}
+:is(#panel-cheese,.ce-root) .nl-pv-sub{font-size:12.5px;min-width:0;flex:1 1 200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+:is(#panel-cheese,.ce-root) .nl-pv-sp{flex:0 0 0}
+:is(#panel-cheese,.ce-root) .nl-pv-frame{flex:1;background:#F3EFE6;display:flex;justify-content:center;overflow:auto}
+:is(#panel-cheese,.ce-root) .nl-pv-frame iframe{border:0;width:100%;height:100%;background:#fff;transition:width .2s}
 /* the template editor (2026-11-08): the email itself in the club site's look — navy page, GREYS logo,
    menu band, Barlow Condensed headings, Nunito Sans words, brass picture frames, gold button */
-#panel-cheese .nl-tpl-head{display:flex;gap:10px 14px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:16px 0 10px}
-#panel-cheese .nl-tpl-head p{margin:0;font-size:13.5px;line-height:1.45;flex:1 1 260px}
-#panel-cheese .nl-tpl-head p b{color:var(--ink);font-weight:600}
-#panel-cheese .nl-mailwrap{background:#06273A;border-radius:12px;overflow:hidden}
-#panel-cheese .nl-mail{max-width:600px;margin:0 auto;color:#F5F7F2;font-family:'Nunito Sans',Inter,system-ui,sans-serif}
-#panel-cheese .nl-m-top{padding:24px 24px 18px}
-#panel-cheese .nl-m-logo{display:block;width:250px;max-width:72%;height:auto}
-#panel-cheese .nl-m-nav{margin:0 24px;display:grid;grid-template-columns:1fr 1.15fr 1fr;border-top:1px solid #F5F7F2;border-bottom:1px solid #F5F7F2;text-align:center;font:700 15px/1.2 'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:1.4px;text-transform:uppercase;color:#FAFAFA;user-select:none}
-#panel-cheese .nl-m-nav span{padding:10px 4px}
-#panel-cheese .nl-m-hero{padding:28px 24px 26px}
-#panel-cheese .nl-m-eye{font:800 12px/1.4 'Nunito Sans',Inter,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#E6B33C}
-#panel-cheese .nl-m-h1{margin:10px 0 0;font:700 44px/1.02 'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.01em;text-transform:uppercase;color:#F5F7F2;min-height:1.02em;word-break:break-word}
-#panel-cheese .nl-m-herop{position:relative;margin-top:22px}
-#panel-cheese .nl-m-card{margin:0 24px 26px;background:#fff;color:#2E3A46;padding:32px 28px 28px}
-#panel-cheese .nl-ce{outline:1px dashed transparent;outline-offset:5px;border-radius:2px;cursor:text;transition:outline-color .12s}
-#panel-cheese .nl-ce:hover{outline-color:rgba(230,179,60,.8)}
-#panel-cheese .nl-ce:focus{outline:2px solid #E6B33C}
-#panel-cheese .nl-ce:empty::before{content:attr(data-ph);color:#9AA5AE;pointer-events:none}
-#panel-cheese .nl-m-h1.nl-ce:empty::before{color:rgba(245,247,242,.42)}
-#panel-cheese .nl-m-blocks{min-height:20px}
-#panel-cheese .nl-b{position:relative;margin:0 0 26px}
-#panel-cheese .nl-b-tools{position:absolute;top:-16px;right:-16px;z-index:3;display:flex;gap:3px;opacity:0;transition:opacity .12s}
-#panel-cheese .nl-b:hover>.nl-b-tools,#panel-cheese .nl-b:focus-within>.nl-b-tools{opacity:1}
-#panel-cheese .nl-b-tools button{width:30px;height:30px;padding:0;border-radius:50%;border:1px solid #D6CDBC;background:#fff;color:#06273A;font:600 14px/1 Inter,sans-serif;cursor:pointer;box-shadow:0 1px 4px rgba(6,39,58,.18);display:grid;place-items:center}
-#panel-cheese .nl-b-tools button:hover:not(:disabled){background:#06273A;border-color:#06273A;color:#fff}
-#panel-cheese .nl-b-tools button[data-rm]:hover{background:#9a4034;border-color:#9a4034}
-#panel-cheese .nl-b-tools button:disabled{opacity:.35;cursor:default}
-#panel-cheese .nl-b-tools button:focus-visible{outline:2px solid #E6B33C;outline-offset:1px}
-#panel-cheese .nl-b-fmt{position:absolute;left:-8px;top:-50px;z-index:4;display:none;gap:4px;align-items:center;padding:5px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 18px rgba(6,39,58,.18);white-space:nowrap}
-#panel-cheese .nl-b-text:focus-within>.nl-b-fmt{display:flex}
-#panel-cheese .nl-b-fmt button{background:#fff;border:1px solid var(--line);border-radius:7px;padding:5px 10px;font:500 13px Inter,sans-serif;color:var(--ink);cursor:pointer;min-height:32px}
-#panel-cheese .nl-b-fmt button:hover{border-color:#b9c7bd;background:var(--alt)}
-#panel-cheese .nl-b-fmt select{width:auto;padding:5px 8px;font-size:13px;border-radius:7px;min-height:32px}
-#panel-cheese .nl-b-rule{display:none;width:40px;height:3px;background:#896D39;margin:0 0 12px}
-#panel-cheese .nl-b-text.has-title>.nl-b-rule{display:block}
-#panel-cheese .nl-b-title{margin:0 0 10px;font:700 28px/1.05 'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.01em;text-transform:uppercase;color:#06273A;word-break:break-word}
-#panel-cheese .nl-b-title:empty{margin:0 0 6px;font:400 13px/1.4 'Nunito Sans',Inter,sans-serif;text-transform:none;letter-spacing:0}
+:is(#panel-cheese,.ce-root) .nl-tpl-head{display:flex;gap:10px 14px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:16px 0 10px}
+:is(#panel-cheese,.ce-root) .nl-tpl-head p{margin:0;font-size:13.5px;line-height:1.45;flex:1 1 260px}
+:is(#panel-cheese,.ce-root) .nl-tpl-head p b{color:var(--ink);font-weight:600}
+:is(#panel-cheese,.ce-root) .nl-mailwrap{background:#06273A;border-radius:12px;overflow:hidden}
+:is(#panel-cheese,.ce-root) .nl-mail{max-width:600px;margin:0 auto;color:#F5F7F2;font-family:'Nunito Sans',Inter,system-ui,sans-serif}
+:is(#panel-cheese,.ce-root) .nl-m-top{padding:24px 24px 18px}
+:is(#panel-cheese,.ce-root) .nl-m-logo{display:block;width:250px;max-width:72%;height:auto}
+:is(#panel-cheese,.ce-root) .nl-m-nav{margin:0 24px;display:grid;grid-template-columns:1fr 1.15fr 1fr;border-top:1px solid #F5F7F2;border-bottom:1px solid #F5F7F2;text-align:center;font:700 15px/1.2 'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:1.4px;text-transform:uppercase;color:#FAFAFA;user-select:none}
+:is(#panel-cheese,.ce-root) .nl-m-nav span{padding:10px 4px}
+:is(#panel-cheese,.ce-root) .nl-m-hero{padding:28px 24px 26px}
+:is(#panel-cheese,.ce-root) .nl-m-eye{font:800 12px/1.4 'Nunito Sans',Inter,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#E6B33C}
+:is(#panel-cheese,.ce-root) .nl-m-h1{margin:10px 0 0;font:700 44px/1.02 'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.01em;text-transform:uppercase;color:#F5F7F2;min-height:1.02em;word-break:break-word}
+:is(#panel-cheese,.ce-root) .nl-m-herop{position:relative;margin-top:22px}
+:is(#panel-cheese,.ce-root) .nl-m-card{margin:0 24px 26px;background:#fff;color:#2E3A46;padding:32px 28px 28px}
+:is(#panel-cheese,.ce-root) .nl-ce{outline:1px dashed transparent;outline-offset:5px;border-radius:2px;cursor:text;transition:outline-color .12s}
+:is(#panel-cheese,.ce-root) .nl-ce:hover{outline-color:rgba(230,179,60,.8)}
+:is(#panel-cheese,.ce-root) .nl-ce:focus{outline:2px solid #E6B33C}
+:is(#panel-cheese,.ce-root) .nl-ce:empty::before{content:attr(data-ph);color:#9AA5AE;pointer-events:none}
+:is(#panel-cheese,.ce-root) .nl-m-h1.nl-ce:empty::before{color:rgba(245,247,242,.42)}
+:is(#panel-cheese,.ce-root) .nl-m-blocks{min-height:20px}
+:is(#panel-cheese,.ce-root) .nl-b{position:relative;margin:0 0 26px}
+:is(#panel-cheese,.ce-root) .nl-b-tools{position:absolute;top:-16px;right:-16px;z-index:3;display:flex;gap:3px;opacity:0;transition:opacity .12s}
+:is(#panel-cheese,.ce-root) .nl-b:hover>.nl-b-tools,:is(#panel-cheese,.ce-root) .nl-b:focus-within>.nl-b-tools{opacity:1}
+:is(#panel-cheese,.ce-root) .nl-b-tools button{width:30px;height:30px;padding:0;border-radius:50%;border:1px solid #D6CDBC;background:#fff;color:#06273A;font:600 14px/1 Inter,sans-serif;cursor:pointer;box-shadow:0 1px 4px rgba(6,39,58,.18);display:grid;place-items:center}
+:is(#panel-cheese,.ce-root) .nl-b-tools button:hover:not(:disabled){background:#06273A;border-color:#06273A;color:#fff}
+:is(#panel-cheese,.ce-root) .nl-b-tools button[data-rm]:hover{background:#9a4034;border-color:#9a4034}
+:is(#panel-cheese,.ce-root) .nl-b-tools button:disabled{opacity:.35;cursor:default}
+:is(#panel-cheese,.ce-root) .nl-b-tools button:focus-visible{outline:2px solid #E6B33C;outline-offset:1px}
+:is(#panel-cheese,.ce-root) .nl-b-fmt{position:absolute;left:-8px;top:-50px;z-index:4;display:none;gap:4px;align-items:center;padding:5px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 18px rgba(6,39,58,.18);white-space:nowrap}
+:is(#panel-cheese,.ce-root) .nl-b-text:focus-within>.nl-b-fmt{display:flex}
+:is(#panel-cheese,.ce-root) .nl-b-fmt button{background:#fff;border:1px solid var(--line);border-radius:7px;padding:5px 10px;font:500 13px Inter,sans-serif;color:var(--ink);cursor:pointer;min-height:32px}
+:is(#panel-cheese,.ce-root) .nl-b-fmt button:hover{border-color:#b9c7bd;background:var(--alt)}
+:is(#panel-cheese,.ce-root) .nl-b-fmt select{width:auto;padding:5px 8px;font-size:13px;border-radius:7px;min-height:32px}
+:is(#panel-cheese,.ce-root) .nl-b-rule{display:none;width:40px;height:3px;background:#896D39;margin:0 0 12px}
+:is(#panel-cheese,.ce-root) .nl-b-text.has-title>.nl-b-rule{display:block}
+:is(#panel-cheese,.ce-root) .nl-b-title{margin:0 0 10px;font:700 28px/1.05 'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.01em;text-transform:uppercase;color:#06273A;word-break:break-word}
+:is(#panel-cheese,.ce-root) .nl-b-title:empty{margin:0 0 6px;font:400 13px/1.4 'Nunito Sans',Inter,sans-serif;text-transform:none;letter-spacing:0}
 /* a cheese (name → description → picture): its empty name looks like the name it will be */
-#panel-cheese .nl-b-cheese>.nl-b-rule{display:block}
-#panel-cheese .nl-b-cheese .nl-b-title:empty{margin:0 0 10px;font:700 28px/1.05 'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.01em;text-transform:uppercase}
-#panel-cheese .nl-b-cheese .nl-b-title:empty::before{color:#C3CAD0}
-#panel-cheese .nl-b-cheese{margin-bottom:14px}
-#panel-cheese .nl-add-b.nl-add-cheese{background:#06273A;color:#fff}
-#panel-cheese .nl-add-b.nl-add-cheese:hover{background:#0B3550}
-#panel-cheese .nl-b-body{min-height:1.6em;font:400 16px/1.6 'Nunito Sans',Inter,sans-serif;color:#2E3A46;word-break:break-word}
-#panel-cheese .nl-b-body p{margin:0 0 14px}
-#panel-cheese .nl-b-body>:last-child{margin-bottom:0}
-#panel-cheese .nl-b-body ul,#panel-cheese .nl-b-body ol{margin:0 0 14px;padding-left:22px}
-#panel-cheese .nl-b-body li{margin:0 0 7px}
-#panel-cheese .nl-b-body b,#panel-cheese .nl-b-body strong{font-weight:800;color:#06273A}
-#panel-cheese .nl-b-body a{color:#896D39;font-weight:700;text-decoration:underline}
-#panel-cheese .nl-m-pic{position:relative}
-#panel-cheese .nl-pic-frame{background:#896D39;padding:4px}
-#panel-cheese .nl-pic-frame img{display:block;width:100%;height:auto}
-#panel-cheese .nl-pic-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:100%;min-height:160px;padding:18px;border:2px dashed #C9B48A;border-radius:4px;background:#FBF8F1;color:#6f5523;font:600 15px Inter,sans-serif;text-align:center;cursor:pointer}
-#panel-cheese .nl-pic-empty b{font-size:28px;line-height:1;font-weight:400}
-#panel-cheese .nl-pic-empty small{font:400 12.5px Inter,sans-serif;opacity:.8}
-#panel-cheese .nl-pic-empty:hover,#panel-cheese .drag .nl-pic-empty{border-color:#E6B33C;background:#fdf6e4}
-#panel-cheese .nl-m-herop .nl-pic-empty{min-height:130px;background:rgba(245,247,242,.05);border-color:rgba(230,179,60,.6);color:#F5F7F2}
-#panel-cheese .nl-m-herop .nl-pic-empty:hover,#panel-cheese .nl-m-herop.drag .nl-pic-empty{background:rgba(230,179,60,.14)}
-#panel-cheese .nl-pic-empty:focus-visible{outline:2px solid #E6B33C;outline-offset:2px}
-#panel-cheese .nl-pic-busy{cursor:progress}
-#panel-cheese .drag .nl-pic-frame{outline:3px solid #E6B33C;outline-offset:2px}
-#panel-cheese .nl-pic-acts{position:absolute;right:12px;bottom:12px;display:flex;gap:6px;opacity:0;transition:opacity .12s}
-#panel-cheese .nl-m-pic:hover .nl-pic-acts,#panel-cheese .nl-m-herop:hover .nl-pic-acts,#panel-cheese .nl-pic-acts:focus-within{opacity:1}
-#panel-cheese .nl-pic-acts button{background:#06273A;color:#fff;border:0;border-radius:6px;padding:8px 12px;font:600 12.5px Inter,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)}
-#panel-cheese .nl-pic-acts button:hover{background:#0B3550}
-#panel-cheese .nl-b-cap{margin:10px 0 0;font:italic 400 14px/1.45 'Nunito Sans',Inter,sans-serif;color:#5E6773;text-align:center;word-break:break-word}
-#panel-cheese .nl-pk{display:flex;gap:16px;align-items:center;background:#F7F4EC;border-left:6px solid #E6B33C;padding:16px 18px 16px 16px;color:#2E3A46}
-#panel-cheese .nl-pk-cal{flex:none;width:70px;text-align:center;background:#fff;border:1px solid #E2DACA}
-#panel-cheese .nl-pk-cal span{display:block;padding:5px 0;background:#06273A;color:#fff;font:800 11px/1 'Nunito Sans',Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase}
-#panel-cheese .nl-pk-cal b{display:block;padding-top:4px;font:800 34px/1.1 'Barlow Condensed','Arial Narrow',sans-serif;color:#06273A}
-#panel-cheese .nl-pk-cal em{display:block;padding:2px 0 7px;font:800 10px/1 'Nunito Sans',Inter,sans-serif;font-style:normal;letter-spacing:.12em;text-transform:uppercase;color:#5E6773}
-#panel-cheese .nl-pk-txt b{display:block;font:700 24px/1.08 'Barlow Condensed','Arial Narrow',sans-serif;text-transform:uppercase;color:#06273A}
-#panel-cheese .nl-pk-txt span{display:block;margin-top:6px;font:400 15px/1.5 'Nunito Sans',Inter,sans-serif}
-#panel-cheese .nl-pk-txt i{font-style:normal;background:#EFE6CF;border-radius:3px;padding:0 4px}
-#panel-cheese .nl-pk-none{font-size:14px;color:#5E6773}
-#panel-cheese .nl-b-note{margin-top:6px;font:400 12px Inter,sans-serif;color:#8a929b;text-align:right}
-#panel-cheese .nl-b-empty{padding:18px;text-align:center;color:#8a929b;font-size:14px}
-#panel-cheese .nl-m-add{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:4px 0 26px;padding:14px 0;border-top:1px dashed #E2DACA;border-bottom:1px dashed #E2DACA}
-#panel-cheese .nl-add-b{background:#fff;border:1.5px solid #06273A;color:#06273A;font:700 13.5px Inter,sans-serif;padding:9px 18px;cursor:pointer}
-#panel-cheese .nl-add-b:hover{background:#06273A;color:#fff}
-#panel-cheese .nl-add-b:focus-visible{outline:2px solid #E6B33C;outline-offset:2px}
-#panel-cheese .nl-m-btn{text-align:center;user-select:none}
-#panel-cheese .nl-m-btn span{display:inline-block;padding:15px 28px;background:#E6B33C;color:#06273A;font:800 12.5px/1.2 'Nunito Sans',Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase}
-#panel-cheese .nl-m-foot{display:flex;gap:16px;align-items:center;background:#F5F7F2;color:#5E6773;padding:18px 24px;font-size:12.5px;line-height:1.45;user-select:none}
-#panel-cheese .nl-m-foot img{flex:none;width:120px;height:auto}
-@media(hover:none){#panel-cheese .nl-b-tools,#panel-cheese .nl-pic-acts{opacity:1}}
+:is(#panel-cheese,.ce-root) .nl-b-cheese>.nl-b-rule{display:block}
+:is(#panel-cheese,.ce-root) .nl-b-cheese .nl-b-title:empty{margin:0 0 10px;font:700 28px/1.05 'Barlow Condensed','Arial Narrow',sans-serif;letter-spacing:.01em;text-transform:uppercase}
+:is(#panel-cheese,.ce-root) .nl-b-cheese .nl-b-title:empty::before{color:#C3CAD0}
+:is(#panel-cheese,.ce-root) .nl-b-cheese{margin-bottom:14px}
+:is(#panel-cheese,.ce-root) .nl-add-b.nl-add-cheese{background:#06273A;color:#fff}
+:is(#panel-cheese,.ce-root) .nl-add-b.nl-add-cheese:hover{background:#0B3550}
+:is(#panel-cheese,.ce-root) .nl-b-body{min-height:1.6em;font:400 16px/1.6 'Nunito Sans',Inter,sans-serif;color:#2E3A46;word-break:break-word}
+:is(#panel-cheese,.ce-root) .nl-b-body p{margin:0 0 14px}
+:is(#panel-cheese,.ce-root) .nl-b-body>:last-child{margin-bottom:0}
+:is(#panel-cheese,.ce-root) .nl-b-body ul,:is(#panel-cheese,.ce-root) .nl-b-body ol{margin:0 0 14px;padding-left:22px}
+:is(#panel-cheese,.ce-root) .nl-b-body li{margin:0 0 7px}
+:is(#panel-cheese,.ce-root) .nl-b-body b,:is(#panel-cheese,.ce-root) .nl-b-body strong{font-weight:800;color:#06273A}
+:is(#panel-cheese,.ce-root) .nl-b-body a{color:#896D39;font-weight:700;text-decoration:underline}
+:is(#panel-cheese,.ce-root) .nl-m-pic{position:relative}
+:is(#panel-cheese,.ce-root) .nl-pic-frame{background:#896D39;padding:4px}
+:is(#panel-cheese,.ce-root) .nl-pic-frame img{display:block;width:100%;height:auto}
+:is(#panel-cheese,.ce-root) .nl-pic-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:100%;min-height:160px;padding:18px;border:2px dashed #C9B48A;border-radius:4px;background:#FBF8F1;color:#6f5523;font:600 15px Inter,sans-serif;text-align:center;cursor:pointer}
+:is(#panel-cheese,.ce-root) .nl-pic-empty b{font-size:28px;line-height:1;font-weight:400}
+:is(#panel-cheese,.ce-root) .nl-pic-empty small{font:400 12.5px Inter,sans-serif;opacity:.8}
+:is(#panel-cheese,.ce-root) .nl-pic-empty:hover,:is(#panel-cheese,.ce-root) .drag .nl-pic-empty{border-color:#E6B33C;background:#fdf6e4}
+:is(#panel-cheese,.ce-root) .nl-m-herop .nl-pic-empty{min-height:130px;background:rgba(245,247,242,.05);border-color:rgba(230,179,60,.6);color:#F5F7F2}
+:is(#panel-cheese,.ce-root) .nl-m-herop .nl-pic-empty:hover,:is(#panel-cheese,.ce-root) .nl-m-herop.drag .nl-pic-empty{background:rgba(230,179,60,.14)}
+:is(#panel-cheese,.ce-root) .nl-pic-empty:focus-visible{outline:2px solid #E6B33C;outline-offset:2px}
+:is(#panel-cheese,.ce-root) .nl-pic-busy{cursor:progress}
+:is(#panel-cheese,.ce-root) .drag .nl-pic-frame{outline:3px solid #E6B33C;outline-offset:2px}
+:is(#panel-cheese,.ce-root) .nl-pic-acts{position:absolute;right:12px;bottom:12px;display:flex;gap:6px;opacity:0;transition:opacity .12s}
+:is(#panel-cheese,.ce-root) .nl-m-pic:hover .nl-pic-acts,:is(#panel-cheese,.ce-root) .nl-m-herop:hover .nl-pic-acts,:is(#panel-cheese,.ce-root) .nl-pic-acts:focus-within{opacity:1}
+:is(#panel-cheese,.ce-root) .nl-pic-acts button{background:#06273A;color:#fff;border:0;border-radius:6px;padding:8px 12px;font:600 12.5px Inter,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+:is(#panel-cheese,.ce-root) .nl-pic-acts button:hover{background:#0B3550}
+:is(#panel-cheese,.ce-root) .nl-b-cap{margin:10px 0 0;font:italic 400 14px/1.45 'Nunito Sans',Inter,sans-serif;color:#5E6773;text-align:center;word-break:break-word}
+:is(#panel-cheese,.ce-root) .nl-pk{display:flex;gap:16px;align-items:center;background:#F7F4EC;border-left:6px solid #E6B33C;padding:16px 18px 16px 16px;color:#2E3A46}
+:is(#panel-cheese,.ce-root) .nl-pk-cal{flex:none;width:70px;text-align:center;background:#fff;border:1px solid #E2DACA}
+:is(#panel-cheese,.ce-root) .nl-pk-cal span{display:block;padding:5px 0;background:#06273A;color:#fff;font:800 11px/1 'Nunito Sans',Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase}
+:is(#panel-cheese,.ce-root) .nl-pk-cal b{display:block;padding-top:4px;font:800 34px/1.1 'Barlow Condensed','Arial Narrow',sans-serif;color:#06273A}
+:is(#panel-cheese,.ce-root) .nl-pk-cal em{display:block;padding:2px 0 7px;font:800 10px/1 'Nunito Sans',Inter,sans-serif;font-style:normal;letter-spacing:.12em;text-transform:uppercase;color:#5E6773}
+:is(#panel-cheese,.ce-root) .nl-pk-txt b{display:block;font:700 24px/1.08 'Barlow Condensed','Arial Narrow',sans-serif;text-transform:uppercase;color:#06273A}
+:is(#panel-cheese,.ce-root) .nl-pk-txt span{display:block;margin-top:6px;font:400 15px/1.5 'Nunito Sans',Inter,sans-serif}
+:is(#panel-cheese,.ce-root) .nl-pk-txt i{font-style:normal;background:#EFE6CF;border-radius:3px;padding:0 4px}
+:is(#panel-cheese,.ce-root) .nl-pk-none{font-size:14px;color:#5E6773}
+:is(#panel-cheese,.ce-root) .nl-b-note{margin-top:6px;font:400 12px Inter,sans-serif;color:#8a929b;text-align:right}
+:is(#panel-cheese,.ce-root) .nl-b-empty{padding:18px;text-align:center;color:#8a929b;font-size:14px}
+:is(#panel-cheese,.ce-root) .nl-m-add{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:4px 0 26px;padding:14px 0;border-top:1px dashed #E2DACA;border-bottom:1px dashed #E2DACA}
+:is(#panel-cheese,.ce-root) .nl-add-b{background:#fff;border:1.5px solid #06273A;color:#06273A;font:700 13.5px Inter,sans-serif;padding:9px 18px;cursor:pointer}
+:is(#panel-cheese,.ce-root) .nl-add-b:hover{background:#06273A;color:#fff}
+:is(#panel-cheese,.ce-root) .nl-add-b:focus-visible{outline:2px solid #E6B33C;outline-offset:2px}
+:is(#panel-cheese,.ce-root) .nl-m-btn{text-align:center;user-select:none}
+:is(#panel-cheese,.ce-root) .nl-m-btn span{display:inline-block;padding:15px 28px;background:#E6B33C;color:#06273A;font:800 12.5px/1.2 'Nunito Sans',Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase}
+:is(#panel-cheese,.ce-root) .nl-m-foot{display:flex;gap:16px;align-items:center;background:#F5F7F2;color:#5E6773;padding:18px 24px;font-size:12.5px;line-height:1.45;user-select:none}
+:is(#panel-cheese,.ce-root) .nl-m-foot img{flex:none;width:120px;height:auto}
+@media(hover:none){:is(#panel-cheese,.ce-root) .nl-b-tools,:is(#panel-cheese,.ce-root) .nl-pic-acts{opacity:1}}
 @media(max-width:640px){
-  #panel-cheese .nl-mailwrap{border-radius:8px}
-  #panel-cheese .nl-m-top{padding:18px 14px 14px}
-  #panel-cheese .nl-m-nav{margin:0 14px;font-size:12.5px;letter-spacing:.6px}
-  #panel-cheese .nl-m-nav span{padding:9px 2px}
-  #panel-cheese .nl-m-hero{padding:22px 14px 20px}
-  #panel-cheese .nl-m-eye{font-size:11px;letter-spacing:.14em}
-  #panel-cheese .nl-m-h1{font-size:34px}
-  #panel-cheese .nl-m-card{margin:0 10px 18px;padding:26px 16px 22px}
-  #panel-cheese .nl-b-tools{right:-8px}
-  #panel-cheese .nl-b-fmt{position:static;margin:0 0 10px;flex-wrap:wrap;white-space:normal;box-shadow:none}
-  #panel-cheese .nl-pk{gap:12px;padding:14px 12px}
-  #panel-cheese .nl-pk-txt b{font-size:21px}
-  #panel-cheese .nl-m-foot{flex-direction:column;align-items:flex-start;padding:16px 14px}
+  :is(#panel-cheese,.ce-root) .nl-mailwrap{border-radius:8px}
+  :is(#panel-cheese,.ce-root) .nl-m-top{padding:18px 14px 14px}
+  :is(#panel-cheese,.ce-root) .nl-m-nav{margin:0 14px;font-size:12.5px;letter-spacing:.6px}
+  :is(#panel-cheese,.ce-root) .nl-m-nav span{padding:9px 2px}
+  :is(#panel-cheese,.ce-root) .nl-m-hero{padding:22px 14px 20px}
+  :is(#panel-cheese,.ce-root) .nl-m-eye{font-size:11px;letter-spacing:.14em}
+  :is(#panel-cheese,.ce-root) .nl-m-h1{font-size:34px}
+  :is(#panel-cheese,.ce-root) .nl-m-card{margin:0 10px 18px;padding:26px 16px 22px}
+  :is(#panel-cheese,.ce-root) .nl-b-tools{right:-8px}
+  :is(#panel-cheese,.ce-root) .nl-b-fmt{position:static;margin:0 0 10px;flex-wrap:wrap;white-space:normal;box-shadow:none}
+  :is(#panel-cheese,.ce-root) .nl-pk{gap:12px;padding:14px 12px}
+  :is(#panel-cheese,.ce-root) .nl-pk-txt b{font-size:21px}
+  :is(#panel-cheese,.ce-root) .nl-m-foot{flex-direction:column;align-items:flex-start;padding:16px 14px}
 }
 @media(max-width:1100px){
-  #panel-cheese .nl-grid{grid-template-columns:minmax(0,1fr)}
-  #panel-cheese .nl-side{position:static}
+  :is(#panel-cheese,.ce-root) .nl-grid{grid-template-columns:minmax(0,1fr)}
+  :is(#panel-cheese,.ce-root) .nl-side{position:static}
 }
 @media(max-width:640px){
-  #panel-cheese .nl-fields{grid-template-columns:minmax(0,1fr)}
-  #panel-cheese .nl-compose,#panel-cheese .nl-card{padding:16px}
-  #panel-cheese .nl-row{grid-template-columns:1fr;gap:6px}
-  #panel-cheese .nl-row-s{white-space:normal}
-  #panel-cheese .nl-stats b{font-size:20px}
+  :is(#panel-cheese,.ce-root) .nl-fields{grid-template-columns:minmax(0,1fr)}
+  :is(#panel-cheese,.ce-root) .nl-compose,:is(#panel-cheese,.ce-root) .nl-card{padding:16px}
+  :is(#panel-cheese,.ce-root) .nl-row{grid-template-columns:1fr;gap:6px}
+  :is(#panel-cheese,.ce-root) .nl-row-s{white-space:normal}
+  :is(#panel-cheese,.ce-root) .nl-stats b{font-size:20px}
+}
+</style>
+<style id="ce-style">
+/* Tickets → a class → ✉ Email the class (class-email edge function). The editor reuses the newsletter's .nl-*
+   styles (ccnl-style is scoped to :is(#panel-cheese,.ce-root)); this block gives .ce-root the Cheese Club
+   panel's basics (cards, buttons, fields) so it looks the same inside the ticket back office. */
+.ce-root{--bg:#ffffff;--alt:#f7f7f7;--paper:#ffffff;--ink:#111111;--muted:#666666;--green:#111111;--green-d:#000000;--gold:#E0A21C;--rust:#A52B1E;--line:#dddddd;--shadow:none;--radius:2px;font-family:'Inter',sans-serif;color:#111111;max-width:1180px}
+.ce-root h3,.ce-root h4{font-family:'Archivo',sans-serif;font-weight:600;line-height:1.15;margin:0 0 .4em;color:#111111}
+.ce-root .card{background:#fff;border:1px solid #ddd;border-radius:2px;padding:24px;box-shadow:none}
+.ce-root .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;padding:12px 22px;font:600 12px Inter,sans-serif;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;text-decoration:none;white-space:nowrap;transition:.15s}
+.ce-root .btn-primary{background:#111;border-color:#111;color:#fff}
+.ce-root .btn-primary:hover{background:#1a1a1a}
+.ce-root .btn-ghost{background:#fff;border:1.5px solid var(--line);color:var(--ink)}
+.ce-root .btn-ghost:hover{border-color:#111}
+.ce-root .btn-sm{padding:8px 14px;font-size:12px}
+.ce-root .btn-danger{background:#A52B1E;border-color:#A52B1E;color:#fff}
+.ce-root .btn-danger:hover{background:#8f2418;border-color:#8f2418;color:#fff}
+.ce-root .btn:disabled{opacity:.5;cursor:not-allowed}
+.ce-root label.fld{display:block;margin:0 0 14px}
+.ce-root label.fld span{display:block;font-weight:600;font-size:13px;margin-bottom:6px}
+.ce-root input:not([type=checkbox]):not([type=radio]):not([type=file]),.ce-root select{width:100%;padding:11px 13px;border:1.5px solid #ddd;border-radius:2px;font:400 15px Inter,sans-serif;background:#fff;color:#111}
+.ce-root input:focus,.ce-root select:focus{outline:none;border-color:#111}
+.ce-root .muted{color:#666}
+.ce-root .empty{text-align:center;color:#666;padding:40px 20px;border:1px dashed #ddd;background:#fafafa}
+.ce-root .ce-loading{padding:10px 2px}
+.ce-root .ce-evline{font-size:13px;color:#666;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 220px}
+.ce-root .nl-head p{margin:2px 0 0}
+.ce-root .ce-sum{font-size:14px;margin-top:8px!important}
+/* who gets it: everyone booked, grouped by booking */
+.ce-root .ce-all{margin:0 0 10px;align-items:flex-start}
+.ce-root .ce-all small{display:block;font-size:12px;color:var(--muted);font-weight:400}
+.ce-root .ce-people{max-height:340px;overflow:auto;border:1px solid var(--line);background:#fff}
+.ce-root .ce-p{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-top:1px solid #eee;font-size:13.5px;cursor:pointer;line-height:1.35}
+.ce-root .ce-p:first-child{border-top:0}
+.ce-root .ce-p input{width:auto;margin:2px 0 0;accent-color:#111;flex:none}
+.ce-root .ce-p span{min-width:0}
+.ce-root .ce-p b{display:block;font-weight:600;overflow-wrap:anywhere}
+.ce-root .ce-p small{display:block;color:var(--muted);font-size:12px;overflow-wrap:break-word}
+.ce-root .ce-p .ce-code{white-space:nowrap}
+.ce-root .ce-p-g{padding-left:28px;background:#fbfbfb}
+.ce-root .ce-p-off{cursor:default;color:#8a8a8a;background:#fafafa}
+.ce-root .ce-p-off b{font-weight:500}
+.ce-root .ce-p-x{flex:none;width:13px;text-align:center;color:#aaa}
+.ce-root .ce-none{padding:12px;font-size:13.5px}
+/* the button at the bottom of the email: pick which one (or none) */
+.ce-root .ce-btnrow{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;justify-content:center;user-select:auto}
+.ce-root .ce-btnrow span[hidden]{display:none!important}
+.ce-root .ce-btnpick{display:inline-flex;align-items:center;gap:8px;font:600 12px Inter,sans-serif;color:#5E6773;text-transform:uppercase;letter-spacing:.06em}
+.ce-root .ce-btnpick select{width:auto!important;padding:6px 8px!important;font:500 13px Inter,sans-serif!important;text-transform:none;letter-spacing:0}
+.ce-root .ce-classpic{display:block;margin:10px auto 0;background:transparent;border:1px solid rgba(230,179,60,.7);color:#F5F7F2;font:600 12.5px Inter,sans-serif;padding:8px 14px;cursor:pointer}
+.ce-root .ce-classpic:hover{background:rgba(230,179,60,.16)}
+/* the class box, like the email's (the shared .nl-pk rules are id-strong, hence #tk-root) */
+#tk-root .ce-root .ce-cb{align-items:flex-start}
+#tk-root .ce-root .ce-cb .nl-pk-txt span{margin-top:3px}
+#tk-root .ce-root .ce-cb .nl-pk-txt .ce-cb-when{margin-top:7px;font-weight:700;color:#06273A}
+#tk-root .ce-root .ce-cb .nl-pk-txt .ce-cb-their{margin-top:6px;font-size:14px;color:#5E6773}
+.ce-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(250%);visibility:hidden;z-index:400;background:#111;color:#fff;padding:12px 20px;font:500 14px Inter,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.25);max-width:min(92vw,560px);text-align:center;transition:transform .3s}
+.ce-toast.show{transform:translateX(-50%) translateY(0);visibility:visible}
+.ce-toast.err{background:#A52B1E}
+@media(max-width:820px){.ce-toast{bottom:92px}}
+@media(max-width:640px){
+  .ce-root .ce-evline{flex-basis:100%;white-space:normal}
+  .ce-root .card{padding:16px}
 }
 </style>
 <style id="cccp-style">
@@ -5062,6 +5126,15 @@ const regStatusLabel = (r) =>
     : r.total === 0
     ? "Comp"
     : "Paid";
+// The people on one booking who can be emailed (✉ Email on a booking card): the person who booked + every
+// guest who gave an email — the same people the confirmation went to.
+const regEmails = (r) => [
+  ...new Set(
+    [r.email, ...(r.guestEmails || [])]
+      .map((e) => String(e || "").trim().toLowerCase())
+      .filter((e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e))
+  ),
+];
 const regToRow = (reg) => ({
   event_id: reg.eventId,
   code: reg.code,
@@ -5704,6 +5777,13 @@ function App() {
                   onFreshRegs={(eventId, fresh) =>
                     setRegs((prev) => [...prev.filter((r) => r.eventId !== eventId), ...fresh])
                   }
+                />
+              )}
+              {view.name === "email" && (
+                <ClassEmailView
+                  eventId={view.eventId}
+                  pick={view.pick || null}
+                  go={go}
                 />
               )}
               {view.name === "customers" && (
@@ -10692,6 +10772,12 @@ function AdminDetail({ ev, regs, soldFor, go, onRefund, onUpdate, onAddComp, onF
           >
             {showComp ? "Cancel comp" : "+ Add comp guest"}
           </button>
+          <button
+            className="cc-btn cc-btn-ghost"
+            onClick={() => go("email", { eventId: ev.id })}
+          >
+            ✉ Email {sectionOf(ev) === "class" ? "the class" : "everyone"}
+          </button>
           <button className="cc-btn cc-btn-ghost" onClick={printRoster}>
             Print roster
           </button>
@@ -10909,6 +10995,15 @@ function AdminDetail({ ev, regs, soldFor, go, onRefund, onUpdate, onAddComp, onF
               <button className="cc-mini" onClick={() => printBookingDoc(r, ev)}>
                 🖨 Print
               </button>
+              {!r.refunded && r.paymentStatus !== "pending" && regEmails(r).length > 0 && (
+                <button
+                  className="cc-mini"
+                  title={"Email " + regEmails(r).join(", ")}
+                  onClick={() => go("email", { eventId: ev.id, pick: regEmails(r) })}
+                >
+                  ✉ Email
+                </button>
+              )}
               <button
                 className="cc-mini"
                 onClick={() => setEditId(editId === r.id ? null : r.id)}
@@ -10952,6 +11047,27 @@ function AdminDetail({ ev, regs, soldFor, go, onRefund, onUpdate, onAddComp, onF
       </div>
     </div>
   );
+}
+
+// ✉ Email the class (2026-11-09): the class-email editor — plain JS in the CLASS EMAIL script (window.ceMount)
+// — mounted inside the back office. Leaving it (a sidebar tab, ← Back) unmounts it; a changed draft is saved.
+function ClassEmailView({ eventId, pick, go }) {
+  const box = useRef(null);
+  const key = (pick || []).join(",");
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    if (!window.ceMount) {
+      el.innerHTML = '<div class="cc-empty">The class email editor didn\u2019t load. Refresh the page.</div>';
+      return;
+    }
+    window.ceMount(el, { eventId, pick, onBack: () => go("detail", { eventId }) });
+    try { window.scrollTo(0, 0); } catch (e) {}
+    return () => {
+      if (window.ceUnmount) window.ceUnmount(el);
+    };
+  }, [eventId, key]);
+  return <div ref={box} />;
 }
 
 function Stat({ n, l }) {
@@ -15066,6 +15182,677 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   };
 })();
 
+</script>
+
+<script>
+/* ═══════════ CLASS EMAIL — email the guests of one class (class-email edge function) ═══════════
+   Maverick 2026-11-09: "we need to be able to send emails to classes individually. build a template just like
+   you did for the newsletter, and add the ability to be able to email an entire class".
+   Tickets → a class → "✉ Email the class" (everyone booked) or "✉ Email" on one booking (just that party).
+   The editor is the Cheese Club newsletter's template editor (same look and the same .nl-* styles, shared
+   through :is(#panel-cheese,.ce-root) in ccnl-style): the email itself in the GREYS site look — staff click
+   to type the headline and the words, click a picture spot to add a photo, add / move / remove text, picture
+   and class-box blocks. Saved as class_emails.design ({v:1, headline, hero, button, blocks}); the function
+   draws the real email per guest (their first name, tickets and confirmation code in the class box).
+   Who gets it: everyone booked (the person who booked + every guest who gave an email — the same people the
+   confirmation went to), or only the people ticked. Drafts, preview, test, schedule and send all go through
+   the class-email function with the manager's session. The back office mounts this with window.ceMount(el,
+   {eventId, pick, onBack}) from its "email" view and calls window.ceUnmount(el) when it leaves — a changed
+   draft is saved quietly then, so nothing typed is lost by clicking away. */
+(function(){
+  const $ = h => { const t = document.createElement('template'); t.innerHTML = h.trim(); return t.content.firstElementChild; };
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const validEmail = e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e || '');
+  function toast(msg, err){
+    let t = document.getElementById('ceToast');
+    if(!t){ t = document.createElement('div'); t.id = 'ceToast'; t.className = 'ce-toast'; t.setAttribute('role','status'); document.body.appendChild(t); }
+    t.textContent = msg; t.className = 'ce-toast show' + (err ? ' err' : '');
+    clearTimeout(t._h); t._h = setTimeout(() => { t.className = 'ce-toast'; }, err ? 5200 : 3200);
+  }
+  async function ceCall(action, p){
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(SB_URL + '/functions/v1/class-email?action=' + encodeURIComponent(action), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SB_KEY, 'Authorization': 'Bearer ' + (session ? session.access_token : SB_KEY) },
+      body: JSON.stringify(Object.assign({ action }, p || {}))
+    });
+    let j = {}; try { j = await res.json(); } catch(e){}
+    if(!res.ok || j.error) throw new Error(j.error || ('Request failed (' + res.status + ')'));
+    return j;
+  }
+  const CE = { root:null, opts:{}, data:null, cur:null, failed:[], dirty:false, draw:0, poll:0, range:null, rangeHost:null, pickFor:null, busyPic:null, testTo:'' };
+  try{ CE.testTo = localStorage.getItem('ce_test_to') || localStorage.getItem('ccnl_test_to') || ''; }catch(e){}
+  const WORD = { draft:'Draft', scheduled:'Scheduled', sending:'Sending', sent:'Sent', canceled:'Stopped' };
+  const LOGO = 'https://cheeseclub.greyscheese.com/email-logo.png', LOGO_INK = 'https://cheeseclub.greyscheese.com/email-logo-ink.png';
+  const FONTS = 'https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Nunito+Sans:ital,wght@0,400;0,700;0,800;1,400&display=swap';
+  const when = iso => iso ? new Date(iso).toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }) : '';
+  const dayOf = (iso, o) => iso ? new Date(iso + 'T12:00:00Z').toLocaleDateString('en-US', Object.assign({ timeZone:'UTC' }, o)) : '';
+  const longDay = iso => dayOf(iso, { weekday:'long', month:'long', day:'numeric' });
+  const copy = o => JSON.parse(JSON.stringify(o));
+  const plain = h => String(h || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim();
+  const live = () => !!CE.root && document.body.contains(CE.root);
+  const ev = () => (CE.data && CE.data.event) || {};
+  const noun = () => ev().kind === 'mahjong' ? 'Mahjong night' : ev().kind === 'event' ? 'event' : 'class';
+  const whoWord = () => ev().kind === 'class' ? 'the class' : 'everyone booked';
+  const evLine = () => { const e = ev(); return [e.title, [longDay(e.date), e.time_label].filter(Boolean).join(' · '), 'GREYS ' + (e.location || '')].filter(Boolean).join(' — '); };
+  const people = n => n + ' ' + (n === 1 ? 'person' : 'people');
+  const tickets = (seats) => { const ps = Math.max(1, ev().party_size || 1); if(ps > 1){ const t = Math.max(1, Math.round(seats / ps)); return t + (t === 1 ? ' table' : ' tables'); } const s = Math.max(1, seats || 0); return s + (s === 1 ? ' ticket' : ' tickets'); };
+  function pill(m){
+    let t = WORD[m.status] || m.status;
+    if(m.status === 'scheduled') t += ' · ' + when(m.send_at);
+    if(m.status === 'sending') t += ' · ' + (m.sent_count || 0) + ' of ' + (m.recipient_count || 0);
+    if(m.status === 'sent') t += ' · ' + (m.sent_count || 0) + ' delivered' + (m.failed_count ? ' · ' + m.failed_count + ' failed' : '');
+    return '<span class="nl-pill nl-' + esc(m.status) + '">' + esc(t) + '</span>';
+  }
+  function fonts(){
+    if([...document.querySelectorAll('link[rel="stylesheet"]')].some(l => l.href === FONTS)) return;
+    const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = FONTS; document.head.appendChild(l);
+  }
+  function hourOf(t){ const m = /^(\d{1,2}):/.exec(String(t || '')); return m ? +m[1] : 18; }
+
+  /* ---- the template a new email starts as: before the class "See you Wednesday!" with the class box and the
+     house rules; after it "Thanks for coming!" with a picture spot. Staff swap in the words and pictures. ---- */
+  function template(){
+    const e = ev(), k = e.kind;
+    if(e.past) return { v:1, headline:'Thanks for coming!', hero:null, button:'classes', blocks:[
+      { t:'text', title:'', html:'<p>Hi {{first_name}},</p><p>Thank you for joining us for <b>{{class}}</b>. We hope you had a great time!</p>' },
+      { t:'photo', url:'', caption:'' },
+      { t:'text', title:'', html:'' },
+      { t:'text', title:'', html:'<p>Hope to see you again soon!<br>— The GREYS crew</p>' }
+    ]};
+    const today = CE.data && CE.data.today === e.date;
+    const head = today ? (hourOf(e.time) >= 15 ? 'See you tonight!' : 'See you today!') : e.date ? 'See you ' + dayOf(e.date, { weekday:'long' }) + '!' : 'See you soon!';
+    const blocks = [
+      { t:'text', title:'', html:'<p>Hi {{first_name}},</p><p>We can’t wait to see you at <b>{{class}}</b>! Here’s everything you need' + (k === 'class' ? ' for the night' : '') + '.</p>' },
+      { t:'class' }
+    ];
+    if(k === 'class') blocks.push({ t:'text', title:'Good to know', html:'<ul><li>Doors open at {{time}} — the class starts about 15 minutes later.</li><li>Can’t make it? Your ticket can go to a friend — they just give your name when they check in.</li><li>Please don’t bring outside food — some guests have allergies.</li></ul>' });
+    else if(k === 'mahjong') blocks.push({ t:'text', title:'Good to know', html:'<ul><li>Tables are set for four — bring your tiles!</li><li>Everyone gets a glass of house wine, and each table shares a cheese and charcuterie platter.</li></ul>' });
+    blocks.push({ t:'text', title:'', html:'<p>See you soon!<br>— The GREYS crew</p>' });
+    return { v:1, headline:head, hero:null, button:'directions', blocks };
+  }
+  const defaultSubject = () => ev().past ? 'Thanks for coming to {{class}}!' : 'See you {{date}} at GREYS {{shop}}';
+  const defaultPre = () => ev().past ? '' : '{{class}} · {{time}}';
+  function designOut(d){
+    d = d || template();
+    return { v:1, headline:String(d.headline || '').trim(), hero:d.hero && d.hero.url ? { url:d.hero.url } : null,
+      button:['directions','classes','none'].includes(d.button) ? d.button : 'directions',
+      blocks:(d.blocks || []).map(b => b.t === 'text' ? { t:'text', title:String(b.title || '').trim(), html:String(b.html || '') } : b.t === 'photo' ? { t:'photo', url:b.url || '', caption:String(b.caption || '').trim() } : { t:'class' }) };
+  }
+  function written(d){
+    if(!d) return false;
+    if(String(d.headline || '').trim() || (d.hero && d.hero.url)) return true;
+    return (d.blocks || []).some(b => (b.t === 'text' && (String(b.title || '').trim() || plain(b.html))) || (b.t === 'photo' && b.url));
+  }
+  // pasted words keep only what the email keeps: paragraphs, bold / italic / underline, links, lists
+  function cleanPaste(html){
+    const t = document.createElement('template'); t.innerHTML = html;
+    const KEEP = { P:1, BR:1, B:1, STRONG:1, I:1, EM:1, U:1, A:1, UL:1, OL:1, LI:1 };
+    const walk = node => {
+      [...node.childNodes].forEach(ch => {
+        if(ch.nodeType === 8){ ch.remove(); return; }
+        if(ch.nodeType !== 1) return;
+        let tag = ch.tagName;
+        if(/^(SCRIPT|STYLE|META|LINK|TITLE|IFRAME|OBJECT|EMBED|SVG|FORM|INPUT|BUTTON|SELECT|TEXTAREA|IMG|HR)$/.test(tag)){ ch.remove(); return; }
+        const css = ch.getAttribute('style') || '';
+        const heavy = /font-weight\s*:\s*(bold|[6-9]00)/i.test(css), slant = /font-style\s*:\s*italic/i.test(css);
+        if((tag === 'B' || tag === 'STRONG') && /font-weight\s*:\s*(normal|[1-4]00)/i.test(css)){ walk(ch); ch.replaceWith(...ch.childNodes); return; }
+        if(/^(H[1-6]|DIV|BLOCKQUOTE)$/.test(tag)){
+          const p = document.createElement('p');
+          if(/^H/.test(tag)){ const b = document.createElement('b'); while(ch.firstChild) b.appendChild(ch.firstChild); p.appendChild(b); }
+          else while(ch.firstChild) p.appendChild(ch.firstChild);
+          ch.replaceWith(p); ch = p;
+        }
+        walk(ch);
+        tag = ch.tagName;
+        if(!KEEP[tag]){
+          let inner = [...ch.childNodes];
+          if(tag === 'SPAN' && (heavy || slant)){ let w = document.createElement(heavy ? 'B' : 'I'); inner.forEach(x => w.appendChild(x)); if(heavy && slant){ const i = document.createElement('I'); i.appendChild(w); w = i; } inner = [w]; }
+          ch.replaceWith(...inner); return;
+        }
+        [...ch.attributes].forEach(a => { if(!(tag === 'A' && a.name === 'href')) ch.removeAttribute(a.name); });
+        if(tag === 'A' && !/^(https?:|mailto:)/i.test(ch.getAttribute('href') || '')) ch.removeAttribute('href');
+      });
+    };
+    walk(t.content);
+    return t.innerHTML.replace(/<p>(\s|&nbsp;|<br>)*<\/p>/gi, '').trim();
+  }
+  // photos: shrink to 1200px wide (keeps emails light), then into the public email-assets bucket
+  async function upload(file){
+    if(!/^image\/(jpeg|png|gif|webp)$/.test(file.type)) throw new Error('Pick a JPG, PNG, GIF or WebP photo.');
+    let blob = file, ext = (file.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+    if(file.type !== 'image/gif'){
+      const img = await new Promise((res, rej) => { const u = URL.createObjectURL(file), i = new Image(); i.onload = () => { URL.revokeObjectURL(u); res(i); }; i.onerror = () => { URL.revokeObjectURL(u); rej(new Error('That photo could not be read.')); }; i.src = u; });
+      const w = Math.min(1200, img.naturalWidth || 1200), h = Math.round((img.naturalHeight || 800) * w / (img.naturalWidth || 1200));
+      const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h);
+      blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85)); ext = 'jpg';
+      if(!blob) throw new Error('That photo could not be prepared.');
+    }
+    if(blob.size > 10 * 1024 * 1024) throw new Error('That photo is too big (10 MB max).');
+    const path = 'class-email/' + (ev().id || 'class') + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + ext;
+    const { error } = await sb.storage.from('email-assets').upload(path, blob, { contentType: ext === 'jpg' ? 'image/jpeg' : 'image/' + ext, upsert: false });
+    if(error) throw new Error('Upload failed: ' + error.message);
+    return sb.storage.from('email-assets').getPublicUrl(path).data.publicUrl;
+  }
+
+  /* ---- mount / unmount (from the back office's "email" view) ---- */
+  function beforeUnload(e){ if(CE.dirty && live()){ e.preventDefault(); e.returnValue = ''; } }
+  window.ceMount = function(el, opts){
+    clearTimeout(CE.poll); CE.draw++;
+    CE.root = el; CE.opts = opts || {}; CE.data = null; CE.cur = null; CE.failed = []; CE.dirty = false; CE.busyPic = null;
+    el.classList.add('ce-root');
+    window.addEventListener('beforeunload', beforeUnload);
+    load(true);
+  };
+  window.ceUnmount = function(el){
+    if(CE.root !== el) return;
+    clearTimeout(CE.poll); CE.draw++;
+    window.removeEventListener('beforeunload', beforeUnload);
+    const keep = CE.dirty && CE.cur && ['draft','scheduled'].includes(CE.cur.status) && CE.data ? collect() : null;
+    CE.root = null; CE.dirty = false;
+    if(keep && (keep.id || written(keep.design))){
+      ceCall('save', keep).then(() => toast('Your class email was saved as a draft.')).catch(e => toast('Your class email wasn’t saved: ' + e.message, true));
+    }
+  };
+  function backToClass(){ if(CE.opts.onBack) CE.opts.onBack(); }
+
+  async function load(first){
+    const my = ++CE.draw, root = CE.root; clearTimeout(CE.poll);
+    if(!root) return;
+    if(!CE.data){ root.innerHTML = ''; root.append($(`<div class="muted ce-loading">Loading the guest list…</div>`)); }
+    let d;
+    try{ d = await ceCall('list', { event_id: CE.opts.eventId }); }
+    catch(e){
+      if(my !== CE.draw || CE.root !== root) return;
+      root.innerHTML = '';
+      const box = $(`<div><div class="nl-top"><button type="button" class="btn btn-ghost btn-sm" data-back>← Back</button></div><div class="empty">${esc(e.message)}</div></div>`);
+      box.querySelector('[data-back]').addEventListener('click', backToClass);
+      root.append(box); return;
+    }
+    if(my !== CE.draw || CE.root !== root) return;
+    CE.data = d;
+    if(first){
+      const pick = Array.isArray(CE.opts.pick) && CE.opts.pick.length ? CE.opts.pick : null;
+      if(pick || !(d.emails || []).length) return startNew(pick);
+    }
+    list();
+  }
+
+  /* ---- this class's emails ---- */
+  function list(){
+    const root = CE.root, d = CE.data, items = d.emails || []; if(!root) return;
+    clearTimeout(CE.poll); CE.cur = null; CE.dirty = false; root.innerHTML = '';
+    const top = $(`<div class="nl-top"><button type="button" class="btn btn-ghost btn-sm" data-back>← Back to the ${esc(noun())}</button></div>`);
+    top.querySelector('[data-back]').addEventListener('click', backToClass);
+    const n = (d.guests || []).length;
+    const head = $(`<div class="card nl-head"><div class="nl-head-row"><div><h3>Email ${esc(whoWord())}</h3><p class="muted">${esc(evLine())}</p><p class="ce-sum">${n ? 'Everyone booked: <b>' + esc(people(n)) + '</b> with an email' : 'Nobody booked has an email yet'}${(d.missing || []).length ? ' <span class="muted">· ' + d.missing.length + ' without one</span>' : ''}</p></div><button type="button" class="btn btn-primary btn-sm" data-new>+ New email</button></div></div>`);
+    head.querySelector('[data-new]').addEventListener('click', () => startNew(null));
+    root.append(top, head);
+    if(!items.length){ root.append($(`<div class="empty">No emails to this ${esc(noun())} yet — start one with “New email”.</div>`)); return; }
+    const box = $(`<div class="nl-list"></div>`);
+    items.forEach(m => {
+      const t = m.status === 'sent' || m.status === 'sending' ? (m.finished_at || m.started_at) : m.status === 'scheduled' ? m.send_at : (m.updated_at || m.created_at);
+      const row = $(`<button type="button" class="nl-row"><span class="nl-row-m">${esc(t ? new Date(t).toLocaleDateString('en-US', { month:'short', day:'numeric' }) : '')}</span><span class="nl-row-s">${esc(m.subject || '(no subject yet)')}</span>${pill(m)}</button>`);
+      row.addEventListener('click', () => openEm(m.id));
+      box.append(row);
+    });
+    root.append(box);
+    if(items.some(m => m.status === 'sending')){ const my = CE.draw; CE.poll = setTimeout(() => { if(my === CE.draw && live() && !CE.cur) load(false); }, 8000); }
+  }
+  async function openEm(id){
+    clearTimeout(CE.poll); const my = ++CE.draw;
+    CE.root.innerHTML = ''; CE.root.append($(`<div class="muted ce-loading">Loading…</div>`));
+    try{
+      const d = await ceCall('get', { id });
+      if(my !== CE.draw || !live()) return;
+      CE.cur = d.email; CE.failed = d.failed || []; CE.dirty = false;
+      if(!CE.cur.design) CE.cur.design = template();
+      editor();
+    }catch(e){ toast(e.message, true); if(live()) list(); }
+  }
+  function startNew(pick){
+    CE.cur = { id:null, status:'draft', event_id:ev().id, subject:defaultSubject(), preheader:defaultPre(), design:template(),
+      audience: pick ? { who:'some', emails:[...new Set(pick.map(e => String(e || '').trim().toLowerCase()).filter(validEmail))] } : { who:'all' } };
+    CE.failed = []; CE.dirty = false;
+    editor();
+  }
+  function back(){
+    if(CE.dirty && !confirm('Leave without saving your changes?')) return;
+    CE.dirty = false;
+    if(CE.cur && CE.cur.id || (CE.data.emails || []).length) load(false); else backToClass();
+  }
+
+  /* ---- the editor ---- */
+  function editor(){
+    const m = CE.cur, root = CE.root; clearTimeout(CE.poll);
+    if(!root) return;
+    if(!['draft','scheduled'].includes(m.status)) return sent();
+    root.innerHTML = '';
+    const top = $(`<div class="nl-top"><button type="button" class="btn btn-ghost btn-sm" data-back>← ${m.id || (CE.data.emails || []).length ? 'All emails for this ' + esc(noun()) : 'Back to the ' + esc(noun())}</button>${m.id ? pill(m) : '<span class="nl-pill nl-draft">New draft</span>'}<span class="ce-evline">${esc(evLine())}</span></div>`);
+    top.querySelector('[data-back]').addEventListener('click', back);
+    const grid = $(`<div class="nl-grid">
+      <div class="card nl-compose">
+        <label class="fld"><span>Subject</span><input data-f="subject" maxlength="200" placeholder="See you Wednesday at GREYS"></label>
+        <label class="fld"><span>Preview text <small class="muted">— shows next to the subject in the inbox</small></span><input data-f="preheader" maxlength="200" placeholder="What to know before you come"></label>
+        <div class="nl-tpl-head"><p class="muted"><b>Click any words to change them. Click a picture spot to add a photo.</b> The logo, colors, menu, class box and footer are already set.</p><button type="button" class="btn btn-ghost btn-sm" data-restart>Start over</button></div>
+        <div class="nl-mailwrap" data-mailwrap>${canvasHtml()}</div>
+        <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" data-file hidden>
+        <p class="muted nl-hint">Guest details like <code>{{first_name}}</code> and <code>{{code}}</code> are filled in for each person when it sends, and so is the class box (their own tickets and confirmation code). Use <b>Preview</b> to see the finished email.</p>
+      </div>
+      <div class="nl-side">
+        <div class="card nl-card">
+          <h4>Who gets it</h4>
+          <label class="nl-chk ce-all"><input type="checkbox" data-all> <span><b>Everyone booked</b> <small data-allnote></small></span></label>
+          <div class="ce-people" data-people></div>
+          <div class="nl-count" data-count aria-live="polite"></div>
+        </div>
+        <div class="card nl-card">
+          <h4>Send</h4>
+          <div class="nl-row2"><button type="button" class="btn btn-ghost btn-sm" data-preview>Preview</button><button type="button" class="btn btn-ghost btn-sm" data-save>Save draft</button></div>
+          <div class="nl-fld"><label class="nl-lbl" for="ce-testto">Send a test to</label><div class="nl-inline"><input id="ce-testto" type="email" data-testto placeholder="you@greyscheese.com" autocomplete="email"><button type="button" class="btn btn-ghost btn-sm" data-test>Send test</button></div></div>
+          <div data-sched></div>
+          <button type="button" class="btn btn-primary nl-go" data-send>Send now</button>
+          ${m.id ? '<button type="button" class="btn btn-danger btn-sm nl-del" data-delete>Delete draft</button>' : ''}
+        </div>
+      </div>
+    </div>`);
+    root.append(top, grid);
+    const q = s => grid.querySelector(s);
+    q('[data-f="subject"]').value = m.subject || '';
+    q('[data-f="preheader"]').value = m.preheader || '';
+    q('[data-testto]').value = CE.testTo;
+    grid.querySelectorAll('[data-f]').forEach(i => i.addEventListener('input', () => { CE.cur[i.dataset.f] = i.value; CE.dirty = true; }));
+    // who gets it
+    peopleDraw();
+    q('[data-people]').addEventListener('change', () => { audFromBoxes(); CE.dirty = true; countDraw(); });
+    q('[data-all]').addEventListener('change', e => {
+      if(e.target.checked){ CE.cur.audience = { who:'all' }; grid.querySelectorAll('[data-em]').forEach(x => x.checked = true); }
+      else { CE.cur.audience = { who:'some', emails:[] }; grid.querySelectorAll('[data-em]').forEach(x => x.checked = false); }
+      CE.dirty = true; countDraw();
+    });
+    // schedule box
+    const sched = q('[data-sched]');
+    if(m.status === 'scheduled'){
+      sched.append($(`<div class="nl-note nl-sched">Scheduled for <b>${esc(when(m.send_at))}</b>. Edits you save still go out then.<br><button type="button" class="btn btn-ghost btn-sm" data-unsched>Unschedule</button></div>`));
+      sched.querySelector('[data-unsched]').addEventListener('click', () => act('cancel', 'Unscheduled — it is a draft again.'));
+    }else{
+      sched.append($(`<div class="nl-fld"><label class="nl-lbl" for="ce-when">Or schedule it</label><div class="nl-inline"><input id="ce-when" type="datetime-local" data-when><button type="button" class="btn btn-ghost btn-sm" data-schedule>Schedule</button></div></div>`));
+      const w = sched.querySelector('[data-when]'), soon = new Date(Date.now() + 10 * 60000); soon.setSeconds(0, 0);
+      w.min = new Date(soon.getTime() - soon.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      sched.querySelector('[data-schedule]').addEventListener('click', async () => {
+        if(!w.value){ toast('Pick a day and time first.', true); w.focus(); return; }
+        const t = new Date(w.value); if(isNaN(t) || t.getTime() < Date.now() + 60000){ toast('Pick a time in the future.', true); return; }
+        if(!ready()) return;
+        if(!(await save(true))) return;
+        try{ const d = await ceCall('send', { id:CE.cur.id, send_at:t.toISOString() }); CE.cur = Object.assign(CE.cur, d.email || {}); toast('Scheduled for ' + when(CE.cur.send_at) + '.'); editor(); }
+        catch(e){ toast(e.message, true); }
+      });
+    }
+    // the email: words + pictures in the template
+    canvasWire(grid);
+    q('[data-restart]').addEventListener('click', () => {
+      if(written(CE.cur.design) && !confirm('Start over with the template? What you have written here will be replaced.')) return;
+      CE.cur.design = template(); CE.dirty = true; canvasFill(); toast('Started over with the template.');
+    });
+    // actions
+    q('[data-save]').addEventListener('click', () => save(false));
+    q('[data-preview]').addEventListener('click', () => preview());
+    q('[data-test]').addEventListener('click', async () => {
+      const to = q('[data-testto]').value.trim();
+      if(!validEmail(to)){ toast('Enter the email address for the test.', true); q('[data-testto]').focus(); return; }
+      CE.testTo = to; try{ localStorage.setItem('ce_test_to', to); }catch(e){}
+      if(!ready()) return;
+      const b = q('[data-test]'); b.disabled = true; b.textContent = 'Sending…';
+      try{ await ceCall('test', Object.assign(collect(), { to })); toast('Test sent to ' + to + '.'); }
+      catch(e){ toast(e.message, true); }
+      finally{ b.disabled = false; b.textContent = 'Send test'; }
+    });
+    q('[data-send]').addEventListener('click', async () => {
+      if(!ready()) return;
+      const n = recipients().length;
+      if(!n){ toast('Tick at least one person to send it to.', true); return; }
+      const c = collect();
+      if(!confirm('Send “' + c.subject + '” to ' + people(n) + ' booked on ' + (ev().title || 'this ' + noun()) + ' now?')) return;
+      if(!(await save(true))) return;
+      const b = q('[data-send]'); b.disabled = true; b.textContent = 'Sending…';
+      try{
+        const d = await ceCall('send', { id:CE.cur.id });
+        CE.cur = Object.assign(CE.cur, d.email || {});
+        toast(CE.cur.status === 'sent' ? 'Sent to ' + people(CE.cur.sent_count || 0) + (CE.cur.failed_count ? ' · ' + CE.cur.failed_count + ' didn’t go out' : '') + '.' : 'Sending…', !!CE.cur.failed_count);
+        if(CE.cur.status !== 'draft' && CE.cur.status !== 'scheduled'){ const g = await ceCall('get', { id:CE.cur.id }).catch(() => null); if(g){ CE.cur = g.email; CE.failed = g.failed || []; } }
+        editor();
+      }catch(e){ toast(e.message, true); b.disabled = false; sendLabel(); }
+    });
+    const del = q('[data-delete]');
+    if(del) del.addEventListener('click', async () => {
+      if(!confirm('Delete this draft?')) return;
+      try{ await ceCall('delete', { id:CE.cur.id }); CE.cur = null; CE.dirty = false; toast('Draft deleted.'); load(false); }catch(e){ toast(e.message, true); }
+    });
+  }
+
+  /* ---- who gets it: everyone booked, grouped by booking; untick anyone to leave them out ---- */
+  function picked(email){ const a = CE.cur.audience || { who:'all' }; return a.who !== 'some' || (a.emails || []).includes(email); }
+  function peopleDraw(){
+    const box = CE.root.querySelector('[data-people]'); if(!box) return;
+    const gs = CE.data.guests || [], miss = CE.data.missing || [];
+    const groups = new Map();
+    gs.forEach(g => { const k = g.reg_id || g.email; if(!groups.has(k)) groups.set(k, []); groups.get(k).push(g); });
+    let html = '';
+    groups.forEach(list => {
+      list.sort((a, b) => (a.booked_by ? 1 : 0) - (b.booked_by ? 1 : 0));
+      list.forEach(g => {
+        const sub = g.booked_by ? 'on ' + esc(g.booked_by) + '’s booking' : esc(tickets(g.seats)) + (g.code ? ' · <span class="ce-code">' + esc(g.code) + '</span>' : '');
+        html += `<label class="ce-p${g.booked_by ? ' ce-p-g' : ''}"><input type="checkbox" data-em="${esc(g.email)}"${picked(g.email) ? ' checked' : ''}><span><b>${esc(g.name || g.email)}</b><small>${esc(g.email)}</small><small>${sub}</small></span></label>`;
+      });
+    });
+    miss.forEach(x => { html += `<div class="ce-p ce-p-off" title="${esc(x.why)}"><span class="ce-p-x" aria-hidden="true">—</span><span><b>${esc(x.name)}</b><small>${esc(x.why)} — won’t get it</small></span></div>`; });
+    box.innerHTML = html || `<div class="muted ce-none">Nobody is booked on this ${esc(noun())} yet.</div>`;
+    const a = CE.cur.audience || { who:'all' };
+    if(a.who === 'some' && gs.length && gs.every(g => (a.emails || []).includes(g.email))) CE.cur.audience = { who:'all' };
+    CE.root.querySelector('[data-all]').checked = (CE.cur.audience || {}).who !== 'some';
+    countDraw();
+  }
+  function audFromBoxes(){
+    const boxes = [...CE.root.querySelectorAll('[data-em]')], on = boxes.filter(x => x.checked).map(x => x.dataset.em);
+    CE.cur.audience = boxes.length && on.length === boxes.length ? { who:'all' } : { who:'some', emails:on };
+    CE.root.querySelector('[data-all]').checked = CE.cur.audience.who === 'all';
+  }
+  function recipients(){ return (CE.data.guests || []).filter(g => picked(g.email)); }
+  function countDraw(){
+    const out = CE.root && CE.root.querySelector('[data-count]'), note = CE.root && CE.root.querySelector('[data-allnote]'); if(!out) return;
+    const n = recipients().length, all = (CE.cur.audience || {}).who !== 'some';
+    if(note) note.textContent = all ? '— anyone who books before it sends gets it too' : '';
+    out.innerHTML = n ? 'Goes to <b>' + esc(people(n)) + '</b>' + (all ? '' : ' <span class="muted">of ' + (CE.data.guests || []).length + '</span>') : '<b>Nobody ticked</b> — tick who it goes to';
+    const miss = (CE.data.missing || []).length;
+    if(miss) out.innerHTML += '<br><small class="muted">' + miss + ' booking' + (miss === 1 ? ' has' : 's have') + ' no usable email</small>';
+    sendLabel();
+  }
+  function sendLabel(){
+    const b = CE.root && CE.root.querySelector('[data-send]'); if(!b || b.disabled) return;
+    const n = recipients().length;
+    b.textContent = n ? 'Send now to ' + people(n) : 'Nobody to send to';
+  }
+
+  /* ---- the email canvas (same blocks + styles as the newsletter's) ---- */
+  function canvasHtml(){
+    fonts();
+    return `<div class="nl-mail" data-mail>
+      <div class="nl-m-top"><img class="nl-m-logo" src="${LOGO}" alt="GREYS Fine Cheeses - Charcuterie - Wine" width="300" height="92"></div>
+      <div class="nl-m-nav" aria-hidden="true"><span>Order &amp; Shop</span><span>Book &amp; Reserve</span><span>Info &amp; FAQ</span></div>
+      <div class="nl-m-hero">
+        <div class="nl-m-eye" data-eye></div>
+        <div class="nl-m-h1 nl-ce" contenteditable="true" role="textbox" aria-label="Headline" data-ph="Write a headline" data-one data-headline></div>
+        <div class="nl-m-herop" data-hero></div>
+      </div>
+      <div class="nl-m-card">
+        <div class="nl-m-blocks" data-blocks></div>
+        <div class="nl-m-add" data-add></div>
+        <div class="nl-m-btn ce-btnrow"><span data-btntext></span><label class="ce-btnpick">Button <select data-button aria-label="The button at the bottom"><option value="directions">Get directions</option><option value="classes">See upcoming classes</option><option value="none">No button</option></select></label></div>
+      </div>
+      <div class="nl-m-foot" aria-hidden="true"><img src="${LOGO_INK}" alt="" width="170" height="52"><span>Both shops’ addresses and phone numbers, Instagram, Facebook, and why they’re getting it (“You booked …”) go here.</span></div>
+    </div>`;
+  }
+  function classInner(){
+    const e = ev();
+    const where = 'GREYS ' + esc(e.location || '') + (e.shop && e.shop.address ? ' · ' + esc(e.shop.address) + (e.shop.city ? ', ' + esc(String(e.shop.city).replace(/,?\s*[A-Z]{2}\s*\d{5}(-\d{4})?$/, '')) : '') : '');
+    const cal = e.date ? `<div class="nl-pk-cal" aria-hidden="true"><span>${esc(dayOf(e.date, { month:'short' }))}</span><b>${esc(dayOf(e.date, { day:'numeric' }))}</b><em>${esc(dayOf(e.date, { weekday:'short' }))}</em></div>` : '';
+    return `${cal}<div class="nl-pk-txt"><b>${esc(e.title || '')}</b><span class="ce-cb-when">${esc(longDay(e.date))}${e.time_label ? ' · ' + esc(e.time_label) : ''}</span><span>${where}${e.shop && e.shop.address ? ' · <u>Get directions</u>' : ''}</span><span class="ce-cb-their">Your booking: <i>their tickets</i> · Confirmation <i>their code</i></span></div>`;
+  }
+  function picHtml(url, busy, hero){
+    if(busy) return '<div class="nl-pic-empty nl-pic-busy" role="status"><span>Uploading the picture…</span></div>';
+    if(!url) return `<button type="button" class="nl-pic-empty" data-pick><b aria-hidden="true">+</b><span>${hero ? 'Add a top picture' : 'Add a picture'}</span><small>${hero ? 'Optional — the big picture under the headline' : 'Click, or drop a photo here'}</small></button>` +
+      (hero && ev().image_url ? '<button type="button" class="ce-classpic" data-classpic>Use the class picture</button>' : '');
+    return `<div class="nl-pic-frame"><img src="${esc(url)}" alt=""></div><div class="nl-pic-acts"><button type="button" data-pick>Change picture</button>${hero ? '<button type="button" data-unhero>Remove</button>' : ''}</div>`;
+  }
+  function blockHtml(b, i, n){
+    const what = b.t === 'photo' ? 'picture' : b.t === 'class' ? 'class box' : 'text';
+    const tools = `<div class="nl-b-tools"><button type="button" data-mv="-1" title="Move up" aria-label="Move this ${what} up"${i === 0 ? ' disabled' : ''}>↑</button><button type="button" data-mv="1" title="Move down" aria-label="Move this ${what} down"${i === n - 1 ? ' disabled' : ''}>↓</button><button type="button" data-rm title="Remove" aria-label="Remove this ${what}">✕</button></div>`;
+    if(b.t === 'text') return `<div class="nl-b nl-b-text${String(b.title || '').trim() ? ' has-title' : ''}" data-i="${i}">${tools}
+      <div class="nl-b-fmt" role="toolbar" aria-label="Text style"><button type="button" data-fmt="bold" title="Bold"><b>B</b></button><button type="button" data-fmt="italic" title="Italic"><i>I</i></button><button type="button" data-fmt="link" title="Add a link">Link</button><button type="button" data-fmt="ul" title="Bulleted list">• List</button><select data-merge aria-label="Add a guest detail"><option value="">+ Guest detail</option><option value="{{first_name}}">First name</option><option value="{{class}}">Class name</option><option value="{{date}}">Date</option><option value="{{time}}">Time</option><option value="{{shop}}">Shop</option><option value="{{tickets}}">Their tickets</option><option value="{{code}}">Confirmation code</option></select></div>
+      <i class="nl-b-rule" aria-hidden="true"></i><div class="nl-b-title nl-ce" contenteditable="true" role="textbox" aria-label="Title" data-ph="+ Title (optional)" data-one data-title></div>
+      <div class="nl-b-body nl-ce" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Words" data-ph="Write here…" data-body></div></div>`;
+    if(b.t === 'photo') return `<div class="nl-b nl-b-photo" data-i="${i}">${tools}<div class="nl-m-pic" data-pic>${picHtml(b.url, CE.busyPic === b, false)}</div>
+      <div class="nl-b-cap nl-ce" contenteditable="true" role="textbox" aria-label="Caption" data-ph="+ Caption (optional)" data-one data-cap></div></div>`;
+    return `<div class="nl-b nl-b-pickup ce-b-class" data-i="${i}">${tools}<div class="nl-pk ce-cb" data-cb>${classInner()}</div><div class="nl-b-note">Filled in for each guest — their own tickets and confirmation code.</div></div>`;
+  }
+  function heroDraw(){ const el = CE.root && CE.root.querySelector('[data-hero]'); if(el) el.innerHTML = picHtml(CE.cur.design.hero && CE.cur.design.hero.url, CE.busyPic === 'hero', true); }
+  function picDraw(target){
+    if(target === 'hero') return heroDraw();
+    const i = CE.cur && CE.cur.design ? CE.cur.design.blocks.indexOf(target) : -1; if(i < 0) return;
+    const el = CE.root && CE.root.querySelector(`.nl-b[data-i="${i}"] [data-pic]`); if(el) el.innerHTML = picHtml(target.url, CE.busyPic === target, false);
+  }
+  function blocksDraw(focusI){
+    const g = CE.root, d = CE.cur.design, box = g && g.querySelector('[data-blocks]'); if(!box) return;
+    box.innerHTML = d.blocks.length ? d.blocks.map((b, i) => blockHtml(b, i, d.blocks.length)).join('') : '<div class="nl-b-empty">Add words or a picture with the buttons below.</div>';
+    box.querySelectorAll('.nl-b').forEach(el => {
+      const b = d.blocks[+el.dataset.i];
+      if(b.t === 'text'){ el.querySelector('[data-title]').textContent = b.title || ''; el.querySelector('[data-body]').innerHTML = b.html || ''; }
+      else if(b.t === 'photo') el.querySelector('[data-cap]').textContent = b.caption || '';
+    });
+    const has = d.blocks.some(b => b.t === 'class');
+    g.querySelector('[data-add]').innerHTML = '<button type="button" class="nl-add-b" data-add-text>+ Text</button><button type="button" class="nl-add-b" data-add-photo>+ Picture</button>' + (has ? '' : '<button type="button" class="nl-add-b" data-add-class>+ Class box</button>');
+    if(focusI != null){ const el = box.querySelector(`.nl-b[data-i="${focusI}"]`); if(el){ el.scrollIntoView({ block:'nearest' }); const f = el.querySelector('[data-body],[data-pick],[data-cap]'); if(f) f.focus(); } }
+  }
+  function buttonDraw(){
+    const g = CE.root; if(!g) return;
+    const v = CE.cur.design.button || 'directions', sel = g.querySelector('[data-button]'), t = g.querySelector('[data-btntext]');
+    if(sel) sel.value = v;
+    if(t){ t.textContent = v === 'classes' ? 'See upcoming classes' : v === 'none' ? '' : 'Get directions'; t.hidden = v === 'none'; }
+  }
+  function canvasFill(){
+    if(!CE.root || !CE.cur || !CE.cur.design) return;
+    const h = CE.root.querySelector('[data-headline]'); if(h) h.textContent = CE.cur.design.headline || '';
+    const e = ev(), eye = CE.root.querySelector('[data-eye]');
+    if(eye) eye.textContent = 'GREYS ' + (e.location || '') + (e.date ? ' · ' + longDay(e.date) : '');
+    heroDraw(); blocksDraw(); buttonDraw();
+  }
+  async function picUpload(f, target){
+    if(!target) return;
+    if(CE.busyPic){ toast('One picture at a time — wait for the last one to finish.', true); return; }
+    CE.busyPic = target; picDraw(target);
+    try{
+      const url = await upload(f);
+      if(target === 'hero') CE.cur.design.hero = { url }; else target.url = url;
+      CE.dirty = true; toast('Picture added.');
+    }catch(e){ toast(e.message, true); }
+    finally{ CE.busyPic = null; if(CE.cur && CE.cur.design && live()) picDraw(target); }
+  }
+  function canvasWire(grid){
+    const wrap = grid.querySelector('[data-mailwrap]'), file = grid.querySelector('[data-file]');
+    CE.range = null; CE.rangeHost = null; CE.pickFor = null; CE.busyPic = null;
+    try{ document.execCommand('defaultParagraphSeparator', false, 'p'); document.execCommand('styleWithCSS', false, false); }catch(e){}
+    canvasFill();
+    const blockOf = el => { const b = el && el.closest('.nl-b'); return b ? CE.cur.design.blocks[+b.dataset.i] : null; };
+    const one = t => t.textContent.replace(/\s+/g, ' ');
+    wrap.addEventListener('input', e => {
+      const t = e.target, d = CE.cur.design;
+      if(t.matches('[data-headline]')) d.headline = one(t);
+      else if(t.matches('[data-title]')){ const b = blockOf(t); if(!b) return; b.title = one(t); t.closest('.nl-b').classList.toggle('has-title', !!b.title.trim()); }
+      else if(t.matches('[data-cap]')){ const b = blockOf(t); if(b) b.caption = one(t); }
+      else if(t.matches('[data-body]')){ const b = blockOf(t); if(b) b.html = t.innerHTML; }
+      else return;
+      CE.dirty = true;
+    });
+    const keep = () => { const s = window.getSelection(); if(!s || !s.rangeCount) return; const r = s.getRangeAt(0), n = r.startContainer, host = (n.nodeType === 1 ? n : n.parentElement); const ce = host && host.closest('.nl-ce'); if(ce && wrap.contains(ce)){ CE.range = r.cloneRange(); CE.rangeHost = ce; } };
+    ['keyup','mouseup','input','focusin'].forEach(evn => wrap.addEventListener(evn, keep));
+    const restore = host => {
+      if(!host) return; host.focus(); const s = window.getSelection();
+      if(CE.range && host.contains(CE.range.startContainer)){ s.removeAllRanges(); s.addRange(CE.range); }
+      else { const r = document.createRange(); r.selectNodeContents(host); r.collapse(false); s.removeAllRanges(); s.addRange(r); }
+    };
+    const bodyFor = el => { const blk = el.closest('.nl-b'); return CE.rangeHost && blk.contains(CE.rangeHost) ? CE.rangeHost : blk.querySelector('[data-body]'); };
+    wrap.addEventListener('keydown', e => { if(e.key === 'Enter' && e.target.matches && e.target.matches('[data-one]')) e.preventDefault(); });
+    wrap.addEventListener('paste', e => {
+      const t = e.target.nodeType === 1 ? e.target : e.target.parentElement, ce = t && t.closest('.nl-ce'), cd = e.clipboardData; if(!ce || !cd) return;
+      e.preventDefault();
+      const h = cd.getData('text/html'), txt = cd.getData('text/plain');
+      if(ce.matches('[data-one]')){ document.execCommand('insertText', false, txt.replace(/\s+/g, ' ').trim()); return; }
+      if(h) document.execCommand('insertHTML', false, cleanPaste(h) || esc(txt));
+      else document.execCommand('insertHTML', false, txt.split(/\r?\n\s*\r?\n/).map(p => '<p>' + esc(p).replace(/\r?\n/g, '<br>') + '</p>').join(''));
+    });
+    wrap.addEventListener('mousedown', e => { if(e.target.closest('.nl-b-fmt button,.nl-b-tools button')) e.preventDefault(); });
+    wrap.addEventListener('change', e => {
+      const btn = e.target.closest('[data-button]');
+      if(btn){ CE.cur.design.button = btn.value; CE.dirty = true; buttonDraw(); return; }
+      const sel = e.target.closest('[data-merge]'); if(!sel) return; const v = sel.value; sel.value = ''; if(!v) return;
+      restore(bodyFor(sel)); document.execCommand('insertText', false, v); CE.dirty = true; keep();
+    });
+    wrap.addEventListener('click', e => {
+      const t = e.target, d = CE.cur.design;
+      const fmt = t.closest('[data-fmt]');
+      if(fmt){
+        const host = bodyFor(fmt), c = fmt.dataset.fmt;
+        if(c === 'link'){
+          restore(host); const sel = window.getSelection(), txt = sel ? String(sel) : '', saved = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+          let url = prompt('Link to (web address or email):', 'https://');
+          if(!url || !url.trim() || url.trim() === 'https://') return; url = url.trim();
+          if(/^[^@\s/]+@[^@\s]+\.[^@\s]+$/.test(url)) url = 'mailto:' + url;
+          else if(!/^(https?:|mailto:)/i.test(url)) url = 'https://' + url.replace(/^\/+/, '');
+          host.focus(); if(saved){ sel.removeAllRanges(); sel.addRange(saved); }
+          if(txt) document.execCommand('createLink', false, url); else document.execCommand('insertHTML', false, '<a href="' + esc(url) + '">' + esc(url.replace(/^mailto:/, '')) + '</a>');
+        }else{
+          restore(host);
+          if(c === 'bold' || c === 'italic') document.execCommand(c); else if(c === 'ul') document.execCommand('insertUnorderedList');
+        }
+        const b = blockOf(host); if(b && host.matches('[data-body]')) b.html = host.innerHTML; CE.dirty = true; keep(); return;
+      }
+      const mv = t.closest('[data-mv]');
+      if(mv){
+        const i = +mv.closest('.nl-b').dataset.i, dir = +mv.dataset.mv, j = i + dir; if(j < 0 || j >= d.blocks.length) return;
+        [d.blocks[i], d.blocks[j]] = [d.blocks[j], d.blocks[i]]; CE.dirty = true; blocksDraw();
+        const el = wrap.querySelector(`.nl-b[data-i="${j}"] [data-mv="${dir}"]`), alt = wrap.querySelector(`.nl-b[data-i="${j}"] [data-mv="${-dir}"]`);
+        (el && !el.disabled ? el : alt).focus(); return;
+      }
+      const rm = t.closest('[data-rm]');
+      if(rm){
+        const i = +rm.closest('.nl-b').dataset.i, b = d.blocks[i];
+        const has = (b.t === 'text' && (String(b.title || '').trim() || plain(b.html))) || (b.t === 'photo' && b.url);
+        if(has && !confirm(b.t === 'photo' ? 'Remove this picture?' : 'Remove this text?')) return;
+        d.blocks.splice(i, 1); CE.dirty = true; blocksDraw(); return;
+      }
+      if(t.closest('[data-add-text]')){ d.blocks.push({ t:'text', title:'', html:'' }); CE.dirty = true; blocksDraw(d.blocks.length - 1); return; }
+      if(t.closest('[data-add-photo]')){ const b = { t:'photo', url:'', caption:'' }; d.blocks.push(b); CE.dirty = true; blocksDraw(); CE.pickFor = b; file.click(); return; }
+      if(t.closest('[data-add-class]')){ const at = d.blocks.length && d.blocks[0].t === 'text' ? 1 : 0; d.blocks.splice(at, 0, { t:'class' }); CE.dirty = true; blocksDraw(); return; }
+      if(t.closest('[data-classpic]')){ d.hero = { url: ev().image_url }; CE.dirty = true; heroDraw(); return; }
+      const pick = t.closest('[data-pick]');
+      if(pick){ CE.pickFor = pick.closest('[data-hero]') ? 'hero' : blockOf(pick); file.click(); return; }
+      if(t.closest('[data-unhero]')){ d.hero = null; CE.dirty = true; heroDraw(); return; }
+    });
+    file.addEventListener('change', () => { const f = file.files && file.files[0], to = CE.pickFor; file.value = ''; CE.pickFor = null; if(f && to) picUpload(f, to); });
+    const spotOf = el => el && el.closest && el.closest('[data-hero],[data-pic]');
+    wrap.addEventListener('dragover', e => {
+      if(!e.dataTransfer || ![...e.dataTransfer.types].includes('Files')) return; e.preventDefault();
+      const s = spotOf(e.target); wrap.querySelectorAll('.drag').forEach(x => { if(x !== s) x.classList.remove('drag'); }); if(s) s.classList.add('drag');
+    });
+    wrap.addEventListener('dragleave', e => { const s = spotOf(e.target); if(s && !s.contains(e.relatedTarget)) s.classList.remove('drag'); });
+    wrap.addEventListener('drop', e => {
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if(!f) return; e.preventDefault();
+      const s = spotOf(e.target); wrap.querySelectorAll('.drag').forEach(x => x.classList.remove('drag'));
+      if(s){ picUpload(f, s.matches('[data-hero]') ? 'hero' : blockOf(s)); return; }
+      const b = { t:'photo', url:'', caption:'' }; CE.cur.design.blocks.push(b); CE.dirty = true; blocksDraw(); picUpload(f, b);
+    });
+  }
+  function collect(){
+    const m = CE.cur || {}, a = m.audience || { who:'all' };
+    return { id:m.id || undefined, event_id:ev().id || m.event_id, subject:String(m.subject || '').trim(), preheader:String(m.preheader || '').trim(),
+      design:designOut(m.design), audience:a.who === 'some' ? { who:'some', emails:(a.emails || []).slice() } : { who:'all' } };
+  }
+  function ready(){
+    const c = collect();
+    if(!c.subject){ toast('Add a subject first.', true); const s = CE.root.querySelector('[data-f="subject"]'); if(s) s.focus(); return false; }
+    if(CE.busyPic){ toast('Wait for the picture to finish uploading.', true); return false; }
+    if(!written(c.design)){ toast('Write the email first.', true); return false; }
+    return true;
+  }
+  async function save(quiet){
+    const c = collect();
+    if(!quiet && !c.subject && !written(c.design)){ toast('Nothing to save yet.', true); return false; }
+    if(CE.busyPic){ toast('Wait for the picture to finish uploading.', true); return false; }
+    if(quiet && CE.cur.id && !CE.dirty) return true;
+    const b = CE.root.querySelector('[data-save]'); if(b){ b.disabled = true; b.textContent = 'Saving…'; }
+    try{
+      const mine = CE.cur.design, wasNew = !CE.cur.id;
+      const d = await ceCall('save', c);
+      CE.cur = Object.assign({}, CE.cur, d.email); CE.dirty = false;
+      if(quiet && mine) CE.cur.design = mine;
+      if(wasNew && CE.data){ CE.data.emails = [d.email].concat(CE.data.emails || []); }
+      if(!quiet){ toast('Draft saved.'); editor(); }
+      return true;
+    }catch(e){ toast(e.message, true); return false; }
+    finally{ if(b && document.body.contains(b)){ b.disabled = false; b.textContent = 'Save draft'; } }
+  }
+  async function preview(c){
+    c = c || collect();
+    const ov = $(`<div class="nl-overlay" role="dialog" aria-modal="true" aria-label="Email preview"><div class="nl-pv"><div class="nl-pv-bar"><b>Preview</b><span class="nl-pv-sub muted"></span><span class="nl-pv-sp"></span><button type="button" class="btn btn-ghost btn-sm" data-w="600">Computer</button><button type="button" class="btn btn-ghost btn-sm" data-w="375">Phone</button><button type="button" class="btn btn-primary btn-sm" data-close>Close</button></div><div class="nl-pv-frame"><div class="muted" style="padding:30px;text-align:center">Building the preview…</div></div></div></div>`);
+    const close = () => { ov.remove(); document.removeEventListener('keydown', escKey); };
+    const escKey = e => { if(e.key === 'Escape') close(); };
+    ov.addEventListener('click', e => { if(e.target === ov || e.target.closest('[data-close]')) close(); });
+    document.addEventListener('keydown', escKey);
+    CE.root.append(ov); ov.querySelector('[data-close]').focus();
+    try{
+      const d = await ceCall('preview', c);
+      ov.querySelector('.nl-pv-sub').textContent = d.subject + (d.to ? ' — shown as it goes to ' + d.to : '');
+      const f = document.createElement('iframe'); f.title = 'Email preview'; f.setAttribute('sandbox', ''); f.srcdoc = d.html;
+      const fr = ov.querySelector('.nl-pv-frame'); fr.innerHTML = ''; fr.append(f);
+      ov.querySelectorAll('[data-w]').forEach(b => b.addEventListener('click', () => { f.style.width = b.dataset.w === '375' ? '375px' : '100%'; }));
+    }catch(e){ ov.querySelector('.nl-pv-frame').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }
+  }
+  async function act(action, msg){
+    try{ const d = await ceCall(action, { id:CE.cur.id }); CE.cur = Object.assign(CE.cur, d.email || {}); toast(msg); editor(); }
+    catch(e){ toast(e.message, true); }
+  }
+  // sent / sending / stopped: read-only, with progress while it sends
+  function sent(){
+    const m = CE.cur, root = CE.root; root.innerHTML = '';
+    const top = $(`<div class="nl-top"><button type="button" class="btn btn-ghost btn-sm" data-back>← All emails for this ${esc(noun())}</button>${pill(m)}<span class="ce-evline">${esc(evLine())}</span></div>`);
+    top.querySelector('[data-back]').addEventListener('click', () => load(false));
+    const pct = m.recipient_count ? Math.round(100 * ((m.sent_count || 0) + (m.failed_count || 0)) / m.recipient_count) : 0;
+    const a = m.audience || {};
+    const card = $(`<div class="card nl-sent">
+      <h3>${esc(m.subject || '(no subject)')}</h3>
+      <p class="muted">${a.who === 'some' ? 'People picked' : 'Everyone booked'}${m.started_at ? ' · started ' + esc(when(m.started_at)) : ''}${m.finished_at ? ' · finished ' + esc(when(m.finished_at)) : ''}</p>
+      <div class="nl-stats"><div><b>${m.recipient_count || 0}</b><span>people</span></div><div><b>${m.sent_count || 0}</b><span>delivered</span></div><div><b>${m.failed_count || 0}</b><span>failed</span></div></div>
+      ${m.status === 'sending' ? `<div class="nl-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><i style="width:${pct}%"></i></div><p class="muted">Sending — you can leave this page; it keeps going.</p>` : ''}
+      ${m.last_error ? `<div class="nl-note nl-err">${esc(m.last_error)}</div>` : ''}
+      <div class="nl-row2"></div>
+    </div>`);
+    const acts = card.querySelector('.nl-row2');
+    const pv = $(`<button type="button" class="btn btn-ghost btn-sm">See the email</button>`);
+    pv.addEventListener('click', () => preview({ id:m.id, event_id:m.event_id, subject:m.subject || '', preheader:m.preheader || '', design:m.design || template(), audience:m.audience || { who:'all' } }));
+    acts.append(pv);
+    const dup = $(`<button type="button" class="btn btn-ghost btn-sm">Copy into a new draft</button>`);
+    dup.addEventListener('click', async () => {
+      try{
+        const d = await ceCall('save', { event_id:ev().id, subject:m.subject, preheader:m.preheader, design:designOut(m.design || template()), audience:{ who:'all' } });
+        CE.cur = d.email; CE.failed = []; CE.dirty = false; if(CE.data) CE.data.emails = [d.email].concat(CE.data.emails || []);
+        toast('Copied into a new draft.'); editor();
+      }catch(e){ toast(e.message, true); }
+    });
+    acts.append(dup);
+    if(m.status === 'sending'){
+      const stop = $(`<button type="button" class="btn btn-danger btn-sm">Stop sending</button>`);
+      stop.addEventListener('click', () => { if(confirm('Stop sending? People who already got it keep it; nobody else will.')) act('cancel', 'Stopped.'); });
+      acts.append(stop);
+    }
+    if(m.status === 'canceled'){
+      const del = $(`<button type="button" class="btn btn-danger btn-sm">Delete</button>`);
+      del.addEventListener('click', async () => { if(!confirm('Delete this stopped email?')) return; try{ await ceCall('delete', { id:m.id }); toast('Deleted.'); load(false); }catch(e){ toast(e.message, true); } });
+      acts.append(del);
+    }
+    if(CE.failed.length){
+      card.append($(`<details class="nl-people" open><summary>${CE.failed.length} didn’t go out</summary>${CE.failed.map(f => '<div class="nl-person"><b>' + esc(f.email) + '</b><small>' + esc(f.error || '') + '</small></div>').join('')}</details>`));
+    }
+    root.append(top, card);
+    if(m.status === 'sending'){
+      const my = CE.draw;
+      CE.poll = setTimeout(async () => {
+        if(my !== CE.draw || !live() || !CE.cur || CE.cur.id !== m.id) return;
+        try{ await ceCall('run'); const d = await ceCall('get', { id:m.id }); if(my !== CE.draw || !CE.cur || CE.cur.id !== m.id) return; CE.cur = d.email; CE.failed = d.failed || []; }catch(e){}
+        if(my === CE.draw && live() && CE.cur && CE.cur.id === m.id) sent();
+      }, 3000);
+    }
+  }
+})();
 </script>
 
 <script>
