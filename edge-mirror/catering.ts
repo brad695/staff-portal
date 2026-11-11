@@ -26,6 +26,17 @@
 //            emails the customer the pay link in the conversation thread, lead stage → invoiced.
 //            If Square fails the quote stays "Invoice pending" and staff retry with create_invoice.
 //
+// Charges staff pick per proposal / invoice (2026-11-11, Maverick: "these needs to be selectable in the invoice,
+// as well as a 3% credit card charge, customers may be tax exempt"):
+//   gratuity_pct  0 | the register's "20% Grat" (Square service charge 7LLRG4S72ZFKTSO7NP72OTKT, AUTO_GRATUITY,
+//                 on the items; taxed only if that service charge is set taxable in Square — it isn't)
+//   tax_exempt    true = no sales tax (tax_rate is kept for when it's switched back on); tax_exempt_id = their
+//                 exemption certificate #, printed on the proposal / PDF / Square invoice
+//   card_fee_pct  0 | 3 — "Credit card fee (3%)": 3% of everything before it (items + gratuity + tax), a fixed
+//                 TOTAL_PHASE service charge on the Square order, not taxed. Square's own credit card surcharge
+//                 can't be used here: the Invoices API doesn't apply it and it doesn't work with deposit + balance.
+// Money: Square rounds half to even; totals() does the same, and the order's own numbers are kept once it exists.
+//
 // Square: its own switch SQUARE_CATERING_ENV = sandbox (default) | production.
 //   sandbox    → SQUARE_EXP_SANDBOX_ACCESS_TOKEN (the experiences sandbox)
 //   production → SQUARE_CATERING_ACCESS_TOKEN ?? SQUARE_ACCESS_TOKEN ?? SQUARE_TICKET_ACCESS_TOKEN
@@ -201,10 +212,38 @@ function normItems(raw: unknown): Item[] {
     image: imgUrl(x?.image),
   })).filter((x) => x.name && x.qty > 0);
 }
-function totals(items: Item[], rate: number) {
+// pct of cents, rounded half to even — Square's rounding
+function pctOf(cents: number, pct: number) {
+  const ppm = Math.round((Number(pct) || 0) * 10000), n = Math.round(cents) * ppm, q = Math.floor(n / 1000000), r = n - q * 1000000;
+  return 2 * r > 1000000 ? q + 1 : 2 * r < 1000000 ? q : q + (q % 2);
+}
+// The charges on top of the items (see the header): gratuity on the items, tax on the items (and on the gratuity
+// only if Square's 20% Grat is taxable), the card fee on everything before it.
+type Charges = { gratuity_pct: number; gratuity_taxable: boolean; tax_rate: number; tax_exempt: boolean; card_fee_pct: number };
+function totals(items: Item[], c: Charges) {
   const subtotal = items.reduce((s, it) => s + Math.round(it.qty * it.price_cents), 0);
-  const tax = Math.round(subtotal * (Number(rate) || 0) / 100);
-  return { subtotal, tax, total: subtotal + tax };
+  const gratuity = c.gratuity_pct > 0 ? pctOf(subtotal, c.gratuity_pct) : 0;
+  const tax = c.tax_exempt ? 0 : pctOf(subtotal + (c.gratuity_taxable ? gratuity : 0), c.tax_rate);
+  const card_fee = c.card_fee_pct > 0 ? pctOf(subtotal + gratuity + tax, c.card_fee_pct) : 0;
+  return { subtotal, gratuity, tax, card_fee, total: subtotal + gratuity + tax + card_fee };
+}
+const CARD_FEE_PCT = 3; // card networks cap credit card surcharges at 3%
+const GRATUITY_ID = Deno.env.get("SQUARE_GRATUITY_ID") || "7LLRG4S72ZFKTSO7NP72OTKT"; // the register's "20% Grat"
+// the register's gratuity as Square has it (percentage + taxable), cached 5 minutes; sandbox has no such object
+let GRAT: { at: number; pct: number; taxable: boolean; id: string | null } | null = null;
+async function gratuityFor(e: Env) {
+  if (e !== "production") return { pct: 20, taxable: false, id: null as string | null };
+  if (GRAT && Date.now() - GRAT.at < 5 * 60_000) return GRAT;
+  try {
+    const o = (await square(e, `/v2/catalog/object/${GRATUITY_ID}`)).object;
+    const g = o && !o.is_deleted ? o.service_charge_data : null;
+    if (!g || !(Number(g.percentage) > 0)) throw new Error("no 20% Grat in Square");
+    GRAT = { at: Date.now(), pct: Number(g.percentage), taxable: g.taxable === true, id: GRATUITY_ID };
+  } catch (err) {
+    console.error("gratuity", err);
+    return GRAT ?? { pct: 20, taxable: false, id: null as string | null };
+  }
+  return GRAT;
 }
 function balanceDate(q: any, lead: any) {
   const today = todayCT();
@@ -298,7 +337,12 @@ async function buildPdf(lead: any, q: any, contract: string, sig: { name: string
   }
   y -= 8; page.drawLine({ start: { x: colQ, y }, end: { x: W - M, y }, thickness: 0.5, color: mute });
   const tot = (k: string, v: string, f = reg) => { need(15); y -= 15; text(k, colQ, 10, f); text(v, colT - f.widthOfTextAtSize(v, 10), 10, f); };
-  tot("Subtotal", money(q.subtotal_cents)); tot(`Sales tax (${Number(q.tax_rate)}%)`, money(q.tax_cents)); tot("Total", money(q.total_cents), bold);
+  tot("Subtotal", money(q.subtotal_cents));
+  if (Number(q.gratuity_cents) > 0) tot(`Gratuity (${Number(q.gratuity_pct)}%)`, money(q.gratuity_cents));
+  tot(q.tax_exempt ? "Sales tax - exempt" : `Sales tax (${Number(q.tax_rate)}%)`, money(q.tax_cents));
+  if (q.tax_exempt && q.tax_exempt_id) { need(11); y -= 11; text(`Exemption certificate #${q.tax_exempt_id}`, colQ, 8.5, reg, mute); }
+  if (Number(q.card_fee_cents) > 0) tot(`Credit card fee (${Number(q.card_fee_pct)}%)`, money(q.card_fee_cents));
+  tot("Total", money(q.total_cents), bold);
   const dep = Math.round(q.total_cents * q.deposit_pct / 100);
   if (q.deposit_pct > 0 && q.deposit_pct < 100) {
     tot(`Deposit (${q.deposit_pct}%)`, money(dep));
@@ -354,12 +398,29 @@ async function createInvoice(quoteId: string) {
           base_price_money: { amount: it.price_cents, currency: "USD" }, note: it.note || undefined,
         })),
       };
-      if (Number(q.tax_rate) > 0) order.taxes = [{ uid: "tn-tax", name: "TN Sales Tax", percentage: String(Number(q.tax_rate)), scope: "ORDER", type: "ADDITIVE" }];
+      if (!q.tax_exempt && Number(q.tax_rate) > 0) order.taxes = [{ uid: "tn-tax", name: "TN Sales Tax", percentage: String(Number(q.tax_rate)), scope: "ORDER", type: "ADDITIVE" }];
+      // the charges staff picked (see the header): the register's 20% Grat on the items, then the card fee on
+      // everything before it as a fixed amount (Square's own TOTAL_PHASE percentage leaves the gratuity out)
+      const sc: Record<string, unknown>[] = [];
+      if (Number(q.gratuity_pct) > 0) {
+        const g = await gratuityFor(e);
+        sc.push(g.id && Number(q.gratuity_pct) === g.pct
+          ? { uid: "gratuity", catalog_object_id: g.id }
+          : { uid: "gratuity", name: `Gratuity (${Number(q.gratuity_pct)}%)`, percentage: String(Number(q.gratuity_pct)), calculation_phase: "SUBTOTAL_PHASE", taxable: g.taxable });
+      }
+      if (Number(q.card_fee_cents) > 0) {
+        sc.push({ uid: "card-fee", name: `Credit card fee (${Number(q.card_fee_pct)}%)`, amount_money: { amount: Number(q.card_fee_cents), currency: "USD" },
+          calculation_phase: "TOTAL_PHASE", taxable: false });
+      }
+      if (sc.length) order.service_charges = sc;
       const o = await square(e, "/v2/orders", { method: "POST", body: JSON.stringify({ idempotency_key: q.id + ":order", order }) });
       orderId = String(o.order.id);
       const sqTotal = Number(o.order.total_money?.amount), sqTax = Number(o.order.total_tax_money?.amount || 0);
+      const scBy = (uid: string) => Number(((o.order.service_charges || []) as any[]).find((x) => x.uid === uid)?.applied_money?.amount || 0);
+      const sqGrat = scBy("gratuity"), sqFee = scBy("card-fee");
       // Square's per-line rounding can move tax a cent; its numbers are what the customer pays
-      await admin.from("catering_quotes").update({ square_order_id: orderId, total_cents: sqTotal, tax_cents: sqTax, subtotal_cents: sqTotal - sqTax }).eq("id", q.id);
+      await admin.from("catering_quotes").update({ square_order_id: orderId, total_cents: sqTotal, tax_cents: sqTax, gratuity_cents: sqGrat, card_fee_cents: sqFee,
+        subtotal_cents: sqTotal - sqTax - sqGrat - sqFee }).eq("id", q.id);
       q.total_cents = sqTotal;
     }
 
@@ -371,7 +432,8 @@ async function createInvoice(quoteId: string) {
       : [{ request_type: "BALANCE", due_date: pct >= 100 ? today : bal, reminders: pct >= 100 ? undefined : reminders }];
     const when = fmtDate(lead.event_date) + (lead.event_time ? " at " + fmtTime(lead.event_time) : "");
     const about = [when, lead.guests ? `${lead.guests} guests` : "", FULFILL[lead.fulfillment] || "catering"].filter(Boolean).join(" · ") + ".";
-    const extra = q.invoice_only ? (q.customer_note ? "\n\n" + q.customer_note : "") : (q.pdf_path ? " Signed agreement attached." : "");
+    const extra = (q.invoice_only ? (q.customer_note ? "\n\n" + q.customer_note : "") : (q.pdf_path ? " Signed agreement attached." : ""))
+      + (q.tax_exempt ? "\n\nSales tax exempt" + (q.tax_exempt_id ? ` (exemption certificate #${q.tax_exempt_id})` : "") + "." : "");
     const inv = await square(e, "/v2/invoices", {
       method: "POST",
       body: JSON.stringify({
@@ -467,6 +529,8 @@ function publicView(q: any, lead: any, contract: string) {
     lead: { name: lead.name, company: lead.company, email: lead.email, code: lead.code, event_date: lead.event_date, event_time: lead.event_time,
       guests: lead.guests, fulfillment: lead.fulfillment, address: lead.address, location: lead.location },
     quote: { status: q.status, items: q.items, subtotal_cents: q.subtotal_cents, tax_cents: q.tax_cents, tax_rate: q.tax_rate, total_cents: q.total_cents,
+      gratuity_pct: Number(q.gratuity_pct) || 0, gratuity_cents: q.gratuity_cents || 0, tax_exempt: q.tax_exempt === true, tax_exempt_id: q.tax_exempt_id || null,
+      card_fee_pct: Number(q.card_fee_pct) || 0, card_fee_cents: q.card_fee_cents || 0,
       deposit_pct: q.deposit_pct, deposit_cents: Math.round(q.total_cents * q.deposit_pct / 100), balance_due_date: balanceDate(q, lead),
       customer_note: q.customer_note, signed_name: q.signed_name, signed_at: q.signed_at, invoice_url: q.invoice_url, amount_paid_cents: q.amount_paid_cents,
       image_url: q.image_url || null },
@@ -632,9 +696,18 @@ async function saveQuote(who: string, b: Record<string, unknown>) {
 
   const items = normItems(b.items);
   const rate = Math.min(20, Math.max(0, Number(b.tax_rate ?? 9.75)));
-  const t = totals(items, rate);
+  // the charges staff ticked: gratuity % (20 = the register's "20% Grat"; templates also use 10) · tax exempt · 3% credit card fee
+  const g = await gratuityFor(envNow());
+  const gp = Math.min(50, Math.max(0, Math.round((Number(b.gratuity_pct) || 0) * 100) / 100));
+  const ch: Charges = {
+    gratuity_pct: gp > 0 ? gp : b.gratuity === true ? g.pct : 0, gratuity_taxable: g.taxable,
+    tax_rate: rate, tax_exempt: b.tax_exempt === true, card_fee_pct: b.card_fee === true || Number(b.card_fee_pct) > 0 ? CARD_FEE_PCT : 0,
+  };
+  const t = totals(items, ch);
   const row: Record<string, unknown> = {
     items, tax_rate: rate, subtotal_cents: t.subtotal, tax_cents: t.tax, total_cents: t.total,
+    gratuity_pct: ch.gratuity_pct, gratuity_cents: t.gratuity, tax_exempt: ch.tax_exempt,
+    tax_exempt_id: ch.tax_exempt ? clean(b.tax_exempt_id, 60) || null : null, card_fee_pct: ch.card_fee_pct, card_fee_cents: t.card_fee,
     deposit_pct: Math.min(100, Math.max(0, Math.round(Number(b.deposit_pct ?? 50)))),
     balance_due_date: /^\d{4}-\d{2}-\d{2}$/.test(clean(b.balance_due_date, 10)) ? clean(b.balance_due_date, 10) : null,
     customer_note: clean(b.customer_note, 4000) || null,
@@ -737,10 +810,13 @@ async function preview(b: Record<string, unknown>) {
     ok: true, kind, env: q.square_env || envNow(),
     email: { to: lead.email, from: FROM, reply_to: REPLY_TO, subject: "Re: " + subjectFor(lead), html: email.html },
     invoice: {
-      title: `GREYS Catering #${lead.code}`, description: about + (q.customer_note ? "\n\n" + q.customer_note : ""),
+      title: `GREYS Catering #${lead.code}`, description: about + (q.customer_note ? "\n\n" + q.customer_note : "")
+        + (q.tax_exempt ? "\n\nSales tax exempt" + (q.tax_exempt_id ? ` (exemption certificate #${q.tax_exempt_id})` : "") + "." : ""),
       recipient: { name: lead.name, company: lead.company, email: lead.email }, location: lead.location || "Memphis",
       service_date: lead.event_date, items: q.items || [], tax_rate: Number(q.tax_rate),
       subtotal_cents: q.subtotal_cents, tax_cents: q.tax_cents, total_cents: q.total_cents, schedule,
+      gratuity_pct: Number(q.gratuity_pct) || 0, gratuity_cents: q.gratuity_cents || 0, tax_exempt: q.tax_exempt === true,
+      tax_exempt_id: q.tax_exempt_id || null, card_fee_pct: Number(q.card_fee_pct) || 0, card_fee_cents: q.card_fee_cents || 0,
       note: "Square sends its own invoice email too; totals can move a cent if Square rounds tax per line.",
     },
     past_event: !!(lead.event_date && lead.event_date < today),

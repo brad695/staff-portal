@@ -792,6 +792,17 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     .cat-tot > div{ display:flex; justify-content:space-between; gap:12px; padding:3px 0; }
     .cat-tot .big{ font-weight:800; border-top:1px solid #e2e8f0; margin-top:4px; padding-top:7px; }
     .cat-tot .paid{ color:#047857; font-weight:700; }
+    /* proposal editor: Gratuity · Sales tax (or tax exempt) · 3% credit card fee (2026-11-11) */
+    .cat-charges{ display:flex; flex-wrap:wrap; align-items:center; gap:10px 22px; margin:0 0 14px; }
+    .cat-chk{ display:flex; align-items:center; gap:7px; font-size:.9rem; font-weight:700; color:var(--ink,#1e293b); }
+    .cat-chk label{ display:flex; align-items:center; gap:7px; cursor:pointer; }
+    .cat-chk input[type=checkbox]{ width:18px; height:18px; margin:0; accent-color:#06273a; }
+    .cat-chk input[type=number], .cat-chk input:not([type]){ padding:6px 8px; border:1px solid var(--line,#cbd5e1); border-radius:8px; font:inherit; font-weight:500; background:#fff; }
+    .cat-chk input[type=number]{ width:5.2em; }
+    .cat-chk.cat-exempt{ flex-basis:100%; font-weight:600; color:#9a3412; }
+    .cat-chk.cat-exempt input{ width:12em; }
+    .cat-chk[hidden]{ display:none; }
+    @media (max-width:640px){ .cat-chk input[type=number], .cat-chk input:not([type]){ font-size:16px; } } /* no iOS auto-zoom */
     .cat-tbl{ width:100%; border-collapse:collapse; margin-top:12px; font-size:.9rem; }
     .cat-tbl th{ text-align:left; color:#64748b; font-size:.7rem; text-transform:uppercase; letter-spacing:.3px; padding:6px 6px; border-bottom:1px solid #e2e8f0; }
     .cat-tbl td{ padding:8px 6px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
@@ -2383,8 +2394,10 @@ function catQuoteRender(copyFrom){
     +   '<select id="catMenu" class="loc-sel" style="max-width:340px;" onchange="catMenuPick(this)"><option value="">＋ From the Square catering menu…</option></select>'
     +   '<button class="btn btn-ghost btn-sm" onclick="catAddItem(\'Delivery & set-up\',1,0)">＋ Delivery fee</button>'
     + '</div></div>'
-    + '<div class="cat-sec"><h4>Pricing</h4><div class="cat-grid">'
-    +   catField('Sales tax %','cq_tax', q?q.tax_rate:9.75,'number') + catField('Deposit %','cq_dep', q?q.deposit_pct:50,'number')
+    + '<div class="cat-sec"><h4>Pricing</h4>'
+    +   catChargesHtml(src)
+    +   '<div class="cat-grid">'
+    +   catField('Deposit %','cq_dep', q?q.deposit_pct:50,'number')
     +   '<div class="rf"><label>Balance due</label><input id="cq_bal" type="date" value="'+esc((q&&q.balance_due_date)||'')+'"><span style="font-size:.72rem;color:#64748b;">Blank = 3 days before the event</span></div>'
     + '</div>'
     + '<div id="catTotals" class="cat-tot"></div></div>'
@@ -2402,11 +2415,72 @@ function catQuoteRender(copyFrom){
     +   '<button class="btn btn-gold" id="cqSend" onclick="catSaveQuote(true)" title="You see a preview first">📨 Save &amp; send proposal…</button>'
     + '</div>'
     + (history?'<div class="hint" style="margin-top:14px;">Earlier proposals: '+history+'</div>':'');
-  box.querySelectorAll('#cq_tax,#cq_dep').forEach(e=>e.oninput = catTotals);
+  box.querySelectorAll('#cq_tax,#cq_dep,#cq_gratpct').forEach(e=>e.oninput = catTotals);
+  ['cq_taxon','cq_fee'].forEach(id=>{ document.getElementById(id).onchange = catTotals; });
+  document.getElementById('cq_grat').onchange = catGratToggle;
   document.getElementById('cq_loc').onchange = catMenuLoad;
   catItemsRender(); catMenuLoad();
 }
 function catField(label,id,val,type){ return '<div class="rf"><label>'+label+'</label><input id="'+id+'" type="'+(type||'text')+'" value="'+esc(val==null?'':val)+'"'+(type==='number'?' step="any" min="0"':'')+'></div>'; }
+/* Charges staff pick per proposal / invoice (2026-11-11, Maverick: "these needs to be selectable in the invoice, as well as
+   a 3% credit card charge, customers may be tax exempt"). The catering fn works the money out the same way and puts them on
+   the Square order: gratuity = the register's "20% Grat" (or that % ad hoc), not taxed · sales tax, or tax exempt with their
+   certificate # · "Credit card fee (3%)" on everything before it. Square rounds half to even; so does catPct. */
+const CAT_CARD_FEE_PCT = 3, CAT_GRAT_LINE = /^gratuity\s*\((\d+(?:\.\d+)?)\s*%\)/i;
+function catPct(c, pct){ const ppm = Math.round((Number(pct)||0)*10000), n = Math.round(c)*ppm, q = Math.floor(n/1e6), r = n - q*1e6; return 2*r>1e6 ? q+1 : 2*r<1e6 ? q : q+(q%2); }
+function catChargesHtml(s){
+  const gOn = !!(s && Number(s.gratuity_pct) > 0), gPct = gOn ? Number(s.gratuity_pct) : 20;
+  const rate = s && Number(s.tax_rate) > 0 ? Number(s.tax_rate) : 9.75;
+  const tOn = !(s && (s.tax_exempt === true || (s.tax_rate != null && Number(s.tax_rate) === 0)));
+  const fOn = !!(s && Number(s.card_fee_pct) > 0);
+  return '<div class="cat-charges">'
+    + '<div class="cat-chk"><label><input type="checkbox" id="cq_grat"'+(gOn?' checked':'')+'>Gratuity</label><input id="cq_gratpct" type="number" step="any" min="0" max="50" value="'+gPct+'" aria-label="Gratuity percent">%</div>'
+    + '<div class="cat-chk"><label><input type="checkbox" id="cq_taxon"'+(tOn?' checked':'')+'>Sales tax</label><input id="cq_tax" type="number" step="any" min="0" max="20" value="'+rate+'" aria-label="Sales tax percent">%</div>'
+    + '<div class="cat-chk"><label><input type="checkbox" id="cq_fee"'+(fOn?' checked':'')+'>'+CAT_CARD_FEE_PCT+'% credit card fee</label></div>'
+    + '<div class="cat-chk cat-exempt" id="cq_exempt"'+(tOn?' hidden':'')+'><label for="cq_taxid">Tax exempt — certificate #</label><input id="cq_taxid" value="'+esc((s&&s.tax_exempt_id)||'')+'" maxlength="60" placeholder="optional"></div>'
+    + '</div>';
+}
+function catCharges(){
+  const el = id => document.getElementById(id), on = id => !!(el(id) && el(id).checked);
+  const tOn = !el('cq_taxon') || on('cq_taxon');
+  return { gratuity_pct: on('cq_grat') ? Math.min(50, Math.max(0, Number(el('cq_gratpct').value)||0)) : 0,
+    tax_rate: Math.min(20, Math.max(0, Number((el('cq_tax')||{}).value)||0)), tax_exempt: !tOn,
+    tax_exempt_id: tOn ? '' : String((el('cq_taxid')||{}).value||'').trim(), card_fee_pct: on('cq_fee') ? CAT_CARD_FEE_PCT : 0 };
+}
+// the money: items, gratuity on the items, tax on the items (Square's 20% Grat isn't taxed), card fee on all of that
+function catCalc(items, ch){
+  const sub = (items||[]).reduce((s,it)=>s+Math.round((Number(it.qty)||0)*(it.price_cents||0)),0);
+  const grat = ch.gratuity_pct > 0 ? catPct(sub, ch.gratuity_pct) : 0;
+  const tax = ch.tax_exempt ? 0 : catPct(sub, ch.tax_rate);
+  const fee = ch.card_fee_pct > 0 ? catPct(sub+grat+tax, ch.card_fee_pct) : 0;
+  return { sub, grat, tax, fee, tot: sub+grat+tax+fee };
+}
+// totals rows for a saved quote (locked view, Square preview): gratuity / tax or exempt / card fee
+function catChargeRows(q, row){
+  return (Number(q.gratuity_cents) > 0 ? row('Gratuity ('+Number(q.gratuity_pct)+'%)', catMoney(q.gratuity_cents)) : '')
+    + row(q.tax_exempt ? 'Sales tax — exempt'+(q.tax_exempt_id?' (#'+esc(q.tax_exempt_id)+')':'') : 'Tax ('+Number(q.tax_rate)+'%)', catMoney(q.tax_cents))
+    + (Number(q.card_fee_cents) > 0 ? row('Credit card fee ('+Number(q.card_fee_pct)+'%)', catMoney(q.card_fee_cents)) : '');
+}
+// ticking Gratuity replaces an old "Gratuity (N%)" line (that one was taxed), keeping its %
+function catGratToggle(){
+  const box = document.getElementById('cq_grat');
+  if(box && box.checked){
+    const old = CAT_ITEMS.find(it=>CAT_GRAT_LINE.test(it.name||''));
+    if(old){
+      document.getElementById('cq_gratpct').value = Number(CAT_GRAT_LINE.exec(old.name)[1]) || 20;
+      CAT_ITEMS = CAT_ITEMS.filter(it=>!CAT_GRAT_LINE.test(it.name||''));
+      const m = document.getElementById('cqMsg'); if(m) m.textContent = 'The Gratuity line moved to the Gratuity box (not taxed).';
+      return catItemsRender();
+    }
+  }
+  catTotals();
+}
+// tick Gratuity from elsewhere (a package template's gratuity %, the ＋ Gratuity button)
+window.catSetGratuity = function(pct){
+  const box = document.getElementById('cq_grat'), p = document.getElementById('cq_gratpct'); if(!box || !p) return false;
+  if(Number(pct) > 0) p.value = Number(pct);
+  box.checked = true; catGratToggle(); return true;
+};
 function catItemsRender(){
   const el = document.getElementById('catItems'); if(!el) return;
   if(!CAT_ITEMS.length){ el.innerHTML = '<div class="rec-empty" style="padding:14px;">No items yet — add from the menu or a custom line.</div>'; catTotals(); return; }
@@ -2425,10 +2499,15 @@ function catAddItem(name, qty, cents){ CAT_ITEMS.push({ name:name||'', qty:qty||
 function catTotals(){
   const el = document.getElementById('catTotals'); if(!el) return;
   CAT_ITEMS.forEach((it,i)=>{ const a=document.getElementById('ciAmt'+i); if(a) a.textContent = catMoney(Math.round((Number(it.qty)||0)*(it.price_cents||0))); });
-  const rate = Number(document.getElementById('cq_tax').value)||0, dep = Math.min(100,Math.max(0,Math.round(Number(document.getElementById('cq_dep').value)||0)));
-  const sub = CAT_ITEMS.reduce((s,it)=>s+Math.round((Number(it.qty)||0)*(it.price_cents||0)),0), tax = Math.round(sub*rate/100), tot = sub+tax;
+  const dep = Math.min(100,Math.max(0,Math.round(Number(document.getElementById('cq_dep').value)||0)));
+  const ch = catCharges(), c = catCalc(CAT_ITEMS, ch), tot = c.tot;
+  const ex = document.getElementById('cq_exempt'); if(ex) ex.hidden = !ch.tax_exempt;
   const row = (k,v,b) => '<div'+(b?' class="big"':'')+'><span>'+k+'</span><span>'+v+'</span></div>';
-  el.innerHTML = row('Subtotal',catMoney(sub)) + row('Tax ('+rate+'%)',catMoney(tax)) + row('Total',catMoney(tot),true)
+  el.innerHTML = row('Subtotal',catMoney(c.sub))
+    + (ch.gratuity_pct>0 ? row('Gratuity ('+ch.gratuity_pct+'%)',catMoney(c.grat)) : '')
+    + row(ch.tax_exempt ? 'Sales tax — exempt' : 'Tax ('+ch.tax_rate+'%)',catMoney(c.tax))
+    + (ch.card_fee_pct>0 ? row('Credit card fee ('+ch.card_fee_pct+'%)',catMoney(c.fee)) : '')
+    + row('Total',catMoney(tot),true)
     + (dep>0&&dep<100 ? row('Deposit ('+dep+'%)',catMoney(Math.round(tot*dep/100))) + row('Balance',catMoney(tot-Math.round(tot*dep/100))) : '');
 }
 async function catMenuLoad(){
@@ -2471,8 +2550,10 @@ async function catSaveQuote(send){
     if(!v('cq_date')) { out.textContent = 'Set the event date first.'; return; }
   }
   out.textContent = 'Saving…';
+  const ch = catCharges();
   const payload = { lead_id: CAT_CUR.id, quote_id: CAT_Q ? CAT_Q.id : undefined, items,
     tax_rate: v('cq_tax'), deposit_pct: v('cq_dep'), balance_due_date: v('cq_bal'), customer_note: v('cq_note'),
+    gratuity_pct: ch.gratuity_pct, tax_exempt: ch.tax_exempt, tax_exempt_id: ch.tax_exempt_id, card_fee_pct: ch.card_fee_pct,
     contract_text: document.getElementById('cq_contract').value === CAT_TEMPLATE ? '' : document.getElementById('cq_contract').value,
     lead: { name:v('cq_name'), email:v('cq_email'), phone:v('cq_phone'), company:v('cq_company'), event_date:v('cq_date'), event_time:v('cq_time'),
       guests:v('cq_guests'), location:v('cq_loc'), fulfillment:v('cq_ful'), occasion:v('cq_occ'), address:v('cq_addr') } };
@@ -2529,7 +2610,7 @@ async function catPreview(kind, env, message, offerSend){
     + (isInv ? '<div class="cat-sec" style="margin:14px 18px;"><h4>What Square bills <span class="r">'+esc(iv.title)+' · '+esc(iv.location)+'</span></h4>'
     +   '<div style="font-size:.88rem;margin-bottom:8px;">To <b>'+esc(iv.recipient.name)+'</b>'+(iv.recipient.company?' ('+esc(iv.recipient.company)+')':'')+' · '+esc(iv.recipient.email)+'<br><span style="color:#64748b;">'+esc(iv.description)+'</span></div>'
     +   '<table class="cat-tbl" style="margin-top:0;"><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th></tr></thead><tbody>'+rows+'</tbody></table>'
-    +   '<div class="cat-tot"><div><span>Subtotal</span><span>'+catMoney(iv.subtotal_cents)+'</span></div><div><span>Tax ('+Number(iv.tax_rate)+'%)</span><span>'+catMoney(iv.tax_cents)+'</span></div>'
+    +   '<div class="cat-tot"><div><span>Subtotal</span><span>'+catMoney(iv.subtotal_cents)+'</span></div>'+catChargeRows(iv, (k,v)=>'<div><span>'+k+'</span><span>'+v+'</span></div>')
     +   '<div class="big"><span>Total</span><span>'+catMoney(iv.total_cents)+'</span></div>'+sched+'</div>'
     +   '<div class="hint" style="margin-top:6px;">Card only. '+esc(iv.note)+'</div></div>' : '')
     + '<div style="margin:14px 18px 0;font-size:.86rem;line-height:1.6;"><b>To:</b> '+esc(em.to)+'<br><b>Subject:</b> '+esc(em.subject)+'<br><b>Reply-to:</b> '+esc(em.reply_to)+'</div>'
@@ -2581,7 +2662,7 @@ function catLockedHtml(q){
     + '<div class="cat-sec"><h4>Proposal</h4><table class="cat-tbl" style="margin-top:0;"><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th></tr></thead><tbody>'+items+'</tbody></table>'
     + '<div class="cat-tot">'
     +   '<div><span>Subtotal</span><span>'+catMoney(q.subtotal_cents)+'</span></div>'
-    +   '<div><span>Tax ('+Number(q.tax_rate)+'%)</span><span>'+catMoney(q.tax_cents)+'</span></div>'
+    +   catChargeRows(q, (k,v)=>'<div><span>'+k+'</span><span>'+v+'</span></div>')
     +   '<div class="big"><span>Total</span><span>'+catMoney(q.total_cents)+'</span></div>'
     +   (split?'<div><span>Deposit ('+q.deposit_pct+'%)</span><span>'+catMoney(dep)+'</span></div>':'')
     +   '<div class="paid"><span>Paid so far</span><span>'+catMoney(q.amount_paid_cents)+'</span></div>'
@@ -2599,7 +2680,8 @@ function catLockedHtml(q){
 function catNewProposal(){
   const from = CAT_Q; CAT_Q = null;
   if(from && ['signed','invoiced','deposit_paid','paid'].includes(from.status) && !confirm((from.invoice_only?'This lead already has an invoice.':'This lead already has a signed proposal.')+' Start a new one anyway?')){ CAT_Q = from; return; }
-  catQuoteRender(from ? { items: from.items, customer_note: from.customer_note, contract_text: '' } : null);
+  catQuoteRender(from ? { items: from.items, customer_note: from.customer_note, contract_text: '',
+    gratuity_pct: from.gratuity_pct, tax_rate: from.tax_rate, tax_exempt: from.tax_exempt, tax_exempt_id: from.tax_exempt_id, card_fee_pct: from.card_fee_pct } : null);
 }
 async function catPdf(id){
   const r = await catApi('contract_url', { quote_id:id });
@@ -17410,7 +17492,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
         + '<tr><td>Balance — due '+P(q.balance_due_date?fmtDisplay(q.balance_due_date):'before the event')+'</td><td style="text-align:right"><b>'+catMoney(Math.max(0,total-dep))+'</b></td></tr>'
         + '<tr><td>Paid to date</td><td style="text-align:right">'+catMoney(paid)+'</td></tr>'
         + '</table></div>'
-      + '<table class="tots"><tr><td>Subtotal</td><td class="n">'+catMoney(q.subtotal_cents)+'</td></tr><tr><td>Tax ('+P(q.tax_rate)+'%)</td><td class="n">'+catMoney(q.tax_cents)+'</td></tr>'
+      + '<table class="tots"><tr><td>Subtotal</td><td class="n">'+catMoney(q.subtotal_cents)+'</td></tr>'
+        + catChargeRows(q, (k,v)=>'<tr><td>'+k+'</td><td class="n">'+v+'</td></tr>')
         + '<tr class="grand"><td>Total</td><td class="n">'+catMoney(total)+'</td></tr>'
         + (paid?'<tr><td>Paid</td><td class="n">−'+catMoney(paid)+'</td></tr>':'')
         + '<tr class="due"><td>Balance due</td><td class="n">'+catMoney(bal)+'</td></tr></table></div>'
@@ -17752,7 +17835,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     const menu = $('catMenu');
     if(menu && !$('catPkg')){
       menu.insertAdjacentHTML('beforebegin', '<select id="catPkg" class="loc-sel" style="max-width:340px;" onchange="ctplPkg(this)"></select>');
-      menu.parentNode.insertAdjacentHTML('beforeend', '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplGrat()" title="Adds a Gratuity (20%) line that recalculates as items change — rename it to change the %">＋ Gratuity</button>');
+      menu.parentNode.insertAdjacentHTML('beforeend', '<button class="btn btn-ghost btn-sm" type="button" onclick="ctplGrat()" title="Ticks Gratuity in Pricing (20% unless you change it) — not taxed">＋ Gratuity</button>');
     }
     const ctr = $('cq_contract');
     if(ctr && !$('catCtrTpl')){
@@ -17789,6 +17872,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   }
   window.ctplGrat = function(){
     const g = CAT_ITEMS.find(it => GRAT_RE.test(it.name || ''));
+    // the Gratuity box in Pricing (2026-11-11) replaces the old taxed "Gratuity (N%)" line
+    if(typeof window.catSetGratuity === 'function' && window.catSetGratuity(g ? GRAT_RE.exec(g.name)[1] : 20)) return;
     setGrat(g ? GRAT_RE.exec(g.name)[1] : 20);
     catItemsRender();
   };
@@ -17800,7 +17885,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     (t.items || []).forEach(it => CAT_ITEMS.push(Object.assign({ name: it.name || '', qty: it.pp ? guests : (Number(it.qty) || 0),
       price_cents: Math.max(0, Math.round(Number(it.price_cents) || 0)), note: String(it.note || '').slice(0, 300) }, okUrl(it.image) ? { image: okUrl(it.image) } : {})));
     if(!COVER && okUrl(t.image_url)){ COVER = okUrl(t.image_url); coverRender(); }
-    if(t.gratuity_pct) setGrat(t.gratuity_pct);
+    if(t.gratuity_pct && !(typeof window.catSetGratuity === 'function' && window.catSetGratuity(t.gratuity_pct))) setGrat(t.gratuity_pct);
     if(t.deposit_pct != null && $('cq_dep')) $('cq_dep').value = t.deposit_pct;
     const note = $('cq_note');
     if(note && t.body){ const b = fill(t.body); if(note.value.indexOf(b.slice(0, 80)) < 0) note.value = note.value.trim() ? note.value.trim() + '\n\n' + b : b; autoGrow(note); }
@@ -18024,10 +18109,10 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     const depPct = t.deposit_pct != null ? Number(t.deposit_pct) : ((formOk() && Number(($('cq_dep') || {}).value)) || 50);
     const L = (t.items || []).filter(it => String(it.name || '').trim()).map(it => { const qty = it.pp ? guests : (Number(it.qty) || 0);
       return { name: it.name, qty, price_cents: Math.max(0, Math.round(Number(it.price_cents) || 0)), note: String(it.note || '').slice(0, 300), image: okUrl(it.image), opt: !(qty > 0) }; });
-    const sum = () => L.reduce((s, l) => s + (l.opt ? 0 : Math.round(l.qty * l.price_cents)), 0);
-    const base = sum();
-    if(Number(t.gratuity_pct) > 0){ const g = Number(t.gratuity_pct); L.push({ name: 'Gratuity (' + g + '%)', qty: 1, price_cents: Math.round(base * g / 100), note: g + '% of ' + catMoney(base), image: '', opt: false }); }
-    const sub = sum(), tax = Math.round(sub * rate / 100), tot = sub + tax, split = depPct > 0 && depPct < 100, dep = Math.round(tot * depPct / 100);
+    // the package's gratuity is the Gratuity box on the proposal (2026-11-11): a totals line, not taxed
+    const gp = Number(t.gratuity_pct) > 0 ? Number(t.gratuity_pct) : 0;
+    const cc = catCalc(L.filter(l => !l.opt), { gratuity_pct: gp, tax_rate: rate, tax_exempt: false, card_fee_pct: 0 });
+    const sub = cc.sub, tax = cc.tax, tot = cc.tot, split = depPct > 0 && depPct < 100, dep = Math.round(tot * depPct / 100);
     const rows = L.map(l => '<tr' + (l.opt ? ' class="opt"' : '') + '><td><div class="itm">' + (l.image ? '<img class="thumb" src="' + esc(l.image) + '" alt="" loading="lazy">' : '')
       + '<div>' + esc(l.name) + (l.note ? '<span class="note">' + esc(l.note) + '</span>' : '') + (l.opt ? '<span class="note">optional — only on the proposal once a qty is set</span>' : '') + '</div></div></td>'
       + '<td class="n">' + (l.opt ? '—' : esc(l.qty)) + '</td><td class="n">' + catMoney(l.price_cents) + '</td><td class="n">' + (l.opt ? '—' : catMoney(Math.round(l.qty * l.price_cents))) + '</td></tr>').join('');
@@ -18041,7 +18126,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       +   '<dt>When</dt><dd>' + esc(c.event_date) + (c.event_time ? ' at ' + esc(c.event_time) : '') + '</dd><dt>Guests</dt><dd>' + esc(c.guests || 'TBD') + '</dd><dt>Shop</dt><dd>' + esc(c.location) + '</dd></dl></div>'
       + '<div class="pv-cardp"><h2 class="pv-h2">Proposal</h2><div style="overflow-x:auto"><table class="pv-items"><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th></tr></thead><tbody>'
       +   (rows || '<tr><td colspan="4"><span class="note">No lines yet.</span></td></tr>') + '</tbody></table></div>'
-      +   '<div class="pv-tot"><div><span>Subtotal</span><span>' + catMoney(sub) + '</span></div><div><span>Sales tax (' + rate + '%)</span><span>' + catMoney(tax) + '</span></div><div class="big"><span>Total</span><span>' + catMoney(tot) + '</span></div>'
+      +   '<div class="pv-tot"><div><span>Subtotal</span><span>' + catMoney(sub) + '</span></div>'
+      +   (gp ? '<div><span>Gratuity (' + gp + '%)</span><span>' + catMoney(cc.grat) + '</span></div>' : '')
+      +   '<div><span>Sales tax (' + rate + '%)</span><span>' + catMoney(tax) + '</span></div><div class="big"><span>Total</span><span>' + catMoney(tot) + '</span></div>'
       +   (split ? '<div class="dep"><span>Deposit to book (' + depPct + '%)</span><span>' + catMoney(dep) + '</span></div><div><span>Balance due ' + esc(balShort) + '</span><span>' + catMoney(tot - dep) + '</span></div>' : '') + '</div>'
       +   (note.trim() ? '<p class="pv-muted">' + esc(note) + '</p>' : '') + '</div>'
       + '<p class="pv-muted" style="margin:0;text-align:center;">— then the agreement and the signature box —</p></div>';
@@ -18081,15 +18168,17 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
      (draft, unsaved edits included) or from the saved proposal when it is locked (sent / signed / invoiced). */
   function proposalState(){
     const q = (typeof CAT_Q !== 'undefined' && CAT_Q) || null, editing = !!$('catItems');
-    if(!editing && q) return { saved: true, items: q.items || [], image_url: okUrl(q.image_url), note: q.customer_note || '', contract: q.contract_text || '', tax: Number(q.tax_rate) || 0, dep: Number(q.deposit_pct) || 0, bal: q.balance_due_date || '' };
+    if(!editing && q) return { saved: true, items: q.items || [], image_url: okUrl(q.image_url), note: q.customer_note || '', contract: q.contract_text || '', tax: Number(q.tax_rate) || 0, dep: Number(q.deposit_pct) || 0, bal: q.balance_due_date || '',
+      ch: { gratuity_pct: Number(q.gratuity_pct) || 0, tax_rate: Number(q.tax_rate) || 0, tax_exempt: q.tax_exempt === true, tax_exempt_id: q.tax_exempt_id || '', card_fee_pct: Number(q.card_fee_pct) || 0 } };
     const v = id => ($(id) ? String($(id).value || '') : '');
     return { saved: false, items: (typeof CAT_ITEMS !== 'undefined' ? CAT_ITEMS : []).filter(it => String(it.name || '').trim()), image_url: COVER, note: v('cq_note'), contract: v('cq_contract'),
-      tax: Number(v('cq_tax')) || 0, dep: Math.min(100, Math.max(0, Math.round(Number(v('cq_dep')) || 0))), bal: v('cq_bal') };
+      tax: Number(v('cq_tax')) || 0, dep: Math.min(100, Math.max(0, Math.round(Number(v('cq_dep')) || 0))), bal: v('cq_bal'), ch: catCharges() };
   }
   function pvProposal(st, c){
     // same arithmetic as catTotals / the catering fn: lines with qty 0 are dropped when the proposal is saved
     const L = st.items.map(it => ({ name: it.name, qty: Number(it.qty) || 0, price_cents: Math.max(0, Math.round(Number(it.price_cents) || 0)), note: String(it.note || '').slice(0, 300), image: okUrl(it.image) })).filter(l => l.qty > 0);
-    const sub = L.reduce((s, l) => s + Math.round(l.qty * l.price_cents), 0), tax = Math.round(sub * st.tax / 100), tot = sub + tax;
+    const ch = st.ch || { gratuity_pct: 0, tax_rate: st.tax, tax_exempt: false, tax_exempt_id: '', card_fee_pct: 0 }, cc = catCalc(L, ch);
+    const sub = cc.sub, tax = cc.tax, tot = cc.tot;
     const split = st.dep > 0 && st.dep < 100, dep = Math.round(tot * st.dep / 100);
     const today = ymdOf(new Date()); let bal = st.bal || (c._ymd ? addDays(c._ymd, -3) : addDays(today, 14)); if(bal < today) bal = today;
     const balShort = new Date(bal + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -18105,7 +18194,11 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       +   '<dt>When</dt><dd>' + esc(c.event_date) + (c.event_time ? ' at ' + esc(c.event_time) : '') + '</dd><dt>Guests</dt><dd>' + esc(c.guests || 'TBD') + '</dd><dt>Shop</dt><dd>' + esc(c.location) + '</dd></dl></div>'
       + '<div class="pv-cardp"><h2 class="pv-h2">Proposal</h2><div style="overflow-x:auto"><table class="pv-items"><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th></tr></thead><tbody>'
       +   (rows || '<tr><td colspan="4"><span class="note">No priced lines yet — lines left at qty 0 are dropped when you save.</span></td></tr>') + '</tbody></table></div>'
-      +   '<div class="pv-tot"><div><span>Subtotal</span><span>' + catMoney(sub) + '</span></div><div><span>Sales tax (' + st.tax + '%)</span><span>' + catMoney(tax) + '</span></div><div class="big"><span>Total</span><span>' + catMoney(tot) + '</span></div>'
+      +   '<div class="pv-tot"><div><span>Subtotal</span><span>' + catMoney(sub) + '</span></div>'
+      +   (ch.gratuity_pct > 0 ? '<div><span>Gratuity (' + ch.gratuity_pct + '%)</span><span>' + catMoney(cc.grat) + '</span></div>' : '')
+      +   '<div><span>' + (ch.tax_exempt ? 'Sales tax — exempt' + (ch.tax_exempt_id ? ' (#' + esc(ch.tax_exempt_id) + ')' : '') : 'Sales tax (' + ch.tax_rate + '%)') + '</span><span>' + catMoney(tax) + '</span></div>'
+      +   (ch.card_fee_pct > 0 ? '<div><span>Credit card fee (' + ch.card_fee_pct + '%)</span><span>' + catMoney(cc.fee) + '</span></div>' : '')
+      +   '<div class="big"><span>Total</span><span>' + catMoney(tot) + '</span></div>'
       +   (split ? '<div class="dep"><span>Deposit to book (' + st.dep + '%)</span><span>' + catMoney(dep) + '</span></div><div><span>Balance due ' + esc(balShort) + '</span><span>' + catMoney(tot - dep) + '</span></div>' : '') + '</div>'
       +   (st.note.trim() ? '<p class="pv-muted">' + esc(st.note) + '</p>' : '') + '</div>'
       + '<div class="pv-cardp"><h2 class="pv-h2">Agreement</h2><div class="pv-contract">' + (contract ? esc(pfill(contract, d)) : '<span style="color:#9A8C76;">(no agreement text — the default agreement is used)</span>') + '</div>'
