@@ -649,6 +649,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab" onclick="mtab('inqform')">📝 Inquiry Form</div>
     <div class="tab-head">Online Ordering</div>
     <div class="tab" onclick="mtab('ordering')">🛒 Online Ordering <span id="ooTabPill" class="oo-tabpill">OFF</span></div>
+    <div class="tab" onclick="mtab('shipping')">🚚 Shipping <span id="shTabPill" class="sh-tabpill"></span></div>
     <div class="tab" onclick="mtab('orderpad')">🧾 Order Pad</div>
     <div class="tab-head">Cheese Club</div>
     <div class="tab" onclick="ccTab(this,'members')">Members</div>
@@ -718,6 +719,37 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       </form>
       <div class="ocd-list" id="ocdList"><div class="rec-empty">Loading…</div></div>
       <div class="oo-err" id="ocdErr" role="alert"></div>
+    </div>
+  </div>
+  <!-- 🚚 SHIPPING (2026-11-12): the ship list / packing list and the shipping settings for orderonline.greyscheese.com
+       (script: SHIPPING TAB, near the end) -->
+  <div id="panel-shipping" class="panel">
+    <div class="section-card">
+      <h2>🚚 Ship list <span class="sh-env" id="shEnv" hidden>TEST ORDERS · Square sandbox</span></h2>
+      <div class="hint">Paid <strong>shipped</strong> orders from orderonline.greyscheese.com, straight from Square. Buy the labels in <strong>Square Dashboard → Orders → Shipments</strong>, then press <strong>Email tracking</strong> so the customer gets the link. Bought the label somewhere else (Pirate Ship, UPS.com)? <strong>Add tracking</strong> emails the customer and marks the order shipped in Square. <strong>Print</strong> gives a packing list plus a packing slip per order with the gift note to tuck in the box.</div>
+      <div class="sh-bar" id="shBar"></div>
+      <div class="sh-list" id="shList"><div class="rec-empty">Loading…</div></div>
+      <div class="oo-err" id="shErr" role="alert"></div>
+    </div>
+    <div class="section-card" id="shSetCard">
+      <h2>⚙️ Shipping settings</h2>
+      <div class="hint">What the order site offers as <strong>Ship it</strong>: the items, the dates, the price and where boxes ship from. Saved changes reach the order site within about 10 seconds. Turning shipping off hides <strong>Ship it</strong>; orders already paid are not changed. Tax is charged only for ship-to states listed under <strong>Sales tax for</strong> (on the boxes and the shipping).</div>
+      <form class="sh-form" id="shForm" autocomplete="off" novalidate>
+        <label class="sh-on"><input type="checkbox" id="shEnabled"><span>Offer <b>Ship it</b> on the order site</span></label>
+        <div class="sh-grid">
+          <label>Ships from<select id="shFrom"><option value="memphis">Memphis</option><option value="nashville">Nashville</option></select></label>
+          <label>Last day to order<input type="date" id="shOrderBy"></label>
+          <label>Ship day<input type="date" id="shShipOn"></label>
+          <label>Arrives from<input type="date" id="shArrFrom"></label>
+          <label>Arrives by<input type="date" id="shArrBy"></label>
+          <label>Shipping, first box<input type="text" inputmode="decimal" id="shFirst" placeholder="30.00"></label>
+          <label>Each extra box<input type="text" inputmode="decimal" id="shEach" placeholder="30.00"></label>
+          <label>Most boxes to ship <span>(0 = no cap)</span><input type="number" min="0" step="1" id="shLimit" placeholder="0"></label>
+          <label>Sales tax for <span>(state codes)</span><input type="text" id="shTax" placeholder="TN" maxlength="60"></label>
+        </div>
+        <fieldset class="sh-items"><legend>Items that ship</legend><div id="shItems"><div class="rec-empty">Loading the menu…</div></div></fieldset>
+        <div class="sh-save"><button type="submit" class="btn btn-gold" id="shSave">Save settings</button><span class="sh-setmsg" id="shSetMsg" role="status"></span></div>
+      </form>
     </div>
   </div>
   <!-- ORDER PAD (2026-11-04): the counter tablet's order pad (order.html) inside the console; loads on first open -->
@@ -19257,6 +19289,391 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     NPM.id = empId; NPM.dirty = false;
     return '';
   };
+})();
+</script>
+<!-- SHIPPING TAB (2026-11-12, Maverick: ship the 12 Days of Cheesemas boxes for Christmas — "do everything we need to do"):
+     the 🚚 Shipping tab (Online Ordering section).
+     SHIP LIST: the square-online-order function's ship_orders (a manager's session). Square is the record: recipient,
+     address, gift note, paid, refunds, the label. On the staging portal it calls square-online-order-test — the Square
+     SANDBOX copy that staging's order site uses — so test orders show there and only there.
+       Add tracking → ship_mark: emails the customer the tracking link, then puts carrier / tracking number / shipped
+       onto the Square order (fulfillment COMPLETED; a paid order closes). For labels bought outside Square.
+       Email tracking → ship_email: for a label bought in Square Dashboard (Square holds the tracking number).
+       Print → a packing list (one table) + one packing slip per order (ship-to, items, the gift note to tuck in).
+     SETTINGS: site_content 'order_shipping' (policy site_content_write: is_app_admin), read by the function every ~10 s:
+       { enabled, from, items[], order_by, ship_on, arrive_from, arrive_by, first_cents, each_cents, limit, tax_states[] }
+     Keys this form doesn't know (note …) are kept. The item list comes from the function's own menu for that shop. -->
+<style id="sh-style">
+.sh-tabpill{ display:none; margin-left:6px; padding:1px 7px; border-radius:999px; background:#0e7490; color:#fff; font-size:.68rem; font-weight:700; vertical-align:middle; }
+.sh-tabpill.show{ display:inline-block; }
+.sh-env{ padding:2px 9px; border-radius:999px; background:#fef3c7; color:#92400e; font-size:.72rem; font-weight:800; letter-spacing:.03em; }
+.sh-bar{ display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px; margin:0 0 14px; }
+.sh-bar .sh-sum{ flex:1 1 260px; font-size:.95rem; color:#111827; }
+.sh-bar .sh-sum b{ font-weight:800; }
+.sh-bar .sh-sum .sh-sub{ display:block; font-size:.8rem; color:#6b7280; margin-top:2px; }
+.sh-chips{ display:flex; gap:6px; flex-wrap:wrap; }
+.sh-chips button{ min-height:38px; padding:0 14px; border-radius:999px; border:1px solid var(--line,#e5e7eb); background:#fff; color:#374151; font:inherit; font-size:.85rem; font-weight:700; cursor:pointer; }
+.sh-chips button[aria-pressed="true"]{ background:#06273a; border-color:#06273a; color:#fff; }
+.sh-acts{ display:flex; gap:8px; flex-wrap:wrap; }
+.sh-acts .btn{ min-height:40px; }
+.sh-ghost{ min-height:40px; padding:0 14px; border-radius:8px; border:1px solid var(--line,#e5e7eb); background:#fff; color:#111827; font:inherit; font-size:.85rem; font-weight:700; cursor:pointer; }
+.sh-ghost:hover{ background:#f9fafb; }
+.sh-ghost:disabled, .sh-acts .btn:disabled{ opacity:.55; cursor:default; }
+.sh-list{ display:flex; flex-direction:column; gap:10px; }
+.sh-row{ display:flex; flex-wrap:wrap; gap:14px; padding:14px 16px; border:1px solid var(--line,#e5e7eb); border-radius:12px; background:#fff; }
+.sh-row.done{ background:#f6fbf7; border-color:#bbf7d0; }
+.sh-row.refund{ opacity:.6; }
+.sh-main{ flex:1 1 300px; min-width:0; display:flex; flex-direction:column; gap:4px; }
+.sh-to{ font-size:1.02rem; color:#111827; }
+.sh-to b{ font-weight:800; }
+.sh-code{ margin-left:6px; padding:1px 7px; border-radius:6px; background:#f3f4f6; color:#374151; font:700 .74rem ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.04em; }
+.sh-addr{ font-size:.9rem; color:#374151; line-height:1.4; }
+.sh-what{ font-size:.88rem; color:#111827; font-weight:600; }
+.sh-gift{ margin-top:2px; padding:8px 10px; border-radius:8px; background:#fdf6e3; color:#5b4410; font-size:.88rem; font-style:italic; }
+.sh-from{ font-size:.78rem; color:#6b7280; }
+.sh-side{ flex:0 1 250px; display:flex; flex-direction:column; align-items:flex-start; gap:6px; }
+.sh-st{ padding:2px 10px; border-radius:999px; font-size:.76rem; font-weight:800; background:#fee2e2; color:#991b1b; }
+.sh-st.done{ background:#dcfce7; color:#166534; }
+.sh-st.refund{ background:#e5e7eb; color:#374151; }
+.sh-trk{ font-size:.84rem; font-weight:700; color:#0b6aa9; word-break:break-all; }
+.sh-em{ font-size:.78rem; color:#6b7280; }
+.sh-em.warn{ color:#b45309; font-weight:700; }
+.sh-track{ flex-basis:100%; display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px; padding-top:12px; border-top:1px dashed var(--line,#e5e7eb); }
+.sh-track label, .sh-grid label{ display:flex; flex-direction:column; gap:4px; font-size:.78rem; font-weight:700; color:#374151; }
+.sh-track label span, .sh-grid label span{ font-weight:500; color:#6b7280; }
+.sh-track input, .sh-track select, .sh-grid input, .sh-grid select{ box-sizing:border-box; min-height:44px; padding:0 10px; border:1px solid var(--line,#e5e7eb); border-radius:8px; background:#fff; color:#111827; font:inherit; font-size:16px; }
+.sh-track .sh-num{ flex:1 1 220px; }
+.sh-msg{ flex-basis:100%; font-size:.84rem; font-weight:700; color:#166534; }
+.sh-msg.bad{ color:#b91c1c; }
+.sh-form{ display:flex; flex-direction:column; gap:16px; }
+.sh-on{ display:flex; align-items:center; gap:10px; font-size:.95rem; color:#111827; cursor:pointer; }
+.sh-on input{ width:22px; height:22px; accent-color:#06273a; }
+.sh-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:12px; }
+.sh-items{ margin:0; padding:12px 14px; border:1px solid var(--line,#e5e7eb); border-radius:10px; }
+.sh-items legend{ padding:0 6px; font-size:.8rem; font-weight:800; color:#374151; }
+.sh-it{ display:flex; align-items:center; gap:10px; padding:6px 0; font-size:.9rem; color:#111827; cursor:pointer; }
+.sh-it input{ width:20px; height:20px; accent-color:#06273a; flex:none; }
+.sh-it .p{ margin-left:auto; color:#6b7280; font-size:.82rem; }
+.sh-it .s{ color:#6b7280; font-size:.78rem; }
+.sh-more{ margin-top:6px; background:none; border:0; padding:4px 0; color:#0b6aa9; font:inherit; font-size:.84rem; font-weight:700; cursor:pointer; }
+.sh-save{ display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
+.sh-save .btn{ min-height:44px; }
+.sh-setmsg{ font-size:.85rem; font-weight:700; color:#166534; }
+.sh-setmsg.bad{ color:#b91c1c; }
+@media (max-width:640px){ .sh-side{ flex-basis:100%; } }
+</style>
+<script>
+(function(){
+  var panel = document.getElementById('panel-shipping');
+  if (!panel || typeof sb === 'undefined') return;
+  // staging portal → the sandbox copy (the test order site's orders); the live portal → the live function
+  var STAGE = /staging/i.test(location.hostname) || /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+  var FN = SB_URL + '/functions/v1/' + (STAGE ? 'square-online-order-test' : 'square-online-order');
+  var listEl = document.getElementById('shList'), barEl = document.getElementById('shBar'), errEl = document.getElementById('shErr');
+  var envEl = document.getElementById('shEnv'), pill = document.getElementById('shTabPill');
+  var form = document.getElementById('shForm'), itemsEl = document.getElementById('shItems'), setMsg = document.getElementById('shSetMsg'), saveBtn = document.getElementById('shSave');
+  var F = { enabled:'shEnabled', from:'shFrom', order_by:'shOrderBy', ship_on:'shShipOn', arrive_from:'shArrFrom', arrive_by:'shArrBy', first:'shFirst', each:'shEach', limit:'shLimit', tax:'shTax' };
+  Object.keys(F).forEach(function(k){ F[k] = document.getElementById(F[k]); });
+  var st = { orders:null, env:'', cfg:null, fromLabel:'Memphis', filter:'todo', open:'', busy:{}, msg:{}, err:'', loading:false,
+             row:null, menu:{}, menuErr:'', picked:[], showAll:false, saving:false };
+  var CARRIERS = ['UPS', 'USPS', 'FedEx', 'Other'];
+  function h(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); }
+  function money(c){ return '$' + (Number(c || 0) / 100).toFixed(2); }
+  function nice(key, long){ // 'YYYY-MM-DD' → 'Tue, Dec 8'
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(key || ''))) return '';
+    var a = String(key).split('-');
+    return new Date(Date.UTC(+a[0], +a[1] - 1, +a[2], 12)).toLocaleDateString('en-US', { timeZone:'UTC', weekday:'short', month:'short', day:'numeric', year: long ? 'numeric' : undefined });
+  }
+  function when(iso){ var d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }); }
+  function phone(p){ var d = String(p || '').replace(/\D/g, ''); if (d.length === 11 && d[0] === '1') d = d.slice(1); return d.length === 10 ? '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6) : String(p || ''); }
+  function shipped(o){ return !!(o.tracking_number || o.fulfillment_state === 'COMPLETED'); }
+  async function session(){ try{ var d = (await sb.auth.getSession()).data; if (d && d.session){ SESSION = d.session; return d.session; } }catch(_){} return SESSION; }
+  async function call(action, body){
+    var s = await session();
+    var res = await fetch(FN + '?action=' + action, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer ' + (s ? s.access_token : SB_KEY) },
+      body: JSON.stringify(body || {})
+    });
+    var d = {}; try{ d = await res.json(); }catch(_){}
+    if (!res.ok || d.ok === false) throw new Error(d.error || ('Error ' + res.status));
+    return d;
+  }
+
+  // ---------- the ship list ----------
+  function counts(){
+    var c = { todo:0, done:0, all:0, boxes:0, boxesTodo:0 };
+    (st.orders || []).forEach(function(o){ if (o.refunded) return; c.all++; c.boxes += o.boxes; if (shipped(o)) c.done++; else { c.todo++; c.boxesTodo += o.boxes; } });
+    return c;
+  }
+  function shown(){
+    return (st.orders || []).filter(function(o){
+      if (st.filter === 'all') return true;
+      if (o.refunded) return false;
+      return st.filter === 'done' ? shipped(o) : !shipped(o);
+    }).sort(function(a, b){ return (a.ship_on || '').localeCompare(b.ship_on || '') || a.to.name.localeCompare(b.to.name); });
+  }
+  function drawPill(){
+    var c = counts();
+    pill.textContent = c.boxesTodo ? String(c.boxesTodo) : '';
+    pill.classList.toggle('show', !!c.boxesTodo);
+    pill.title = c.boxesTodo ? c.boxesTodo + ' box' + (c.boxesTodo === 1 ? '' : 'es') + ' to ship' : '';
+  }
+  function drawBar(){
+    var c = counts(), cfg = st.cfg, days = {};
+    (st.orders || []).forEach(function(o){ if (!o.refunded && o.ship_on) days[o.ship_on] = 1; });
+    var dayList = Object.keys(days).sort();
+    var head = cfg ? 'Ships <b>' + h(nice(cfg.ship_on)) + '</b> from ' + h(st.fromLabel) : 'Shipping is <b>off</b> on the order site';
+    if (dayList.length > 1 || (dayList.length === 1 && cfg && dayList[0] !== cfg.ship_on)) head += ' · ship days ' + dayList.map(function(d){ return h(nice(d)); }).join(', ');
+    barEl.innerHTML = '<div class="sh-sum">' + head + ' · <b>' + c.all + '</b> order' + (c.all === 1 ? '' : 's') + ' · <b>' + c.boxes + '</b> box' + (c.boxes === 1 ? '' : 'es') + ' · ' + c.done + ' shipped'
+      + '<span class="sh-sub">' + (cfg ? h((cfg.text || '') + (cfg.order_by ? ' · orders close ' + nice(cfg.order_by) : '')) : 'Turn it on under Shipping settings below.') + '</span></div>'
+      + '<div class="sh-chips" role="group" aria-label="Show">'
+      + [['todo', 'To ship', c.todo], ['done', 'Shipped', c.done], ['all', 'All', (st.orders || []).length]].map(function(x){
+          return '<button type="button" data-sh="filter" data-v="' + x[0] + '" aria-pressed="' + (st.filter === x[0]) + '">' + x[1] + ' (' + x[2] + ')</button>';
+        }).join('') + '</div>'
+      + '<div class="sh-acts"><button type="button" class="sh-ghost" data-sh="refresh"' + (st.loading ? ' disabled' : '') + '>' + (st.loading ? 'Loading…' : 'Refresh') + '</button>'
+      + '<button type="button" class="btn btn-gold" data-sh="print"' + (shown().length ? '' : ' disabled') + '>🖨 Print packing list</button></div>';
+  }
+  function rowHTML(o){
+    var done = shipped(o), busy = !!st.busy[o.id], m = st.msg[o.id];
+    var addr = h(o.to.address1) + (o.to.address2 ? ', ' + h(o.to.address2) : '') + '<br>' + h(o.to.city) + ', ' + h(o.to.state) + ' ' + h(o.to.zip) + (o.to.phone ? ' · ' + h(phone(o.to.phone)) : '');
+    var items = o.lines.map(function(l){ return l.qty + '× ' + h(l.name) + (l.option ? ' (' + h(l.option) + ')' : '') + (l.note ? ' — “' + h(l.note) + '”' : ''); }).join(' · ');
+    var side = '<span class="sh-st' + (o.refunded ? ' refund' : done ? ' done' : '') + '">' + (o.refunded ? 'Refunded' : done ? 'Shipped' : 'Not shipped') + '</span>';
+    if (o.tracking_number) side += o.tracking_url
+      ? '<a class="sh-trk" href="' + h(o.tracking_url) + '" target="_blank" rel="noopener">' + h((o.carrier ? o.carrier + ' ' : '') + o.tracking_number) + ' ↗</a>'
+      : '<span class="sh-trk">' + h((o.carrier ? o.carrier + ' ' : '') + o.tracking_number) + '</span>';
+    if (o.tracking_number) side += o.tracking_emailed ? '<span class="sh-em">Tracking emailed ' + h(when(o.tracking_emailed)) + '</span>' : '<span class="sh-em warn">Tracking not emailed yet</span>';
+    if (!o.refunded) {
+      if (!done) side += '<button type="button" class="btn btn-gold" data-sh="track" data-v="' + h(o.id) + '"' + (busy ? ' disabled' : '') + '>Add tracking</button>';
+      else if (o.tracking_number) side += '<button type="button" class="sh-ghost" data-sh="email" data-v="' + h(o.id) + '"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Sending…' : o.tracking_emailed ? 'Resend tracking email' : 'Email tracking') + '</button>';
+    }
+    var form = '';
+    if (st.open === o.id && !done) {
+      form = '<form class="sh-track" data-sh="trackform" data-v="' + h(o.id) + '">'
+        + '<label>Carrier<select name="carrier">' + CARRIERS.map(function(c){ return '<option>' + c + '</option>'; }).join('') + '</select></label>'
+        + '<label class="sh-num">Tracking number<input name="num" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="1Z…" maxlength="60"></label>'
+        + '<button type="submit" class="btn btn-gold"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Saving…' : 'Save & email the customer') + '</button>'
+        + '<button type="button" class="sh-ghost" data-sh="cancel" data-v="' + h(o.id) + '">Cancel</button></form>';
+    }
+    return '<div class="sh-row' + (o.refunded ? ' refund' : done ? ' done' : '') + '" data-id="' + h(o.id) + '">'
+      + '<div class="sh-main"><div class="sh-to"><b>' + h(o.to.name || '(no name)') + '</b><span class="sh-code">' + h(o.code) + '</span>'
+      + (o.ship_on && st.cfg && o.ship_on !== st.cfg.ship_on ? ' <span class="sh-code">ships ' + h(nice(o.ship_on)) + '</span>' : '') + '</div>'
+      + '<div class="sh-addr">' + addr + '</div><div class="sh-what">' + items + '</div>'
+      + (o.gift_note ? '<div class="sh-gift">🎁 “' + h(o.gift_note) + '”</div>' : '')
+      + '<div class="sh-from">From ' + h(o.buyer || 'the buyer') + (o.email ? ' · ' + h(o.email) : '') + (o.buyer_phone ? ' · ' + h(phone(o.buyer_phone)) : '')
+      + ' · ' + money(o.total_cents) + ' paid (' + money(o.shipping_cents) + ' shipping' + (o.tax_cents ? ', ' + money(o.tax_cents) + ' tax' : '') + ') · ordered ' + h(when(o.created_at)) + '</div></div>'
+      + '<div class="sh-side">' + side + '</div>' + form
+      + (m ? '<div class="sh-msg' + (m.bad ? ' bad' : '') + '" role="status">' + h(m.text) + '</div>' : '') + '</div>';
+  }
+  function draw(){
+    var of = listEl.querySelector('.sh-track'), keep = of ? { id: of.getAttribute('data-v'), carrier: of.carrier.value, num: of.num.value, focus: document.activeElement === of.num } : null; // a half-typed tracking number survives a redraw
+    errEl.textContent = st.err;
+    envEl.hidden = st.env !== 'sandbox';
+    if (!st.orders){ barEl.innerHTML = ''; listEl.innerHTML = '<div class="rec-empty">' + (st.err ? 'Couldn’t load the ship list.' : 'Loading…') + '</div>'; return; }
+    drawBar(); drawPill();
+    var rows = shown();
+    listEl.innerHTML = rows.length ? rows.map(rowHTML).join('')
+      : '<div class="rec-empty">' + (st.orders.length ? (st.filter === 'todo' ? 'Everything is shipped. 🎉' : 'Nothing here.') : 'No shipped orders yet.') + '</div>';
+    var nf = listEl.querySelector('.sh-track');
+    if (nf) {
+      if (keep && keep.id === nf.getAttribute('data-v')) { nf.carrier.value = keep.carrier; nf.num.value = keep.num; if (keep.focus) nf.num.focus(); }
+      else nf.num.focus();
+    }
+  }
+  async function load(fresh){
+    if (st.loading) return;
+    if (fresh) st.msg = {}; // Refresh clears the "saved / emailed" notes
+    st.loading = true; if (st.orders) drawBar();
+    try {
+      var d = await call('ship_orders', { fresh: !!fresh });
+      st.orders = d.orders || []; st.env = d.env || ''; st.cfg = d.config || null; st.fromLabel = d.from_label || 'Memphis'; st.err = '';
+    } catch (e) { st.err = e.message; }
+    st.loading = false; draw();
+  }
+  function patch(o){ st.orders = (st.orders || []).map(function(x){ return x.id === o.id ? o : x; }); }
+  async function addTracking(id, carrier, num){
+    st.busy[id] = true; st.msg[id] = null; draw();
+    try {
+      var d = await call('ship_mark', { order_id:id, carrier:carrier, tracking_number:num });
+      patch(d.order); st.open = '';
+      st.msg[id] = d.email_sent && d.saved_in_square ? { text:'Saved in Square and the customer has the tracking link.' }
+        : d.email_sent ? { text:'Tracking emailed to the customer. ' + (d.square_error || 'Square wasn’t updated.'), bad:true }
+        : d.saved_in_square ? { text:'Saved in Square, but the email didn’t go — press Email tracking to try again.', bad:true }
+        : { text:'Nothing was saved: ' + (d.square_error || 'try again.'), bad:true };
+    } catch (e) { st.msg[id] = { text:e.message, bad:true }; }
+    st.busy[id] = false; draw();
+  }
+  async function emailTracking(id){
+    st.busy[id] = true; st.msg[id] = null; draw();
+    try {
+      var d = await call('ship_email', { order_id:id });
+      patch(d.order);
+      st.msg[id] = d.email_sent ? { text:'Tracking emailed to ' + d.order.email + '.' } : { text:'The email didn’t go — try again in a minute.', bad:true };
+    } catch (e) { st.msg[id] = { text:e.message, bad:true }; }
+    st.busy[id] = false; draw();
+  }
+  // the packing list: one table, then a slip per order (ship-to, items, the gift note to tuck in the box)
+  function printList(){
+    var rows = shown().filter(function(o){ return !o.refunded; });
+    if (!rows.length) return;
+    var w = window.open('', '_blank');
+    if (!w){ st.err = 'The print window was blocked — allow pop-ups for this site, then press Print again.'; draw(); return; }
+    var boxes = rows.reduce(function(n, o){ return n + o.boxes; }, 0), cfg = st.cfg;
+    var title = 'GREYS shipping · ' + (cfg ? 'ships ' + nice(cfg.ship_on, true) : 'packing list') + (st.env === 'sandbox' ? ' · TEST' : '');
+    var addr = function(o){ return h(o.to.name) + '<br>' + h(o.to.address1) + (o.to.address2 ? '<br>' + h(o.to.address2) : '') + '<br>' + h(o.to.city) + ', ' + h(o.to.state) + ' ' + h(o.to.zip); };
+    var items = function(o){ return o.lines.map(function(l){ return l.qty + '× ' + h(l.name) + (l.option ? ' (' + h(l.option) + ')' : ''); }).join('<br>'); };
+    var table = '<table class="list"><thead><tr><th>✓</th><th>Order</th><th>Ship to</th><th>Phone</th><th>Boxes</th><th>Gift note</th></tr></thead><tbody>'
+      + rows.map(function(o){
+          return '<tr><td class="ck">☐</td><td><b>' + h(o.code) + '</b><br><small>' + h(o.buyer) + '</small></td><td>' + addr(o) + '</td><td>' + h(phone(o.to.phone)) + '</td>'
+            + '<td class="n">' + o.boxes + '</td><td>' + (o.gift_note ? '“' + h(o.gift_note) + '”' : '<small>—</small>') + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    var slips = rows.map(function(o){
+      return '<section class="slip"><div class="brand">GREYS <span>Fine Cheeses · shipped from ' + h(st.fromLabel) + '</span></div>'
+        + '<div class="cols"><div><div class="k">Ship to</div><div class="to">' + addr(o) + '</div>' + (o.to.phone ? '<div class="ph">' + h(phone(o.to.phone)) + '</div>' : '') + '</div>'
+        + '<div><div class="k">Order</div><div class="code">' + h(o.code) + '</div><div class="k">In this box</div><div class="it">' + items(o) + '</div></div></div>'
+        + (o.gift_note ? '<div class="gift"><div class="k">Gift note — tuck it in the box</div><div class="gn">“' + h(o.gift_note) + '”</div>' + (o.buyer ? '<div class="gb">— ' + h(o.buyer) + '</div>' : '') + '</div>' : '')
+        + '<div class="cold">Keep refrigerated · please put this box in the fridge as soon as it arrives.</div></section>';
+    }).join('');
+    w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + h(title) + '</title><style>'
+      + 'body{font:14px/1.4 Arial,Helvetica,sans-serif;color:#111;margin:24px} h1{font:700 22px Georgia,serif;margin:0 0 4px} .meta{color:#555;margin:0 0 16px}'
+      + '.test{display:inline-block;background:#fde68a;padding:2px 8px;border-radius:4px;font-weight:700;margin-left:8px;font-size:12px}'
+      + 'table.list{width:100%;border-collapse:collapse} .list th,.list td{border:1px solid #bbb;padding:7px 8px;text-align:left;vertical-align:top} .list th{background:#f2f2f2;font-size:12px}'
+      + '.list td.ck{font-size:18px;text-align:center;width:28px} .list td.n{text-align:center;font-weight:700;font-size:16px} small{color:#666}'
+      + '.slip{page-break-before:always;break-before:page;padding-top:8px} .brand{font:700 26px Georgia,serif;letter-spacing:.05em;border-bottom:3px solid #E0A21C;padding-bottom:8px;margin-bottom:18px} .brand span{font:400 13px Arial;letter-spacing:0;color:#555}'
+      + '.cols{display:flex;gap:40px} .cols>div{flex:1} .k{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#666;margin:0 0 4px}'
+      + '.to{font-size:22px;line-height:1.35;font-weight:700} .ph{margin-top:6px;font-size:15px} .code{font:700 22px ui-monospace,Menlo,monospace;margin-bottom:14px} .it{font-size:16px}'
+      + '.gift{margin:28px 0;padding:22px 26px;border:2px dashed #E0A21C;border-radius:10px} .gn{font:italic 24px/1.4 Georgia,serif} .gb{margin-top:10px;font-size:16px}'
+      + '.cold{margin-top:24px;font-size:13px;color:#333} @media print{body{margin:0}}'
+      + '</style></head><body><h1>' + h(cfg ? 'Ship day · ' + nice(cfg.ship_on, true) : 'Packing list') + (st.env === 'sandbox' ? '<span class="test">TEST ORDERS</span>' : '') + '</h1>'
+      + '<p class="meta">' + rows.length + ' order' + (rows.length === 1 ? '' : 's') + ' · ' + boxes + ' box' + (boxes === 1 ? '' : 'es') + ' · printed ' + h(when(new Date().toISOString())) + '</p>'
+      + table + slips + '</body></html>');
+    w.document.close(); w.focus();
+    setTimeout(function(){ try{ w.print(); }catch(_){} }, 350);
+  }
+
+  // ---------- settings ----------
+  var cents = function(v){ var n = Number(String(v || '').replace(/[$,\s]/g, '')); return isFinite(n) && n >= 0 && n <= 500 ? Math.round(n * 100) : null; };
+  function fill(d){
+    d = d || {};
+    F.enabled.checked = d.enabled === true;
+    F.from.value = d.from === 'nashville' ? 'nashville' : 'memphis';
+    F.order_by.value = d.order_by || ''; F.ship_on.value = d.ship_on || ''; F.arrive_from.value = d.arrive_from || ''; F.arrive_by.value = d.arrive_by || '';
+    F.first.value = d.first_cents != null ? (d.first_cents / 100).toFixed(2) : ''; F.each.value = d.each_cents != null ? (d.each_cents / 100).toFixed(2) : '';
+    F.limit.value = d.limit ? String(d.limit) : '0';
+    F.tax.value = (Array.isArray(d.tax_states) ? d.tax_states : ['TN']).join(', ');
+    st.picked = Array.isArray(d.items) ? d.items.slice() : [];
+  }
+  async function loadSettings(){
+    try {
+      var r = await sb.from('site_content').select('data, updated_at, updated_by').eq('key', 'order_shipping').maybeSingle();
+      if (r.error) throw r.error;
+      st.row = r.data || null; fill(st.row ? st.row.data : null);
+      setMsg.className = 'sh-setmsg'; setMsg.textContent = st.row ? 'Last saved ' + when(st.row.updated_at) + (st.row.updated_by ? ' by ' + st.row.updated_by : '') : 'Not set up yet.';
+    } catch (e) { setMsg.className = 'sh-setmsg bad'; setMsg.textContent = 'Couldn’t load the settings: ' + (e.message || e); }
+    loadMenu();
+  }
+  // the from-shop's items, from the order function's own menu (what the order site sells)
+  async function loadMenu(){
+    var shop = F.from.value;
+    if (!st.menu[shop]) {
+      itemsEl.innerHTML = '<div class="rec-empty">Loading the menu…</div>';
+      try { st.menu[shop] = await call('menu', { location:shop }); st.menuErr = ''; }
+      catch (e) { st.menuErr = e.message; }
+    }
+    drawItems();
+  }
+  function drawItems(){
+    var m = st.menu[F.from.value];
+    if (!m) { itemsEl.innerHTML = '<div class="sh-em warn">Couldn’t load the menu (' + h(st.menuErr) + '). Item ids: ' + h(st.picked.join(', ') || 'none') + '</div>'; return; }
+    var secs = (m.sections || []), byId = m.items || {}, seen = {}, out = '';
+    var row = function(id, sec){
+      var it = byId[id]; if (!it || seen[id]) return ''; seen[id] = 1;
+      var p = (it.vars || [])[0], on = st.picked.indexOf(id) >= 0;
+      return '<label class="sh-it"><input type="checkbox" data-sh="item" value="' + h(id) + '"' + (on ? ' checked' : '') + '><span>' + h(it.name) + (sec ? ' <span class="s">· ' + h(sec) + '</span>' : '') + '</span>'
+        + (p ? '<span class="p">' + money(p.price) + '</span>' : '') + '</label>';
+    };
+    st.picked.forEach(function(id){ var s = secs.filter(function(x){ return (x.items || []).indexOf(id) >= 0; })[0]; out += row(id, s ? s.name : ''); });
+    secs.forEach(function(s){ if (s.id === 'special' || st.showAll) (s.items || []).forEach(function(id){ out += row(id, s.name); }); });
+    var missing = st.picked.filter(function(id){ return !byId[id]; });
+    if (missing.length) out += '<div class="sh-em warn">Saved but not on the ' + h(F.from.options[F.from.selectedIndex].text) + ' menu right now: ' + h(missing.join(', ')) + ' — they stay in the settings.</div>';
+    itemsEl.innerHTML = (out || '<div class="rec-empty">No Special Offers items on this menu.</div>')
+      + '<button type="button" class="sh-more" data-sh="more">' + (st.showAll ? 'Show only Special Offers' : 'Show every item on the menu') + '</button>';
+  }
+  function problem(d){
+    if (!d.ship_on) return 'Pick the ship day.';
+    if (d.order_by && d.order_by > d.ship_on) return 'The last day to order has to be on or before the ship day.';
+    if (d.arrive_from && d.arrive_from < d.ship_on) return '“Arrives from” can’t be before the ship day.';
+    if (d.arrive_from && d.arrive_by && d.arrive_by < d.arrive_from) return '“Arrives by” can’t be before “Arrives from”.';
+    if (d.first_cents == null || d.each_cents == null) return 'Check the shipping prices (dollars, like 30.00).';
+    if (d.enabled && !d.items.length) return 'Tick at least one item that ships, or turn shipping off.';
+    if (!/^\d+$/.test(String(F.limit.value || '0').trim())) return 'Most boxes to ship is a whole number (0 = no cap).';
+    if (d.bad_states.length) return 'Not a state code: ' + d.bad_states.join(', ');
+    return '';
+  }
+  async function save(e){
+    e.preventDefault();
+    if (st.saving) return;
+    var states = String(F.tax.value || '').toUpperCase().split(/[\s,;]+/).filter(Boolean);
+    var d = {
+      enabled: F.enabled.checked, from: F.from.value, items: st.picked.slice(),
+      order_by: F.order_by.value || null, ship_on: F.ship_on.value || null, arrive_from: F.arrive_from.value || null, arrive_by: F.arrive_by.value || null,
+      first_cents: cents(F.first.value), each_cents: F.each.value.trim() ? cents(F.each.value) : cents(F.first.value),
+      limit: Math.max(0, parseInt(F.limit.value || '0', 10) || 0),
+      tax_states: states.filter(function(s){ return /^[A-Z]{2}$/.test(s); }), bad_states: states.filter(function(s){ return !/^[A-Z]{2}$/.test(s); })
+    };
+    var why = problem(d);
+    if (why) { setMsg.className = 'sh-setmsg bad'; setMsg.textContent = why; return; }
+    delete d.bad_states;
+    var s = await session(), who = s && s.user && s.user.email ? s.user.email : 'manager';
+    var data = Object.assign({}, st.row && st.row.data ? st.row.data : {}, d); // keeps keys this form doesn't know (note …)
+    st.saving = true; saveBtn.disabled = true; setMsg.className = 'sh-setmsg'; setMsg.textContent = 'Saving…';
+    try {
+      var r = await sb.from('site_content').upsert({ key:'order_shipping', data:data, updated_at:new Date().toISOString(), updated_by:who }, { onConflict:'key' }).select('data, updated_at, updated_by').maybeSingle();
+      if (r.error) throw r.error;
+      st.row = r.data || { data:data, updated_at:new Date().toISOString(), updated_by:who };
+      setMsg.textContent = 'Saved — the order site picks it up within about 10 seconds.';
+      setTimeout(function(){ load(true); }, 11000);
+    } catch (err) { setMsg.className = 'sh-setmsg bad'; setMsg.textContent = 'Couldn’t save: ' + (err.message || err); }
+    st.saving = false; saveBtn.disabled = false;
+  }
+
+  // ---------- events ----------
+  panel.addEventListener('click', function(e){
+    var b = e.target.closest('[data-sh]'); if (!b || b.tagName === 'FORM' || b.tagName === 'INPUT') return;
+    var a = b.getAttribute('data-sh'), v = b.getAttribute('data-v');
+    if (a === 'filter') { st.filter = v; draw(); }
+    else if (a === 'refresh') load(true);
+    else if (a === 'print') printList();
+    else if (a === 'track') { st.open = v; st.msg[v] = null; draw(); }
+    else if (a === 'cancel') { st.open = ''; draw(); }
+    else if (a === 'email') emailTracking(v);
+    else if (a === 'more') { st.showAll = !st.showAll; drawItems(); }
+  });
+  panel.addEventListener('change', function(e){
+    var t = e.target;
+    if (t.getAttribute('data-sh') === 'item') {
+      st.picked = st.picked.filter(function(id){ return id !== t.value; });
+      if (t.checked) st.picked.push(t.value);
+    } else if (t === F.from) loadMenu();
+  });
+  panel.addEventListener('submit', function(e){
+    var f = e.target;
+    if (f === form) return save(e);
+    if (f.getAttribute('data-sh') === 'trackform') {
+      e.preventDefault();
+      var num = String(f.num.value || '').replace(/[\s-]+/g, '').toUpperCase(), id = f.getAttribute('data-v');
+      if (!/^[A-Z0-9]{6,40}$/.test(num)) { st.msg[id] = { text:'Please check the tracking number.', bad:true }; draw(); return; }
+      addTracking(id, f.carrier.value, num);
+    }
+  });
+
+  var started = false;
+  function start(){ if (started) return; started = true; load(false); loadSettings(); }
+  // fresh whenever the tab is opened, and every 2 minutes while it shows; the tab's box count once signed in
+  new MutationObserver(function(){ if (panel.classList.contains('active')) { if (!started) start(); else load(false); } }).observe(panel, { attributes:true, attributeFilter:['class'] });
+  setInterval(function(){ if (!document.hidden && panel.classList.contains('active')) load(false); }, 120000);
+  (async function(){ for (var i = 0; i < 40; i++) { var s = await session(); if (s) { if (!started) load(false); return; } await new Promise(function(r){ setTimeout(r, 3000); }); } })();
+  window.__ship = { state: st, load: load, print: printList };
 })();
 </script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
