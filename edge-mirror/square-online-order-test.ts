@@ -111,6 +111,8 @@
 // The ledger: online_orders gets fulfillment / ship_to / gift_note / shipping_cents / ship_on and the tracking
 // columns (migration online_orders_shipping). Until they exist a ship order is logged without them, so the sweep,
 // the double-click guard and status still work.
+//   v17.2 (2026-11-12, go-live): the staff actions pick Square by function, not by the caller's Origin (the staff
+//   portal isn't the order site) — square-online-order = production, square-online-order-test = sandbox. See staffEnv.
 //
 // Actions (POST ?action=…): config · menu · quote · pay · status · sweep · ship_days · ship_orders · ship_mark ·
 // ship_email · track                                                            verify_jwt = false
@@ -172,6 +174,9 @@ const listEnv = (name: string, dflt: string[]) => {
 const TEST_COPY = true;
 const envFor = (req: Request): Env =>
   !TEST_COPY && listEnv("ORDER_LIVE_ORIGINS", LIVE_ORIGINS).includes((req.headers.get("Origin") ?? "").trim().toLowerCase()) ? "production" : "sandbox";
+// The staff side (ship list, ship days, tracking) is called from the staff portal and pg_cron, never from the order
+// site, so the page's Origin can't pick it: the live function works the live Square orders, the test copy the sandbox's (v17.2).
+const staffEnv = (): Env => (TEST_COPY ? "sandbox" : "production");
 const liveShop = (shop: Shop) => listEnv("ORDER_LIVE_SHOPS", LIVE_SHOPS).includes(shop);
 const credsFor = (e: Env) => e === "production"
   ? { token: Deno.env.get("SQUARE_TICKET_ACCESS_TOKEN") ?? Deno.env.get("SQUARE_ACCESS_TOKEN"), appId: Deno.env.get("SQUARE_TICKET_APP_ID") ?? null, location: null as string | null }
@@ -1319,7 +1324,7 @@ async function shipOrders(e: Env, fresh = false): Promise<ShipOrder[]> {
 }
 // staff calendar: how many boxes go out each ship day — no names (the portal home page has no login)
 async function shipDays(req: Request) {
-  const e = envFor(req), c = shipCfg;
+  const e = staffEnv(), c = shipCfg;
   const by: Record<string, { date: string; orders: number; boxes: number; shipped: number }> = {};
   for (const o of await shipOrders(e)) {
     if (o.refunded || !o.ship_on) continue;
@@ -1333,7 +1338,7 @@ async function shipDays(req: Request) {
 // the packing list, with what the ledger knows about the tracking email
 async function shipOrdersAction(req: Request, b: any) {
   await needStaff(req, b);
-  const e = envFor(req), c = shipCfg;
+  const e = staffEnv(), c = shipCfg;
   const list = await shipOrders(e, b.fresh === true);
   const ids = list.map((o) => o.id);
   if (ids.length) {
@@ -1367,7 +1372,7 @@ async function ledgerTrack(o: ShipOrder, emailed: boolean) {
 // number, shipped_at; fulfillment COMPLETED; metadata.tracking_emailed when the email went)
 async function shipMark(req: Request, b: any) {
   const who = await needStaff(req, b);
-  const e = envFor(req);
+  const e = staffEnv();
   const id = clean(b.order_id, 80);
   const carrier = CARRIERS.find((x) => x.toLowerCase() === clean(b.carrier, 20).toLowerCase()) ?? "UPS";
   const num = clean(b.tracking_number, 60).replace(/[\s-]+/g, "").toUpperCase();
@@ -1431,7 +1436,7 @@ async function shipMark(req: Request, b: any) {
 // the tracking email again, for a label that's already in Square
 async function shipEmail(req: Request, b: any) {
   await needStaff(req, b);
-  const e = envFor(req);
+  const e = staffEnv();
   const o = shipOrderOf((await square(`/v2/orders/${encodeURIComponent(clean(b.order_id, 80))}`, { method: "GET" }, e))?.order);
   if (!o) throw new PublicError("That isn't a shipped order from the order site.", 404);
   if (!o.tracking_number) throw new PublicError("Square has no tracking number on this order yet — buy the label, or add the tracking number.", 409);
