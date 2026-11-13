@@ -19153,6 +19153,11 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   var form = document.getElementById('shForm'), itemsEl = document.getElementById('shItems'), setMsg = document.getElementById('shSetMsg'), saveBtn = document.getElementById('shSave');
   var F = { enabled:'shEnabled', from:'shFrom', order_by:'shOrderBy', ship_on:'shShipOn', arrive_from:'shArrFrom', arrive_by:'shArrBy', first:'shFirst', each:'shEach', limit:'shLimit', tax:'shTax' };
   Object.keys(F).forEach(function(k){ F[k] = document.getElementById(F[k]); });
+  // TEST SWITCH (2026-11-13, Maverick: shipping on the test site to show the owner, live stays off): on the staging
+  // portal the on/off box is the TEST order site's own switch, order_shipping.test_enabled (read only by
+  // square-online-order-test; not set = follows enabled). It never changes the live site's `enabled`. The other
+  // settings (dates, prices, items) are still shared with the live site.
+  if (STAGE && F.enabled && F.enabled.nextElementSibling) F.enabled.nextElementSibling.innerHTML = 'Offer <b>Ship it</b> on the <b>test</b> order site <span style="font-weight:400;color:#6b7280">(staging only — dates, prices and items are shared with the live site)</span>';
   var st = { orders:null, env:'', cfg:null, fromLabel:'Memphis', filter:'todo', open:'', busy:{}, msg:{}, err:'', loading:false,
              row:null, menu:{}, menuErr:'', picked:[], showAll:false, saving:false };
   var CARRIERS = ['UPS', 'USPS', 'FedEx', 'Other'];
@@ -19334,7 +19339,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   var cents = function(v){ var n = Number(String(v || '').replace(/[$,\s]/g, '')); return isFinite(n) && n >= 0 && n <= 500 ? Math.round(n * 100) : null; };
   function fill(d){
     d = d || {};
-    F.enabled.checked = d.enabled === true;
+    F.enabled.checked = (STAGE && 'test_enabled' in d ? d.test_enabled : d.enabled) === true; // staging: the test site's switch (TEST SWITCH)
     F.from.value = d.from === 'nashville' ? 'nashville' : 'memphis';
     F.order_by.value = d.order_by || ''; F.ship_on.value = d.ship_on || ''; F.arrive_from.value = d.arrive_from || ''; F.arrive_by.value = d.arrive_by || '';
     F.first.value = d.first_cents != null ? (d.first_cents / 100).toFixed(2) : ''; F.each.value = d.each_cents != null ? (d.each_cents / 100).toFixed(2) : '';
@@ -19403,6 +19408,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     var why = problem(d);
     if (why) { setMsg.className = 'sh-setmsg bad'; setMsg.textContent = why; return; }
     delete d.bad_states;
+    if (STAGE) { d.test_enabled = d.enabled; delete d.enabled; } // staging saves the test site's switch; live's `enabled` is kept as it is
     var s = await session(), who = s && s.user && s.user.email ? s.user.email : 'manager';
     var data = Object.assign({}, st.row && st.row.data ? st.row.data : {}, d); // keeps keys this form doesn't know (note …)
     st.saving = true; saveBtn.disabled = true; setMsg.className = 'sh-setmsg'; setMsg.textContent = 'Saving…';

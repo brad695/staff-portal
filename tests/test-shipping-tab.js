@@ -34,7 +34,7 @@ const ORDERS = () => [
 // a supabase-js stand-in: a session, is_app_admin true, empty tables, and the order_shipping row
 const SB_STUB = `(function(){
   var calls = window.__sbCalls = [];
-  var row = ${JSON.stringify({ data: CFG, updated_at: "2026-11-12T20:08:26Z", updated_by: "claude" })};
+  var row = window.__shipRowOverride || ${JSON.stringify({ data: CFG, updated_at: "2026-11-12T20:08:26Z", updated_by: "claude" })};
   function builder(table){
     var q = { table: table, ops: [] }, p;
     var res = function(){
@@ -66,6 +66,8 @@ async function open(browser, file, opts) {
   const ctx = await browser.newContext({ viewport: opts.viewport || { width: 1360, height: 900 } });
   const page = await ctx.newPage();
   const st = { errors: [], calls: [], orders: ORDERS() };
+  const H = opts.host || HOST;
+  if (opts.row) await page.addInitScript((r) => { window.__shipRowOverride = r; }, { data: opts.row, updated_at: "2026-11-13T23:00:00Z", updated_by: "claude" });
   page.on("pageerror", (e) => st.errors.push(String(e)));
   await page.route("**/*", (route) => {
     const req = route.request(), u = new URL(req.url());
@@ -89,13 +91,13 @@ async function open(browser, file, opts) {
       return reply({ ok: false, error: "nope" }, 400);
     }
     if (/square-orders$/.test(u.pathname)) return route.fulfill({ status: 200, contentType: "application/json", headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify({ ok: true, orders: [] }) });
-    if (u.origin === HOST && (u.pathname === "/manager.html" || u.pathname === "/manager")) return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: MANAGER });
-    if (u.origin === HOST && (u.pathname === "/" || u.pathname === "/index.html")) return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: INDEX });
+    if (u.origin === H && (u.pathname === "/manager.html" || u.pathname === "/manager")) return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: MANAGER });
+    if (u.origin === H && (u.pathname === "/" || u.pathname === "/index.html")) return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: INDEX });
     if (/\.js(\?|$)/.test(u.pathname + u.search)) return route.fulfill({ status: 200, contentType: "application/javascript", body: "" });
     if (/\.(png|svg|ico|jpg|webp)$/.test(u.pathname)) return route.fulfill({ status: 404, body: "" });
     return route.fulfill({ status: 200, contentType: "application/json", headers: { "Access-Control-Allow-Origin": "*" }, body: "{}" });
   });
-  await page.goto(HOST + file);
+  await page.goto(H + file);
   return { ctx, page, st };
 }
 const txt = (page, sel) => page.evaluate((s) => { const e = document.querySelector(s); return e ? e.textContent.replace(/\s+/g, " ").trim() : ""; }, sel);
@@ -167,6 +169,47 @@ const txt = (page, sel) => page.evaluate((s) => { const e = document.querySelect
       && JSON.stringify(d.tax_states) === '["TN","MS"]' && d.enabled === true && JSON.stringify(d.items) === '["EN2OPFWI6P6WHF3DDHD4T2V2"]', JSON.stringify(up && up[2]));
     t("…keeps keys the form doesn't know, says who saved", !!d && d.note === "keep me" && up[2].updated_by === "manager@greyscheese.com" && /Saved/.test(await txt(page, "#shSetMsg")));
     if (process.env.SHOTS) { await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({ path: path.join(process.env.SHOTS, "manager-shipping.png"), fullPage: true }); }
+    t("no page errors", st.errors.length === 0, st.errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
+  // TEST SWITCH (2026-11-13): the staging portal's on/off box is the test site's order_shipping.test_enabled; live's is enabled
+  const settingsSave = async (page) => {
+    await page.click("#shSave"); await page.waitForTimeout(400);
+    const up = await page.evaluate(() => (window.__sbCalls || []).filter((c) => c[0] === "site_content" && c[1] === "upsert").pop());
+    return up && up[2] && up[2].data;
+  };
+  const openSettings = async (opts) => {
+    const o = await open(browser, "/manager.html", opts);
+    await o.page.waitForFunction(() => !document.getElementById("consoleView").classList.contains("hide"), null, { timeout: 15000 });
+    await o.page.evaluate(() => mtab("shipping"));
+    await o.page.waitForSelector("#shItems .sh-it", { timeout: 8000 }); await o.page.waitForTimeout(300);
+    return o;
+  };
+  console.log("\nmanager.html · the test site's own shipping switch");
+  {
+    const { ctx, page, st } = await openSettings({ row: Object.assign({}, CFG, { enabled: false, test_enabled: true }) });
+    t("staging: live off + test on → the box is ticked", await page.evaluate(() => document.getElementById("shEnabled").checked));
+    t("…and says it's the test order site", /on the test order site/.test(await txt(page, ".sh-on")), await txt(page, ".sh-on"));
+    await page.uncheck("#shEnabled"); const d = await settingsSave(page);
+    t("…untick + Save: test_enabled false, live enabled left false", !!d && d.test_enabled === false && d.enabled === false && d.note === "keep me", JSON.stringify(d));
+    t("no page errors", st.errors.length === 0, st.errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
+  {
+    const { ctx, page, st } = await openSettings({ row: Object.assign({}, CFG, { enabled: false }) });
+    t("staging: no test_enabled yet → the box follows live (off)", !(await page.evaluate(() => document.getElementById("shEnabled").checked)));
+    await page.check("#shEnabled"); const d = await settingsSave(page);
+    t("…tick + Save: test_enabled true, live enabled stays false", !!d && d.test_enabled === true && d.enabled === false, JSON.stringify(d));
+    t("no page errors", st.errors.length === 0, st.errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
+  {
+    const { ctx, page, st } = await openSettings({ host: "https://staff.greyscheese.com", row: Object.assign({}, CFG, { enabled: false, test_enabled: true }) });
+    t("live portal: the box is the live switch (off), test on doesn't tick it", !(await page.evaluate(() => document.getElementById("shEnabled").checked)));
+    t("…label unchanged", /on the order site/.test(await txt(page, ".sh-on")) && !/test/.test(await txt(page, ".sh-on")), await txt(page, ".sh-on"));
+    await page.check("#shEnabled"); const d = await settingsSave(page);
+    t("…tick + Save: enabled true, test_enabled kept as it was", !!d && d.enabled === true && d.test_enabled === true, JSON.stringify(d));
+    t("…talks to the live function", st.calls.some((c) => c.fn === "square-online-order") && !st.calls.some((c) => c.fn === "square-online-order-test"));
     t("no page errors", st.errors.length === 0, st.errors.slice(0, 3).join(" | "));
     await ctx.close();
   }
