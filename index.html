@@ -1314,6 +1314,11 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
 }
 @media print{ .sn-zoom{ display:none !important; } }
 </style>
+<style id="ship-day">
+/* SHIP DAYS on the calendar (2026-11-12) — the tag, in every theme layer above */
+.t-ship{ background:rgba(14,116,144,0.13); color:#0e7490; }
+.today-card .t-ship, #view-calendar .ag-day .t-ship{ color:#0e7490; }
+</style>
 </head>
 <body>
 <div class="app">
@@ -2528,7 +2533,7 @@ function renderReservations(recs){
 
 // ═══ CALENDAR ═══
 let _calYear=new Date().getFullYear(), _calMonth=new Date().getMonth(), _selDay=null;
-let _calData={ res:{}, ev:{}, sp:{}, sch:{}, off:{}, cls:{}, ord:{}, exp:{}, xbeo:{} };
+let _calData={ res:{}, ev:{}, sp:{}, sch:{}, off:{}, cls:{}, ord:{}, exp:{}, xbeo:{}, shp:{} };
 let _calTarget={ label:'calMonthLabel', list:'agendaList' };   // where the calendar renders: full view or inline home preview
 async function loadCalMonth(y,m){
   _calData.res={};
@@ -2639,6 +2644,34 @@ async function loadCalOrders(mS,mE){
     Object.values(_calData.ord).forEach(a=>a.sort((x,y)=>Date.parse(x.at)-Date.parse(y.at)));
   }catch(e){ _calData.ord={}; _calData.xbeo={}; }
 }
+// ── SHIP DAYS (2026-11-12): shipped online orders (12 Days of Cheesemas) — how many boxes go out each ship day,
+// from the order function's public ship_days (counts only, no names). Only on the calendar of the shop the boxes
+// ship from. The staging portal reads the Square-sandbox copy (the test order site's orders), the live one the live
+// function (which answers 400 until shipping is deployed there — then nothing shows). The packing list is in the
+// manager: Online Ordering → 🚚 Shipping.
+const SHIP_URL = SB_URL + '/functions/v1/' + (/staging/i.test(location.hostname) ? 'square-online-order-test' : 'square-online-order');
+let _shipDays = null, _shipDaysAt = 0;
+async function loadCalShips(mS,mE){
+  _calData.shp={};
+  try{
+    if(!_shipDays || Date.now()-_shipDaysAt > 60000){
+      _shipDaysAt = Date.now();
+      _shipDays = fetch(SHIP_URL+'?action=ship_days', { method:'POST', headers:{ 'Content-Type':'application/json', apikey:SB_KEY, Authorization:'Bearer '+SB_KEY }, body:'{}' })
+        .then(r=>r.ok ? r.json() : null).catch(()=>null);
+    }
+    const d = await _shipDays;
+    if(!d || !d.ok || d.from !== LOC) return;
+    (d.days||[]).forEach(x=>{ if(x.date>=mS && x.date<=mE && x.boxes>0) (_calData.shp[x.date]=_calData.shp[x.date]||[]).push(Object.assign({}, x, { test: d.env==='sandbox' })); });
+  }catch(e){ _calData.shp={}; }
+}
+function shipRow(s){
+  const txt = s.boxes+' box'+(s.boxes===1?'':'es')+' to ship · '+s.orders+' order'+(s.orders===1?'':'s')+(s.shipped?' · '+s.shipped+' shipped':'')+(s.test?' · TEST':'');
+  const detail = agDetail([
+    ['What', 'Shipped online orders — pack them cold (gel packs, insulated box) and ship them today.'],
+    ['Packing list', 'Manager → Online Ordering → Shipping']
+  ]) + '<a class="xt-a" href="/manager#shipping" onclick="event.stopPropagation()">🚚 Open the ship list →</a>';
+  return agRow('t-ship','Ship day','🚚 '+esc(txt),detail);
+}
 // One agenda line per order: when, who, what it is worth, and whether the
 // money is already in. Item names go on a second, quieter line.
 function ordRow(o){
@@ -2680,7 +2713,7 @@ async function _renderCalendar(opt){
   const labelEl=tgt.label&&document.getElementById(tgt.label); if(labelEl) labelEl.textContent=months[m]+' '+y;
   await loadCalMonth(y,m);
   const mS=fmt(new Date(y,m,1)), mE=fmt(new Date(y,m+1,0));
-  await Promise.all([ loadCalClasses(mS,mE), loadCalOrders(mS,mE), loadCalExperiences(mS,mE) ]);
+  await Promise.all([ loadCalClasses(mS,mE), loadCalOrders(mS,mE), loadCalExperiences(mS,mE), loadCalShips(mS,mE) ]);
   _calData.ev={}; _calEvents.forEach(ev=>occurrences(ev,mS,mE).forEach(d=>{(_calData.ev[d]=_calData.ev[d]||[]).push({name:ev.name,time:ev.time,desc:ev.desc,status:ev.status,endDate:ev.endDate,repeat:ev.repeat});}));
   _calData.sp={}; _specials.forEach(s=>{ if((s.repeat||'none')==='none'&&s.endDate&&s.endDate>s.date){ spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sp[k]=_calData.sp[k]||[]).push(s);}); } else { occurrences(s,mS,mE).forEach(d=>{(_calData.sp[d]=_calData.sp[d]||[]).push(s);}); } });
   _calData.sch={}; _schedules.forEach(s=>{ if(!s.date) return; spanDays(s.date,s.endDate,mS,mE,k=>{(_calData.sch[k]=_calData.sch[k]||[]).push(s);}); });
@@ -2716,8 +2749,8 @@ function renderAgenda(y,m,tgt,only){
   let html='', any=false;
   for(let d=(only?+only.slice(8):startDay); d<=(only?+only.slice(8):dim); d++){
     const date=fmt(new Date(y,m,d));
-    const res=_calData.res[date]||[], ev=_calData.ev[date]||[], sp=_calData.sp[date]||[], sch=_calData.sch[date]||[], off=_calData.off[date]||[], cls=_calData.cls[date]||[], ord=_calData.ord[date]||[], exp=_calData.exp[date]||[];
-    if(!(res.length||ev.length||sp.length||sch.length||off.length||cls.length||ord.length||exp.length)) continue;
+    const res=_calData.res[date]||[], ev=_calData.ev[date]||[], sp=_calData.sp[date]||[], sch=_calData.sch[date]||[], off=_calData.off[date]||[], cls=_calData.cls[date]||[], ord=_calData.ord[date]||[], exp=_calData.exp[date]||[], shp=_calData.shp[date]||[];
+    if(!(res.length||ev.length||sp.length||sch.length||off.length||cls.length||ord.length||exp.length||shp.length)) continue;
     any=true;
     const dl=new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
     let rows='';
@@ -2725,6 +2758,7 @@ function renderAgenda(y,m,tgt,only){
       ['Details', t.body], ['Time', t.time?fmtTime(t.time):''],
       ['Runs', (t.repeat&&t.repeat!=='none')?repeatLabel(t.repeat):'']
     ])));
+    shp.forEach(s=>rows+=shipRow(s));
     ord.forEach(o=>rows+=ordRow(o));
     ev.forEach(e=>rows+=agRow('t-event','Event',esc(e.name)+(e.time?' · '+fmtTime(e.time):'')+statusChip(e.status),agDetail([
       ['Details', e.desc], ['Status', e.status==='confirmed'?'Confirmed':e.status==='tentative'?'Tentative':''],
