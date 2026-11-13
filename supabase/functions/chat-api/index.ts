@@ -20,6 +20,8 @@
 // Client emails (2026-10-12): subject "Your GREYS question [#CODE]" (chat_convos.mail_code), Reply-To the inquiry
 // inbox — the inquiry Gmail sync in brad@greyscheese.com (subject:(GREYS question)) posts the customer's reply to
 // inquiries?action=ingest, which drops it into the conversation with that code.
+// Archive (2026-11-12): leads and inquiries carry archived_at; lead_archive {convo, archived} sets / clears it (managers,
+// through chat_lead_archive, which names who on the "🗄 Archived" card). A new customer message clears it (DB trigger).
 //
 // POST { a: <action>, ...args }   header x-chat-token: <token>   (verify_jwt = false)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -39,10 +41,10 @@ const STAGES = ["new", "replied", "quoted", "contract_sent", "signed", "invoiced
 // experience inquiries (chat_convos.inquiry_id): replies go where the inquiries function sends them
 const INQ_REPLY_TO = Deno.env.get("INQUIRY_REPLY_TO") || "brad@greyscheese.com";
 const ISTAGES = ["new", "replied", "link_sent", "booked", "lost"];
-const INQ_COLS = "id,code,name,email,phone,location,experience_type_id,experience_name,preferred_date,preferred_time,party_size,stage,unread,last_message_at,created_at,reservation_id,reservation_code,hold_expires_at,option_label,event_address,details";
+const INQ_COLS = "id,code,name,email,phone,location,experience_type_id,experience_name,preferred_date,preferred_time,party_size,stage,unread,last_message_at,created_at,reservation_id,reservation_code,hold_expires_at,option_label,event_address,details,archived_at";
 // paid_cents: what the card paid (price + 20% gratuity + tax) since 2026-11-10; total_cents is the price
 const RES_COLS = "id,code,status,payment_status,total_cents,paid_cents,refunded_cents,starts_at";
-const LEAD_COLS = "id,code,name,email,phone,company,location,event_date,event_time,guests,fulfillment,address,occasion,budget,stage,unread,last_message_at,created_at,beo_rev";
+const LEAD_COLS = "id,code,name,email,phone,company,location,event_date,event_time,guests,fulfillment,address,occasion,budget,stage,unread,last_message_at,created_at,beo_rev,archived_at";
 const QUOTE_COLS = "lead_id,status,total_cents,deposit_pct,amount_paid_cents,invoice_status,invoice_url,invoice_number,sent_at,viewed_at,signed_at,signed_name,invoice_only,balance_due_date,deposit_paid_at,paid_at,created_at";
 
 const CORS = {
@@ -608,6 +610,19 @@ async function handle(a: string, b: any, me: number) {
         : await db.rpc("chat_lead_set_stage", { p_lead: c.lead_id, p_stage: st, p_by: str(e?.name) });
       if (error) fail(500, error.message);
       return { ok: true };
+    }
+    case "lead_archive": {
+      // 🗄 Archive / ↩ Unarchive (Maverick 2026-11-12: "the ability to archive leads, both in the chat and in the catering
+      // leads"): out of the Leads lists without calling it Lost. sql/2026-11-12_lead_archive.sql
+      const c = await convo(str(b.convo));
+      if (!c?.lead_id && !c?.inquiry_id) fail(404, "That isn't a lead.");
+      await mustMember(c.id, me);
+      const e = await emp(me);
+      if (!isMgr(e)) fail(403, "Only managers can archive leads.");
+      const on = b.archived !== false;
+      const { error } = await db.rpc("chat_lead_archive", { p_lead: c.lead_id || null, p_inq: c.lead_id ? null : c.inquiry_id, p_on: on, p_by: str(e?.name) });
+      if (error) fail(500, error.message);
+      return { ok: true, archived: on };
     }
     case "prefs": {
       const upd: any = {};

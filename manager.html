@@ -763,7 +763,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
         <div style="flex:1;min-width:0;"><h3 id="inqTitle"></h3><div id="inqMeta" class="hint"></div></div>
         <div class="cat-mhead-r"><a class="btn btn-ghost btn-sm" id="inqChatLink" href="/chat" target="_blank" rel="noopener" title="This inquiry's conversation in Greys Chat — texts, emails and notes stay in step with this one">💬 Chat</a><span class="cat-stagelbl">Stage</span><select id="inqStage" class="loc-sel" onchange="inqSetStage(this.value)">
           <option value="new">New</option><option value="replied">Replied</option><option value="link_sent">Booking link sent</option><option value="booked">Booked</option><option value="lost">Lost</option>
-        </select>
+        </select><button class="btn btn-ghost btn-sm" id="inqArch" onclick="inqArchive()">🗄 Archive</button>
         <button class="btn btn-ghost btn-sm" onclick="inqClose()">✕</button></div>
       </div>
       <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;margin:10px 0 0;cursor:pointer;">
@@ -898,6 +898,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       #catList .cat-card .cat-sub{ white-space:normal; }
       #catList .cat-card .res-r-time{ font-size:.78rem; }
       #catList .cat-card > .pill{ margin-left:auto; }
+      #catList .cat-card > .cat-arch + .pill{ margin-left:0; }
     }
   </style>
   <!-- Catering leads: HoneyBook-style pipeline — conversation → proposal → e-signed contract → Square invoice -->
@@ -917,7 +918,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="rec-card" style="background:#fff;max-width:900px;width:100%;border-radius:14px;padding:22px;">
       <div class="cat-mhead">
         <div style="flex:1;min-width:220px;"><h3 id="catTitle"></h3><div id="catMeta" class="hint"></div></div>
-        <div class="cat-mhead-r"><a class="btn btn-ghost btn-sm" id="catChatLink" href="/chat" target="_blank" rel="noopener" title="This lead's conversation in Greys Chat — texts, emails and notes stay in step with this one">💬 Chat</a><span class="cat-stagelbl">Stage</span><select id="catStage" class="loc-sel" onchange="catSetStage(this.value)"></select>
+        <div class="cat-mhead-r"><a class="btn btn-ghost btn-sm" id="catChatLink" href="/chat" target="_blank" rel="noopener" title="This lead's conversation in Greys Chat — texts, emails and notes stay in step with this one">💬 Chat</a><span class="cat-stagelbl">Stage</span><select id="catStage" class="loc-sel" onchange="catSetStage(this.value)"></select><button class="btn btn-ghost btn-sm" id="catArch" onclick="catArchive()">🗄 Archive</button>
         <button class="btn btn-ghost btn-sm" onclick="catClose()">✕</button></div>
       </div>
       <div class="cat-tabbar" id="catTabs">
@@ -2015,11 +2016,11 @@ window.inqOpenById = async function(id){
 function inqRender(){
   try{ if(document.getElementById('catList')) catRender(); }catch(_){} // inquiries list under Catering Leads now
   const counts = { open:0 }; Object.keys(INQ_STAGES).forEach(k=>counts[k]=0);
-  INQ_ROWS.forEach(r=>{ counts[r.stage]=(counts[r.stage]||0)+1; if(r.stage!=='booked'&&r.stage!=='lost') counts.open++; });
+  INQ_ROWS.forEach(r=>{ counts[r.stage]=(counts[r.stage]||0)+1; if(r.stage!=='booked'&&r.stage!=='lost'&&!r.archived_at) counts.open++; });
   document.getElementById('inqChips').innerHTML = [['open','Open'],...Object.entries(INQ_STAGES),['all','All']].map(([k,l])=>
     '<button class="chip'+(INQ_FILTER===k?' on':'')+'" onclick="INQ_FILTER=\''+k+'\';inqRender()">'+l+(k==='all'?'':' · '+(counts[k]||0))+'</button>').join('')
     +'<div class="spacer"></div><button class="btn btn-ghost btn-sm" onclick="inqLoad()">↻ Refresh</button>';
-  const rows = INQ_ROWS.filter(r=> INQ_FILTER==='all' ? true : INQ_FILTER==='open' ? (r.stage!=='booked'&&r.stage!=='lost') : r.stage===INQ_FILTER);
+  const rows = INQ_ROWS.filter(r=> INQ_FILTER==='all' ? true : INQ_FILTER==='open' ? (r.stage!=='booked'&&r.stage!=='lost'&&!r.archived_at) : r.stage===INQ_FILTER);
   const el = document.getElementById('inqList');
   if(!rows.length){ el.innerHTML = '<div class="rec-empty">No inquiries here.</div>'; return; }
   el.innerHTML = rows.map(r=>{
@@ -2045,6 +2046,7 @@ async function inqOpen(id){
         ? '<div style="margin-top:4px;color:#92400e;">⏳ Held until '+esc(inqWhen(r.hold_expires_at))+' — sending the booking link restarts the 48 h.</div>'
         : '<div style="margin-top:4px;color:#b91c1c;">Hold expired — the link still works if the time is open.</div>') : '');
   document.getElementById('inqStage').value = r.stage;
+  leadArchBtn('inqArch', r);
   const icl = document.getElementById('inqChatLink'); if(icl) icl.href = '/chat#lead=' + encodeURIComponent(r.code);
   document.getElementById('inqHideCal').checked = !!r.hide_on_calendar;
   document.getElementById('inqBody').value = '';
@@ -2054,6 +2056,10 @@ async function inqOpen(id){
   document.getElementById('inqModal').style.display = 'flex';
   await inqThread();
   if(r.unread){ await sb.from('inquiries').update({ unread:false }).eq('id', r.id); r.unread=false; inqLoad(); }
+}
+async function inqArchive(){
+  if(!INQ_CUR) return;
+  if(await leadArchiveRow('inquiries', INQ_CUR, 'inqMsg')){ leadArchBtn('inqArch', INQ_CUR); inqLoad(); }
 }
 async function inqThread(){
   const el = document.getElementById('inqThread'); el.innerHTML = '<div class="rec-empty">Loading…</div>';
@@ -2215,7 +2221,9 @@ function catRender(){
   // stay too; no date = stays until Lost. Unread stays under Open until someone opens it.
   const catToday = new Date().toLocaleDateString('en-CA');
   const catPast = x => { const d = String((x.inq ? x.r.preferred_date : x.r.event_date) || '').slice(0,10); return !!d && d < catToday; };
-  const isOpen = x => !!x.r.unread || (x.stage!=='lost' && !catPast(x));
+  // 🗄 Archived (2026-11-12): out of Open and every stage chip until Unarchive or a new message from the customer
+  const isArch = x => !!x.r.archived_at;
+  const isOpen = x => !isArch(x) && (!!x.r.unread || (x.stage!=='lost' && !catPast(x)));
   const kc = { all:0, catering:0, event:0, experience:0, table:0, donation:0, question:0 };
   all.filter(isOpen).forEach(x=>{ kc.all++; kc[x.kind]++; });
   const kd = document.getElementById('catKinds');
@@ -2224,11 +2232,11 @@ function catRender(){
   const tools = document.getElementById('catTools');
   if(tools && !tools.querySelector('button')) tools.innerHTML = '<button class="btn btn-ghost btn-sm" onclick="catLoad();inqLoad()">↻ Refresh</button><button class="btn btn-gold btn-sm" onclick="catNew()">＋ New lead</button>';
   const mine = all.filter(x=> CAT_KIND==='all' || x.kind===CAT_KIND);
-  const counts = { open:0 }; Object.keys(CAT_STAGES).forEach(k=>counts[k]=0);
-  mine.forEach(x=>{ counts[x.stage]=(counts[x.stage]||0)+1; if(isOpen(x)) counts.open++; });
-  document.getElementById('catChips').innerHTML = '<span class="lbl">Stage</span>' + [['open','Open'],['sep'],...Object.entries(CAT_STAGES),['sep'],['all','All']].map(([k,l])=>
+  const counts = { open:0, archived:0 }; Object.keys(CAT_STAGES).forEach(k=>counts[k]=0);
+  mine.forEach(x=>{ if(isArch(x)){ counts.archived++; return; } counts[x.stage]=(counts[x.stage]||0)+1; if(isOpen(x)) counts.open++; });
+  document.getElementById('catChips').innerHTML = '<span class="lbl">Stage</span>' + [['open','Open'],['sep'],...Object.entries(CAT_STAGES),['sep'],['archived','🗄 Archived'],['all','All']].map(([k,l])=>
     k==='sep' ? '<span class="sep"></span>' : '<button class="chip'+(CAT_FILTER===k?' on':'')+'" onclick="CAT_FILTER=\''+k+'\';catRender()">'+l+(k==='all'?'':'<b>'+(counts[k]||0)+'</b>')+'</button>').join('');
-  const rows = mine.filter(x=> CAT_FILTER==='all' ? true : CAT_FILTER==='open' ? isOpen(x) : x.stage===CAT_FILTER);
+  const rows = mine.filter(x=> CAT_FILTER==='all' ? true : CAT_FILTER==='open' ? isOpen(x) : CAT_FILTER==='archived' ? isArch(x) : !isArch(x) && x.stage===CAT_FILTER);
   const el = document.getElementById('catList');
   if(!rows.length){ el.innerHTML = '<div class="rec-empty">Nothing here.</div>'; return; }
   // CAT-CARDS (2026-10-14): one card per lead, colored tab on the left end = its kind (CAT_KINDS). No type badge,
@@ -2250,6 +2258,7 @@ function catRender(){
       +'<div class="cat-main"><div class="res-r-name">'+(r.unread?'<span class="cat-new" title="New message"></span>':'')+esc(r.name)+(r.company?' <span class="co">('+esc(r.company)+')</span>':'')+'</div>'
       +(bits?'<div class="cat-sub">'+esc(bits)+'</div>':'')+'</div>'
       +'<span class="res-r-time">'+esc(inqWhen(r.last_message_at))+'</span>'
+      +(isArch(x)?'<span class="pill pill-mid cat-arch" title="Archived">🗄 Archived</span>':'')
       +'<span class="pill '+pill+'">'+esc(label)+'</span></div>';
   }).join('');
 }
@@ -2273,7 +2282,32 @@ function catHead(){
   const fact = x => x ? '<span class="cat-fact">'+x+'</span>' : '';
   document.getElementById('catMeta').innerHTML = fact('<a href="mailto:'+esc(r.email)+'">'+esc(r.email)+'</a>') + fact(r.phone?esc(r.phone):'')
     + fact(r.event_date?'📅 '+fmtDisplay(r.event_date)+(r.event_time?' · '+catTime(r.event_time):''):'') + fact(r.guests?'👥 '+r.guests:'')
-    + fact(r.fulfillment?CAT_FUL[r.fulfillment]:'') + fact(r.location||'') + fact(r.address?'📍 '+esc(r.address):'') + fact(r.budget?'Budget: '+esc(r.budget):'') + fact('#'+esc(r.code));
+    + fact(r.fulfillment?CAT_FUL[r.fulfillment]:'') + fact(r.location||'') + fact(r.address?'📍 '+esc(r.address):'') + fact(r.budget?'Budget: '+esc(r.budget):'') + fact('#'+esc(r.code))
+    + (r.archived_at ? fact('🗄 Archived') : '');
+  leadArchBtn('catArch', r);
+}
+// 🗄 Archive / ↩ Unarchive (Maverick 2026-11-12: "the ability to archive leads, both in the chat and in the catering
+// leads"): takes a lead or inquiry out of the lists without marking it Lost; Stage → 🗄 Archived lists them. A new
+// message from the customer brings it back (DB trigger), and Greys Chat gets a "🗄 Archived · By …" card.
+// Archiving clears the unread dot too (an unread lead would otherwise stay under Open). sql/2026-11-12_lead_archive.sql
+function leadArchBtn(id, r){
+  const b = document.getElementById(id); if(!b || !r) return;
+  b.textContent = r.archived_at ? '↩ Unarchive' : '🗄 Archive';
+  b.title = r.archived_at ? 'Put it back in the lists' : 'Take it out of the lists without marking it Lost';
+}
+async function leadArchiveRow(table, r, msgId){
+  const on = !r.archived_at;
+  const upd = on ? { archived_at:new Date().toISOString(), unread:false } : { archived_at:null };
+  const { error } = await sb.from(table).update(upd).eq('id', r.id);
+  const msg = document.getElementById(msgId);
+  if(error){ if(msg) msg.textContent = '❌ '+error.message; return false; }
+  Object.assign(r, upd);
+  if(msg) msg.textContent = on ? '🗄 Archived — it\'s under Stage → 🗄 Archived now' : '↩ Back in the lists';
+  return true;
+}
+async function catArchive(){
+  if(!CAT_CUR) return;
+  if(await leadArchiveRow('catering_leads', CAT_CUR, 'catMsg')){ catHead(); catLoad(); }
 }
 function catView(which){
   document.getElementById('catConvo').style.display = which==='convo' ? '' : 'none';
