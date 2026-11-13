@@ -93,7 +93,27 @@
 // TEST COPY: square-online-order-test is staging's copy of this file with TEST_COPY = true — it uses the Square
 // SANDBOX for every request, whatever the Origin. Deploy both from this one source.
 //
-// Actions (POST ?action=…): config · menu · quote · pay · status · sweep        verify_jwt = false
+// SHIPPED ORDERS, THE STAFF SIDE (v17, 2026-11-12): Square is the record of a shipped order — the recipient and
+// address, the gift note, paid or not, refunds, and the label (carrier, tracking number, shipped_at) once staff buy
+// it. shipOrders() reads the from-shop's SHIPMENT orders that came from this site (metadata.fulfillment 'ship') with
+// SearchOrders, keeps the paid ones, and caches them 30 s. The order's metadata also carries buyer, buyer_phone and
+// gift_note (orders from before v17: parsed from the shipping note).
+//   ship_days   public, counts only (no names): [{ date, orders, boxes, shipped }] by ship day — the staff portal
+//               calendar shows "Ship day · N boxes" from it.
+//   ship_orders staff (a manager's session, is_app_admin): the packing list — every paid ship order in full.
+//   ship_mark   staff: tracking for a label bought outside Square (Pirate Ship, UPS.com) or typed in by hand —
+//               writes carrier / tracking number / shipped_at onto the Square fulfillment, marks it COMPLETED,
+//               flags metadata.tracking_emailed, and emails the buyer the tracking link.
+//   ship_email  staff: (re)send the tracking email for an order whose label is already in Square.
+//   track       cron (cc_cron_secret) or staff: emails the tracking link for labels bought in Square Dashboard.
+//               Square won't update a COMPLETED order, so "already emailed" for those lives in online_orders
+//               (tracking_emailed_at) — without those columns track does nothing and says so.
+// The ledger: online_orders gets fulfillment / ship_to / gift_note / shipping_cents / ship_on and the tracking
+// columns (migration online_orders_shipping). Until they exist a ship order is logged without them, so the sweep,
+// the double-click guard and status still work.
+//
+// Actions (POST ?action=…): config · menu · quote · pay · status · sweep · ship_days · ship_orders · ship_mark ·
+// ship_email · track                                                            verify_jwt = false
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -910,17 +930,10 @@ function arriveText(c: ShipCfg) {
   return one ? `arrives by ${fmtLongDay(one)}` : "";
 }
 const shipText = (c: ShipCfg) => [`Ships ${fmtLongDay(c.ship_on)}`, arriveText(c)].filter(Boolean).join(" · ");
-// boxes already paid for shipping (this env) — what `limit` counts against
-const shipCount: Record<string, { at: number; n: number }> = {};
-async function shippedBoxes(e: Env, c: ShipCfg, fresh = false): Promise<number> {
-  const hit = shipCount[e];
-  if (!fresh && hit && Date.now() - hit.at < 20_000) return hit.n;
-  const { data, error } = await admin.from("online_orders").select("lines").eq("fulfillment", "ship").eq("env", e).eq("status", "paid").limit(5000);
-  if (error) throw new Error("ship count: " + error.message);
-  let n = 0;
-  for (const r of data ?? []) for (const l of ((r as any).lines ?? []) as any[]) if (c.items.includes(String(l?.item_id ?? ""))) n += Math.max(0, Number(l?.qty) || 0);
-  shipCount[e] = { at: Date.now(), n };
-  return n;
+// boxes already paid for shipping (this env) — what `limit` counts against. From Square (v17): every line of a ship
+// order is a box that ships; refunded orders don't count.
+async function shippedBoxes(e: Env, _c: ShipCfg, fresh = false): Promise<number> {
+  return (await shipOrders(e, fresh)).filter((o) => !o.refunded).reduce((n, o) => n + o.boxes, 0);
 }
 // why shipping can't take an order right now (null = it can)
 function shipClosed(c: ShipCfg, e: Env): string | null {
@@ -996,6 +1009,12 @@ function buildShipOrder(e: Env, m: Menu, c: ShipCfg, lines: Line[], state: strin
   if (code) {
     order.reference_id = code;
     order.metadata = { web_code: code, shop: m.shop, fulfillment: "ship" };
+    if (cust) { // the packing list reads these back (v17)
+      const md = order.metadata as Record<string, string>;
+      md.buyer = `${cust.first} ${cust.last}`.trim().slice(0, 255);
+      if (cust.phone) md.buyer_phone = cust.phone;
+      if (to?.gift_note) md.gift_note = to.gift_note.slice(0, 255);
+    }
   }
   if (taxed && taxIds.length) {
     // ORDER scope: the boxes AND the taxable Shipping charge
@@ -1139,7 +1158,11 @@ async function payShip(req: Request, b: any) {
     square_order_id: o.id, updated_at: new Date().toISOString(),
     fulfillment: "ship", ship_to: to, gift_note: to.gift_note || null, shipping_cents: shipCents, ship_on: c.ship_on,
   };
-  const w = prior ? await admin.from("online_orders").update(row).eq("id", prior.id) : await admin.from("online_orders").insert(row);
+  let w = prior ? await admin.from("online_orders").update(row).eq("id", prior.id) : await admin.from("online_orders").insert(row);
+  if (w.error && /column|schema cache/i.test(w.error.message)) { // the shipping columns aren't there yet: log the rest
+    const { fulfillment: _f, ship_to: _t, gift_note: _g, shipping_cents: _s, ship_on: _o, ...base } = row;
+    w = prior ? await admin.from("online_orders").update(base).eq("id", prior.id) : await admin.from("online_orders").insert(base);
+  }
   if (w.error) console.error("ledger", o.id, w.error.message);
   const oid = o.id;
   const fail = (msg: string) => admin.from("online_orders").update({ status: "failed", error: msg.slice(0, 500), updated_at: new Date().toISOString() })
@@ -1189,11 +1212,279 @@ async function payShip(req: Request, b: any) {
   await admin.from("online_orders").update({
     status: "paid", square_payment_id: pmt.id, receipt_url: pmt.receipt_url ?? null, card, error: null, paid_at: new Date().toISOString(), updated_at: new Date().toISOString(),
   }).eq("square_order_id", oid);
-  delete shipCount[e]; // the next menu counts this box
+  delete shipCache[e]; // the next menu and packing list count this box
   const out = result({ card, receipt_url: pmt.receipt_url ?? null }, null);
   const sent = await mailShipConfirmation(out, cust, to, note).catch((err) => { console.error("mail", code, err); return false; });
   await admin.from("online_orders").update({ email_sent: sent }).eq("square_order_id", oid);
   return { ...out, email_sent: sent };
+}
+
+// ---------- shipped orders: the staff side (v17, SHIPPED ORDERS at the top) ----------
+const ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+// a manager's session (is_app_admin) or the cron secret; null = not staff
+async function staff(req: Request, b: any): Promise<string | null> {
+  const sec = clean(b.secret, 200);
+  if (sec) {
+    const { data } = await admin.from("app_secrets").select("value").eq("name", "cc_cron_secret").maybeSingle();
+    if (data?.value && sec === data.value) return "cron";
+  }
+  const tok = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+  if (!tok || tok === ANON || tok.startsWith("sb_publishable_")) return null;
+  if (tok === SERVICE) return "service";
+  const user = createClient(SUPABASE_URL, ANON || SERVICE, { global: { headers: { Authorization: "Bearer " + tok } }, auth: { persistSession: false } });
+  const { data, error } = await user.rpc("is_app_admin");
+  if (error || data !== true) return null;
+  const { data: u } = await admin.auth.getUser(tok);
+  return u?.user?.email ?? "manager";
+}
+async function needStaff(req: Request, b: any) {
+  const who = await staff(req, b);
+  if (!who) throw new PublicError("Managers only — please sign in to the manager console again.", 401);
+  return who;
+}
+
+type ShipOrder = {
+  id: string; code: string; state: string; created_at: string; ship_on: string | null; paid: boolean; refunded: boolean;
+  buyer: string; buyer_first: string; email: string; buyer_phone: string;
+  to: { name: string; phone: string; address1: string; address2: string; city: string; state: string; zip: string };
+  gift_note: string; note: string; lines: { name: string; option: string; qty: number; note: string }[]; boxes: number;
+  total_cents: number; shipping_cents: number; tax_cents: number;
+  fulfillment_uid: string; fulfillment_state: string;
+  carrier: string; tracking_number: string; tracking_url: string; shipped_at: string | null; tracking_emailed: string | null;
+};
+function shipOrderOf(o: any): ShipOrder | null {
+  const f = (o?.fulfillments ?? []).find((x: any) => x?.type === "SHIPMENT");
+  if (!o?.id || !f || (o.metadata?.fulfillment !== "ship" && o.source?.name !== "Greys online ordering")) return null;
+  const sd = f.shipment_details ?? {}, r = sd.recipient ?? {}, a = r.address ?? {}, md = o.metadata ?? {};
+  const tenders: any[] = Array.isArray(o.tenders) ? o.tenders : [];
+  const good = tenders.filter((t) => !["FAILED", "VOIDED"].includes(String(t?.card_details?.status ?? "")));
+  const total = Number(o.total_money?.amount ?? 0), due = Number(o.net_amount_due_money?.amount);
+  const paid = good.length > 0 || (Number.isFinite(due) && due <= 0 && total > 0 && o.state === "COMPLETED");
+  const refundedCents = (Array.isArray(o.refunds) ? o.refunds : []).filter((x: any) => x?.status !== "REJECTED" && x?.status !== "FAILED")
+    .reduce((n: number, x: any) => n + Number(x?.amount_money?.amount ?? 0), 0);
+  const sn = String(sd.shipping_note ?? "");
+  const buyer = clean(md.buyer, 120) || clean((sn.match(/From ([^·]+)/) ?? [])[1], 120);
+  const gift = clean(md.gift_note, 255) || clean((sn.match(/Gift note: “([^”]*)”/) ?? [])[1], 255);
+  const lines = (o.line_items ?? []).map((li: any) => ({
+    name: clean(li.name, 120), option: li.variation_name && li.variation_name !== "Regular" ? clean(li.variation_name, 80) : "",
+    qty: Math.max(0, Number(li.quantity) || 0), note: clean(li.note, 200),
+  }));
+  const shipMs = Date.parse(sd.expected_shipped_at ?? "");
+  return {
+    id: o.id, code: clean(o.reference_id || md.web_code, 12), state: o.state, created_at: o.created_at,
+    ship_on: Number.isFinite(shipMs) ? localDate(shipMs) : null, paid, refunded: refundedCents > 0 && refundedCents >= total,
+    buyer, buyer_first: buyer.split(" ")[0] || "", email: clean(r.email_address, 200), buyer_phone: clean(md.buyer_phone, 40),
+    to: {
+      name: clean(r.display_name, 120), phone: clean(r.phone_number, 40), address1: clean(a.address_line_1, 120), address2: clean(a.address_line_2, 120),
+      city: clean(a.locality, 80), state: clean(a.administrative_district_level_1, 2), zip: clean(a.postal_code, 10),
+    },
+    gift_note: gift, note: clean(o.note, 300), lines, boxes: lines.reduce((n: number, l: { qty: number }) => n + l.qty, 0),
+    total_cents: total, shipping_cents: Number(o.total_service_charge_money?.amount ?? 0), tax_cents: Number(o.total_tax_money?.amount ?? 0),
+    fulfillment_uid: String(f.uid ?? ""), fulfillment_state: String(f.state ?? ""),
+    carrier: clean(sd.carrier, 40), tracking_number: clean(sd.tracking_number, 60), tracking_url: clean(sd.tracking_url, 300),
+    shipped_at: sd.shipped_at ?? null, tracking_emailed: clean(md.tracking_emailed, 40) || null,
+  };
+}
+// every paid ship order from this site at the from-shop (this env), newest first; cached 30 s
+const shipCache: Record<string, { at: number; v: ShipOrder[] } | undefined> = {};
+async function shipOrders(e: Env, fresh = false): Promise<ShipOrder[]> {
+  const hit = shipCache[e];
+  if (!fresh && hit && Date.now() - hit.at < 30_000) return hit.v;
+  const c = shipCfg, from: Shop = c?.from ?? "memphis";
+  const since = new Date(Math.min(Date.now(), c ? dayAt(c.ship_on, 12) : Date.now()) - 150 * 86400_000).toISOString();
+  const location = await paymentLocation(from, e);
+  const out: ShipOrder[] = [];
+  let cursor: string | undefined;
+  for (let page = 0; page < 10; page++) {
+    const d = await square("/v2/orders/search", {
+      method: "POST",
+      body: JSON.stringify({
+        location_ids: [location], limit: 100, ...(cursor ? { cursor } : {}),
+        query: {
+          filter: {
+            state_filter: { states: ["OPEN", "COMPLETED"] },
+            fulfillment_filter: { fulfillment_types: ["SHIPMENT"] },
+            date_time_filter: { created_at: { start_at: since } },
+          },
+          sort: { sort_field: "CREATED_AT", sort_order: "DESC" },
+        },
+      }),
+    }, e);
+    for (const o of d?.orders ?? []) { const s = shipOrderOf(o); if (s && s.paid) out.push(s); }
+    cursor = d?.cursor;
+    if (!cursor) break;
+  }
+  shipCache[e] = { at: Date.now(), v: out };
+  return out;
+}
+// staff calendar: how many boxes go out each ship day — no names (the portal home page has no login)
+async function shipDays(req: Request) {
+  const e = envFor(req), c = shipCfg;
+  const by: Record<string, { date: string; orders: number; boxes: number; shipped: number }> = {};
+  for (const o of await shipOrders(e)) {
+    if (o.refunded || !o.ship_on) continue;
+    const d = (by[o.ship_on] ??= { date: o.ship_on, orders: 0, boxes: 0, shipped: 0 });
+    d.orders++; d.boxes += o.boxes;
+    if (o.tracking_number || o.fulfillment_state === "COMPLETED") d.shipped++;
+  }
+  const from: Shop = c?.from ?? "memphis";
+  return { ok: true, env: e, from, from_label: SHOPS[from].label, ship_on: c?.ship_on ?? null, days: Object.values(by).sort((a, b) => a.date.localeCompare(b.date)) };
+}
+// the packing list, with what the ledger knows about the tracking email
+async function shipOrdersAction(req: Request, b: any) {
+  await needStaff(req, b);
+  const e = envFor(req), c = shipCfg;
+  const list = await shipOrders(e, b.fresh === true);
+  const ids = list.map((o) => o.id);
+  if (ids.length) {
+    const { data, error } = await admin.from("online_orders").select("square_order_id, tracking_emailed_at").in("square_order_id", ids);
+    if (!error) for (const r of data ?? []) { const o = list.find((x) => x.id === (r as any).square_order_id); if (o && (r as any).tracking_emailed_at && !o.tracking_emailed) o.tracking_emailed = (r as any).tracking_emailed_at; }
+  }
+  const from: Shop = c?.from ?? "memphis";
+  return {
+    ok: true, env: e, from, from_label: SHOPS[from].label, config: shipCfg ? { ...shipCfg, text: shipText(shipCfg) } : null,
+    orders: list,
+  };
+}
+const CARRIERS = ["UPS", "USPS", "FedEx", "Other"];
+function trackUrl(carrier: string, num: string) {
+  const n = encodeURIComponent(num);
+  if (/^ups$/i.test(carrier)) return `https://www.ups.com/track?loc=en_US&tracknum=${n}`;
+  if (/^usps$/i.test(carrier)) return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${n}`;
+  if (/^fedex$/i.test(carrier)) return `https://www.fedex.com/fedextrack/?trknbr=${n}`;
+  return "";
+}
+// what the ledger knows (best effort: the columns may not be there yet)
+async function ledgerTrack(o: ShipOrder, emailed: boolean) {
+  const { error } = await admin.from("online_orders").update({
+    carrier: o.carrier || null, tracking_number: o.tracking_number || null, tracking_url: o.tracking_url || null,
+    shipped_at: o.shipped_at, ...(emailed ? { tracking_emailed_at: new Date().toISOString() } : {}), updated_at: new Date().toISOString(),
+  }).eq("square_order_id", o.id);
+  if (error) console.error("ledger track", o.id, error.message);
+  return !error;
+}
+// a label bought outside Square (or typed in by hand): the email first, then onto the Square order (carrier, tracking
+// number, shipped_at; fulfillment COMPLETED; metadata.tracking_emailed when the email went)
+async function shipMark(req: Request, b: any) {
+  const who = await needStaff(req, b);
+  const e = envFor(req);
+  const id = clean(b.order_id, 80);
+  const carrier = CARRIERS.find((x) => x.toLowerCase() === clean(b.carrier, 20).toLowerCase()) ?? "UPS";
+  const num = clean(b.tracking_number, 60).replace(/[\s-]+/g, "").toUpperCase();
+  if (!/^[A-Z0-9]{6,40}$/.test(num)) throw new PublicError("Please check the tracking number.");
+  const url = /^https:\/\/\S+$/.test(clean(b.tracking_url, 300)) ? clean(b.tracking_url, 300) : trackUrl(carrier, num);
+  let o = (await square(`/v2/orders/${encodeURIComponent(id)}`, { method: "GET" }, e))?.order;
+  const s0 = shipOrderOf(o);
+  if (!s0) throw new PublicError("That isn't a shipped order from the order site.", 404);
+  if (!s0.paid) throw new PublicError("That order isn't paid.", 409);
+  const now = new Date().toISOString();
+  const s: ShipOrder = { ...s0, carrier, tracking_number: num, tracking_url: url, shipped_at: now };
+  const sent = await mailShipTracking(e, s).catch((err) => { console.error("mail track", s.code, err); return false; });
+  let saved = false, squareError: string | null = null;
+  if (o.state === "OPEN") {
+    const put = async (state: string, details: boolean) => {
+      const d = await square(`/v2/orders/${encodeURIComponent(o.id)}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          idempotency_key: (`tk-${o.id}-${o.version}-${state}`).slice(0, 190),
+          order: {
+            location_id: o.location_id, version: o.version,
+            ...(details ? { metadata: { ...(o.metadata ?? {}), ...(sent ? { tracking_emailed: now } : {}), tracking_by: who.slice(0, 120) } } : {}),
+            fulfillments: [{
+              uid: s0.fulfillment_uid, state,
+              ...(details ? { shipment_details: { carrier, tracking_number: num, ...(url ? { tracking_url: url } : {}), shipped_at: now } } : {}),
+            }],
+          },
+        }),
+      }, e);
+      o = d?.order ?? o;
+    };
+    try {
+      try { await put("COMPLETED", true); }
+      catch (err) { // a fulfillment that can't jump straight to COMPLETED: step it through
+        if (!(err instanceof SquareError) || err.status >= 500) throw err;
+        for (const st of ["RESERVED", "PREPARED"]) {
+          const cur = String((o.fulfillments ?? []).find((x: any) => x.uid === s0.fulfillment_uid)?.state ?? "");
+          if (cur !== "PROPOSED" && !(cur === "RESERVED" && st === "PREPARED")) continue;
+          await put(st, false);
+        }
+        await put("COMPLETED", true);
+      }
+      saved = true;
+    } catch (err) { squareError = String((err as Error).message).slice(0, 300); console.error("ship_mark", s.code, squareError); }
+  } else squareError = `Square has this order ${String(o.state).toLowerCase()}, so the tracking number wasn't added there.`;
+  const after = saved ? shipOrderOf(o) ?? s : s;
+  await ledgerTrack(after, sent);
+  delete shipCache[e];
+  return { ok: true, env: e, saved_in_square: saved, square_error: squareError, email_sent: sent, order: { ...after, tracking_emailed: sent ? now : after.tracking_emailed } };
+}
+// the tracking email again, for a label that's already in Square
+async function shipEmail(req: Request, b: any) {
+  await needStaff(req, b);
+  const e = envFor(req);
+  const o = shipOrderOf((await square(`/v2/orders/${encodeURIComponent(clean(b.order_id, 80))}`, { method: "GET" }, e))?.order);
+  if (!o) throw new PublicError("That isn't a shipped order from the order site.", 404);
+  if (!o.tracking_number) throw new PublicError("Square has no tracking number on this order yet — buy the label, or add the tracking number.", 409);
+  const sent = await mailShipTracking(e, o);
+  if (sent) await ledgerTrack(o, true);
+  delete shipCache[e];
+  return { ok: true, env: e, email_sent: sent, order: { ...o, tracking_emailed: sent ? new Date().toISOString() : o.tracking_emailed } };
+}
+// labels bought in Square Dashboard → the tracking email, once (the ledger remembers)
+async function track(req: Request, b: any) {
+  await needStaff(req, b);
+  const out = { ok: true, checked: 0, emailed: [] as string[], errors: [] as string[], needs_migration: false };
+  for (const e of (TEST_COPY ? ["sandbox"] : ["production"]) as Env[]) { // the test copy: the sandbox's test orders only
+    const list = (await shipOrders(e, true)).filter((o) => o.tracking_number && !o.tracking_emailed && !o.refunded);
+    if (!list.length) continue;
+    const { data, error } = await admin.from("online_orders").select("square_order_id, tracking_emailed_at").in("square_order_id", list.map((o) => o.id));
+    if (error) { out.needs_migration = true; out.errors.push(e + ": " + error.message); continue; }
+    const done = new Set((data ?? []).filter((r: any) => r.tracking_emailed_at).map((r: any) => r.square_order_id));
+    const known = new Set((data ?? []).map((r: any) => r.square_order_id));
+    for (const o of list) {
+      if (done.has(o.id) || !known.has(o.id)) continue; // no ledger row = nowhere to remember it: leave it to a person
+      out.checked++;
+      try {
+        const sent = await mailShipTracking(e, o);
+        if (sent && await ledgerTrack(o, true)) out.emailed.push(o.code);
+        else if (!sent) out.errors.push(o.code + ": email not sent");
+      } catch (err) { out.errors.push(o.code + ": " + String((err as Error).message).slice(0, 200)); }
+    }
+  }
+  if (out.errors.length) console.error("track", out.errors);
+  return out;
+}
+async function mailShipTracking(e: Env, o: ShipOrder): Promise<boolean> {
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(o.email)) return false;
+  const c = shipCfg, from: Shop = c?.from ?? "memphis";
+  const L = (await loadMenu(from)).location;
+  const test = e === "sandbox";
+  const what = o.lines.map((l) => `${l.qty}× ${l.name}`).join(", ");
+  const arrive = c ? arriveText(c) : "";
+  const link = o.tracking_url ? `<a href="${esc(o.tracking_url)}" style="display:inline-block;background:#06273A;color:#fff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:8px">Track your box</a>` : "";
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#221E1B;line-height:1.5">
+  ${test ? `<div style="background:#FDECC8;padding:8px 12px;margin-bottom:14px;font-size:13px"><b>Test order</b> — Square sandbox. Nothing was charged and nothing shipped.</div>` : ""}
+  <div style="font:700 22px Georgia,serif;letter-spacing:.04em;border-bottom:2px solid #E0A21C;padding-bottom:8px;margin-bottom:18px">GREYS <span style="font:400 12px Arial">Fine Cheeses · Shipped from ${esc(L.label)}</span></div>
+  <p>Good news${o.buyer_first ? ", " + esc(o.buyer_first) : ""}! Your order is on its way${o.to.name ? " to " + esc(o.to.name) : ""}.</p>
+  <p style="font-size:18px;margin:14px 0"><b>${esc(o.carrier || "Tracking")} · ${esc(o.tracking_number)}</b>${arrive ? `<br><span style="font-size:14px;color:#6E6353">It ${esc(arrive)}.</span>` : ""}</p>
+  ${link ? `<p style="margin:0 0 18px">${link}</p>` : ""}
+  <p style="font-size:14px;margin:0 0 14px"><b>Shipping to</b><br>${esc(o.to.name)}<br>${esc(o.to.address1)}${o.to.address2 ? "<br>" + esc(o.to.address2) : ""}<br>${esc(o.to.city)}, ${esc(o.to.state)} ${esc(o.to.zip)}</p>
+  <p style="font-size:14px;margin:0 0 14px">${esc(what)}</p>
+  <p style="font-size:14px">It's cheese, so it travels cold: please put the box in the fridge as soon as it arrives. If anything arrives warm or damaged, call us${L.phone ? ` at <b>${esc(L.phone)}</b>` : ""} and we'll make it right.</p>
+  <p style="margin:0;color:#6E6353;font-size:13px">Order ${esc(o.code)}</p></div>`;
+  const res = await fetch(SUPABASE_URL + "/functions/v1/send-mail", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICE },
+    body: JSON.stringify({
+      to: o.email,
+      subject: `${test ? "[TEST] " : ""}Your Greys order ${o.code} has shipped`,
+      html,
+      from: Deno.env.get("INQUIRY_FROM") || "GREYS Fine Cheeses <info@greyscheese.com>",
+      replyTo: L.email || Deno.env.get("INQUIRY_REPLY_TO") || "brad@greyscheese.com",
+    }),
+  });
+  const d = await res.json().catch(() => ({}));
+  return res.ok && (d as any).ok !== false;
 }
 
 async function quote(req: Request, b: any) {
@@ -1495,11 +1786,13 @@ async function mailShipConfirmation(r: any, cust: Cust, to: ShipTo, note: string
 }
 
 async function status(b: any) {
-  const { data } = await admin.from("online_orders")
-    .select("code, env, location, status, pickup_at, asap, catering, lines, subtotal_cents, tax_cents, tip_cents, total_cents, card, receipt_url, created_at, fulfillment, ship_on, shipping_cents")
+  const base = "code, env, location, status, pickup_at, asap, catering, lines, subtotal_cents, tax_cents, tip_cents, total_cents, card, receipt_url, created_at";
+  const look = (cols: string) => admin.from("online_orders").select(cols)
     .eq("code", clean(b.code, 12).toUpperCase()).eq("email", clean(b.email, 200).toLowerCase())
     .order("created_at", { ascending: false }).limit(1).maybeSingle();
-  return data ? { ok: true, order: data } : { ok: false, error: "Order not found." };
+  let q = await look(base + ", fulfillment, ship_on, shipping_cents, carrier, tracking_number, tracking_url, shipped_at");
+  if (q.error) q = await look(base); // before the shipping columns exist
+  return q.data ? { ok: true, order: q.data } : { ok: false, error: "Order not found." };
 }
 
 Deno.serve(async (req) => {
@@ -1519,6 +1812,12 @@ Deno.serve(async (req) => {
     if (action === "pay") return json(req, body.ship ? await payShip(req, body) : await pay(req, body));
     if (action === "status") return json(req, await status(body));
     if (action === "sweep") return json(req, await sweep(body));
+    if (action === "ship_days" || action === "ship_orders" || action === "ship_mark" || action === "ship_email" || action === "track") await refreshSwitch();
+    if (action === "ship_days") return json(req, await shipDays(req));
+    if (action === "ship_orders") return json(req, await shipOrdersAction(req, body));
+    if (action === "ship_mark") return json(req, await shipMark(req, body));
+    if (action === "ship_email") return json(req, await shipEmail(req, body));
+    if (action === "track") return json(req, await track(req, body));
     return json(req, { ok: false, error: "Unknown action" }, 400);
   } catch (e) {
     if (e instanceof PublicError) return json(req, { ok: false, error: e.message, ...(e.extra ?? {}) }, e.status);
