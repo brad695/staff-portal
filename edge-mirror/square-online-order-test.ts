@@ -1411,6 +1411,16 @@ async function shipMark(req: Request, b: any) {
         await put("COMPLETED", true);
       }
       saved = true;
+      // paid and shipped: close the order too (Square Dashboard doesn't list an OPEN order whose fulfillment is done)
+      if (o.state === "OPEN" && Number(o.net_amount_due_money?.amount ?? 1) <= 0) {
+        try {
+          const d = await square(`/v2/orders/${encodeURIComponent(o.id)}`, {
+            method: "PUT",
+            body: JSON.stringify({ idempotency_key: (`tc-${o.id}-${o.version}`).slice(0, 190), order: { location_id: o.location_id, version: o.version, state: "COMPLETED" } }),
+          }, e);
+          o = d?.order ?? o;
+        } catch (err) { console.error("ship_mark complete", s.code, (err as Error).message); }
+      }
     } catch (err) { squareError = String((err as Error).message).slice(0, 300); console.error("ship_mark", s.code, squareError); }
   } else squareError = `Square has this order ${String(o.state).toLowerCase()}, so the tracking number wasn't added there.`;
   const after = saved ? shipOrderOf(o) ?? s : s;
