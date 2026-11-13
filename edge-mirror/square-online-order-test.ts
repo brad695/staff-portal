@@ -80,6 +80,8 @@
 //     order), ship_on: 'YYYY-MM-DD', arrive_from, arrive_by, first_cents (shipping for the first box), each_cents (each
 //     box after it), limit (most boxes to ship, 0 = no limit beyond Square's stock), tax_states: ['TN'] }
 //   No row, enabled not true, no items or no ship_on = no shipping (menu.ship is null and pay refuses).
+//   test_enabled (2026-11-13): the TEST COPY's own on/off, so staging can show shipping while the live site keeps it
+//   off. Not set = the test copy follows enabled. The live function never reads it.
 // A ship order holds shippable items only. It is booked at the `from` shop as a Square SHIPMENT fulfillment —
 // recipient, street address, expected ship day, gift note — instead of a pickup, so it lands in Square Dashboard →
 // Orders → Shipments, where staff buy the labels. One address per order: Square's API takes one fulfillment per
@@ -204,7 +206,9 @@ type ShipCfg = {
 };
 let shipCfg: ShipCfg | null = null;
 function parseShip(raw: any): ShipCfg | null {
-  if (!raw || typeof raw !== "object" || raw.enabled !== true) return null;
+  if (!raw || typeof raw !== "object") return null;
+  const on = TEST_COPY && "test_enabled" in raw ? raw.test_enabled : raw.enabled; // test copy: its own switch (see SHIPPING)
+  if (on !== true) return null;
   const day = (k: string) => (DATE_ONLY.test(String(raw[k] ?? "")) ? String(raw[k]) : null);
   const items = (Array.isArray(raw.items) ? raw.items : []).map((x: unknown) => String(x ?? "").trim()).filter((x: string) => /^[A-Z0-9]{8,40}$/.test(x));
   const ship_on = day("ship_on");
