@@ -600,6 +600,49 @@ body{display:flex;flex-direction:column}
 .v-head a.btn{text-decoration:none;color:var(--fg)}
 </style>
 
+<style id="page-nav">
+/* PAGE NAV (Maverick, 2026-11-12: "i need some kind of header on the greys chat, its hard to get back to other pages").
+   Links back to the staff portal — Staff Portal (the cow = the portal's home-screen icon), Resys, Calendar, Schedule,
+   Manager — as plain same-tab links, so they stay inside the home-screen app. /#resys and /#calendar open those views of
+   the portal home (its HISTORY-ROUTER reads the hash on load).
+   Computers: right side of the Slack top bar. Phones: a strip across the top of every screen, conversations included
+   (a notification tap opens straight into one). Phones also keep the bottom tabs on DMs / Activity / the other list
+   screens — they used to leave an empty navy strip there; an open conversation still hides them for the composer. */
+.pages{display:flex;align-items:center;gap:2px;flex:none;margin-left:auto}
+.pages .pg{display:flex;align-items:center;gap:6px;height:28px;padding:0 9px;border-radius:6px;color:rgba(255,255,255,.86);font-size:13px;font-weight:700;text-decoration:none;white-space:nowrap}
+.pages .pg:hover{background:rgba(255,255,255,.12);color:#fff}
+.pages .pg:active{background:rgba(255,255,255,.2)}
+.pages .pg img{display:block;flex:none;width:20px;height:20px;border-radius:5px;background:#fff}
+.pages .pg svg{width:16px;height:16px}
+.pages .pg-home{margin-right:4px}
+.pages .l-m{display:none}
+.top .help{margin-left:4px}
+/* narrower windows: the history buttons stop lining up with the sidebar, then the four page links go icon-only */
+@media (min-width:761px) and (max-width:1279px){.top .hist{width:auto}}
+@media (min-width:761px) and (max-width:999px){.pages .pg:not(.pg-home) span{display:none}.pages .pg:not(.pg-home){padding:0 7px}}
+/* the sign-in screen covers everything, so it gets its own way back */
+.gate-home{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:10px;display:flex;align-items:center;gap:6px;padding:6px 10px 6px 6px;border-radius:8px;color:rgba(255,255,255,.88);font-size:14px;font-weight:700;text-decoration:none}
+.gate-home:hover{background:rgba(255,255,255,.12);color:#fff}
+.gate-home img{width:22px;height:22px;border-radius:6px;background:#fff}
+@media (max-width:760px){
+  #app{grid-template-rows:auto minmax(0,1fr) 58px}
+  #app.inconvo{grid-template-rows:auto minmax(0,1fr) 0}
+  .top{display:flex;grid-column:1;grid-row:1;gap:0;padding:env(safe-area-inset-top,0px) 4px 0;background:var(--rail);border-bottom:1px solid var(--side-line)}
+  .top .hist,.top .search,.top .help{display:none}
+  .pages{flex:1;margin:0;gap:0}
+  .pages .pg{flex:1 1 0;min-width:0;flex-direction:column;justify-content:center;gap:3px;height:54px;padding:0 2px;border-radius:8px;font-size:11px;color:rgba(255,255,255,.8)}
+  .pages .pg:hover{background:none}
+  .pages .pg:active{background:rgba(255,255,255,.14)}
+  .pages .pg svg{width:22px;height:22px}
+  .pages .pg img{width:24px;height:24px;border-radius:6px}
+  .pages .pg-home{margin:0}
+  .pages .l-d{display:none}
+  .pages .l-m{display:inline}
+  .client.m-main ~ .tabbar{display:flex}
+  #app.inconvo .tabbar{display:none}
+}
+</style>
+
 </head>
 <body>
 <div class="nbar" id="nbar" hidden></div>
@@ -614,6 +657,14 @@ body{display:flex;flex-direction:column}
       <input id="search" placeholder="Search GREYS Fine Cheeses" autocomplete="off" aria-label="Search">
       <span class="si" id="searchIco"></span>
     </div>
+    <!-- PAGE NAV: the way back to the rest of the staff portal (style block "page-nav") -->
+    <nav class="pages" aria-label="Staff portal pages">
+      <a class="pg pg-home" href="/" title="Staff Portal home"><img src="/apple-touch-icon.png" alt="" width="20" height="20"><span class="l-d">Staff Portal</span><span class="l-m">Portal</span></a>
+      <a class="pg" href="/#resys" title="Resys"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 11a2 2 0 0 1 2 2v2h10v-2a2 2 0 1 1 4 0v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z"/><path d="M5 11V6a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v5M6 19v2M18 19v2"/></svg><span>Resys</span></a>
+      <a class="pg" href="/#calendar" title="Calendar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/><rect x="7.5" y="13" width="3.5" height="3.5" rx=".6"/></svg><span>Calendar</span></a>
+      <a class="pg" href="/schedule" title="Schedule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span>Schedule</span></a>
+      <a class="pg" href="/manager" title="Manager console"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6" height="8" rx="1"/><rect x="4" y="16" width="6" height="4" rx="1"/><rect x="14" y="12" width="6" height="8" rx="1"/><rect x="14" y="4" width="6" height="4" rx="1"/></svg><span>Manager</span></a>
+    </nav>
     <button class="help" id="helpBtn" title="Keyboard shortcuts" aria-label="Help"></button>
   </header>
   <nav class="rail" id="rail"></nav>
@@ -1925,7 +1976,7 @@ function ingest(d){
 }
 function showGate(err){
   $('#gate').hidden=false;
-  $('#gate').innerHTML=`<form class="gate-card" id="gateForm"><span class="ws-tile">G</span><h1>Greys Chat</h1><p>Sign in with your GREYS employee ID, the same one you use in the staff portal.</p><input id="gateId" placeholder="Employee ID" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Employee ID"><button class="btn" type="submit">Sign in</button><div class="err" role="alert">${esc(err||'')}</div><small>Don't have an ID? Ask your manager.</small></form>`;
+  $('#gate').innerHTML=`<a class="gate-home" href="/"><img src="/apple-touch-icon.png" alt="" width="22" height="22">Staff Portal</a><form class="gate-card" id="gateForm"><span class="ws-tile">G</span><h1>Greys Chat</h1><p>Sign in with your GREYS employee ID, the same one you use in the staff portal.</p><input id="gateId" placeholder="Employee ID" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Employee ID"><button class="btn" type="submit">Sign in</button><div class="err" role="alert">${esc(err||'')}</div><small>Don't have an ID? Ask your manager.</small></form>`;
   const f=$('#gateForm');setTimeout(()=>$('#gateId').focus(),0);
   f.onsubmit=async e=>{e.preventDefault();const v=$('#gateId').value.trim();if(!v){$('.err',f).textContent='Enter your employee ID.';return;}
     const b=$('button',f);b.disabled=true;$('.err',f).textContent='';
