@@ -22,6 +22,10 @@
 //                   Then lead + first message, staff alert, customer ack.
 //                   A day the shop is closed (rb_day_closed: a Wix holiday, an all-day buyout, a weekday
 //                   with no hours) is refused for every experience, held or requested (2026-11-13).
+//                   2026-11-14: a party that isn't one of the experience's steps is refused (Fondue: 2, 4,
+//                   6 or 8 — rb_experience_types.party_step), and `addons` (keys, e.g. chocolate_fondue)
+//                   ride along — priced onto a held booking (rb_experience_addons), on the message and
+//                   in details.addons for a request (the portal's booking link carries them).
 //   reply (admin)   staff reply from the manager console → emailed to the customer;
 //                   sending a booking link (…?book=…) restarts the 48 h hold
 //   log   (admin)   paste a reply the customer sent by email into the conversation
@@ -66,6 +70,15 @@ const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: 
 class PublicError extends Error {}
 const clean = (v: unknown, max = 200) => String(v ?? "").trim().slice(0, max);
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+const usd = (c: number) => "$" + (c / 100).toFixed(2).replace(/\.00$/, "");
+// "2, 4, 6 or 8 guests" — same words as rb_party_sizes() in the database
+function partySizes(min: number, max: number, step: number) {
+  if (step <= 1) return `parties of ${min} to ${max}`;
+  if (Math.floor((max - min) / step) >= 7) return `parties of ${min} to ${max}, in steps of ${step}`;
+  const n: number[] = [];
+  for (let p = min; p <= max; p += step) n.push(p);
+  return (n.length > 1 ? n.slice(0, -1).join(", ") + " or " + n[n.length - 1] : String(n[0])) + " guests";
+}
 const para = (s: string) => esc(s).replace(/\r?\n/g, "<br>").replace(/(https:\/\/[^\s<]+)/g, '<a href="$1">$1</a>');
 
 async function isAdmin(req: Request) {
@@ -211,7 +224,7 @@ async function ask(req: Request, b: Record<string, unknown>) {
   const request = b.request === true;
   if (!b.experience_id) throw new PublicError("Pick an experience.");
   const { data: x } = await admin.from("rb_experience_types")
-    .select("id, name, options, at_home, min_party, max_party, active, bookable").eq("id", clean(b.experience_id, 64)).maybeSingle();
+    .select("id, name, options, at_home, min_party, max_party, active, bookable, party_step, addons").eq("id", clean(b.experience_id, 64)).maybeSingle();
   if (!x || !x.active) throw new PublicError("That experience isn't available.");
   // only an experience that books online is held (request-only ones: Greysing Table, Build a
   // Board, Raclette at Home — rb_experience_types.bookable, 2026-11-05)
@@ -219,6 +232,17 @@ async function ask(req: Request, b: Record<string, unknown>) {
   const time = clean(other ? note : b.preferred_time, holds ? 5 : 80);
   if (party < 1) throw new PublicError("How many guests?");
   if (party < x.min_party || party > x.max_party) throw new PublicError(`${x.name} is for parties of ${x.min_party} to ${x.max_party}.`);
+  const step = Math.max(1, Math.floor(Number(x.party_step) || 1));
+  if (step > 1 && (party - x.min_party) % step !== 0) throw new PublicError(`${x.name} is for ${partySizes(x.min_party, x.max_party, step)}.`);
+  // the add-ons they ticked (chocolate fondue, $12.95 per guest): in the experience's own order, priced the way
+  // rb_experience_addons prices them (per guest × the party, or once)
+  const addonKeys = Array.isArray(b.addons) ? [...new Set((b.addons as unknown[]).map((k) => clean(k, 40)).filter(Boolean))].slice(0, 10) : [];
+  const xAdds: any[] = Array.isArray(x.addons) ? x.addons : [];
+  if (addonKeys.some((k) => !xAdds.some((a) => a && a.key === k))) throw new PublicError("That add-on isn't available anymore. Refresh the page and try again.");
+  const addons = xAdds.filter((a) => a && addonKeys.includes(a.key)).map((a) => {
+    const qty = a.per === "party" ? 1 : party, each = Math.round(Number(a.price_cents) || 0);
+    return { key: String(a.key), label: String(a.label || "Add-on"), qty, per: a.per === "party" ? "party" : "guest", total_cents: each * qty };
+  });
   const opts: any[] = Array.isArray(x.options) ? x.options : [];
   const opt = opts.find((o) => o && o.key === clean(b.option, 40)) || null;
   if (opts.length && !opt) throw new PublicError("Pick " + opts.map((o) => o.label).join(" or ") + ".");
@@ -248,6 +272,7 @@ async function ask(req: Request, b: Record<string, unknown>) {
   const facts = [
     winLabel && "Time: " + (other ? "another time — " + note : winLabel + (holds ? " (holding " + hhmm12(time) + ")" : "")),
     opt && "Option: " + opt.label,
+    ...addons.map((a) => "Add-on: " + a.label + (a.per === "guest" ? " for " + a.qty : "") + " (" + usd(a.total_cents) + ")"),
     x.at_home && "Address: " + address,
     !has("occasion") && occasion && "Occasion: " + occasion,
     !has("dietary") && dietary.length && "Dietary: " + dietary.join(", "),
@@ -271,7 +296,16 @@ async function ask(req: Request, b: Record<string, unknown>) {
     if (!res || res.ok === false) throw new PublicError((res && res.error) || "That time isn't available — pick another.");
     rid = String(res.id); rcode = String(res.code);
     holdUntil = new Date(Date.now() + HOLD_HOURS * 3600000).toISOString();
-    await admin.from("rb_reservations").update({ status: "pending", hold_expires_at: holdUntil }).eq("id", rid);
+    // the add-ons go on the held booking too, so its booking link pays for them (total_cents = package + add-ons)
+    const held: Record<string, unknown> = { status: "pending", hold_expires_at: holdUntil };
+    if (addons.length) {
+      const { data: q } = await admin.rpc("rb_experience_addons", { p_experience: x.id, p_party: party, p_keys: addons.map((a) => a.key) });
+      if (q && q.ok) {
+        const cents = Math.round(Number(q.cents) || 0);
+        Object.assign(held, { addons: q.items, addons_cents: cents, total_cents: Math.round(Number(res.total_cents) || 0) + cents });
+      } else console.error("rb_experience_addons", q && q.error);
+    }
+    await admin.from("rb_reservations").update(held).eq("id", rid);
     // 2. the same tables in Wix, so dinner bookings can't take them meanwhile (none for at-home)
     if (!x.at_home) {
       const { data: r } = await admin.from("rb_reservations").select("starts_at, ends_at").eq("id", rid).single();
@@ -293,7 +327,7 @@ async function ask(req: Request, b: Record<string, unknown>) {
     reservation_id: rid, reservation_code: rcode, hold_expires_at: holdUntil,
     option_label: opt ? opt.label : null, event_address: address || null,
     details: { occasion: occasion || answers.find((a) => a.id === "occasion")?.value || null, dietary, answers, contact_pref: contact || null, option_key: opt ? opt.key : null, source: clean(b.source, 40) || null,
-      time_window: win || null, time_note: other ? note : null, request: request || null },
+      time_window: win || null, time_note: other ? note : null, request: request || null, addons: addons.length ? addons.map((a) => a.key) : null },
   }).select("*").single();
   if (error) throw new Error(error.message);
   if (rid) await admin.from("rb_reservations").update({ inquiry_id: inq.id }).eq("id", rid);

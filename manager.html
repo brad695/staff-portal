@@ -2124,6 +2124,7 @@ function inqLink(){
   // request, '6:00 PM' (2026-11-04) — sent as &time=18:00 so the booking page opens on it
   const tm = inqTime24(r.preferred_time); if(tm) p.set('time', tm);
   if(r.details && r.details.option_key) p.set('opt', r.details.option_key);
+  if(r.details && Array.isArray(r.details.addons) && r.details.addons.length) p.set('addons', r.details.addons.join(','));
   if(r.reservation_id && r.reservation_code && r.hold_expires_at){ p.set('hold', r.reservation_id); p.set('hc', r.reservation_code); }
   if(first) p.set('first', first); if(rest.length) p.set('last', rest.join(' '));
   if(r.email) p.set('email', r.email); if(r.phone) p.set('phone', r.phone);
@@ -7485,10 +7486,13 @@ const EXP_SITE = "https://tickets.greyscheese.com/experiences";
 const EXP_MIN_NOTICE_DAYS = 7;
 const expBlank = () => ({ id: null, name: "", description: "", price_cents: 30000, per_person: false,
   duration_min: 90, min_party: 2, max_party: 8, tables_needed: 2, lead_time_min: EXP_MIN_NOTICE_DAYS * 1440, active: true,
-  sort_order: 99, image_url: "", bookable: true, info_url: "", price_unit_guests: null, options: null, price_label: "", includes: [] });
+  sort_order: 99, image_url: "", bookable: true, info_url: "", price_unit_guests: null, options: null, price_label: "", includes: [],
+  party_step: 1, addons: [] });
 // How an experience is priced, the same three ways rb_experience_quote() charges (2026-11-07):
-// per person, per group of N guests (price_unit_guests: "per table of 6", "per 2 guests"), or one
-// price per party. Choices (options) each carry their own price, charged the same way.
+// per person, per N guests (price_unit_guests — charged by the guest since 2026-11-14, price × party ÷ N to the
+// cent: "$350 for 6" makes 7 guests $408.33 and 12 guests $700), or one price per party. Choices (options) each
+// carry their own price, charged the same way. Add-ons (addons, 2026-11-14: chocolate fondue $12.95 per guest) are
+// ticked by the guest on top; party_step (Fondue 2) makes guests book 2, 4, 6, 8.
 const expPriceShort = (x) => (Array.isArray(x.options) && x.options.length > 1 ? "from " : "") + money(x.price_cents) +
   (x.per_person ? " / guest" : x.price_unit_guests > 0 ? " / " + x.price_unit_guests + " guests" : " / party");
 
@@ -7572,7 +7576,7 @@ function ExperienceBookings({ x, onBack, onEdit }) {
   const load = async () => {
     setErr("");
     let q = db.from("rb_reservations")
-      .select("id, code, guest_name, email, phone, party_size, starts_at, ends_at, status, payment_status, total_cents, paid_cents, gratuity_cents, tax_cents, refunded_cents, notes, hold_expires_at, inquiry_id, external_id, created_at, cancel_reason, experience_type_id, rb_experience_types(name)")
+      .select("id, code, guest_name, email, phone, party_size, starts_at, ends_at, status, payment_status, total_cents, paid_cents, gratuity_cents, tax_cents, refunded_cents, notes, hold_expires_at, inquiry_id, external_id, created_at, cancel_reason, experience_type_id, addons, addons_cents, rb_experience_types(name)")
       .eq("kind", "experience").order("starts_at", { ascending: true }).limit(1000);
     if (x) q = q.eq("experience_type_id", x.id);
     const { data, error } = await q;
@@ -7644,6 +7648,7 @@ function ExperienceBookings({ x, onBack, onEdit }) {
                 <b>{r.guest_name || "Guest"}</b>
                 <span className="cc-td-sub">{[r.email && <a key="e" href={"mailto:" + r.email}>{r.email}</a>, r.phone && <a key="p" href={"tel:" + r.phone}>{r.phone}</a>].filter(Boolean).reduce((a, b, i) => i ? [...a, " · ", b] : [b], [])}</span>
                 {r.notes && <span className="cc-td-sub">📝 {r.notes}</span>}
+                {Array.isArray(r.addons) && r.addons.length > 0 && <span className="cc-td-sub">➕ {r.addons.map((a) => a.label + (a.qty > 1 ? " × " + a.qty : "") + " (" + money(a.total_cents || 0) + ")").join(", ")}</span>}
                 {q && <a className="cc-td-sub" href="#inquiries" style={{ fontWeight: 700 }} onClick={(e) => { e.preventDefault(); window.inqOpenById && window.inqOpenById(q.id); }}>💬 Open the conversation (#{q.code} · {q.stage.replace("_", " ")}) →</a>}
               </span>
               <span className="cc-mono">👥 {r.party_size}<br />{money(r.paid_cents != null ? r.paid_cents : r.total_cents || 0)}
@@ -7781,6 +7786,14 @@ function ExperienceEdit({ x, count, onCancel, onSaved }) {
   const [incl, setIncl] = useState(() => (Array.isArray(x.includes) ? x.includes : []).map((i) => ({
     item: String((i && i.item) || ""), per: i && (i.per === "guest" || i.per === "party") ? i.per : "" })));
   const setInc = (i, patch) => setIncl(incl.map((o, k) => (k === i ? { ...o, ...patch } : o)));
+  // add-ons guests can tick when they book (Jackie 2026-11-14: "add a chocolate fondue to any experience for $12.95 per
+  // person … as an add-on"). per: "guest" = × the party, "party" = once. Saved as addons [{key, label, price_cents, per}].
+  const [adds, setAdds] = useState(() => (Array.isArray(x.addons) ? x.addons : []).map((a) => ({
+    key: String((a && a.key) || ""), label: String((a && a.label) || ""), price: ((Number(a && a.price_cents) || 0) / 100).toString(),
+    per: a && a.per === "party" ? "party" : "guest" })));
+  const setAdd = (i, patch) => setAdds(adds.map((o, k) => (k === i ? { ...o, ...patch } : o)));
+  // guests book in steps of this many from the fewest (Fondue 2 → 2, 4, 6, 8); 1 = any number
+  const [stepP, setStepP] = useState(String(x.party_step || 1));
   const [label, setLabel] = useState(x.price_label || "");
   const [duration, setDuration] = useState(String(x.duration_min || 90));
   const [minP, setMinP] = useState(String(x.min_party || 1));
@@ -7825,10 +7838,15 @@ function ExperienceEdit({ x, count, onCancel, onSaved }) {
   const optCents = opts.map((o) => Math.round(Number(o.price) * 100) || 0);
   const goodOpt = optCents.filter((c) => c > 0).sort((a, b) => a - b);
   const baseCents = opts.length ? (goodOpt[0] || 0) : (Math.round(Number(price) * 100) || 0);
-  const chargeFor = (c, n) => mode === "person" ? c * n : mode === "group" && unitN >= 2 ? c * Math.ceil(n / unitN) : c;
+  // "per N guests" is charged by the guest (2026-11-14): price × party ÷ N, to the cent — same as rb_experience_quote()
+  const chargeFor = (c, n) => mode === "person" ? c * n : mode === "group" && unitN >= 2 ? Math.round(c * n / unitN) : c;
   const perWords = mode === "person" ? " per person" : mode === "group" ? " per " + (unitN >= 2 ? unitN : "N") + " guests" : " per party";
   const priceWords = goodOpt.length > 1 ? [...new Set(goodOpt)].map((c) => money(c)).join(" or ") : money(baseCents);
-  const suggested = priceWords + perWords + " · " + (pMin <= 2 && pMax >= 20 ? "up to " + pMax + " guests" : pMin + " to " + pMax + " guests");
+  const stepN = Math.max(1, Math.floor(Number(stepP) || 1));
+  const sizes = []; for (let n = pMin; n <= pMax && sizes.length < 13; n += stepN) sizes.push(n);
+  const sizeWords = stepN > 1 && sizes.length <= 8 ? sizes.slice(0, -1).join(", ") + (sizes.length > 1 ? " or " : "") + sizes[sizes.length - 1] + " guests"
+    : pMin <= 2 && pMax >= 20 ? "up to " + pMax + " guests" : pMin + " to " + pMax + " guests" + (stepN > 1 ? ", in steps of " + stepN : "");
+  const suggested = priceWords + perWords + " · " + sizeWords;
   const labelMissesPrice = label.trim() && baseCents > 0 && !label.includes(money(baseCents));
   const setOpt = (i, patch) => setOpts(opts.map((o, k) => (k === i ? { ...o, ...patch } : o)));
 
@@ -7851,13 +7869,25 @@ function ExperienceEdit({ x, count, onCancel, onSaved }) {
     if (optsOut.length === 1) return setErr("Add a second choice, or remove this one (one choice is the same as no choice).");
     if (!(cents > 0)) return setErr(opts.length ? "Give the choices a price." : "Enter a price.");
     if (!(mn >= 1) || !(mx >= mn)) return setErr("Party size: the most must be at least the fewest.");
+    const st = Math.floor(Number(stepP));
+    if (!(st >= 1 && st <= 12)) return setErr("Guests come in steps of 1 to 12 (1 = any number).");
+    const addsOut = [];
+    for (let i = 0; i < adds.length; i++) {
+      const a = adds[i], nm = a.label.trim(), c = Math.round(Number(a.price) * 100) || 0;
+      if (!nm && !a.price) continue; // an empty row
+      if (!nm) return setErr("Give add-on " + (i + 1) + " a name.");
+      if (!(c > 0)) return setErr("Give " + nm + " a price.");
+      let key = a.key || nm.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 30) || "addon";
+      while (addsOut.some((o) => o.key === key)) key += "_" + (i + 1);
+      addsOut.push({ key, label: nm.slice(0, 60), price_cents: c, per: a.per === "party" ? "party" : "guest" });
+    }
     if (!(du >= 15)) return setErr("Length must be at least 15 minutes.");
     if (!(tb >= 1)) return setErr("It needs at least one table.");
     if (infoUrl.trim() && !/^https:\/\/\S+$/i.test(infoUrl.trim())) return setErr("The greyscheese.com page must be a full link starting with https://");
     const row = { name: name.trim(), description: desc.trim(), price_cents: optsOut.length ? Math.min(...optsOut.map((o) => o.price_cents)) : cents,
       per_person: mode === "person", price_unit_guests: mode === "group" ? unitN : null,
       options: optsOut.length ? optsOut : null, price_label: label.trim() || suggested,
-      duration_min: du, min_party: mn, max_party: mx, tables_needed: tb,
+      duration_min: du, min_party: mn, max_party: mx, tables_needed: tb, party_step: st, addons: addsOut,
       lead_time_min: Math.max(EXP_MIN_NOTICE_DAYS, Math.ceil(Number(lead) || 0)) * 1440,
       bookable, active, image_url: imageUrl || null, info_url: infoUrl.trim() || null,
       includes: incl.map((o) => ({ item: o.item.trim().slice(0, 120), per: o.per })).filter((o) => o.item)
@@ -7943,7 +7973,7 @@ function ExperienceEdit({ x, count, onCancel, onSaved }) {
           <select className="cc-input" value={mode} onChange={(e) => setMode(e.target.value)}>
             <option value="party">Per party (one price for the group)</option>
             <option value="person">Per guest</option>
-            <option value="group">Per group of guests (e.g. per table of 6, or per 2 guests)</option>
+            <option value="group">Per group of guests, charged by the guest (e.g. $350 for 6, or $125 per 2)</option>
           </select>
         </div>
       </div>
@@ -7960,8 +7990,8 @@ function ExperienceEdit({ x, count, onCancel, onSaved }) {
         {!baseCents ? "Enter a price."
           : mode === "person" ? `A party of ${pMin} pays ${money(chargeFor(baseCents, pMin))}, a party of ${pMax} pays ${money(chargeFor(baseCents, pMax))}.`
           : mode === "group" ? (unitN >= 2
-              ? `Every ${unitN} guests (or part of ${unitN}) pays ${money(baseCents)}: ${pMin} guests pay ${money(chargeFor(baseCents, pMin))}` +
-                (unitN + 1 > pMin && unitN + 1 < pMax ? `, ${unitN + 1} pay ${money(chargeFor(baseCents, unitN + 1))}` : "") +
+              ? `${money(baseCents)} for every ${unitN} guests, charged by the guest (${money(chargeFor(baseCents, 1))} each): ${pMin} guests pay ${money(chargeFor(baseCents, pMin))}` +
+                (pMin + stepN < pMax ? `, ${pMin + stepN} pay ${money(chargeFor(baseCents, pMin + stepN))}` : "") +
                 `, ${pMax} pay ${money(chargeFor(baseCents, pMax))}.`
               : "Enter how many guests each price covers (2 or more).")
           : `Every party pays ${money(baseCents)}, whatever its size.`}
@@ -7979,6 +8009,22 @@ function ExperienceEdit({ x, count, onCancel, onSaved }) {
         </div>
       ))}
       <button className="cc-mini" onClick={() => setOpts([...opts, { key: "", name: "", more: "", price: "" }])}>＋ Add a choice</button>
+
+      {/* Jackie 2026-11-14: chocolate fondue as an add-on, $12.95 per person (rb_experience_types.addons) */}
+      <label className="cc-label" style={{ marginTop: 14 }}>Add-ons guests can tick <span style={{ fontWeight: 400, color: "#6b7280" }}>(optional)</span></label>
+      <p className="cc-hint" style={{ marginTop: 0 }}>Shown under this experience on the inquiry form, the pay page and the experiences page. Ticked ones are added to the price (before tax and the 20% gratuity), go on the Square sale and print on the BEO.</p>
+      {adds.map((a, i) => (
+        <div key={i} style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 8 }}>
+          <input className="cc-input" style={{ margin: 0, flex: "1 1 160px", minWidth: 0 }} placeholder="e.g. Chocolate fondue" value={a.label} onChange={(e) => setAdd(i, { label: e.target.value })} />
+          <input className="cc-input" style={{ margin: 0, flex: "0 0 90px", width: 90 }} type="number" min="0" step="0.01" placeholder="$" value={a.price} onChange={(e) => setAdd(i, { price: e.target.value })} />
+          <select className="cc-input" style={{ margin: 0, flex: "0 0 140px", width: 140 }} value={a.per} onChange={(e) => setAdd(i, { per: e.target.value })}>
+            <option value="guest">per guest</option>
+            <option value="party">per party</option>
+          </select>
+          <button className="cc-mini danger" onClick={() => setAdds(adds.filter((_, k) => k !== i))}>Remove</button>
+        </div>
+      ))}
+      <button className="cc-mini" onClick={() => setAdds([...adds, { key: "", label: "", price: "", per: "guest" }])}>＋ Add an add-on</button>
 
       <label className="cc-label" style={{ marginTop: 14 }}>Price line guests see</label>
       <input className="cc-input" value={label} placeholder={suggested} onChange={(e) => setLabel(e.target.value)} />
@@ -8000,6 +8046,14 @@ function ExperienceEdit({ x, count, onCancel, onSaved }) {
           <input className="cc-input" type="number" min="1" value={maxP} onChange={(e) => setMaxP(e.target.value)} />
         </div>
       </div>
+      <div className="cc-row2">
+        <div>
+          <label className="cc-label">Guests come in steps of</label>
+          <input className="cc-input" type="number" min="1" max="12" value={stepP} onChange={(e) => setStepP(e.target.value)} />
+        </div>
+        <div />
+      </div>
+      <p className="cc-hint">{stepN > 1 ? "Guests can book " + sizeWords + "." : "1 = any number of guests between the fewest and the most."} (Fondue is 2: 2, 4, 6 or 8.)</p>
 
       <div className="cc-row2">
         <div>
@@ -18533,10 +18587,74 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
         "label": "Donation Request",
         "sub": "Fundraisers, auctions, raffles and charity events",
         "title": "Donation request",
-        "lede": "Tell us who you are and what you're asking for. We'll get back to you by email.",
+        "lede": "Tell us about your organization and your event. We'll get back to you by email.",
         "msg_label": "What are you requesting?",
         "msg_hint": "Your organization, the event and its date, and what you'd like from GREYS",
-        "questions": []
+        "questions": [
+          {
+            "id": "company",
+            "label": "Organization",
+            "hint": "",
+            "kind": "text",
+            "required": true,
+            "on": true,
+            "options": []
+          },
+          {
+            "id": "position",
+            "label": "Position in Organization",
+            "hint": "",
+            "kind": "text",
+            "required": true,
+            "on": true,
+            "options": []
+          },
+          {
+            "id": "tax_id",
+            "label": "Tax ID # of 501(c)(3)",
+            "hint": "",
+            "kind": "text",
+            "required": true,
+            "on": true,
+            "options": []
+          },
+          {
+            "id": "event_date",
+            "label": "Event Date",
+            "hint": "",
+            "kind": "date",
+            "required": true,
+            "on": true,
+            "options": []
+          },
+          {
+            "id": "cause",
+            "label": "Explanation of Cause",
+            "hint": "",
+            "kind": "long",
+            "required": true,
+            "on": true,
+            "options": []
+          },
+          {
+            "id": "suggested_donation",
+            "label": "Suggested Donation",
+            "hint": "",
+            "kind": "long",
+            "required": true,
+            "on": true,
+            "options": []
+          },
+          {
+            "id": "promotion",
+            "label": "What is your commitment to promoting our organization",
+            "hint": "",
+            "kind": "long",
+            "required": true,
+            "on": true,
+            "options": []
+          }
+        ]
       },
       {
         "key": "question",
@@ -18545,13 +18663,13 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
         "sub": "Cheese, gift cards, hours or anything else",
         "title": "Ask us a question",
         "lede": "Ask us anything. We'll get back to you by email.",
-        "msg_label": "Your question",
+        "msg_label": "Write a message",
         "msg_hint": "Type your question here",
         "questions": []
       }
     ]
   };
-  var FORM_KINDS = ["one", "many", "text", "long"];
+  var FORM_KINDS = ["one", "many", "text", "long", "date"];
   function formTidyQ(q, i) {
     if (!q || typeof q !== "object") return null;
     var label = String(q.label || "").trim().slice(0, 120);
@@ -18593,14 +18711,14 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   }
 
   var KEY = 'inquiry_form';
-  var KIND_NAMES = { one:'Buttons — pick one', many:'Buttons — pick any', text:'Short typed answer', long:'Long typed answer' };
+  var KIND_NAMES = { one:'Buttons — pick one', many:'Buttons — pick any', text:'Short typed answer', long:'Long typed answer', date:'A date (date picker)' };
   var BUILT_IN = {
     table: 'Built in: which shop, guests (1 to 6), date and time, then name, email, phone and a note. Memphis and Nashville book the table on the spot (it lands in Wix reservations and they get a confirmation email). Questions you add here show on a "A few details" screen.',
     experience: 'Built in: which experience (and tasting), shop, guests, date and time, then name, email, phone and a message. Experiences that are bookable by clients (✨ Experiences → Edit → "Booking") show only open times at least 7 days out and end on Book & pay (or a 48-hour hold with their question); request-only ones are requests — any half hour, nothing held. Nashville: up to 12 guests. Requests and holds show in 💼 Catering Leads tagged Experience; paid bookings land there with a BEO. The questions below share one "A few details" screen.',
     catering: 'Built in: shop and pickup / delivery / on site / off site (plus the address), then guests, date and time, then the interest buttons (Greysing Table, Charcuterie board, Private event, Sandwiches / box lunches), name, email, phone and a message. Goes to 💼 Catering Leads. The questions below show under the date on the second screen.',
     event: 'Built in: shop, guests, date and a start time (12:00 to 7:00), then name, email, phone and a message. Goes to 💼 Catering Leads tagged Private event, so it can get a proposal and an invoice. The questions below share one "A few details" screen.',
-    donation: 'Built in: shop, then ONE page — name, email and what they are requesting (required, the message box below names it). No date, guests or phone. Goes to 💼 Catering Leads tagged Donation request; they get a "we\'ve got your donation request" email. Questions you add here show on a "A few details" screen first.',
-    question: 'Built in: shop, then ONE page — name, email and their question (required, the message box below names it). No date, guests or phone. Goes to 💼 Catering Leads tagged Question (the Questions tab); they get a "we\'ve got your question" email. Questions you add here show on a "A few details" screen first.'
+    donation: 'Built in: shop, then the questions below on one screen (the same as greyscheese.com\'s Donation Form: organization, position, 501(c)(3) tax ID, event date, cause, suggested donation, how they\'ll promote GREYS), then first name, last name, email and phone (all required). The question with the id "company" (Organization) fills the lead\'s company; every answer is in the message. Switch every question off and the message box below comes back instead. Goes to 💼 Catering Leads tagged Donation request; they get a "we\'ve got your donation request" email.',
+    question: 'Built in: shop, then ONE page — first name, last name, email, phone and their message (all required; the message box below names it), like greyscheese.com\'s Contact Form. No date or guests. Goes to 💼 Catering Leads tagged Question (the Questions tab); they get a "we\'ve got your question" email. Questions you add here show on a "A few details" screen first.'
   };
   var STAGING = /staging/i.test(location.hostname);
   // the live form has its own site since 2026-11-05 (info.greyscheese.com); staging keeps it on the staging ticket site

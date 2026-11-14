@@ -13,6 +13,9 @@
 //                              trigger on rb_reservations (rb_experience_lead_sync) opens a
 //                              Catering Lead with a BEO for it. If the order can't be built
 //                              the charge still goes through without one (square_order_error).
+//                              The add-ons they ticked (2026-11-14: chocolate fondue, $12.95 per guest)
+//                              ride on that line as priced modifiers, and what the package includes
+//                              (rb_experience_types.includes, 2026-11-08) as $0 ones.
 //   4. Square /v2/payments   — charges the card token against that order
 //   5. marks the reservation paid (external_id = square:<payment id>, square_order_id)
 //   6. emails the guest their GREYS confirmation (2026-11-07); never blocks or undoes the booking
@@ -28,7 +31,9 @@
 // See "20% gratuity + sales tax" below.
 //
 // The browser never sends a price: the price comes from rb_experience_types via
-// rb_create_experience_v2 (the browser only says which option, if the experience has options).
+// rb_create_experience_v2 (the browser only says which option, if the experience has options),
+// and the add-ons from rb_experience_addons (the browser only sends their keys, `addons`).
+// rb_reservations.total_cents = the package + its add-ons (addons / addons_cents say which).
 // It does send expected_cents, the total it showed; if that isn't what the server works out,
 // nothing is charged and the guest is asked to refresh (so no one pays more than they saw).
 //
@@ -247,15 +252,48 @@ async function ensureVariation(expId: string): Promise<string> {
 
 const fmtCT = (iso: string) => new Date(iso).toLocaleString("en-US", { timeZone: "America/Chicago", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
+// The add-ons they took (2026-11-14, Jackie: "add a chocolate fondue to any experience for $12.95 per person").
+// rb_reservations.addons = [{label, price_cents, qty, …}] as rb_experience_addons priced them. They ride on the
+// experience's own line as priced modifiers: one line, so Square taxes exactly the amount charged here (two lines
+// can each round their tax and land a cent apart).
+function addonModifiers(r: any) {
+  return (Array.isArray(r?.addons) ? r.addons : [])
+    .map((a: any) => ({ name: clean(a?.label, 255) || "Add-on", quantity: String(Math.max(1, Math.floor(Number(a?.qty) || 1))),
+      base_price_money: { amount: Math.max(0, Math.round(Number(a?.price_cents) || 0)), currency: "USD" } }))
+    .filter((m: any) => m.base_price_money.amount > 0)
+    .slice(0, 10);
+}
+const addonsTotal = (mods: any[]) => mods.reduce((s, m) => s + m.base_price_money.amount * Number(m.quantity), 0);
+
+// What's in the package (Maverick 2026-11-08: "experience packages need to have items listed being
+// sold"). rb_experience_types.includes = [{item, per?: "party" | "guest"}], edited in the manager
+// console. Each item rides on the sale as a $0 modifier, so the Square order and receipt list it and
+// the total doesn't move; "per guest" counts the party (one raclette burner each). The BEO gets the
+// same list from rb_experience_lead_sync.
+function includedModifiers(r: any) {
+  const list = r?.rb_experience_types?.includes;
+  const party = Math.max(1, Math.floor(Number(r?.party_size) || 1));
+  return (Array.isArray(list) ? list : [])
+    .map((x: any) => ({ name: clean(x?.item, 255), per: x?.per }))
+    .filter((x: any) => x.name)
+    .slice(0, 30)
+    .map((x: any) => ({ name: x.name, quantity: x.per === "guest" ? String(party) : "1", base_price_money: { amount: 0, currency: "USD" } }));
+}
+
 async function createOrder(key: string, code: string, P: Priced, R: Rates, r: any, location_id: string): Promise<string> {
   const varId = await ensureVariation(r.experience_type_id);
   const when = fmtCT(r.starts_at);
   // the option they picked, and where an at-home party is — shows on the sale in Square
   const extra = [r.option_label, r.event_address ? "AT: " + r.event_address : null].filter(Boolean).join(" · ");
-  const d = await square("/v2/orders", {
+  // the line = the package, plus each add-on as a priced modifier: together they are the price charged
+  let paid = addonModifiers(r);
+  if (addonsTotal(paid) > P.price_cents) paid = [];
+  const base = P.price_cents - addonsTotal(paid);
+  const included = includedModifiers(r);
+  const build = (k: string, withItems: boolean) => square("/v2/orders", {
     method: "POST",
     body: JSON.stringify({
-      idempotency_key: key,
+      idempotency_key: k,
       order: {
         location_id,
         reference_id: code,
@@ -263,8 +301,9 @@ async function createOrder(key: string, code: string, P: Priced, R: Rates, r: an
         line_items: [{
           catalog_object_id: varId,
           quantity: "1",
-          base_price_money: { amount: P.price_cents, currency: "USD" },
+          base_price_money: { amount: base, currency: "USD" },
           note: [`Party of ${r.party_size} · ${when} · ${code}`, extra].filter(Boolean).join(" · ").slice(0, 2000),
+          ...(paid.length || (withItems && included.length) ? { modifiers: [...paid, ...(withItems ? included : [])] } : {}),
         }],
         // sales tax on the experience, and the 20% gratuity: the register's own objects in production
         taxes: [R.tax_id
@@ -277,6 +316,14 @@ async function createOrder(key: string, code: string, P: Priced, R: Rates, r: an
       },
     }),
   });
+  let d: any;
+  try { d = await build(key, true); }
+  catch (e) {
+    // Square turned the item list down: still make the itemized sale (with the priced add-ons), just without the list
+    if (!included.length || (e as any)?.status !== 400) throw e;
+    console.error("order items", code, String((e as Error).message || e).slice(0, 300));
+    d = await build(key.slice(0, 40) + ":plain", false);
+  }
   const o = d?.order;
   if (!o?.id) throw new Error("Square did not return an order");
   const total = Number(o.total_money?.amount);
@@ -304,8 +351,9 @@ type ConfirmInfo = {
   first: string; experience: string; option: string | null; startsAt: string; party: number; shop: string;
   atHome: boolean; address: string | null; totalCents: number; card: string | null; code: string;
   notes: string | null; receiptUrl: string | null; infoUrl: string | null; test: boolean;
-  // what the total is made of (2026-11-10)
+  // what the total is made of (2026-11-10): the package (priceCents), the add-ons, the gratuity and the tax
   priceCents?: number; gratuityCents?: number; taxCents?: number; gratuityPct?: string;
+  addons?: { label: string; qty: number; total_cents: number }[];
 };
 function confirmationEmail(d: ConfirmInfo) {
   const shop = SHOP_INFO[String(d.shop || "").toLowerCase()] ?? SHOP_INFO.memphis;
@@ -328,9 +376,12 @@ function confirmationEmail(d: ConfirmInfo) {
     row("When", `${cfEsc(cfDay(d.startsAt))} at <span style="white-space:nowrap">${cfEsc(cfTime(d.startsAt))}</span>`) +
     row("Where", where) +
     row("Guests", String(d.party)) +
+    ((d.addons || []).length ? row("Add-ons", (d.addons || []).map((a) => cfEsc(a.label) + (a.qty > 1 ? " for " + a.qty : "")).join("<br>")) : "") +
     row("Paid", cfEsc(cfMoney(d.totalCents)) + (d.card ? ` <span style="font:13px Arial,sans-serif;color:${CF.MUTE}">(${cfEsc(d.card)})</span>` : "") +
       (d.priceCents != null && (d.gratuityCents || d.taxCents)
-        ? `<br><span style="font:13px/1.5 Arial,sans-serif;color:${CF.MUTE}">${cfEsc(cfMoney(d.priceCents))} + ${cfEsc(String(Number(d.gratuityPct || 20)))}% gratuity ${cfEsc(cfMoney(d.gratuityCents || 0))} + sales tax ${cfEsc(cfMoney(d.taxCents || 0))}</span>`
+        ? `<br><span style="font:13px/1.5 Arial,sans-serif;color:${CF.MUTE}">${cfEsc(cfMoney(d.priceCents))}` +
+          (d.addons || []).map((a) => ` + ${cfEsc(a.label.toLowerCase())} ${cfEsc(cfMoney(a.total_cents))}`).join("") +
+          ` + ${cfEsc(String(Number(d.gratuityPct || 20)))}% gratuity ${cfEsc(cfMoney(d.gratuityCents || 0))} + sales tax ${cfEsc(cfMoney(d.taxCents || 0))}</span>`
         : "")) +
     row("Confirmation", `<b>${cfEsc(d.code)}</b>`) +
     (d.notes ? row("Your notes", cfEsc(d.notes)) : "") +
@@ -397,6 +448,10 @@ async function pay(req: Request, b: Record<string, unknown>) {
   const shop = clean(b.location, 40) || "Memphis";
   const email = clean(b.email, 200);
   const name = (clean(b.first_name, 80) + " " + clean(b.last_name, 80)).trim();
+  // the add-ons they ticked, as keys (2026-11-14: chocolate fondue). Not sent at all (an older copy of a page):
+  // a held slot keeps the add-ons it was held with, a fresh booking takes none.
+  const addonKeys: string[] | null = Array.isArray(b.addons)
+    ? [...new Set((b.addons as unknown[]).map((k) => clean(k, 40)).filter(Boolean))].slice(0, 10) : null;
 
   // 1. the reservation (server decides price, validates party / time / tables).
   //    A link from an inquiry carries hold=<id>&hc=<code>: that slot is already held
@@ -437,9 +492,24 @@ async function pay(req: Request, b: Record<string, unknown>) {
     res = data;
   }
   if (!res || res.ok === false) throw new PublicError((res && res.error) || "That time is no longer available.");
-  const rid = String(res.id), code = String(res.code), price = Math.round(Number(res.total_cents) || 0);
+  const rid = String(res.id), code = String(res.code);
+  let price = Math.round(Number(res.total_cents) || 0);
   // a failed payment on a held slot keeps the hold; a fresh booking is cancelled
   const undo = async () => { if (fromHold) await admin.from("rb_reservations").update({ status: "pending" }).eq("id", rid).neq("payment_status", "paid"); else await cancelReservation(rid); };
+  // the add-ons, priced here (rb_experience_addons) and kept on the booking: total_cents = the package + add-ons
+  if (addonKeys) {
+    const { data: cur } = await admin.from("rb_reservations").select("experience_type_id, party_size, total_cents, addons_cents").eq("id", rid).single();
+    const pkg = Math.round(Number(cur?.total_cents) || 0) - Math.round(Number(cur?.addons_cents) || 0);
+    const { data: q, error: qe } = await admin.rpc("rb_experience_addons", { p_experience: cur?.experience_type_id, p_party: cur?.party_size, p_keys: addonKeys });
+    if (qe || !q || q.ok === false) {
+      await undo();
+      throw new PublicError((q && q.error) || "We couldn't add that add-on. Refresh the page and try again. Nothing was charged.");
+    }
+    const cents = Math.round(Number(q.cents) || 0);
+    const { error: ue } = await admin.from("rb_reservations").update({ addons: q.items, addons_cents: cents, total_cents: pkg + cents }).eq("id", rid);
+    if (ue) { await undo(); throw new Error(ue.message); }
+    price = pkg + cents;
+  }
   if (!(price > 0) || price > MAX_TOTAL_CENTS) { await undo(); throw new PublicError("That price doesn't look right — please call the shop."); }
 
   // the charge: price + 20% gratuity + sales tax, with the rates as Square has them right now
@@ -462,7 +532,7 @@ async function pay(req: Request, b: Record<string, unknown>) {
   try {
     // 2. real tables in Wix (an at-home experience happens at their place: no tables)
     const { data: r } = await admin.from("rb_reservations")
-      .select("experience_type_id, starts_at, ends_at, party_size, location, guest_name, email, phone, option_label, event_address, rb_experience_types(name, at_home, info_url)").eq("id", rid).single();
+      .select("experience_type_id, starts_at, ends_at, party_size, location, guest_name, email, phone, option_label, event_address, addons, addons_cents, rb_experience_types(name, at_home, info_url, includes)").eq("id", rid).single();
     const atHome = !!(r as any)?.rb_experience_types?.at_home;
     if (!atHome) {
       const hold = await tableHolds("hold", {
@@ -515,6 +585,12 @@ async function pay(req: Request, b: Record<string, unknown>) {
       await admin.from("inquiries").update({ stage: "booked", hold_expires_at: null, reservation_id: rid, reservation_code: code }).eq("id", lapsedInquiry);
     }
     const card = pmt.card_details?.card ? `${pmt.card_details.card.card_brand} ····${pmt.card_details.card.last_4}` : null;
+    // what was booked: the package, then each add-on (2026-11-14)
+    const adds = (Array.isArray((r as any)?.addons) ? (r as any).addons : [])
+      .map((a: any) => ({ key: String(a?.key || ""), label: String(a?.label || "Add-on"), qty: Math.max(1, Math.floor(Number(a?.qty) || 1)),
+        price_cents: Math.round(Number(a?.price_cents) || 0), total_cents: Math.round(Number(a?.total_cents) || 0) }));
+    const addCents = Math.round(Number((r as any)?.addons_cents) || 0);
+    const pkgCents = P.price_cents - addCents;
 
     // 6. the guest's confirmation email. The booking is paid by now, so nothing here may throw
     //    into the catch below (that would release the tables of a paid booking).
@@ -529,7 +605,7 @@ async function pay(req: Request, b: Record<string, unknown>) {
           shop: String(r?.location || shop), atHome, address: r?.event_address || null, totalCents: amount, card, code,
           notes: clean(b.notes, 1000) || null, receiptUrl: pmt.receipt_url ?? null, infoUrl: /^https:\/\//i.test(x.info_url || "") ? x.info_url : null,
           test: env() !== "production",
-          priceCents: P.price_cents, gratuityCents: P.gratuity_cents, taxCents: P.tax_cents, gratuityPct: R.gratuity_pct,
+          priceCents: pkgCents, gratuityCents: P.gratuity_cents, taxCents: P.tax_cents, gratuityPct: R.gratuity_pct, addons: adds,
         });
         const sending = sendConfirmation(to, mail).catch((e) => { console.error("confirm mail", rid, e); return "failed"; });
         const rt = (globalThis as any).EdgeRuntime;
@@ -541,6 +617,7 @@ async function pay(req: Request, b: Record<string, unknown>) {
     return {
       ok: true, id: rid, code, experience: res.experience, time: res.time, total_cents: amount,
       price_cents: P.price_cents, gratuity_cents: P.gratuity_cents, tax_cents: P.tax_cents, pricing: pricingOut(R),
+      package_cents: pkgCents, addons: adds, addons_cents: addCents,
       party: r?.party_size, option_label: r?.option_label || null, at_home: atHome, card,
       receipt_url: pmt.receipt_url ?? null, confirm_email,
     };
@@ -646,7 +723,7 @@ async function cancelOrRefund(req: Request, b: Record<string, unknown>, action: 
 
 async function status(b: Record<string, unknown>) {
   const { data } = await admin.from("rb_reservations")
-    .select("code, party_size, starts_at, total_cents, gratuity_cents, tax_cents, paid_cents, status, payment_status, option_label, event_address, rb_experience_types(name)")
+    .select("code, party_size, starts_at, total_cents, gratuity_cents, tax_cents, paid_cents, status, payment_status, option_label, event_address, addons, addons_cents, rb_experience_types(name)")
     .eq("code", clean(b.code, 20).toUpperCase()).eq("email", clean(b.email, 200).toLowerCase()).eq("kind", "experience").maybeSingle();
   return data ? { ok: true, reservation: data } : { ok: false, error: "Reservation not found" };
 }
