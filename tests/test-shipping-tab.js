@@ -14,6 +14,7 @@ const INDEX = fs.readFileSync(path.join(__dirname, "..", "index.html"));
 let ok = 0, bad = 0;
 const t = (name, cond, extra) => { if (cond) { ok++; console.log("  ✓ " + name); } else { bad++; console.log("  ✗ " + name + (extra ? "  -> " + extra : "")); } };
 
+const RATES = { ground_miles: 600, ground: { first_cents: 2000, each_cents: 2000 }, air: { first_cents: 4000, each_cents: 4000 } };
 const CFG = { enabled: true, from: "memphis", items: ["EN2OPFWI6P6WHF3DDHD4T2V2"], order_by: "2026-12-03", ship_on: "2026-12-08", arrive_from: "2026-12-09",
   arrive_by: "2026-12-11", first_cents: 3000, each_cents: 3000, limit: 0, tax_states: ["TN"], note: "keep me" };
 const order = (id, extra) => Object.assign({
@@ -25,7 +26,7 @@ const order = (id, extra) => Object.assign({
   carrier: "", tracking_number: "", tracking_url: "", shipped_at: null, tracking_emailed: null,
 }, extra || {});
 const ORDERS = () => [
-  order("aaaa11", { to: { name: "Sam Giftee", phone: "", address1: "123 Main St", address2: "", city: "Franklin", state: "TN", zip: "37064" }, gift_note: "Merry Cheesemas! <3", boxes: 2,
+  order("aaaa11", { service: "air", to: { name: "Sam Giftee", phone: "", address1: "123 Main St", address2: "", city: "Franklin", state: "TN", zip: "37064" }, gift_note: "Merry Cheesemas! <3", boxes: 2,
     lines: [{ name: "12 Days of Cheesemas", option: "", qty: 2, note: "" }] }),
   order("bbbb22", { fulfillment_state: "COMPLETED", carrier: "UPS", tracking_number: "1Z999AA10123456784", tracking_url: "https://www.ups.com/track?tracknum=1Z999AA10123456784",
     shipped_at: "2026-11-12T22:00:00Z", tracking_emailed: "2026-11-12T22:00:01Z" }),
@@ -87,6 +88,7 @@ async function open(browser, file, opts) {
       if (action === "ship_email") { const o = st.orders.find((x) => x.id === b.order_id); o.tracking_emailed = new Date().toISOString(); return reply({ ok: true, email_sent: true, order: o }); }
       if (action === "menu") return reply({ ok: true, sections: [{ id: "special", name: "Special Offers", items: ["EN2OPFWI6P6WHF3DDHD4T2V2", "FALL1"] }, { id: "sandwiches", name: "Sandwiches", items: ["ITAL"] }],
         items: { EN2OPFWI6P6WHF3DDHD4T2V2: { name: "12 Days of Cheesemas", vars: [{ price: 9900 }] }, FALL1: { name: "Fall Gooeys", vars: [{ price: 4500 }] }, ITAL: { name: "Italian", vars: [{ price: 1600 }] } } });
+      if (action === "zones") return reply({ ok: true, from: b.from, miles: b.miles, all: b.miles < 550 ? ["AR", "MS", "TN"] : ["AL", "AR", "GA", "MS", "TN"], part: [{ state: "TX", near: 32, areas: 51 }] });
       if (action === "ship_days") return reply({ ok: true, env: "sandbox", from: "memphis", from_label: "Memphis", ship_on: "2026-12-08", days: [{ date: "2026-12-08", orders: 2, boxes: 3, shipped: 1 }] });
       return reply({ ok: false, error: "nope" }, 400);
     }
@@ -118,6 +120,7 @@ const txt = (page, sel) => page.evaluate((s) => { const e = document.querySelect
     t("test orders are flagged", await page.evaluate(() => !document.getElementById("shEnv").hidden));
     t("summary: ships Tue, Dec 8 · 2 orders · 3 boxes · 1 shipped", /Ships Tue, Dec 8 from Memphis · 2 orders · 3 boxes · 1 shipped/.test(await txt(page, "#shBar .sh-sum")), await txt(page, "#shBar .sh-sum"));
     t("To ship shows the one not shipped", await page.locator("#shList .sh-row").count() === 1 && /Sam Giftee/.test(await txt(page, "#shList")), await txt(page, "#shList"));
+    t("…with its label: UPS 2nd Day Air", (await txt(page, "#shList .sh-row .sh-svc.air")) === "UPS 2nd Day Air", await txt(page, "#shList .sh-row"));
     t("…with its address, boxes and gift note (escaped)", /123 Main St/.test(await txt(page, "#shList")) && /2× 12 Days of Cheesemas/.test(await txt(page, "#shList"))
       && await page.evaluate(() => document.querySelector(".sh-gift").textContent.indexOf("Merry Cheesemas! <3") >= 0 && !document.querySelector(".sh-gift b")));
     await page.click('#shBar [data-sh="filter"][data-v="done"]');
@@ -149,24 +152,38 @@ const txt = (page, sel) => page.evaluate((s) => { const e = document.querySelect
     await page.click('#shBar [data-sh="filter"][data-v="todo"]');
     const [pop] = await Promise.all([page.waitForEvent("popup"), page.click('#shBar [data-sh="print"]')]);
     await pop.waitForLoadState(); const ph = await pop.content();
+    t("Print: the packing list says which label to buy", /<b><small>UPS 2nd Day Air<\/small><\/b>/.test(ph), ph.slice(0, 200));
     t("Print: a packing list + a slip with the gift note", /Ship day · Tue, Dec 8, 2026/.test(ph) && /TEST ORDERS/.test(ph) && (ph.match(/class="slip"/g) || []).length === 1 && /Merry Cheesemas! &lt;3/.test(ph) && /tuck it in the box/.test(ph), ph.slice(0, 200));
     if (process.env.SHOTS) { await pop.setViewportSize({ width: 900, height: 1100 }); await pop.screenshot({ path: path.join(process.env.SHOTS, "packing-list.png"), fullPage: true }); }
     await pop.close();
     // settings
     await page.waitForSelector("#shItems .sh-it", { timeout: 8000 });
     t("settings: filled from order_shipping", await page.evaluate(() => document.getElementById("shEnabled").checked && document.getElementById("shShipOn").value === "2026-12-08"
-      && document.getElementById("shFirst").value === "30.00" && document.getElementById("shTax").value === "TN"));
+      && document.getElementById("shTax").value === "TN"));
+    t("…no near/far yet: UPS Ground starts from the flat $30, 2nd Day Air blank, 600 miles", await page.evaluate(() => document.getElementById("shGFirst").value === "30.00" && document.getElementById("shGEach").value === ""
+      && document.getElementById("shAFirst").value === "" && document.getElementById("shMiles").value === "600"));
+    await page.waitForTimeout(500);
+    t("…the coverage line from zones", /UPS Ground at 600 miles from Memphis: all of AL, AR, GA, MS, TN; part of TX\. Everywhere else in the lower 48 ships 2nd Day Air\./.test(await txt(page, "#shCover")), await txt(page, "#shCover"));
+    await page.fill("#shMiles", "500"); await page.waitForTimeout(600);
+    const zc = st.calls.filter((c) => c.action === "zones").pop();
+    t("…typing 500 miles asks again", !!zc && zc.body.miles === 500 && zc.body.from === "memphis" && /at 500 miles/.test(await txt(page, "#shCover")), JSON.stringify(zc && zc.body));
+    await page.fill("#shMiles", "600"); await page.waitForTimeout(400);
     t("…the Cheesemas box is ticked, Special Offers listed", await page.evaluate(() => { const b = [...document.querySelectorAll('#shItems input[data-sh="item"]')]; return b.length === 2 && b[0].checked && b[0].value === "EN2OPFWI6P6WHF3DDHD4T2V2" && !b[1].checked; }));
     await page.click('#shItems [data-sh="more"]');
     t("…Show every item lists the rest", (await page.locator('#shItems input[data-sh="item"]').count()) === 3);
     await page.fill("#shOrderBy", "2026-12-10"); await page.click("#shSave"); await page.waitForTimeout(200);
     t("a last order day after the ship day is refused", /on or before the ship day/.test(await txt(page, "#shSetMsg")));
-    await page.fill("#shOrderBy", "2026-12-04"); await page.fill("#shFirst", "35"); await page.fill("#shEach", "25"); await page.fill("#shTax", "tn, ms");
+    await page.fill("#shOrderBy", "2026-12-04"); await page.fill("#shGFirst", "35"); await page.fill("#shGEach", "25"); await page.fill("#shTax", "tn, ms");
+    await page.click("#shSave"); await page.waitForTimeout(200);
+    t("a blank 2nd Day Air price is refused", /Check the 2nd Day Air prices/.test(await txt(page, "#shSetMsg")), await txt(page, "#shSetMsg"));
+    await page.fill("#shAFirst", "45");
     await page.click("#shSave"); await page.waitForTimeout(400);
     const up = await page.evaluate(() => (window.__sbCalls || []).filter((c) => c[0] === "site_content" && c[1] === "upsert").pop());
     const d = up && up[2] && up[2].data;
-    t("Save: upserts order_shipping with the new values", !!d && up[2].key === "order_shipping" && d.order_by === "2026-12-04" && d.first_cents === 3500 && d.each_cents === 2500
-      && JSON.stringify(d.tax_states) === '["TN","MS"]' && d.enabled === true && JSON.stringify(d.items) === '["EN2OPFWI6P6WHF3DDHD4T2V2"]', JSON.stringify(up && up[2]));
+    t("Save: upserts order_shipping with the new values", !!d && up[2].key === "order_shipping" && d.order_by === "2026-12-04"
+      && JSON.stringify(d.tax_states) === '["TN","MS"]' && JSON.stringify(d.items) === '["EN2OPFWI6P6WHF3DDHD4T2V2"]', JSON.stringify(up && up[2]));
+    t("…near/far: Ground $35 + $25, 2nd Day Air $45 each, 600 miles", !!d && JSON.stringify(d.rates) === JSON.stringify({ ground_miles: 600, ground: { first_cents: 3500, each_cents: 2500 }, air: { first_cents: 4500, each_cents: 4500 } }), JSON.stringify(d && d.rates));
+    t("…the old flat price is left alone", !!d && d.first_cents === 3000 && d.each_cents === 3000, JSON.stringify(d && [d.first_cents, d.each_cents]));
     t("…keeps keys the form doesn't know, says who saved", !!d && d.note === "keep me" && up[2].updated_by === "manager@greyscheese.com" && /Saved/.test(await txt(page, "#shSetMsg")));
     if (process.env.SHOTS) { await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({ path: path.join(process.env.SHOTS, "manager-shipping.png"), fullPage: true }); }
     t("no page errors", st.errors.length === 0, st.errors.slice(0, 3).join(" | "));
@@ -187,7 +204,7 @@ const txt = (page, sel) => page.evaluate((s) => { const e = document.querySelect
   };
   console.log("\nmanager.html · the test site's own shipping switch");
   {
-    const { ctx, page, st } = await openSettings({ row: Object.assign({}, CFG, { enabled: false, test_enabled: true }) });
+    const { ctx, page, st } = await openSettings({ row: Object.assign({}, CFG, { rates: RATES, enabled: false, test_enabled: true }) });
     t("staging: live off + test on → the box is ticked", await page.evaluate(() => document.getElementById("shEnabled").checked));
     t("…and says it's the test order site", /on the test order site/.test(await txt(page, ".sh-on")), await txt(page, ".sh-on"));
     await page.uncheck("#shEnabled"); const d = await settingsSave(page);
@@ -196,7 +213,7 @@ const txt = (page, sel) => page.evaluate((s) => { const e = document.querySelect
     await ctx.close();
   }
   {
-    const { ctx, page, st } = await openSettings({ row: Object.assign({}, CFG, { enabled: false }) });
+    const { ctx, page, st } = await openSettings({ row: Object.assign({}, CFG, { rates: RATES, enabled: false }) });
     t("staging: no test_enabled yet → the box follows live (off)", !(await page.evaluate(() => document.getElementById("shEnabled").checked)));
     await page.check("#shEnabled"); const d = await settingsSave(page);
     t("…tick + Save: test_enabled true, live enabled stays false", !!d && d.test_enabled === true && d.enabled === false, JSON.stringify(d));
@@ -204,7 +221,7 @@ const txt = (page, sel) => page.evaluate((s) => { const e = document.querySelect
     await ctx.close();
   }
   {
-    const { ctx, page, st } = await openSettings({ host: "https://staff.greyscheese.com", row: Object.assign({}, CFG, { enabled: false, test_enabled: true }) });
+    const { ctx, page, st } = await openSettings({ host: "https://staff.greyscheese.com", row: Object.assign({}, CFG, { rates: RATES, enabled: false, test_enabled: true }) });
     t("live portal: the box is the live switch (off), test on doesn't tick it", !(await page.evaluate(() => document.getElementById("shEnabled").checked)));
     t("…label unchanged", /on the order site/.test(await txt(page, ".sh-on")) && !/test/.test(await txt(page, ".sh-on")), await txt(page, ".sh-on"));
     await page.check("#shEnabled"); const d = await settingsSave(page);
