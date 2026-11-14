@@ -82,6 +82,14 @@
 //   No row, enabled not true, no items or no ship_on = no shipping (menu.ship is null and pay refuses).
 //   test_enabled (2026-11-13): the TEST COPY's own on/off, so staging can show shipping while the live site keeps it
 //   off. Not set = the test copy follows enabled. The live function never reads it.
+//   rates (v18, 2026-11-14, Maverick: "charge shipping based on their location" → near vs far):
+//     { ground_miles: 600, ground: { first_cents, each_cents }, air: { first_cents, each_cents } }
+//   The ship-to ZIP decides: its 3-digit area within ground_miles of the from-shop's (as the crow flies, the way UPS
+//   draws its zones; 600 = UPS zones 2–4, about 1–2 days by Ground from Memphis) pays the `ground` price and ships UPS
+//   Ground; farther pays `air` and ships UPS 2nd Day Air. A ZIP area we don't know takes its state's answer (Ground only
+//   if the whole state is). No `rates` = the flat first_cents / each_cents as before. The ZIP must be in the picked
+//   state. The service goes on the Square order (metadata.ship_service, and the shipping note staff see when they buy
+//   the label). `zones` (public) tells the staff portal which states a distance covers.
 // A ship order holds shippable items only. It is booked at the `from` shop as a Square SHIPMENT fulfillment —
 // recipient, street address, expected ship day, gift note — instead of a pickup, so it lands in Square Dashboard →
 // Orders → Shipments, where staff buy the labels. One address per order: Square's API takes one fulfillment per
@@ -200,9 +208,12 @@ let switchAt = 0;
 type Closed = { day: string; shop: "all" | Shop; label: string | null; close: number | null };
 let closedDates: Closed[] = [];
 // SHIPPING (v16) rides along too: same read, same 10 s, same "last known answer stands".
+type Service = "ground" | "air";
+type Tier = { first_cents: number; each_cents: number };
+type Rates = { miles: number; ground: Tier; air: Tier };
 type ShipCfg = {
   from: Shop; items: string[]; order_by: string | null; ship_on: string; arrive_from: string | null; arrive_by: string | null;
-  first_cents: number; each_cents: number; limit: number; tax_states: string[];
+  first_cents: number; each_cents: number; limit: number; tax_states: string[]; rates: Rates | null;
 };
 let shipCfg: ShipCfg | null = null;
 function parseShip(raw: any): ShipCfg | null {
@@ -216,10 +227,19 @@ function parseShip(raw: any): ShipCfg | null {
   const cents = (v: unknown, d: number) => (Number.isInteger(Number(v)) && Number(v) >= 0 && Number(v) <= 50000 ? Number(v) : d);
   const first = cents(raw.first_cents, 0);
   const taxStates = (Array.isArray(raw.tax_states) ? raw.tax_states : ["TN"]).map((s: unknown) => String(s ?? "").toUpperCase()).filter((s: string) => US_STATES[s]);
+  // near vs far (v18): both prices or none (then the flat price)
+  const tier = (v: any): Tier | null => {
+    const f = Number(v?.first_cents);
+    if (!v || typeof v !== "object" || !Number.isInteger(f) || f < 0 || f > 50000) return null;
+    return { first_cents: f, each_cents: cents(v.each_cents, f) };
+  };
+  const r = raw.rates && typeof raw.rates === "object" ? raw.rates : null;
+  const g = tier(r?.ground), a = tier(r?.air), mi = Number(r?.ground_miles);
   return {
     from: raw.from === "nashville" ? "nashville" : "memphis", items, order_by: day("order_by"), ship_on,
     arrive_from: day("arrive_from"), arrive_by: day("arrive_by"), first_cents: first, each_cents: cents(raw.each_cents, first),
     limit: Math.max(0, Math.min(100000, Math.floor(Number(raw.limit) || 0))), tax_states: taxStates,
+    rates: g && a ? { miles: Number.isFinite(mi) && mi >= 50 && mi <= 3000 ? Math.round(mi) : 600, ground: g, air: a } : null,
   };
 }
 async function refreshSwitch() {
@@ -923,7 +943,70 @@ const US_STATES: Record<string, string> = {
 const NO_SHIP = new Set(["AK", "HI"]); // cheese travels cold: the lower 48 + DC only
 const PO_BOX = /\bp\.?\s*o\.?\s*box\b|\bpost\s+office\s+box\b|\b(?:apo|fpo|dpo)\b/i;
 type ShipTo = { name: string; phone: string | null; address1: string; address2: string; city: string; state: string; zip: string; gift_note: string };
-const shipFee = (c: ShipCfg, boxes: number) => (boxes > 0 ? c.first_cents + (boxes - 1) * c.each_cents : 0);
+// shipping for this many boxes: the service's price when there are near/far rates, else the flat price
+function shipFee(c: ShipCfg, boxes: number, service: Service | null = null) {
+  if (boxes <= 0) return 0;
+  const p: Tier = c.rates ? c.rates[service ?? "ground"] : c;
+  return p.first_cents + (boxes - 1) * p.each_cents;
+}
+const SERVICE_LABEL: Record<Service, string> = { ground: "UPS Ground", air: "UPS 2nd Day Air" };
+// ---- near vs far (rates, v18) ----
+// ZIP3 → the average spot of that 3-digit ZIP area and its state(s), lower 48 + DC: "zip3:lat:lon:ST[/ST2]".
+// Built 2026-11-14 from the zipcodes 1.2.0 package's USPS list (STANDARD ZIPs; military left out).
+const ZIP3_RAW = "005:40.80:-73.04:NY,010:42.27:-72.60:MA,011:42.11:-72.55:MA,012:42.36:-73.22:MA,013:42.59:-72.56:MA,014:42.59:-71.78:MA,015:42.22:-71.84:MA,016:42.27:-71.82:MA,017:42.35:-71.45:MA,018:42.64:-71.21:MA,019:42.61:-70.90:MA,020:42.15:-71.16:MA,021:42.34:-71.07:MA,022:42.35:-71.07:MA,023:42.03:-70.92:MA,024:42.35:-71.21:MA,025:41.61:-70.58:MA,026:41.71:-70.20:MA,027:41.77:-71.08:MA,028:41.67:-71.53:RI,029:41.82:-71.44:RI,030:42.88:-71.51:NH,031:42.99:-71.46:NH,032:43.51:-71.64:NH,033:43.25:-71.55:NH,034:42.92:-72.20:NH,035:44.49:-71.47:NH,036:43.18:-72.34:NH,037:43.73:-72.13:NH,038:43.40:-71.07:NH,039:43.21:-70.72:ME,040:43.75:-70.53:ME,041:43.67:-70.25:ME,042:44.32:-70.39:ME,043:44.30:-69.78:ME,044:45.14:-68.73:ME,045:43.95:-69.56:ME,046:44.57:-67.96:ME,047:46.68:-68.24:ME,048:44.15:-69.11:ME,049:44.79:-69.65:ME,050:43.84:-72.40:VT,051:43.26:-72.63:VT,052:43.03:-73.14:VT,053:42.94:-72.79:VT,054:44.60:-73.04:VT,055:42.65:-71.18:MA,056:44.34:-72.56:VT,057:43.66:-73.04:VT,058:44.68:-72.14:VT,059:44.75:-71.67:VT,060:41.86:-72.81:CT,061:41.76:-72.69:CT,062:41.80:-72.11:CT,063:41.49:-72.05:CT/NY,064:41.42:-72.75:CT,065:41.34:-72.93:CT,066:41.21:-73.19:CT,067:41.64:-73.19:CT,068:41.19:-73.44:CT,069:41.08:-73.54:CT,070:40.76:-74.23:NJ,071:40.75:-74.19:NJ,072:40.67:-74.22:NJ,073:40.72:-74.06:NJ,074:41.05:-74.30:NJ,075:40.92:-74.17:NJ,076:40.93:-74.02:NJ,077:40.32:-74.10:NJ,078:40.94:-74.74:NJ,079:40.74:-74.50:NJ,080:39.83:-74.98:NJ,081:39.93:-75.09:NJ,082:39.26:-74.66:NJ,083:39.44:-75.02:NJ,084:39.34:-74.49:NJ,085:40.27:-74.66:NJ,086:40.20:-74.70:NJ,087:39.99:-74.17:NJ,088:40.54:-74.61:NJ,089:40.48:-74.45:NJ,100:40.76:-73.98:NY,101:40.76:-73.98:NY,102:40.71:-74.01:NY,103:40.59:-74.15:NY,104:40.85:-73.88:NY,105:41.19:-73.77:NY,106:41.03:-73.77:NY,107:40.95:-73.86:NY,108:40.92:-73.79:NY,109:41.25:-74.14:NY,110:40.75:-73.71:NY,111:40.76:-73.93:NY,112:40.66:-73.96:NY,113:40.75:-73.83:NY,114:40.69:-73.79:NY,115:40.71:-73.64:NY,116:40.59:-73.83:NY,117:40.80:-73.24:NY,118:40.77:-73.48:NY,119:40.92:-72.59:NY,120:42.69:-73.97:NY,121:42.71:-73.95:NY,122:42.67:-73.77:NY,123:42.80:-73.94:NY,124:42.11:-74.21:NY,125:41.77:-73.84:NY,126:41.68:-73.88:NY,127:41.70:-74.78:NY,128:43.50:-73.73:NY,129:44.56:-73.89:NY,130:43.00:-76.17:NY,131:43.06:-76.28:NY,132:43.05:-76.15:NY,133:43.15:-75.21:NY,134:43.09:-75.25:NY,135:43.11:-75.20:NY,136:44.31:-75.52:NY,137:42.25:-75.43:NY,138:42.36:-75.56:NY,139:42.13:-75.89:NY,140:42.80:-78.62:NY,141:42.84:-78.68:NY,142:42.91:-78.83:NY,143:43.10:-79.01:NY,144:42.95:-77.64:NY,145:42.94:-77.48:NY,146:43.17:-77.62:NY,147:42.21:-78.85:NY,148:42.30:-77.15:NY,149:42.09:-76.81:NY,150:40.48:-80.07:PA,151:40.42:-79.93:PA,152:40.45:-79.99:PA,153:40.01:-80.20:PA,154:39.95:-79.71:PA,155:39.95:-78.84:PA,156:40.32:-79.52:PA,157:40.76:-79.01:PA,158:41.26:-78.70:PA,159:40.35:-78.87:PA,160:40.90:-79.91:PA,161:41.17:-80.33:PA,162:41.05:-79.38:PA,163:41.55:-79.61:PA,164:41.90:-80.04:PA,165:42.11:-80.07:PA,166:40.46:-78.35:PA,167:41.82:-78.48:PA,168:40.95:-77.99:PA,169:41.82:-77.30:PA,170:40.42:-77.10:PA,171:40.28:-76.85:PA,172:40.03:-77.80:PA,173:39.90:-76.84:PA,174:39.95:-76.72:PA,175:40.04:-76.24:PA,176:40.03:-76.33:PA,177:41.32:-77.14:PA,178:40.88:-76.76:PA,179:40.71:-76.28:PA,180:40.63:-75.47:PA,181:40.60:-75.51:PA,182:40.90:-75.91:PA,183:41.07:-75.26:PA,184:41.56:-75.39:PA,185:41.41:-75.66:PA,186:41.33:-76.07:PA,187:41.24:-75.89:PA,188:41.82:-76.10:PA,189:40.34:-75.15:PA,190:40.01:-75.21:PA,191:40.00:-75.15:PA,192:39.95:-75.16:PA,193:39.93:-75.72:PA,194:40.18:-75.41:PA,195:40.40:-75.87:PA,196:40.34:-75.95:PA,197:39.66:-75.67:DE,198:39.76:-75.56:DE,199:38.83:-75.42:DE,200:38.91:-77.02:DC,201:38.92:-77.59:VA,202:38.89:-77.03:DC,203:38.90:-77.04:DC,204:38.90:-77.04:DC,205:38.89:-77.04:DC/VA,206:38.40:-76.73:MD,207:38.92:-76.80:MD,208:39.12:-77.17:MD,209:39.04:-77.01:MD,210:39.36:-76.55:MD,211:39.41:-76.65:MD,212:39.31:-76.60:MD,214:38.99:-76.50:MD,215:39.56:-79.06:MD,216:38.85:-76.04:MD,217:39.48:-77.48:MD,218:38.28:-75.59:MD,219:39.58:-75.98:MD,220:38.82:-77.26:VA,221:38.78:-77.27:VA,222:38.88:-77.10:VA,223:38.79:-77.09:VA,224:38.07:-76.98:VA,225:38.06:-77.17:VA,226:39.02:-78.23:VA,227:38.48:-78.06:VA,228:38.58:-78.82:VA,229:38.01:-78.61:VA,230:37.62:-77.20:VA,231:37.58:-77.09:VA,232:37.55:-77.48:VA,233:37.45:-75.88:VA,234:37.18:-76.06:VA,235:36.88:-76.27:VA,236:37.10:-76.45:VA,237:36.83:-76.33:VA,238:36.96:-77.43:VA,239:37.00:-78.41:VA,240:37.12:-80.07:VA,241:37.10:-80.12:VA,242:36.86:-82.47:VA,243:36.84:-81.12:VA,244:38.09:-79.32:VA,245:37.14:-79.13:VA,246:37.20:-81.84:VA,247:37.40:-81.18:WV,248:37.49:-81.65:WV,249:37.86:-80.41:WV,250:38.20:-81.49:WV,251:38.24:-81.53:WV,252:38.62:-81.55:WV,253:38.35:-81.63:WV,254:39.41:-78.07:WV,255:38.28:-82.15:WV,256:37.76:-82.06:WV,257:38.39:-82.41:WV,258:37.79:-81.20:WV,259:37.76:-81.04:WV,260:40.14:-80.62:WV,261:39.22:-81.25:WV,262:38.77:-80.06:WV,263:39.17:-80.58:WV,264:39.23:-80.39:WV,265:39.59:-80.12:WV,266:38.48:-80.80:WV,267:39.36:-78.96:WV,268:38.94:-79.03:WV,270:36.26:-80.40:NC,271:36.09:-80.27:NC,272:35.90:-79.68:NC,273:35.93:-79.59:NC,274:36.08:-79.83:NC,275:35.87:-78.60:NC,276:35.83:-78.65:NC,277:35.99:-78.90:NC,278:35.93:-77.40:NC,279:36.21:-76.26:NC,280:35.37:-81.01:NC,281:35.30:-80.75:NC,282:35.21:-80.83:NC,283:34.98:-78.96:NC,284:34.31:-78.23:NC,285:35.00:-77.10:NC,286:36.12:-81.30:NC,287:35.44:-82.74:NC,288:35.59:-82.55:NC,289:35.10:-83.90:NC,290:33.94:-80.85:SC,291:33.88:-80.88:SC,292:34.04:-81.01:SC,293:34.81:-81.92:SC,294:32.98:-80.13:SC,295:34.06:-79.42:SC,296:34.67:-82.57:SC,297:34.86:-80.93:SC,298:33.52:-81.77:SC,299:32.53:-80.92:SC,300:33.87:-84.17:GA,301:34.02:-84.84:GA,302:33.31:-84.46:GA,303:33.80:-84.39:GA,304:32.46:-82.16:GA,305:34.51:-83.73:GA,306:33.89:-83.25:GA,307:34.74:-85.14:GA,308:33.35:-82.37:GA,309:33.44:-82.06:GA,310:32.58:-83.45:GA,311:33.76:-84.40:GA,312:32.84:-83.66:GA,313:31.97:-81.42:GA,314:32.04:-81.11:GA,315:31.33:-82.16:GA,316:31.00:-83.20:GA,317:31.51:-83.86:GA,318:32.53:-84.72:GA,319:32.47:-84.92:GA,320:30.17:-82.19:FL,321:29.29:-81.42:FL,322:30.30:-81.64:FL,323:30.32:-84.27:FL,324:30.51:-85.55:FL,325:30.56:-86.96:FL,326:29.61:-82.48:FL,327:28.78:-81.33:FL,328:28.50:-81.32:FL,329:28.04:-80.62:FL,330:25.80:-80.39:FL,331:25.77:-80.28:FL,332:25.77:-80.22:FL,333:26.13:-80.23:FL,334:26.63:-80.21:FL,335:28.11:-82.27:FL,336:27.99:-82.48:FL,337:27.86:-82.73:FL,338:27.87:-81.70:FL,339:26.70:-81.90:FL,341:26.18:-81.66:FL,342:27.30:-82.42:FL,344:29.02:-82.32:FL,346:28.30:-82.61:FL,347:28.47:-81.59:FL,349:27.31:-80.41:FL,350:33.57:-86.73:AL,351:33.50:-86.64:AL,352:33.51:-86.80:AL,354:33.12:-87.77:AL,355:33.98:-87.67:AL,356:34.69:-87.32:AL,357:34.73:-86.33:AL,358:34.71:-86.62:AL,359:34.30:-85.93:AL,360:32.16:-86.17:AL,361:32.36:-86.28:AL,362:33.55:-85.70:AL,363:31.31:-85.54:AL,364:31.42:-87.03:AL,365:30.90:-87.96:AL,366:30.69:-88.13:AL,367:32.35:-87.37:AL,368:32.60:-85.35:AL,369:32.13:-88.26:AL,370:36.12:-86.86:TN,371:36.07:-86.76:TN,372:36.15:-86.79:TN,373:35.27:-85.37:TN,374:35.05:-85.28:TN,375:35.15:-90.05:TN,376:36.37:-82.34:TN,377:36.13:-83.86:TN,378:36.09:-83.80:TN,379:35.97:-83.98:TN,380:35.49:-89.45:TN,381:35.12:-89.94:TN,382:36.29:-88.70:TN,383:35.60:-88.50:TN,384:35.30:-87.32:TN,385:36.20:-85.42:TN,386:34.60:-89.75:MS,387:33.59:-90.79:MS,388:34.34:-88.61:MS,389:33.80:-89.90:MS,390:32.50:-90.16:MS,391:32.38:-90.17:MS,392:32.31:-90.19:MS,393:32.38:-88.83:MS,394:31.33:-89.31:MS,395:30.46:-89.02:MS,396:31.35:-90.57:MS,397:33.54:-88.90:MS,398:31.34:-84.67:GA,399:33.75:-84.39:GA,400:38.14:-85.31:KY,401:37.86:-86.17:KY,402:38.21:-85.70:KY,403:38.04:-84.16:KY,404:37.49:-84.43:KY,405:38.03:-84.49:KY,406:38.23:-84.90:KY,407:36.95:-84.08:KY,408:36.88:-83.30:KY,409:36.90:-83.71:KY,410:38.79:-84.44:KY,411:38.37:-82.96:KY,412:37.86:-82.71:KY,413:37.57:-83.46:KY,414:37.84:-83.18:KY,415:37.46:-82.34:KY,416:37.50:-82.74:KY,417:37.23:-83.23:KY,418:37.23:-82.87:KY,420:36.89:-88.58:KY,421:36.87:-86.03:KY,422:36.94:-86.99:KY,423:37.46:-87.00:KY,424:37.49:-87.65:KY,425:37.15:-84.72:KY,426:36.80:-84.74:KY,427:37.36:-85.78:KY,430:40.18:-82.90:OH,431:39.71:-82.94:OH,432:39.99:-82.99:OH,433:40.52:-83.42:OH,434:41.44:-83.32:OH,435:41.47:-84.13:OH,436:41.66:-83.57:OH,437:39.84:-81.71:OH,438:40.26:-81.86:OH,439:40.25:-80.84:OH,440:41.53:-81.40:OH,441:41.46:-81.67:OH,442:41.12:-81.60:OH,443:41.08:-81.53:OH,444:41.10:-80.75:OH,445:41.09:-80.66:OH,446:40.68:-81.49:OH,447:40.82:-81.38:OH,448:41.03:-82.75:OH,449:40.74:-82.53:OH,450:39.40:-84.46:OH,451:39.12:-83.94:OH,452:39.17:-84.49:OH,453:39.98:-84.30:OH,454:39.75:-84.17:OH,455:39.93:-83.82:OH,456:38.93:-82.80:OH,457:39.35:-81.76:OH,458:40.82:-84.19:OH,459:39.16:-84.46:OH,460:40.14:-86.05:IN,461:39.64:-86.17:IN,462:39.81:-86.14:IN,463:41.46:-87.17:IN,464:41.57:-87.33:IN,465:41.44:-86.04:IN,466:41.68:-86.26:IN,467:41.19:-85.19:IN,468:41.08:-85.14:IN,469:40.72:-86.10:IN,470:39.16:-85.05:IN,471:38.39:-86.01:IN,472:39.02:-85.75:IN,473:40.09:-85.19:IN,474:39.03:-86.69:IN,475:38.41:-86.99:IN,476:38.16:-87.48:IN,477:38.00:-87.57:IN,478:39.45:-87.30:IN,479:40.46:-87.07:IN,480:42.68:-82.91:MI,481:42.21:-83.49:MI,482:42.37:-83.10:MI,483:42.63:-83.33:MI,484:43.26:-83.28:MI,485:43.02:-83.68:MI,486:43.84:-84.26:MI,487:43.96:-83.55:MI,488:43.01:-84.69:MI,489:42.73:-84.56:MI,490:42.21:-85.56:MI,491:41.89:-86.42:MI,492:42.05:-84.34:MI,493:43.25:-85.53:MI,494:43.29:-86.13:MI,495:42.94:-85.66:MI,496:44.52:-85.61:MI,497:45.56:-84.48:MI,498:46.05:-87.18:MI,499:46.72:-88.87:MI,500:41.62:-93.81:IA,501:41.59:-93.45:IA,502:41.67:-93.59:IA,503:41.60:-93.65:IA,504:43.17:-93.33:IA,505:42.76:-94.44:IA,506:42.64:-92.46:IA,507:42.48:-92.29:IA,508:40.97:-94.55:IA,509:41.60:-93.61:IA,510:42.58:-95.90:IA,511:42.51:-96.39:IA,512:43.25:-96.03:IA,513:43.25:-95.14:IA,514:42.10:-95.07:IA,515:41.46:-95.56:IA,516:40.73:-95.40:IA,520:42.50:-91.00:IA,521:43.15:-91.73:IA,522:41.91:-91.75:IA,523:41.91:-91.71:IA,524:41.99:-91.68:IA,525:40.96:-92.44:IA,526:40.86:-91.44:IA,527:41.64:-90.82:IA,528:41.54:-90.58:IA,530:43.45:-88.21:WI,531:42.78:-88.23:WI,532:43.05:-87.97:WI,534:42.74:-87.83:WI,535:42.95:-89.61:WI,537:43.07:-89.40:WI,538:42.86:-90.75:WI,539:43.61:-89.54:WI,540:45.08:-92.49:WI,541:44.90:-88.24:WI,542:44.62:-87.53:WI,543:44.52:-88.02:WI,544:44.88:-89.81:WI,545:45.91:-89.89:WI,546:43.87:-90.95:WI,547:44.85:-91.58:WI,548:46.00:-91.67:WI,549:44.20:-88.86:WI,550:45.03:-93.02:MN,551:44.95:-93.10:MN,553:44.98:-93.88:MN,554:44.98:-93.31:MN,555:45.02:-93.71:MN,556:47.65:-90.92:MN,557:47.13:-92.74:MN,558:46.81:-92.13:MN,559:43.90:-92.29:MN,560:44.00:-93.95:MN,561:43.91:-95.64:MN,562:45.03:-95.65:MN,563:45.79:-94.69:MN,564:46.56:-94.51:MN,565:46.84:-96.12:MN,566:47.78:-94.42:MN,567:48.37:-96.38:MN,569:38.89:-77.02:DC,570:43.46:-97.02:SD,571:43.54:-96.73:SD,572:45.04:-97.12:SD,573:43.82:-98.40:SD,574:45.34:-98.75:SD,575:43.80:-100.43:SD,576:45.50:-101.43:SD,577:44.12:-103.04:SD,580:46.70:-97.34:ND,581:46.86:-96.84:ND,582:48.23:-97.64:ND,583:48.38:-99.22:ND,584:46.95:-99.02:ND,585:46.79:-100.92:ND,586:46.78:-102.90:ND,587:48.35:-101.58:ND,588:48.26:-103.46:ND,590:45.83:-108.71:MT,591:45.77:-108.53:MT,592:48.35:-105.34:MT,593:46.36:-105.43:MT,594:47.68:-111.01:MT,595:48.52:-109.45:MT,596:46.56:-111.91:MT,597:45.67:-112.24:MT,598:47.02:-114.26:MT,599:48.22:-114.46:MT,600:42.23:-88.01:IL,601:41.98:-88.22:IL,602:42.04:-87.70:IL,603:41.89:-87.80:IL,604:41.52:-87.92:IL,605:41.74:-88.29:IL,606:41.87:-87.67:IL,607:41.96:-87.76:IL,608:41.72:-87.71:IL,609:40.83:-87.95:IL,610:42.21:-89.52:IL,611:42.28:-89.05:IL,612:41.50:-90.32:IL,613:41.32:-89.17:IL,614:40.83:-90.44:IL,615:40.71:-89.68:IL,616:40.70:-89.61:IL,617:40.51:-88.92:IL,618:40.10:-88.13:IL,619:39.67:-88.25:IL,620:39.06:-90.02:IL,622:38.43:-89.80:IL,623:40.01:-91.05:IL,624:39.05:-88.22:IL,625:39.69:-89.22:IL,626:39.86:-89.97:IL,627:39.79:-89.65:IL,628:38.34:-88.69:IL,629:37.54:-88.98:IL,630:38.44:-90.68:MO,631:38.64:-90.30:MO,633:38.97:-91.03:MO,634:39.97:-91.79:MO,635:40.20:-92.60:MO,636:37.66:-90.63:MO,637:37.34:-89.80:MO,638:36.48:-89.83:MO,639:36.86:-90.54:MO,640:39.08:-94.18:MO,641:39.11:-94.55:MO,644:40.11:-94.69:MO,645:39.75:-94.83:MO,646:39.88:-93.56:MO,647:38.09:-94.21:MO,648:36.94:-94.34:MO,649:39.10:-94.58:MO,650:38.45:-92.27:MO,651:38.52:-92.20:MO,652:39.21:-92.39:MO,653:38.74:-93.23:MO,654:37.66:-91.82:MO,655:37.63:-91.94:MO,656:37.06:-93.09:MO,657:37.07:-93.01:MO,658:37.19:-93.29:MO,660:38.90:-95.12:KS,661:39.11:-94.69:KS,662:38.96:-94.71:KS,664:39.40:-96.05:KS,665:39.33:-96.09:KS,666:39.04:-95.70:KS,667:37.61:-95.10:KS,668:38.36:-96.38:KS,669:39.78:-97.71:KS,670:37.53:-97.63:KS,671:37.55:-97.67:KS,672:37.69:-97.33:KS,673:37.22:-95.74:KS,674:38.93:-97.76:KS,675:38.23:-98.85:KS,676:39.36:-99.41:KS,677:39.32:-101.07:KS,678:37.81:-100.63:KS,679:37.19:-101.49:KS,680:41.48:-96.44:NE,681:41.24:-96.03:NE,683:40.46:-96.81:NE,684:40.53:-96.62:NE,685:40.82:-96.68:NE,686:41.48:-97.55:NE,687:42.40:-97.74:NE,688:41.17:-98.92:NE,689:40.34:-98.81:NE,690:40.34:-100.88:NE,691:41.30:-101.57:NE,692:42.65:-100.65:NE,693:42.17:-103.01:NE,700:29.90:-90.21:LA,701:29.99:-90.06:LA,703:29.63:-90.75:LA,704:30.56:-90.25:LA,705:30.22:-92.18:LA,706:30.37:-93.21:LA,707:30.51:-91.18:LA,708:30.45:-91.11:LA,710:32.49:-93.47:LA,711:32.46:-93.76:LA,712:32.57:-92.04:LA,713:31.32:-91.95:LA,714:31.54:-92.83:LA,716:33.62:-91.77:AR,717:33.49:-92.82:AR,718:33.67:-93.83:AR,719:34.40:-93.60:AR,720:34.93:-92.01:AR,721:34.92:-92.16:AR,722:34.74:-92.37:AR,723:35.14:-90.51:AR,724:36.05:-90.75:AR,725:36.02:-91.81:AR,726:36.15:-92.86:AR/MO,727:36.15:-94.17:AR,728:35.28:-93.39:AR,729:35.34:-94.18:AR,730:35.33:-97.76:OK,731:35.47:-97.52:OK,733:30.24:-97.75:TX,734:34.20:-97.14:OK,735:34.51:-98.78:OK,736:35.51:-99.29:OK,737:36.38:-98.12:OK,738:36.47:-99.48:OK,739:36.75:-101.54:OK/TX,740:36.29:-96.15:OK,741:36.14:-95.94:OK,743:36.52:-94.98:OK,744:35.64:-95.40:OK,745:34.65:-95.66:OK,746:36.70:-97.13:OK,747:34.01:-95.55:OK,748:35.22:-96.69:OK,749:35.22:-94.70:OK,750:33.07:-96.78:TX,751:32.53:-96.43:TX,752:32.81:-96.80:TX,753:32.78:-96.81:TX,754:33.37:-95.79:TX,755:33.30:-94.43:TX,756:32.50:-94.62:TX,757:32.29:-95.36:TX,758:31.44:-95.70:TX,759:31.29:-94.32:TX,760:32.65:-97.36:TX,761:32.76:-97.33:TX,762:33.42:-97.30:TX,763:33.80:-98.76:TX,764:32.58:-98.51:TX,765:31.07:-97.53:TX,766:31.74:-97.04:TX,767:31.55:-97.15:TX,768:31.30:-99.35:TX,769:31.38:-100.58:TX,770:29.78:-95.41:TX,772:29.77:-95.36:TX,773:30.29:-95.38:TX,774:29.54:-95.88:TX,775:29.59:-95.05:TX,776:30.16:-94.12:TX,777:30.07:-94.16:TX,778:30.67:-96.30:TX,779:28.97:-96.95:TX,780:28.99:-98.86:TX,781:29.30:-98.02:TX,782:29.47:-98.51:TX,783:27.75:-97.89:TX,784:27.75:-97.42:TX,785:26.28:-98.05:TX,786:30.28:-97.96:TX,787:30.30:-97.77:TX,788:29.35:-99.99:TX,789:29.93:-96.81:TX,790:35.36:-101.57:TX,791:35.21:-101.85:TX,792:34.32:-100.60:TX,793:33.49:-102.13:TX,794:33.57:-101.88:TX,795:32.66:-100.17:TX,796:32.42:-99.78:TX,797:31.84:-102.34:TX,798:31.01:-105.20:TX,799:31.80:-106.38:TX,800:39.80:-104.95:CO,801:39.49:-104.77:CO,802:39.74:-104.98:CO,803:40.01:-105.27:CO,804:39.84:-105.95:CO,805:40.42:-105.16:CO,806:40.34:-104.59:CO,807:40.45:-103.03:CO,808:39.10:-103.78:CO,809:38.85:-104.74:CO,810:37.89:-103.79:CO,811:37.55:-106.23:CO,812:38.53:-106.23:CO,813:37.49:-108.45:CO,814:38.55:-108.02:CO,815:39.09:-108.61:CO,816:39.81:-107.56:CO,820:41.36:-105.06:WY,821:44.57:-110.44:WY,822:42.34:-104.58:WY,823:41.50:-107.04:WY,824:44.34:-108.31:WY,825:43.16:-108.96:WY,826:43.04:-106.57:WY,827:44.40:-104.82:WY,828:44.72:-106.92:WY,829:42.02:-109.90:WY,830:43.65:-110.60:WY,831:42.67:-110.73:WY,832:42.98:-112.50:ID,833:42.79:-114.30:ID,834:44.03:-112.11:ID/WY,835:46.17:-116.29:ID,836:43.86:-116.30:ID,837:43.61:-116.20:ID,838:47.65:-116.55:ID,840:40.57:-111.42:UT,841:40.72:-111.88:UT,842:41.22:-111.97:UT,843:41.67:-112.10:UT,844:41.22:-112.00:UT,845:38.94:-110.20:UT,846:39.69:-111.79:UT,847:37.84:-112.85:UT,850:33.53:-112.09:AZ,851:33.04:-111.53:AZ,852:33.45:-111.80:AZ,853:33.45:-112.72:AZ,855:33.35:-110.23:AZ,856:31.85:-110.47:AZ,857:32.23:-110.96:AZ,859:34.14:-109.69:AZ,860:35.56:-111.43:AZ,863:34.65:-112.25:AZ,864:35.24:-114.22:AZ,865:36.23:-109.50:AZ,870:35.26:-106.67:NM,871:35.11:-106.62:NM,873:35.40:-108.49:NM,874:36.73:-108.13:NM,875:36.09:-105.97:NM,876:32.99:-106.98:NM,877:36.01:-104.90:NM,878:34.05:-107.59:NM,879:32.95:-107.28:NM,880:32.40:-107.43:NM,881:34.22:-103.53:NM,882:32.88:-103.95:NM,883:33.26:-105.62:NM,884:35.69:-103.76:NM,885:31.76:-106.49:TX,889:36.04:-114.98:NV,890:36.50:-115.33:NV,891:36.14:-115.21:NV,893:39.40:-115.68:NV,894:39.55:-119.08:NV,895:39.56:-119.81:NV,897:39.17:-119.74:NV,898:40.98:-115.81:NV,900:34.04:-118.30:CA,901:34.06:-118.25:CA,902:33.94:-118.34:CA,903:33.95:-118.35:CA,904:34.02:-118.49:CA,905:33.84:-118.33:CA,906:33.92:-118.03:CA,907:33.82:-118.17:CA,908:33.79:-118.17:CA,910:34.18:-118.10:CA,911:34.15:-118.13:CA,912:34.17:-118.26:CA,913:34.28:-118.58:CA,914:34.18:-118.46:CA,915:34.19:-118.32:CA,916:34.16:-118.38:CA,917:34.07:-117.83:CA,918:34.08:-118.14:CA,919:32.69:-116.82:CA,920:33.11:-117.07:CA,921:32.79:-117.13:CA,922:33.64:-116.03:CA,923:34.50:-116.97:CA,924:34.14:-117.30:CA,925:33.76:-117.17:CA,926:33.63:-117.78:CA,927:33.74:-117.87:CA,928:33.84:-117.81:CA,930:34.29:-119.11:CA,931:34.46:-119.76:CA,932:35.85:-119.19:CA,933:35.34:-119.04:CA,934:35.25:-120.58:CA,935:35.45:-118.13:CA,936:36.86:-119.70:CA,937:36.77:-119.79:CA,938:36.75:-119.77:CA,939:36.53:-121.62:CA,940:37.46:-122.26:CA,941:37.77:-122.43:CA,942:38.58:-121.49:CA,943:37.43:-122.15:CA,944:37.55:-122.31:CA,945:37.94:-122.06:CA,946:37.80:-122.23:CA,947:37.88:-122.27:CA,948:37.95:-122.33:CA,949:38.09:-122.66:CA,950:37.06:-121.84:CA,951:37.31:-121.85:CA,952:38.10:-120.97:CA,953:37.62:-120.70:CA,954:38.92:-123.09:CA,955:40.71:-123.90:CA,956:38.66:-121.27:CA,957:38.75:-121.01:CA,958:38.58:-121.44:CA,959:39.47:-121.51:CA,960:40.94:-122.29:CA,961:40.19:-120.34:CA,970:45.45:-122.35:OR,971:45.52:-123.39:OR,972:45.52:-122.66:OR,973:44.74:-123.23:OR,974:43.58:-123.41:OR,975:42.40:-123.10:OR,976:42.44:-121.18:OR,977:43.84:-120.58:OR,978:45.20:-118.63:OR,979:43.85:-117.57:OR,980:47.56:-122.13:WA,981:47.60:-122.33:WA,982:48.40:-122.29:WA,983:47.42:-122.65:WA,984:47.21:-122.46:WA,985:46.94:-123.20:WA,986:45.94:-122.45:WA,988:47.91:-119.86:WA,989:46.58:-120.49:WA,990:47.63:-117.45:WA,991:47.81:-118.02:WA,992:47.68:-117.38:WA,993:46.38:-119.00:WA,994:46.17:-117.17:WA";
+type Spot = { lat: number; lon: number; states: string[] };
+let zip3Map: Map<string, Spot> | null = null;
+function zip3s(): Map<string, Spot> {
+  if (zip3Map) return zip3Map;
+  zip3Map = new Map();
+  for (const e of ZIP3_RAW.split(",")) {
+    const [z, la, lo, st] = e.split(":");
+    zip3Map.set(z, { lat: Number(la), lon: Number(lo), states: st.split("/") });
+  }
+  return zip3Map;
+}
+const SHOP_ZIP3: Record<Shop, string> = { memphis: "381", nashville: "372" }; // 38117 and 37209
+function milesApart(a: Spot, b: Spot) { // as the crow flies, like UPS zones
+  const r = Math.PI / 180, dLa = (b.lat - a.lat) * r, dLo = (b.lon - a.lon) * r;
+  const h = Math.sin(dLa / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLo / 2) ** 2;
+  return 3958.8 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+const nearShop = (from: Shop, spot: Spot, miles: number) => { const o = zip3s().get(SHOP_ZIP3[from]); return !!o && milesApart(o, spot) <= miles; };
+// what the ship-to ZIP means: Ground or 2nd Day Air (null: no ZIP yet, or a flat price), or a ZIP that isn't in the state
+function shipZone(c: ShipCfg, zipIn: unknown, stateIn: unknown): { service: Service | null; problem: string | null } {
+  const zip = String(zipIn ?? "").trim(), state = String(stateIn ?? "").trim().toUpperCase();
+  if (!/^\d{5}(-\d{4})?$/.test(zip)) return { service: null, problem: null };
+  const spot = zip3s().get(zip.slice(0, 3));
+  if (spot && US_STATES[state] && !spot.states.includes(state)) {
+    return { service: null, problem: `ZIP code ${zip.slice(0, 5)} isn't in ${US_STATES[state]} — please check the ZIP code and the state.` };
+  }
+  if (!c.rates) return { service: null, problem: null };
+  const miles = c.rates.miles;
+  if (spot) return { service: nearShop(c.from, spot, miles) ? "ground" : "air", problem: null };
+  // a ZIP area we don't know: Ground only if every known area of that state is
+  const inState = [...zip3s().values()].filter((x) => x.states.includes(state));
+  return { service: inState.length && inState.every((x) => nearShop(c.from, x, miles)) ? "ground" : "air", problem: null };
+}
+// the ZIP areas that ship Ground (for the page's own math before the quote comes back); cached per shop + distance
+const groundCache: Record<string, string[]> = {};
+function groundZip3(c: ShipCfg): string[] {
+  if (!c.rates) return [];
+  const k = c.from + ":" + c.rates.miles;
+  return groundCache[k] ??= [...zip3s().entries()].filter(([, v]) => nearShop(c.from, v, c.rates!.miles)).map(([z]) => z);
+}
+// which states a distance covers, for the staff portal: whole states, and states with some areas inside
+function zones(b: any) {
+  const from = shopOf(b.from || "memphis"), mi = Number(b.miles);
+  const miles = Number.isFinite(mi) && mi >= 50 && mi <= 3000 ? Math.round(mi) : 600;
+  const n: Record<string, [number, number]> = {};
+  for (const v of zip3s().values()) {
+    const st = v.states[0], near = nearShop(from, v, miles);
+    (n[st] ??= [0, 0])[near ? 0 : 1]++;
+  }
+  const all = Object.keys(n).filter((s) => n[s][0] && !n[s][1]).sort();
+  const part = Object.keys(n).filter((s) => n[s][0] && n[s][1]).sort().map((s) => ({ state: s, near: n[s][0], areas: n[s][0] + n[s][1] }));
+  return { ok: true, from, miles, all, part };
+}
 // a shop-local wall-clock time as a real instant (the shops keep Central time; December is CST)
 function zonedMs(y: number, mo: number, d: number, hh: number, mm: number, tz = TZ) {
   const off = (ms: number) => { const p = zparts(ms, tz); return Date.UTC(p.y, p.m - 1, p.d, p.hh, p.mm) - Math.floor(ms / 60000) * 60000; };
@@ -964,6 +1047,8 @@ async function publicShip(e: Env) {
     first_cents: c.first_cents, each_cents: c.each_cents, left,
     states: Object.keys(US_STATES).filter((s) => !NO_SHIP.has(s)).map((s) => ({ code: s, name: US_STATES[s] })),
     tax_states: c.tax_states,
+    // near vs far (v18): the two prices and the ZIP areas that ship Ground; null = the flat price above
+    rates: c.rates ? { miles: c.rates.miles, ground: c.rates.ground, air: c.rates.air, ground_zip3: groundZip3(c) } : null,
   };
 }
 // a ship bag holds shippable items only; returns how many boxes
@@ -991,7 +1076,7 @@ function readShipTo(s: any, cust: Cust): ShipTo {
   return t;
 }
 // The Square order for a ship bag: SHIPMENT fulfillment, a "Shipping" service charge, and taxes only for tax_states.
-function buildShipOrder(e: Env, m: Menu, c: ShipCfg, lines: Line[], state: string | null, to: ShipTo | null, cust: Cust | null, locationId: string, code: string, note: string) {
+function buildShipOrder(e: Env, m: Menu, c: ShipCfg, lines: Line[], state: string | null, to: ShipTo | null, cust: Cust | null, locationId: string, code: string, note: string, service: Service | null = null) {
   const taxed = !!state && c.tax_states.includes(state);
   const taxIds = [...new Set(lines.flatMap((l) => l.item.taxes))].filter((t) => m.taxes[t]);
   const line_items = lines.map((l, i) => {
@@ -1018,6 +1103,7 @@ function buildShipOrder(e: Env, m: Menu, c: ShipCfg, lines: Line[], state: strin
   if (code) {
     order.reference_id = code;
     order.metadata = { web_code: code, shop: m.shop, fulfillment: "ship" };
+    if (service) (order.metadata as Record<string, string>).ship_service = service; // which label to buy (v18)
     if (cust) { // the packing list reads these back (v17)
       const md = order.metadata as Record<string, string>;
       md.buyer = `${cust.first} ${cust.last}`.trim().slice(0, 255);
@@ -1031,7 +1117,8 @@ function buildShipOrder(e: Env, m: Menu, c: ShipCfg, lines: Line[], state: strin
       ? { uid: "t-" + t, catalog_object_id: t, scope: "ORDER" }
       : { uid: "t-" + t, name: m.taxes[t].name, percentage: m.taxes[t].pct, type: m.taxes[t].inclusive ? "INCLUSIVE" : "ADDITIVE", scope: "ORDER" });
   }
-  const fee = shipFee(c, lines.reduce((n, l) => n + l.qty, 0));
+  // near/far rates and no ZIP yet (a quote): no shipping line until the ZIP says which
+  const fee = c.rates && !service ? 0 : shipFee(c, lines.reduce((n, l) => n + l.qty, 0), service);
   if (fee > 0) {
     order.service_charges = [{ uid: "ship", name: "Shipping", amount_money: { amount: fee, currency: "USD" }, calculation_phase: "SUBTOTAL_PHASE", taxable: taxed }];
   }
@@ -1046,7 +1133,7 @@ function buildShipOrder(e: Env, m: Menu, c: ShipCfg, lines: Line[], state: strin
       shipment_details: {
         recipient,
         expected_shipped_at: new Date(dayAt(c.ship_on, 12, m.location.tz)).toISOString(),
-        shipping_note: [`SHIP ${fmtLongDay(c.ship_on)}`, `Online ${code}`, `From ${cust.first} ${cust.last}`.trim(), to.gift_note ? `Gift note: “${to.gift_note}”` : "", note]
+        shipping_note: [`SHIP ${fmtLongDay(c.ship_on)}`, service ? SERVICE_LABEL[service] : "", `Online ${code}`, `From ${cust.first} ${cust.last}`.trim(), to.gift_note ? `Gift note: “${to.gift_note}”` : "", note]
           .filter(Boolean).join(" · ").slice(0, 500),
       },
     }];
@@ -1080,11 +1167,14 @@ async function quoteShip(req: Request, b: any) {
   shipLines(c, lines);
   const st = clean(b.ship?.state, 2).toUpperCase();
   const state = US_STATES[st] && !NO_SHIP.has(st) ? st : null; // no state yet: totals before tax
-  const order = buildShipOrder(e, m, c, lines, state, null, null, await paymentLocation(c.from, e), "", "");
+  const zone = shipZone(c, clean(b.ship?.zip, 10), state); // near/far rates: the ZIP sets the shipping (v18)
+  const shipKnown = !c.rates || !!zone.service;
+  const order = buildShipOrder(e, m, c, lines, state, null, null, await paymentLocation(c.from, e), "", "", zone.service);
   const d = await square("/v2/orders/calculate", { method: "POST", body: JSON.stringify({ order }) }, e);
   const t = totalsOf(d.order);
   return {
-    ok: true, env: e, ...t, shipping_cents: Number(d.order?.total_service_charge_money?.amount ?? 0), state, tax_known: !!state,
+    ok: true, env: e, ...t, shipping_cents: Number(d.order?.total_service_charge_money?.amount ?? 0), state, tax_known: !!state && shipKnown,
+    shipping_known: shipKnown, service: zone.service, service_label: zone.service ? SERVICE_LABEL[zone.service] : null, zip_problem: zone.problem,
     lines: (d.order?.line_items ?? []).map((li: any, i: number) => ({ ...lineSummary([lines[i]])[0], total_cents: Number(li.total_money?.amount ?? 0), tax_cents: Number(li.total_tax_money?.amount ?? 0) })),
   };
 }
@@ -1109,6 +1199,9 @@ async function payShip(req: Request, b: any) {
   if (digits.length < 10) throw new PublicError("Please add a phone number so we can reach you about your order.");
   const cust: Cust = { first, last, email, phone: e164(digits) };
   const to = readShipTo(b.ship, cust);
+  const zone = shipZone(c, to.zip, to.state); // near/far rates (v18)
+  if (zone.problem) throw new PublicError(zone.problem + " Nothing was charged.");
+  if (c.rates && !zone.service) throw new PublicError("Please check the ZIP code. Nothing was charged.");
 
   const m = await loadMenu(shop);
   const lines = priceLines(m, b.lines);
@@ -1130,7 +1223,7 @@ async function payShip(req: Request, b: any) {
   });
   const hash = await sha256hex(sig);
   const code = codeFrom(hash);
-  const order = buildShipOrder(e, m, c, lines, to.state, to, cust, locationId, code, note);
+  const order = buildShipOrder(e, m, c, lines, to.state, to, cust, locationId, code, note, zone.service);
   const od = await square("/v2/orders", { method: "POST", body: JSON.stringify({ idempotency_key: "s-" + hash.slice(0, 60), order }) }, e);
   let o = od?.order;
   if (!o?.id) throw new Error("Square did not return an order");
@@ -1154,6 +1247,7 @@ async function payShip(req: Request, b: any) {
   const shipOut = {
     name: to.name, city: to.city, state: to.state, zip: to.zip, ship_on: c.ship_on, arrive_from: c.arrive_from, arrive_by: c.arrive_by,
     label: shipText(c), from: shop, from_label: SHOPS[shop].label,
+    service: zone.service, service_label: zone.service ? SERVICE_LABEL[zone.service] : null,
   };
   const result = (row: { card: string | null; receipt_url: string | null }, emailSent: boolean | null) => ({
     ok: true, env: e, code, ...t, shipping_cents: shipCents, tip_cents: 0, charged_cents: charge, fulfillment: "ship", ship: shipOut,
@@ -1165,7 +1259,7 @@ async function payShip(req: Request, b: any) {
     customer_name: `${first} ${last}`.trim(), email, phone: cust.phone ?? digits, pickup_at: null, asap: false, catering: false, note: note || null,
     lines: lineSummary(lines), subtotal_cents: t.subtotal_cents, tax_cents: t.tax_cents, tip_cents: 0, total_cents: charge,
     square_order_id: o.id, updated_at: new Date().toISOString(),
-    fulfillment: "ship", ship_to: to, gift_note: to.gift_note || null, shipping_cents: shipCents, ship_on: c.ship_on,
+    fulfillment: "ship", ship_to: zone.service ? { ...to, service: zone.service } : to, gift_note: to.gift_note || null, shipping_cents: shipCents, ship_on: c.ship_on,
   };
   let w = prior ? await admin.from("online_orders").update(row).eq("id", prior.id) : await admin.from("online_orders").insert(row);
   if (w.error && /column|schema cache/i.test(w.error.message)) { // the shipping columns aren't there yet: log the rest
@@ -1260,6 +1354,7 @@ type ShipOrder = {
   total_cents: number; shipping_cents: number; tax_cents: number;
   fulfillment_uid: string; fulfillment_state: string;
   carrier: string; tracking_number: string; tracking_url: string; shipped_at: string | null; tracking_emailed: string | null;
+  service: string; // "ground" | "air" | "" (v18: which label to buy)
 };
 function shipOrderOf(o: any): ShipOrder | null {
   const f = (o?.fulfillments ?? []).find((x: any) => x?.type === "SHIPMENT");
@@ -1292,6 +1387,7 @@ function shipOrderOf(o: any): ShipOrder | null {
     fulfillment_uid: String(f.uid ?? ""), fulfillment_state: String(f.state ?? ""),
     carrier: clean(sd.carrier, 40), tracking_number: clean(sd.tracking_number, 60), tracking_url: clean(sd.tracking_url, 300),
     shipped_at: sd.shipped_at ?? null, tracking_emailed: clean(md.tracking_emailed, 40) || null,
+    service: md.ship_service === "ground" || md.ship_service === "air" ? md.ship_service : "",
   };
 }
 // every paid ship order from this site at the from-shop (this env), newest first; cached 30 s
@@ -1781,7 +1877,7 @@ async function mailShipConfirmation(r: any, cust: Cust, to: ShipTo, note: string
   <table style="width:100%;border-collapse:collapse;border-top:1px solid #E6DCC6;border-bottom:1px solid #E6DCC6">${rows}</table>
   <table style="width:100%;margin-top:8px;font-size:14px">
     <tr><td>Subtotal</td><td style="text-align:right">${money(r.subtotal_cents)}</td></tr>
-    <tr><td>Shipping</td><td style="text-align:right">${money(r.shipping_cents)}</td></tr>
+    <tr><td>Shipping${r.ship?.service_label ? ` · ${esc(r.ship.service_label)}` : ""}</td><td style="text-align:right">${money(r.shipping_cents)}</td></tr>
     ${r.tax_cents ? `<tr><td>Tax</td><td style="text-align:right">${money(r.tax_cents)}</td></tr>` : ""}
     <tr><td style="padding-top:6px"><b>Total</b></td><td style="text-align:right;padding-top:6px"><b>${money(r.charged_cents)}</b></td></tr>
   </table>
@@ -1837,6 +1933,7 @@ Deno.serve(async (req) => {
     if (action === "ship_mark") return json(req, await shipMark(req, body));
     if (action === "ship_email") return json(req, await shipEmail(req, body));
     if (action === "track") return json(req, await track(req, body));
+    if (action === "zones") return json(req, zones(body)); // near/far coverage for the staff portal (v18)
     return json(req, { ok: false, error: "Unknown action" }, 400);
   } catch (e) {
     if (e instanceof PublicError) return json(req, { ok: false, error: e.message, ...(e.extra ?? {}) }, e.status);
