@@ -836,18 +836,19 @@
   const nudgeCommit = GS.debounce(() => E.commit(), 500);
 
   // ---------- images ----------
-  E.fillFrame = function (id, ref) {
+  E.fillFrame = function (id, ref, contain) {
     const el = E.byId(id);
     if (!el) return;
-    el.src = ref; el.crop = { z: 1, x: 0.5, y: 0.5 }; delete el.fit;
+    el.src = ref; el.crop = { z: 1, x: 0.5, y: 0.5 };
+    if (contain) el.fit = 'contain'; else delete el.fit; // a sticker or logo stays whole; a photo fills the frame
     E.sel = [id];
     E.commit(); E.render(); GS.bus.emit('sel');
   };
   E.addImage = function (rec, opts = {}) {
     if (!E.design) return;
-    if (E.replaceTarget && E.byId(E.replaceTarget)) { const id = E.replaceTarget; E.replaceTarget = null; E.fillFrame(id, rec.ref); GS.bus.emit('replacemode'); return; }
+    if (E.replaceTarget && E.byId(E.replaceTarget)) { const id = E.replaceTarget; E.replaceTarget = null; E.fillFrame(id, rec.ref, opts.contain); GS.bus.emit('replacemode'); return; }
     const sel = E.selEls();
-    if (!opts.at && sel.length === 1 && sel[0].type === 'image' && !sel[0].src && !sel[0].lock) { E.fillFrame(sel[0].id, rec.ref); return; }
+    if (!opts.at && sel.length === 1 && sel[0].type === 'image' && !sel[0].src && !sel[0].lock) { E.fillFrame(sel[0].id, rec.ref, opts.contain); return; }
     const d = E.design;
     const frac = opts.contain ? 0.4 : 0.6;
     const s = Math.min((d.w * frac) / (rec.w || 800), (d.h * frac) / (rec.h || 800));

@@ -455,7 +455,7 @@
       const st = h('div', { class: 'tiles' });
       GS.EXTRA_STICKERS.forEach((x) => st.append(photoTile(x, { contain: true })));
       st.querySelectorAll('img').forEach((im) => (im.style.objectFit = 'contain'));
-      w.append(sec('Greysie'), st);
+      w.append(sec('Stickers'), st);
     }
     w.append(sec('Your logos & graphics', h('button', { onclick: () => P.pickFiles('brand') }, '+ Upload')));
     if (kit.logos && kit.logos.length) {

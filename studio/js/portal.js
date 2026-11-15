@@ -51,7 +51,12 @@
   brand.parentNode.insertBefore(back, brand);
   const goHome = GS.UI.goHome;
   GS.UI.goHome = async function () { await goHome.apply(this, arguments); S.refresh(); };
-  GS.EXTRA_STICKERS = [{ ref: '/greysie-cheesemonger-sticker.svg', w: 600, h: 600, name: 'Greysie, cheesemonger' }];
+  GS.EXTRA_STICKERS = [
+    { ref: '/greysie-cheesemonger-sticker.svg', w: 600, h: 600, name: 'Greysie, cheesemonger' },
+    { ref: '/studio/graphics/cow.svg', w: 524, h: 485, name: 'Cow' },
+    { ref: '/studio/graphics/goat.svg', w: 484, h: 516, name: 'Goat' },
+    { ref: '/studio/graphics/sheep.svg', w: 468, h: 422, name: 'Sheep' },
+  ];
 
   const share = h('button', { class: 'btn ghost-light', id: 'ed-share', title: 'Post to Instagram & Facebook, or get an email link', onclick: () => shareDialog() });
   share.innerHTML = GS.icon('send', 17) + '<span class="lbl">Share</span>';

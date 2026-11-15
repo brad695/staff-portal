@@ -10,6 +10,8 @@
 <script>
 (function () {
   const GS = window.GS, R = GS.R;
+  GS.Store = GS.Store || { resolveURL: async (ref) => ref }; // badge pictures are plain /studio/graphics/ paths
+  const MILKS = ['cow', 'goat', 'sheep'];
   const FACES = ['700 40px "League Spartan"', '800 40px "League Spartan"', '800 40px "Barlow Condensed"', '400 40px "Nunito Sans"', '800 40px "Nunito Sans"'];
   window.fontsReady = (async () => {
     for (const f of FACES) await document.fonts.load(f, 'AaBbÉéèüä’·—“”–0123456789$');
@@ -71,6 +73,18 @@
     if (fit1(price, range(30, 18, 1), 4) == null) warn.push('price wraps');
     price.y = pY + (p0 - price.size) * 0.6;
 
+    // milk badge — the template shows the cow; goat and sheep swap the picture, blends keep the gold cheese wheel
+    const disc = els.find((e) => e.type === 'shape' && e.shape === 'ellipse');
+    const pic = els.find((e) => e.type === 'image' && /\/graphics\/cow\.svg$/.test(e.src || ''));
+    if (!disc || !pic) throw new Error('cheese-card template has no milk badge');
+    const milk = String(c.milk || '').trim().toLowerCase();
+    if (MILKS.includes(milk)) pic.src = '/studio/graphics/' + milk + '.svg';
+    else {
+      const at = els.indexOf(disc), keep = els.filter((e) => e !== disc && e !== pic);
+      keep.splice(at, 0, GS.mk.icon({ icon: 'wheel', x: 312, y: 22, w: 52, h: 52 }));
+      els.length = 0; els.push(...keep);
+    }
+
     els.forEach((e) => R.syncText(e));
     d.id = c.design_id; d.name = c.name; d.kind = 'cheese-card';
     d.createdAt = baseMs - idx * 1000;
@@ -79,6 +93,12 @@
     return { d, diag };
   };
 
+  // load the badge pictures before drawing; a card must never be saved with an empty frame
+  window.prep = async function (d) {
+    await R.preload(d);
+    const bad = d.pages[0].els.filter((e) => e.type === 'image' && R.imgState(e.src) !== 'ok').map((e) => e.src);
+    if (bad.length) throw new Error('picture did not load: ' + bad.join(', '));
+  };
   window.thumbOf = function (d) {
     const s = Math.min(280 / d.w, 280 / d.h);
     const cv = document.createElement('canvas');
