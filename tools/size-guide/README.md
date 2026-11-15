@@ -9,7 +9,8 @@ each dimension line with its label, the captions and the headings.
   One scale for everything: 14 px per inch. A wedge is the same amount of cheese on every board:
   Custom 4, Large 8, Extra Large 12, Gathering 3, Demi 15/16 of one, Mini 3/8 of one.
 - `build.js` turns the spec into a `studio_designs` row with the live Studio renderer
-  (`out/row.json`, thumb included) plus `out/preview.png`.
+  (`out/row.json`, thumb included) plus `out/preview.png`. `row.json` here is the design as first loaded
+  (2026-11-15) — reload it to get the original back.
 
 ```
 python3 make_graphics.py
@@ -21,6 +22,6 @@ Load (keeps the design if staff already edited it):
 insert into studio_designs (id,name,w,h,unit,kind,page_count,thumb,pages,created_at,updated_at)
 select r->>'id', r->>'name', (r->>'w')::int, (r->>'h')::int, r->>'unit', r->>'kind', 1, r->>'thumb', r->'pages',
        (r->>'created_at')::timestamptz, (r->>'updated_at')::timestamptz
-from (select $j$<contents of out/row.json>$j$::jsonb r) s
-on conflict (id) do nothing;
+from (select content::jsonb r from http_get('https://raw.githubusercontent.com/brad695/staff-portal/<commit>/tools/size-guide/row.json')) s
+on conflict (id) do nothing;   -- use do update set pages = excluded.pages, thumb = excluded.thumb only to reset it on purpose
 ```
