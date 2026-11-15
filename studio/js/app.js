@@ -45,8 +45,19 @@
     const note = $('#designs-note');
     note.textContent = S.slow ? 'Can’t reach saved designs yet. Showing what’s loaded.' : S.dbError ? 'Saved designs couldn’t load. Reload to try again.' : S.mode === 'local' ? 'Kept in this browser. Open on claude.ai to save to the cloud.' : '';
     if (!S.designsLoaded) { for (let i = 0; i < 4; i++) g.append(h('div', { class: 'skel' })); return; }
-    if (!S.designs.length) { g.append(h('div', { class: 'empty' }, h('b', null, 'No designs yet. '), 'Pick a size above or start from a GREYS template below.')); return; }
-    S.designs.forEach((d) => {
+    if (!S.designs.length) { renderFilter(0, 0); g.append(h('div', { class: 'empty' }, h('b', null, 'No designs yet. '), 'Pick a size above or start from a GREYS template below.')); return; }
+    // filter chips (only once there are cheese cards to split out) + search
+    const isCard = (d) => d.kind === 'cheese-card';
+    const nCards = S.designs.filter(isCard).length;
+    if (!nCards && homeFilter !== 'all') homeFilter = 'all';
+    renderFilter(nCards, S.designs.length - nCards);
+    const q = fold($('#designs-q').value);
+    let list = S.designs;
+    if (homeFilter === 'cards') list = list.filter(isCard).slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
+    else if (homeFilter === 'other') list = list.filter((d) => !isCard(d));
+    if (q) list = list.filter((d) => fold(d.name).includes(q));
+    if (!list.length) { g.append(h('div', { class: 'empty' }, h('b', null, 'Nothing matches. '), q ? 'Try a different search.' : 'Pick another filter.')); return; }
+    list.forEach((d) => {
       const img = d.thumb ? h('img', { src: d.thumb, alt: '' }) : h('div', { class: 'muted' }, GS.iconEl('image', 28));
       const more = h('button', { class: 'ibtn sm', title: 'More', 'aria-label': 'More actions for ' + d.name, html: GS.icon('more', 18), onclick: (e) => { e.stopPropagation(); designMenu(more, d); } });
       g.append(h('div', { class: 'card', role: 'button', tabindex: '0', onclick: () => UI.openById(d.id), onkeydown: (e) => { if (e.key === 'Enter') UI.openById(d.id); } },
@@ -54,6 +65,18 @@
         h('div', { class: 'meta' }, h('div', null, h('div', { class: 't' }, d.name || 'Untitled'), h('div', { class: 's' }, GS.fmtAgo(d.updatedAt) + ' · ' + GS.sizeText(d.w, d.h, d.unit))), more)));
     });
   }
+  let homeFilter = 'all';
+  const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  function renderFilter(nCards, nOther) {
+    const box = $('#designs-filter');
+    box.innerHTML = '';
+    $('#designs-q').hidden = nCards + nOther < 7;
+    if (!nCards) return;
+    [['all', 'All', nCards + nOther], ['cards', 'Cheese cards', nCards], ['other', 'Everything else', nOther]].forEach(([k, label, n]) => {
+      box.append(h('button', { class: 'chip' + (homeFilter === k ? ' on' : ''), 'aria-pressed': homeFilter === k ? 'true' : 'false', onclick: () => { homeFilter = k; renderDesigns(); } }, `${label} · ${n}`));
+    });
+  }
+  $('#designs-q').addEventListener('input', GS.debounce(() => renderDesigns(), 120));
   function designMenu(anchor, d) {
     const m = h('div', { class: 'menu' },
       h('button', { onclick: () => { GS.pop.close(); UI.openById(d.id); } }, GS.iconEl('edit', 18), 'Open'),
