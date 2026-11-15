@@ -192,7 +192,9 @@
         B(0, 0, 384, 96, NAVY),
         T('Comté', 22, 16, 270, 46, { font: BC, weight: 800, color: CREAM, lh: 1.05 }),
         T('AGED 18 MONTHS', 22, 66, 270, 12.5, { font: LS, weight: 700, color: GOLD, ls: 200 }),
-        IC('wheel', 312, 22, 52, 52, GOLD),
+        // milk badge: swap in goat.svg or sheep.svg (Brand ▸ Stickers); blends use the gold cheese wheel instead
+        B(306, 16, 64, 64, CREAM, { shape: 'ellipse', stroke: { c: GOLD, w: 3 } }),
+        P('/studio/graphics/cow.svg', 315, 25, 46, 46, { fit: 'contain' }),
         T('France  ·  Cow  ·  Raw', 22, 112, 340, 14, { font: NS, weight: 800, color: RIND, upper: true, ls: 120 }),
         T('Brown butter, toasted hazelnut and a little sweetness on the finish.', 22, 138, 340, 15, { font: NS, color: '#33424D', lh: 1.4 }),
         LN(22, 206, 340, { sw: 1.5, color: '#E3D7BF' }),

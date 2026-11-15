@@ -21,7 +21,7 @@ function fontsCss() {
   }
   return out.join('\n');
 }
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2' };
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg' };
 const css = fontsCss();
 const srv = http.createServer((q, r) => {
   const u = decodeURIComponent(q.url.split('?')[0]);
@@ -53,8 +53,9 @@ const srv = http.createServer((q, r) => {
   for (let i = 0; i < all.length; i++) {
     const c = Object.assign({}, all[i], { line: [all[i].origin, all[i].milk, all[i].treat].filter(Boolean).join('  ·  ') });
     if (only && !only.has(c.design_id)) continue;
-    const res = await page.evaluate(([c, i, base, png]) => {
+    const res = await page.evaluate(async ([c, i, base, png]) => {
       const { d, diag } = window.buildCard(c, i, base);
+      await window.prep(d);
       return { d, diag, thumb: window.thumbOf(d), png: png ? window.pngOf(d, 3.125) : null };
     }, [c, i, base, process.argv.includes('--png')]);
     const iso = new Date(res.d.createdAt).toISOString();
