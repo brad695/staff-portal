@@ -50,26 +50,38 @@
     const maxW = Math.max(1, el.w - pad * 2);
     const txt = el.upper ? String(el.text).toUpperCase() : String(el.text);
     const meas = measurer(el);
-    const out = [];
-    for (const para of txt.split('\n')) {
-      if (!para) { out.push(''); continue; }
+    const wrap = (para, mw) => {
+      const res = [];
       const parts = para.split(/(\s+)/).filter((s) => s.length);
       let line = '';
       for (const part of parts) {
         if (/^\s+$/.test(part)) { line += part; continue; }
         const test = line + part;
-        if (line.trim().length && meas(test.trimEnd()) > maxW) { out.push(line); line = part; }
+        if (line.trim().length && meas(test.trimEnd()) > mw) { res.push(line); line = part; }
         else line = test;
-        while (line.trimEnd().length > 1 && meas(line.trimEnd()) > maxW) {
+        while (line.trimEnd().length > 1 && meas(line.trimEnd()) > mw) {
           let lo = 1, hi = line.length;
-          while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (meas(line.slice(0, mid)) <= maxW) lo = mid; else hi = mid - 1; }
-          out.push(line.slice(0, lo));
+          while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); if (meas(line.slice(0, mid)) <= mw) lo = mid; else hi = mid - 1; }
+          res.push(line.slice(0, lo));
           line = line.slice(lo);
         }
       }
-      out.push(line);
+      res.push(line);
+      return res;
+    };
+    // A tab makes a price-list line: what follows the last tab sits flush right on the line where the
+    // left side ends (dot leaders fill the gap when drawn). The left side wraps short of the price.
+    const out = [];
+    for (const para of txt.split('\n')) {
+      if (!para) { out.push({ t: '' }); continue; }
+      const ti = para.lastIndexOf('\t');
+      if (ti < 0) { wrap(para, maxW).forEach((t) => out.push({ t })); continue; }
+      const right = para.slice(ti + 1).replace(/\t/g, ' ').trim();
+      const rw = meas(right);
+      const left = wrap(para.slice(0, ti).replace(/\t/g, ' '), Math.max(size, maxW - rw - (right ? size * 0.6 : 0)));
+      left.forEach((t, i) => out.push(i === left.length - 1 ? { t, tab: right, rw } : { t }));
     }
-    const lines = out.map((t) => { t = t.replace(/\s+$/, ''); return { t, w: meas(t) }; });
+    const lines = out.map((o) => { const t = o.t.replace(/\s+$/, ''); return Object.assign(o, { t, w: meas(t) }); });
     const { asc, desc } = metrics(el);
     const lh = size * (el.lh || 1.2);
     L = { lines, lh, asc, desc, pad, maxW, height: lines.length * lh + pad * 2, lsPx: ((el.ls || 0) / 1000) * size };
@@ -82,7 +94,7 @@
     const key = ['c', fontEpoch, el.text, el.font, el.size, el.weight, el.ital ? 1 : 0, el.ls || 0, el.upper ? 1 : 0, el.curve].join('|');
     let L = layoutCache.get(key);
     if (L) return L;
-    const txt = (el.upper ? String(el.text).toUpperCase() : String(el.text)).replace(/\s*\n\s*/g, ' ');
+    const txt = (el.upper ? String(el.text).toUpperCase() : String(el.text)).replace(/\s*\n\s*/g, ' ').replace(/\t/g, ' ');
     mctx.font = GS.fontStr(el);
     if (HAS_LS) mctx.letterSpacing = '0px';
     const ls = ((el.ls || 0) / 1000) * el.size;
@@ -166,20 +178,38 @@
     ctx.textBaseline = 'alphabetic';
     const pos = L.lines.map((ln, i) => {
       let x = L.pad;
-      if (el.align === 'center') x += (L.maxW - ln.w) / 2;
-      else if (el.align === 'right') x += L.maxW - ln.w;
+      if (ln.tab == null) {
+        if (el.align === 'center') x += (L.maxW - ln.w) / 2;
+        else if (el.align === 'right') x += L.maxW - ln.w;
+      }
       return { x, y: L.pad + i * L.lh + (L.lh - (L.asc + L.desc)) / 2 + L.asc, ln };
     });
+    const rx = (p) => L.pad + L.maxW - p.ln.rw; // where a price-list line's right part starts
+    const both = (fn) => pos.forEach((p) => { lineText(ctx, p.ln.t, p.x, p.y, L.lsPx, fn); if (p.ln.tab) lineText(ctx, p.ln.tab, rx(p), p.y, L.lsPx, fn); });
     const outline = el.stroke && el.stroke.w > 0;
     if (outline || el.hollow) {
       ctx.lineJoin = 'round'; ctx.miterLimit = 2;
       ctx.strokeStyle = outline ? el.stroke.c : el.color;
       ctx.lineWidth = el.hollow ? Math.max(0.5, outline ? el.stroke.w : el.size * 0.03) : el.stroke.w * 2;
-      pos.forEach((p) => lineText(ctx, p.ln.t, p.x, p.y, L.lsPx, 'strokeText'));
+      both('strokeText');
       if (!el.hollow) noShadow(ctx);
     }
-    ctx.fillStyle = el.color || '#000';
-    if (!el.hollow) pos.forEach((p) => lineText(ctx, p.ln.t, p.x, p.y, L.lsPx, 'fillText'));
+    ctx.fillStyle = el.grad ? R.linGrad(ctx, el.w, L.height, el.grad) : el.color || '#000';
+    if (!el.hollow) both('fillText');
+    if (el.lead !== 'none' && pos.some((p) => p.ln.tab)) {
+      // leaders: dots on a shared grid so they line up from line to line, or a thin rule
+      const sp = el.size * 0.32, r = Math.max(0.5, el.size * 0.045), gap = el.size * 0.3;
+      if (el.hollow) ctx.fillStyle = el.color || '#000';
+      ctx.beginPath();
+      for (const p of pos) {
+        if (!p.ln.tab) continue;
+        const x0 = p.x + p.ln.w + gap, x1 = rx(p) - gap;
+        if (x1 - x0 < sp) continue;
+        if (el.lead === 'line') { const th = Math.max(0.5, el.size * 0.04); ctx.rect(x0, p.y - el.size * 0.06 - th, x1 - x0, th); continue; }
+        for (let x = L.pad + Math.ceil((x0 - L.pad) / sp) * sp; x <= x1; x += sp) { ctx.moveTo(x + r, p.y - r); ctx.arc(x, p.y - r, r, 0, Math.PI * 2); }
+      }
+      ctx.fill();
+    }
     if (el.under) {
       noShadow(ctx);
       const th = Math.max(1, el.size * 0.065);
@@ -207,8 +237,23 @@
       pass('strokeText');
       if (!el.hollow) noShadow(ctx);
     }
-    ctx.fillStyle = el.color || '#000';
+    ctx.fillStyle = (el.grad && el.grad.a) || el.color || '#000';
     if (!el.hollow) pass('fillText');
+  }
+
+  // QR code: the module grid comes from GS.QR (vendor qrcode-generator); quiet zone only on a solid background
+  function drawQR(ctx, el) {
+    const solid = el.bg && el.bg !== 'none';
+    if (solid) { ctx.fillStyle = el.bg; ctx.fillRect(0, 0, el.w, el.h); noShadow(ctx); }
+    const q = GS.QR && GS.QR.matrix(el.data || '', el.ecc || 'M');
+    if (!q) return;
+    const quiet = solid ? 2 : 0, n = q.n + quiet * 2, s = Math.min(el.w, el.h) / n;
+    ctx.save();
+    ctx.translate((el.w - s * n) / 2 + quiet * s, (el.h - s * n) / 2 + quiet * s);
+    ctx.scale(s, s);
+    ctx.fillStyle = el.fg || '#06273A';
+    ctx.fill(q.path);
+    ctx.restore();
   }
 
   function drawShape(ctx, el) {
@@ -417,6 +462,7 @@
     if (el.type === 'text') R.syncText(el);
     ctx.save();
     ctx.globalAlpha *= el.op ?? 1;
+    if (el.blend && el.blend !== 'normal') ctx.globalCompositeOperation = el.blend;
     ctx.translate(el.x + el.w / 2, el.y + el.h / 2);
     if (el.rot) ctx.rotate(el.rot * GS.RAD);
     if (el.fx || el.fy) ctx.scale(el.fx ? -1 : 1, el.fy ? -1 : 1);
@@ -428,6 +474,7 @@
       else if (el.type === 'image') drawImageEl(ctx, el, o);
       else if (el.type === 'line') drawLine(ctx, el, o);
       else if (el.type === 'icon') drawIcon(ctx, el, o);
+      else if (el.type === 'qr') drawQR(ctx, el, o);
     } catch (err) { console.warn('draw failed', el.type, err); }
     ctx.restore();
   };
@@ -451,8 +498,12 @@
     ctx.restore();
   };
 
+  // o.bleed (design px): the background runs that far past every edge, for print files with bleed
   R.drawPage = function (ctx, design, page, o = {}) {
-    if (!o.transparent) R.drawBg(ctx, page.bg, design.w, design.h, o);
+    if (!o.transparent) {
+      if (o.bleed) { ctx.save(); ctx.translate(-o.bleed, -o.bleed); R.drawBg(ctx, page.bg, design.w + o.bleed * 2, design.h + o.bleed * 2, o); ctx.restore(); }
+      else R.drawBg(ctx, page.bg, design.w, design.h, o);
+    }
     for (const el of page.els) {
       if (el.hidden || (o.skip && o.skip.has(el.id))) continue;
       R.drawEl(ctx, el, Object.assign({}, o, { cropGhost: o.cropId === el.id }));
@@ -475,6 +526,22 @@
     R.drawPage(ctx, design, page, { scale: s * dpr });
     ctx.restore();
     return cv;
+  };
+
+  // How much a placed photo is blown up: design px per image px (null until it loads).
+  // Print designs are 96 px to the inch, so the photo prints at 96 / s dpi.
+  R.imgScale = function (el) {
+    const e = el && el.type === 'image' && el.src ? R.getImg(el.src) : null;
+    if (!e) return null;
+    const cr = el.crop || {};
+    return el.fit === 'contain' ? Math.min(el.w / e.w, el.h / e.h) : Math.max(el.w / e.w, el.h / e.h) * (cr.z || 1);
+  };
+  // null = fine; otherwise a short warning. Print: under 150 dpi. Screen: stretched past 1.6× at 1× export.
+  R.lowRes = function (el, design) {
+    const s = R.imgScale(el);
+    if (!s) return null;
+    if (design && design.unit === 'in') { const dpi = Math.round(96 / s); return dpi < 150 ? { dpi, text: `Low resolution: prints at about ${dpi} dpi. Use a bigger photo (300 dpi is ideal) or make it smaller.` } : null; }
+    return s > 1.6 ? { text: 'Low resolution: this photo is stretched and may look blurry. Use a bigger photo or make it smaller.' } : null;
   };
 
   // ---------- Geometry ----------

@@ -5,8 +5,22 @@
     design: null, pi: 0, sel: [], zoom: 1, panX: 0, panY: 0, sw: 800, sh: 600, dpr: 1, autoFit: true,
     hover: null, editing: null, cropping: null, guides: [], marquee: null, tip: null,
     hist: [], hi: -1, clip: null, dirty: false, saving: false, pointers: new Map(), replaceTarget: null,
+    snapOn: true, showRulers: false,
   });
-  const MIN = 4;
+  const MIN = 4, RS = 20; // RS = ruler thickness (screen px)
+  const pref = (k, v) => (GS.Store && GS.Store.pref ? GS.Store.pref(k, v) : null);
+  // snapping can be switched off (Canva's top complaint about "sticky" elements); hold Ctrl/Cmd or Alt to skip it once
+  const noSnap = (e) => !E.snapOn || e.altKey || e.ctrlKey || e.metaKey;
+  E.setSnap = function (on) { E.snapOn = !!on; pref('snap', E.snapOn); GS.bus.emit('viewopts'); GS.toast(E.snapOn ? 'Snapping on' : 'Snapping off. Elements move freely.'); };
+  E.setRulers = function (on) {
+    E.showRulers = !!on; pref('rulers', E.showRulers); E.render(); GS.bus.emit('viewopts');
+    if (!on || !E.design) return;
+    const k = E.design.unit === 'in' ? 'tipP' : 'tipR';
+    if (E[k]) return;
+    E[k] = true;
+    GS.toast(k === 'tipP' ? 'Print lines: keep words inside the blue dashes; run photos and colors out to the red dashes (bleed).' : 'Drag from a ruler to add a guide. Drag it back to remove it.');
+  };
+  E.fmtLen = (v) => (E.design && E.design.unit === 'in' ? GS.round(v / 96, 3) + ' in' : Math.round(v) + ' px');
 
   // ---------- accessors ----------
   E.page = () => E.design.pages[E.pi];
@@ -21,6 +35,7 @@
     if (el.type === 'icon') return (GS.ICONS[el.icon] || {}).label || 'Graphic';
     if (el.type === 'line') return 'Line';
     if (el.type === 'image') return el.src ? (el.fit === 'contain' ? 'Graphic' : 'Photo') : 'Photo frame';
+    if (el.type === 'qr') return 'QR code';
     return 'Element';
   };
   const toScreen = (x, y) => [E.panX + x * E.zoom, E.panY + y * E.zoom];
@@ -34,8 +49,18 @@
     E.ov = GS.h('div', { class: 'ov' });
     E.ovSel = GS.h('div', { class: 'ov-sel' });
     E.ov.append(E.ovSel);
+    // rulers: drag from the top ruler for a horizontal guide, from the left ruler for a vertical one
+    E.rulerTop = GS.h('canvas', { class: 'ruler top', hidden: true, title: 'Drag down to add a guide' });
+    E.rulerLeft = GS.h('canvas', { class: 'ruler left', hidden: true, title: 'Drag right to add a guide' });
+    E.rulerCorner = GS.h('button', { class: 'ruler corner', hidden: true, title: 'Hide rulers (Shift+R)', 'aria-label': 'Hide rulers', html: GS.icon('close', 12), onclick: () => E.setRulers(false) });
+    E.ov.append(E.rulerTop, E.rulerLeft, E.rulerCorner);
+    E.rulerTop.addEventListener('pointerdown', (e) => startGuide(e, 'h', -1));
+    E.rulerLeft.addEventListener('pointerdown', (e) => startGuide(e, 'v', -1));
+    E.ov.addEventListener('pointerdown', (e) => { const g = e.target.closest && e.target.closest('.uguide'); if (g) startGuide(e, g.dataset.axis, +g.dataset.i); });
     stage.append(E.cv, E.ov);
     E.ctx = E.cv.getContext('2d');
+    E.snapOn = pref('snap') !== false;
+    E.showRulers = pref('rulers') === true;
     new ResizeObserver(() => { sizeCanvas(); if (E.design) { if (E.autoFit) E.fit(); else E.render(); } }).observe(stage);
     stage.addEventListener('pointerdown', onDown);
     stage.addEventListener('pointermove', onMove);
@@ -118,8 +143,10 @@
     E.saving = true; E.dirty = false;
     GS.bus.emit('save', 'saving');
     try {
-      await GS.Store.saveDesign(E.design, thumbData());
+      const d = E.design, thumb = thumbData();
+      await GS.Store.saveDesign(d, thumb);
       GS.bus.emit('save', 'saved');
+      GS.bus.emit('designsaved', d, thumb);
     } catch (e) {
       E.dirty = true;
       GS.bus.emit('save', 'error', e);
@@ -188,7 +215,89 @@
     ctx.beginPath(); ctx.rect(0, 0, d.w, d.h); ctx.clip();
     R.drawPage(ctx, d, pg, { scale: s, skip, cropId: E.cropping });
     ctx.restore();
+    drawRulers();
   }
+
+  // ---------- rulers & guides ----------
+  const MINOR = { 1: 1, 2: 2, 5: 5, 10: 10, 20: 4, 25: 5, 50: 5, 100: 10, 200: 4, 250: 5, 500: 5, 1000: 10, 2000: 4, 5000: 5 };
+  function drawRulers() {
+    const on = !!(E.showRulers && E.design);
+    E.rulerTop.hidden = E.rulerLeft.hidden = E.rulerCorner.hidden = !on;
+    if (!on) return;
+    const inch = E.design.unit === 'in', unitPx = inch ? 96 : 1, us = unitPx * E.zoom;
+    const steps = inch ? [0.125, 0.25, 0.5, 1, 2, 4, 6, 12, 24, 48] : [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000];
+    const step = steps.find((s) => s * us >= 56) || steps[steps.length - 1];
+    const minor = inch ? (step >= 1 ? 8 : step >= 0.5 ? 4 : 2) : MINOR[step] || 5;
+    const lab = (u) => (inch ? String(GS.round(u, 3)) : String(Math.round(u)));
+    const one = (cv, horiz) => {
+      const len = Math.max(1, (horiz ? E.sw : E.sh) - RS), dpr = E.dpr;
+      const W = horiz ? len : RS, H = horiz ? RS : len;
+      if (cv.width !== Math.round(W * dpr)) cv.width = Math.round(W * dpr);
+      if (cv.height !== Math.round(H * dpr)) cv.height = Math.round(H * dpr);
+      cv.style.width = W + 'px'; cv.style.height = H + 'px';
+      const c = cv.getContext('2d');
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
+      c.fillStyle = '#F4F6F8'; c.fillRect(0, 0, W, H);
+      const pan = horiz ? E.panX : E.panY, size = horiz ? E.design.w : E.design.h;
+      c.fillStyle = '#FFFFFF';
+      if (horiz) c.fillRect(pan - RS, 0, size * E.zoom, RS); else c.fillRect(0, pan - RS, RS, size * E.zoom);
+      c.strokeStyle = '#A9B4BE'; c.lineWidth = 1; c.fillStyle = '#5E6C78'; c.font = '600 9.5px system-ui, -apple-system, Segoe UI, sans-serif';
+      const u0 = Math.floor((-pan + RS) / us / step) * step, u1 = (len + RS - pan) / us;
+      c.beginPath();
+      for (let u = u0; u <= u1 + step; u += step) {
+        for (let k = 0; k < minor; k++) {
+          const p = Math.round(pan + (u + (step / minor) * k) * us - RS) + 0.5;
+          if (p < 0 || p > len) continue;
+          const t = k === 0 ? RS : minor % 2 === 0 && k === minor / 2 ? RS * 0.42 : RS * 0.24;
+          if (horiz) { c.moveTo(p, RS); c.lineTo(p, RS - t); } else { c.moveTo(RS, p); c.lineTo(RS - t, p); }
+        }
+        const p = pan + u * us - RS;
+        if (p > -60 && p < len) {
+          if (horiz) c.fillText(lab(u), p + 3, 10);
+          else { c.save(); c.translate(10, p + 3); c.rotate(-Math.PI / 2); c.textAlign = 'right'; c.fillText(lab(u), 0, 0); c.restore(); }
+        }
+      }
+      c.stroke();
+      c.fillStyle = '#DFE4E9';
+      if (horiz) c.fillRect(0, RS - 1, W, 1); else c.fillRect(RS - 1, 0, 1, H);
+    };
+    one(E.rulerTop, true);
+    one(E.rulerLeft, false);
+  }
+  let gdrag = null;
+  function startGuide(e, axis, i) {
+    if (!E.design || e.button === 2) return;
+    e.preventDefault(); e.stopPropagation();
+    E.endEdit();
+    gdrag = { axis, i, pos: null, out: false };
+    const move = (ev) => {
+      const r = E.stage.getBoundingClientRect(), sx = ev.clientX - r.left, sy = ev.clientY - r.top;
+      const [px, py] = toDesign(sx, sy);
+      let v = axis === 'v' ? px : py;
+      const lim = axis === 'v' ? E.design.w : E.design.h, thr = 6 / E.zoom;
+      for (const t of [0, lim / 2, lim]) if (Math.abs(v - t) <= thr) v = t;
+      gdrag.pos = Math.round(v * 2) / 2;
+      gdrag.out = axis === 'v' ? sx < RS : sy < RS;
+      E.tip = { x: sx + 14, y: sy + 14, t: gdrag.out ? (i >= 0 ? 'Let go to remove the guide' : 'Drag onto the page') : E.fmtLen(gdrag.pos) };
+      drawOverlay();
+    };
+    const up = () => {
+      document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up);
+      const d = gdrag;
+      gdrag = null; E.tip = null;
+      if (d && d.pos != null) {
+        const pg = E.page();
+        const g = (pg.guides = { v: (pg.guides && pg.guides.v) || [], h: (pg.guides && pg.guides.h) || [] });
+        g[d.axis] = g[d.axis].slice();
+        if (d.i >= 0) g[d.axis].splice(d.i, 1);
+        if (!d.out) g[d.axis].push(d.pos);
+        E.commit();
+      }
+      drawOverlay();
+    };
+    document.addEventListener('pointermove', move); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
+  }
+  E.clearGuides = function () { const pg = E.page(); if (pg.guides) { delete pg.guides; E.commit(); E.render(); } };
 
   // ---------- overlay (selection UI in screen space) ----------
   const HANDLES = { tl: [-1, -1], tm: [0, -1], tr: [1, -1], ml: [-1, 0], mr: [1, 0], bl: [-1, 1], bm: [0, 1], br: [1, 1] };
@@ -199,7 +308,7 @@
     if (el.lock) return [];
     if (el.type === 'line') return ['ml', 'mr'];
     if (el.type === 'text') return el.curve ? ['tl', 'tr', 'bl', 'br'] : ['tl', 'tr', 'bl', 'br', 'ml', 'mr'];
-    if (el.type === 'image' && el.fit === 'contain') return ['tl', 'tr', 'bl', 'br'];
+    if ((el.type === 'image' && el.fit === 'contain') || el.type === 'qr') return ['tl', 'tr', 'bl', 'br'];
     return Object.keys(HANDLES);
   }
   function boxStyle(x, y, w, h, rot) {
@@ -240,6 +349,20 @@
       if (el) html += `<div class="sbox editing" style="${boxStyle(el.x, el.y, el.w, el.h, el.rot)}"></div>`;
     }
     const [px0, py0] = toScreen(0, 0), [px1, py1] = toScreen(E.design.w, E.design.h);
+    if (E.showRulers) {
+      const ug = E.page().guides || {};
+      (ug.v || []).forEach((x, i) => { if (!(gdrag && gdrag.axis === 'v' && gdrag.i === i && gdrag.pos != null)) html += `<div class="uguide v" data-axis="v" data-i="${i}" style="left:${toScreen(x, 0)[0] - 3}px"></div>`; });
+      (ug.h || []).forEach((y, i) => { if (!(gdrag && gdrag.axis === 'h' && gdrag.i === i && gdrag.pos != null)) html += `<div class="uguide h" data-axis="h" data-i="${i}" style="top:${toScreen(0, y)[1] - 3}px"></div>`; });
+      if (E.design.unit === 'in') { // print: keep text inside the blue line (1/8 in in), run backgrounds out to the red one (1/8 in bleed)
+        const [a, b] = toScreen(12, 12), [c, d] = toScreen(E.design.w - 12, E.design.h - 12);
+        html += `<div class="safe" style="left:${a}px;top:${b}px;width:${Math.max(0, c - a)}px;height:${Math.max(0, d - b)}px"></div>`;
+        const [e1, f1] = toScreen(-12, -12), [g1, h1] = toScreen(E.design.w + 12, E.design.h + 12);
+        html += `<div class="bleed" style="left:${e1}px;top:${f1}px;width:${g1 - e1}px;height:${h1 - f1}px"></div>`;
+      }
+    }
+    if (gdrag && gdrag.pos != null && !gdrag.out) {
+      html += gdrag.axis === 'v' ? `<div class="uguide v live" style="left:${toScreen(gdrag.pos, 0)[0] - 3}px"></div>` : `<div class="uguide h live" style="top:${toScreen(0, gdrag.pos)[1] - 3}px"></div>`;
+    }
     for (const g of E.guides) {
       if (g.x != null) { const [sx] = toScreen(g.x, 0); html += `<div class="guide v" style="left:${sx}px;top:${py0}px;height:${py1 - py0}px"></div>`; }
       else { const [, sy] = toScreen(0, g.y); html += `<div class="guide h" style="top:${sy}px;left:${px0}px;width:${px1 - px0}px"></div>`; }
@@ -280,7 +403,7 @@
   function onDown(e) {
     if (!E.design) return;
     if (e.button === 2) return;
-    if (e.target.closest && e.target.closest('textarea.ta')) return;
+    if (e.target.closest && e.target.closest('textarea.ta, .ruler, .uguide')) return;
     GS.pop.close();
     E.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try { E.stage.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
@@ -305,7 +428,8 @@
       if (e.shiftKey || e.metaKey || e.ctrlKey) {
         const ids = E.groupIds(hit);
         const on = E.sel.includes(hit.id);
-        E.select(on ? E.sel.filter((id) => !ids.includes(id)) : E.sel.concat(ids));
+        // Ctrl/Cmd on something already selected keeps it selected, so Ctrl-drag moves it without snapping
+        if (!(on && !e.shiftKey)) E.select(on ? E.sel.filter((id) => !ids.includes(id)) : E.sel.concat(ids));
       } else if (!E.sel.includes(hit.id)) E.select(E.groupIds(hit));
       drag = { kind: 'move', sx, sy, moved: false, wasSole, dbl, hitId: hit.id, shift: e.shiftKey, starts: E.selEls().map((el) => ({ id: el.id, x: el.x, y: el.y })) };
       prepSnap();
@@ -324,7 +448,8 @@
       E.select([el.id]);
       if (!el.src) GS.bus.emit('pickimage', el.id);
       else E.startCrop(el.id);
-    } else E.select([el.id]);
+    } else if (el.type === 'qr') { E.select([el.id]); GS.bus.emit('editqr', el.id); }
+    else E.select([el.id]);
   }
 
   function onMove(e) {
@@ -375,6 +500,8 @@
   function prepSnap() {
     const d = E.design, ids = new Set(E.sel);
     const xs = [0, d.w / 2, d.w], ys = [0, d.h / 2, d.h];
+    const ug = E.showRulers && E.page().guides;
+    if (ug) { (ug.v || []).forEach((x) => xs.push(x)); (ug.h || []).forEach((y) => ys.push(y)); }
     for (const el of E.els()) {
       if (ids.has(el.id) || el.hidden) continue;
       const b = R.bounds([el]);
@@ -395,7 +522,7 @@
     let dx = (sx - drag.sx) / E.zoom, dy = (sy - drag.sy) / E.zoom;
     if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
     E.guides = [];
-    if (!e.altKey && snapT) {
+    if (!noSnap(e) && snapT) {
       const starts = drag.starts.map((s) => Object.assign({}, E.byId(s.id), { x: s.x, y: s.y }));
       const b = R.bounds(starts);
       const thr = 6 / E.zoom;
@@ -441,7 +568,7 @@
       const dxl = (px - ax) * co + (py - ay) * si, dyl = -(px - ax) * si + (py - ay) * co;
       let w = hx ? Math.max(MIN, hx * dxl) : st.w, h = hy ? Math.max(MIN, hy * dyl) : st.h;
       const corner = hx && hy;
-      const keep = corner && (st.type === 'text' || st.type === 'image' ? true : st.type === 'icon' ? !e.shiftKey : e.shiftKey);
+      const keep = corner && (st.type === 'text' || st.type === 'image' || st.type === 'qr' ? true : st.type === 'icon' ? !e.shiftKey : e.shiftKey);
       let s = 1;
       if (corner && keep) {
         s = (hx * dxl * st.w + hy * dyl * st.h) / (st.w * st.w + st.h * st.h);
@@ -462,7 +589,7 @@
       } else if (st.type === 'line') { h = st.h; offY = 0; }
       // snap moving edges for unrotated, free resizes
       E.guides = [];
-      if (!st.rot && !(corner && keep) && snapT && !e.altKey && st.type !== 'text') {
+      if (!st.rot && !(corner && keep) && snapT && !noSnap(e) && st.type !== 'text') {
         const thr = 6 / E.zoom;
         if (hx) {
           const edge = hx > 0 ? ax + w : ax - w;
@@ -642,6 +769,12 @@
     ta.addEventListener('keydown', (ev) => {
       ev.stopPropagation();
       if (ev.key === 'Escape' || (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey))) { ev.preventDefault(); E.endEdit(); }
+      else if (ev.key === 'Tab' && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+        // Tab = price-list tab: what follows lines up on the right with dot leaders
+        ev.preventDefault();
+        ta.setRangeText('\t', ta.selectionStart, ta.selectionEnd, 'end');
+        ta.dispatchEvent(new Event('input'));
+      }
     });
     ta.addEventListener('blur', () => setTimeout(() => { if (E.editing === id && document.activeElement !== ta) E.endEdit(); }, 120));
     ta.focus({ preventScroll: true });
@@ -818,6 +951,29 @@
     }
     E.commit(); E.render(); GS.bus.emit('sel');
   };
+  // Make everything selected as wide (or tall) as the first thing selected. Top-left corners stay put;
+  // QR codes, graphics and logos keep their proportions; text re-wraps to the new width.
+  E.matchSize = function (dim) {
+    const sel = E.selEls().filter((e) => !e.lock);
+    if (sel.length < 2) return;
+    const ref = sel[0];
+    for (const el of sel.slice(1)) {
+      const prop = el.type === 'qr' || el.type === 'icon' || (el.type === 'image' && el.fit === 'contain');
+      if (dim === 'w') {
+        if (el.type === 'text' && el.curve) continue;
+        const k = ref.w / el.w;
+        el.w = ref.w;
+        if (prop) el.h *= k;
+        if (el.type === 'text') R.syncText(el);
+      } else {
+        if (el.type === 'text' || el.type === 'line') continue;
+        const k = ref.h / el.h;
+        el.h = ref.h;
+        if (prop) el.w *= k;
+      }
+    }
+    E.commit(); E.render(); GS.bus.emit('sel');
+  };
   E.flip = function (axis) { E.update((el) => { if (el.type !== 'text') el[axis === 'h' ? 'fx' : 'fy'] = !el[axis === 'h' ? 'fx' : 'fy']; }); };
   E.toggleLock = function () {
     const sel = E.selEls();
@@ -885,6 +1041,7 @@
     const src = E.design.pages[i];
     const gmap = {};
     const p = { id: GS.uid('p'), bg: GS.clone(src.bg), els: src.els.map((e) => { const c = GS.clone(e); c.id = GS.uid('e'); if (c.gid) c.gid = gmap[c.gid] || (gmap[c.gid] = GS.uid('g')); return c; }) };
+    if (src.guides) p.guides = GS.clone(src.guides);
     E.addPage(p, i + 1);
   };
   E.delPage = function (i = E.pi) {
@@ -914,6 +1071,9 @@
       if (el.shadow) { el.shadow.b *= s; el.shadow.x *= s; el.shadow.y *= s; }
       if (el.border) el.border.w *= s;
       el.x = cx - el.w / 2; el.y = cy - el.h / 2;
+    }
+    if (page.guides) {
+      page.guides = { v: (page.guides.v || []).map((x) => GS.round((x - fw / 2) * s + tw / 2, 1)), h: (page.guides.h || []).map((y) => GS.round((y - fh / 2) * s + th / 2, 1)) };
     }
     return page;
   };
@@ -964,7 +1124,8 @@
       return;
     }
     if ((k === 'Delete' || k === 'Backspace') && hasSel) { e.preventDefault(); E.del(); return; }
-    if (k === 'Enter' && E.sel.length === 1) { const el = E.selEls()[0]; if (el.type === 'text') { e.preventDefault(); E.startEdit(el.id); } else if (el.type === 'image' && el.src) { e.preventDefault(); E.cropping ? E.endCrop() : E.startCrop(el.id); } return; }
+    if (k === 'Enter' && E.sel.length === 1) { const el = E.selEls()[0]; if (el.type === 'text') { e.preventDefault(); E.startEdit(el.id); } else if (el.type === 'image' && el.src) { e.preventDefault(); E.cropping ? E.endCrop() : E.startCrop(el.id); } else if (el.type === 'qr' && !el.lock) { e.preventDefault(); GS.bus.emit('editqr', el.id); } return; }
+    if (!mod && e.shiftKey && (k === 'R' || k === 'r')) { e.preventDefault(); E.setRulers(!E.showRulers); return; }
     if (k.startsWith('Arrow') && hasSel) {
       e.preventDefault();
       const st = e.shiftKey ? 10 : 1;
