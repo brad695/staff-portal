@@ -1,10 +1,12 @@
-// Builds GREYS Studio cheese cards from studio/data/cheese-cards.json with the real Studio renderer.
-// Writes out/rows.json (studio_designs rows, thumbs included) and, with --png, 300 dpi PNGs in out/png.
-//   npm i && node build.js [--png] [--only dccxxx,dccyyy] [--chrome /usr/bin/google-chrome]
+// Builds GREYS Studio counter cards with the real Studio renderer: cheese cards from studio/data/cheese-cards.json,
+// or wine cards from studio/data/wine-cards.json with --wine.
+// Writes out/rows.json (out-wine/ for wine; studio_designs rows, thumbs included) and, with --png, 300 dpi PNGs in out/png.
+//   npm i && node build.js [--wine] [--png] [--only dccxxx,dccyyy] [--chrome /usr/bin/google-chrome]
 const fs = require('fs'), http = require('http'), path = require('path');
 const { chromium } = require('playwright');
 const REPO = path.resolve(__dirname, '../..');
-const OUT = path.join(__dirname, 'out');
+const KIND = process.argv.includes('--wine') ? 'wine' : 'cheese';
+const OUT = path.join(__dirname, KIND === 'wine' ? 'out-wine' : 'out');
 const arg = (k) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : null; };
 const FACES = [['League Spartan', 'league-spartan', [700, 800]], ['Barlow Condensed', 'barlow-condensed', [800]], ['Nunito Sans', 'nunito-sans', [400, 800]]];
 
@@ -37,7 +39,7 @@ const srv = http.createServer((q, r) => {
 (async () => {
   await new Promise((ok) => srv.listen(0, ok));
   const port = srv.address().port;
-  const data = JSON.parse(fs.readFileSync(path.join(REPO, 'studio/data/cheese-cards.json'), 'utf8'));
+  const data = JSON.parse(fs.readFileSync(path.join(REPO, `studio/data/${KIND}-cards.json`), 'utf8'));
   const only = arg('--only') ? new Set(arg('--only').split(',')) : null;
   // alphabetical; created/updated times step back 1 s per card so the Studio home (newest first) reads A to Z
   const all = data.cards.slice().sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
@@ -51,19 +53,20 @@ const srv = http.createServer((q, r) => {
   fs.mkdirSync(path.join(OUT, 'png'), { recursive: true });
   const rows = [], warns = [];
   for (let i = 0; i < all.length; i++) {
-    const c = Object.assign({}, all[i], { line: [all[i].origin, all[i].milk, all[i].treat].filter(Boolean).join('  ·  ') });
+    const parts = KIND === 'wine' ? [all[i].origin, all[i].grape] : [all[i].origin, all[i].milk, all[i].treat];
+    const c = Object.assign({}, all[i], { line: (KIND === 'wine' && all[i].line) || parts.filter(Boolean).join('  ·  ') });
     if (only && !only.has(c.design_id)) continue;
-    const res = await page.evaluate(async ([c, i, base, png]) => {
-      const { d, diag } = window.buildCard(c, i, base);
+    const res = await page.evaluate(async ([c, i, base, png, kind]) => {
+      const { d, diag } = window.buildCard(c, i, base, kind);
       await window.prep(d);
       return { d, diag, thumb: window.thumbOf(d), png: png ? window.pngOf(d, 3.125) : null };
-    }, [c, i, base, process.argv.includes('--png')]);
+    }, [c, i, base, process.argv.includes('--png'), KIND]);
     const iso = new Date(res.d.createdAt).toISOString();
     rows.push({ id: res.d.id, name: res.d.name, w: res.d.w, h: res.d.h, unit: res.d.unit, kind: res.d.kind, page_count: 1, thumb: res.thumb, pages: res.d.pages, created_at: iso, updated_at: iso });
     if (res.diag.warn.length) warns.push(c.name + ': ' + res.diag.warn.join(', '));
     if (res.png) fs.writeFileSync(path.join(OUT, 'png', String(i).padStart(3, '0') + '-' + c.design_id + '.png'), Buffer.from(res.png.split(',')[1], 'base64'));
   }
   fs.writeFileSync(path.join(OUT, 'rows.json'), JSON.stringify(rows));
-  console.log(`${rows.length} cards -> out/rows.json` + (warns.length ? '\nCHECK:\n' + warns.join('\n') : ''));
+  console.log(`${rows.length} cards -> ${path.basename(OUT)}/rows.json` + (warns.length ? '\nCHECK:\n' + warns.join('\n') : ''));
   await browser.close(); srv.close();
 })().catch((e) => { console.error(e); process.exit(1); });

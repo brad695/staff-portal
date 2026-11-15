@@ -56,6 +56,14 @@
     { ref: '/studio/graphics/cow.svg', w: 524, h: 485, name: 'Cow' },
     { ref: '/studio/graphics/goat.svg', w: 484, h: 516, name: 'Goat' },
     { ref: '/studio/graphics/sheep.svg', w: 468, h: 422, name: 'Sheep' },
+    { ref: '/studio/graphics/wine-red.svg', w: 420, h: 660, name: 'Red wine glass' },
+    { ref: '/studio/graphics/wine-white.svg', w: 420, h: 660, name: 'White wine glass' },
+    { ref: '/studio/graphics/wine-rose.svg', w: 420, h: 660, name: 'Rosé glass' },
+    { ref: '/studio/graphics/wine-orange.svg', w: 420, h: 660, name: 'Orange wine glass' },
+    { ref: '/studio/graphics/wine-sparkling.svg', w: 322, h: 692, name: 'Sparkling flute' },
+    { ref: '/studio/graphics/wine-sparkling-rose.svg', w: 322, h: 692, name: 'Sparkling rosé flute' },
+    { ref: '/studio/graphics/wine-dessert.svg', w: 462, h: 672, name: 'Dessert wine glass' },
+    { ref: '/studio/graphics/wine-port.svg', w: 462, h: 672, name: 'Port glass' },
   ];
 
   const share = h('button', { class: 'btn ghost-light', id: 'ed-share', title: 'Post to Instagram & Facebook, or get an email link', onclick: () => shareDialog() });

@@ -12,6 +12,12 @@
   const GS = window.GS, R = GS.R;
   GS.Store = GS.Store || { resolveURL: async (ref) => ref }; // badge pictures are plain /studio/graphics/ paths
   const MILKS = ['cow', 'goat', 'sheep'];
+  const GLASSES = ['red', 'white', 'rose', 'orange', 'sparkling', 'sparkling-rose', 'dessert', 'port'];
+  // each card kind: its template and the sample text the template ships with (that's how the fields are found)
+  const KINDS = {
+    cheese: { tpl: 'cheese-card', title: 'Comté', sub: 'AGED 18 MONTHS', line: 'France  ·  Cow  ·  Raw', desc: /^Brown butter/, price: '$00.00 / lb', pic: /\/graphics\/cow\.svg$/ },
+    wine: { tpl: 'wine-card', title: 'Côte de Brouilly', sub: 'Cru Beaujolais', line: 'Beaujolais, France  ·  Gamay', desc: /^Dark berries/, price: '$00.00', pic: /\/graphics\/wine-red\.svg$/ },
+  };
   const FACES = ['700 40px "League Spartan"', '800 40px "League Spartan"', '800 40px "Barlow Condensed"', '400 40px "Nunito Sans"', '800 40px "Nunito Sans"'];
   window.fontsReady = (async () => {
     for (const f of FACES) await document.fonts.load(f, 'AaBbÉéèüä’·—“”–0123456789$');
@@ -20,7 +26,6 @@
     return ok;
   })();
 
-  const tpl = GS.TEMPLATES.find((t) => t.id === 'cheese-card');
   const lines = (el, w) => { const w0 = el.w; el.w = w; const L = R.textLayout(el); el.w = w0; return L; };
   const range = (a, b, st) => { const o = []; for (let s = a; s >= b - 1e-9; s -= st) o.push(Math.round(s * 100) / 100); return o; };
 
@@ -30,12 +35,14 @@
     return null;
   }
 
-  window.buildCard = function (c, idx, baseMs) {
-    const d = GS.fromTemplate(tpl);
+  window.buildCard = function (c, idx, baseMs, kind) {
+    const K = KINDS[kind || 'cheese'];
+    const d = GS.fromTemplate(GS.TEMPLATES.find((t) => t.id === K.tpl));
     const els = d.pages[0].els;
     const T = (txt) => els.find((e) => e.type === 'text' && e.text === txt);
-    const title = T('Comté'), sub = T('AGED 18 MONTHS'), line = T('France  ·  Cow  ·  Raw');
-    const desc = els.find((e) => e.type === 'text' && /^Brown butter/.test(e.text)), price = T('$00.00 / lb');
+    const title = T(K.title), sub = T(K.sub), line = T(K.line);
+    const desc = els.find((e) => e.type === 'text' && K.desc.test(e.text)), price = T(K.price);
+    if (!title || !sub || !line || !desc || !price) throw new Error(K.tpl + ' template text changed; update KINDS in harness.html');
     const warn = [];
 
     // title — one line down to 28px, else two lines; bottom stays where the sample's sits
@@ -73,12 +80,16 @@
     if (fit1(price, range(30, 18, 1), 4) == null) warn.push('price wraps');
     price.y = pY + (p0 - price.size) * 0.6;
 
-    // milk badge — the template shows the cow; goat and sheep swap the picture, blends keep the gold cheese wheel
+    // badge: wine picks the glass for its style; cheese shows the cow, goat or sheep, and blends keep the gold cheese wheel
     const disc = els.find((e) => e.type === 'shape' && e.shape === 'ellipse');
-    const pic = els.find((e) => e.type === 'image' && /\/graphics\/cow\.svg$/.test(e.src || ''));
-    if (!disc || !pic) throw new Error('cheese-card template has no milk badge');
+    const pic = els.find((e) => e.type === 'image' && K.pic.test(e.src || ''));
+    if (!disc || !pic) throw new Error(K.tpl + ' template has no badge');
     const milk = String(c.milk || '').trim().toLowerCase();
-    if (MILKS.includes(milk)) pic.src = '/studio/graphics/' + milk + '.svg';
+    if (kind === 'wine') {
+      const g = String(c.type || '').trim().toLowerCase();
+      if (!GLASSES.includes(g)) throw new Error(c.name + ': unknown wine type ' + c.type);
+      pic.src = '/studio/graphics/wine-' + g + '.svg';
+    } else if (MILKS.includes(milk)) pic.src = '/studio/graphics/' + milk + '.svg';
     else {
       const at = els.indexOf(disc), keep = els.filter((e) => e !== disc && e !== pic);
       keep.splice(at, 0, GS.mk.icon({ icon: 'wheel', x: 312, y: 22, w: 52, h: 52 }));
@@ -86,7 +97,7 @@
     }
 
     els.forEach((e) => R.syncText(e));
-    d.id = c.design_id; d.name = c.name; d.kind = 'cheese-card';
+    d.id = c.design_id; d.name = c.name; d.kind = K.tpl;
     d.createdAt = baseMs - idx * 1000;
     // diagnostics
     const diag = { title: [title.size, lines(title, title.w).lines.length], sub: sub.size, line: line.size, desc: [desc.size, lines(desc, desc.w).lines.length, Math.round(desc.y + desc.h)], price: price.size, warn };
