@@ -116,6 +116,7 @@ legend{
 #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 @media (max-width:1100px){ #editor{width:290px;} #sidebar{width:210px;} }
 </style>
+<script>/* STAGING-ICON: on a staging host the browser tab shows the sheep (favicon-sheep.ico); the live site keeps its own icon */(function(){if(location.hostname.indexOf("staging")<0)return;var l=document.querySelectorAll('link[rel~="icon"]');if(!l.length){var n=document.createElement("link");n.rel="icon";document.head.appendChild(n);l=[n];}for(var i=0;i<l.length;i++){l[i].href="/favicon-sheep.ico";l[i].removeAttribute("type");l[i].removeAttribute("sizes");}})();</script>
 </head>
 <body>
 
