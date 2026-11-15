@@ -100,8 +100,12 @@
 // fulfillment 'ship', same env) count against `limit`; Square's stock count at the `from` shop applies as usual.
 // The menu sends `ship` so the page can offer "Ship it"; quote takes ship.state (tax depends on it); pay takes
 // ship.{name, phone, address1, address2, city, state, zip, gift_note}. The pickup path is unchanged.
-// TEST COPY: square-online-order-test is staging's copy of this file with TEST_COPY = true — it uses the Square
-// SANDBOX for every request, whatever the Origin. Deploy both from this one source.
+// TEST COPY: square-online-order-test is staging's copy of this file with TEST_COPY = true — it uses ONE Square
+// environment for every request, whatever the Origin: TEST_ENV. Deploy both from this one source.
+//   TEST_ENV = "production" since 2026-11-15 (v18.1, Maverick: "take the testing site out of sandbox" — so the owner
+//   can try shipping end to end while the live site keeps it off). The test order site then takes REAL cards and
+//   makes REAL Square orders (pickups go to the kitchen, ship orders to Orders → Shipments, same as the live site).
+//   "sandbox" puts it back on test cards.
 //
 // SHIPPED ORDERS, THE STAFF SIDE (v17, 2026-11-12): Square is the record of a shipped order — the recipient and
 // address, the gift note, paid or not, refunds, and the label (carrier, tracking number, shipped_at) once staff buy
@@ -122,7 +126,7 @@
 // columns (migration online_orders_shipping). Until they exist a ship order is logged without them, so the sweep,
 // the double-click guard and status still work.
 //   v17.2 (2026-11-12, go-live): the staff actions pick Square by function, not by the caller's Origin (the staff
-//   portal isn't the order site) — square-online-order = production, square-online-order-test = sandbox. See staffEnv.
+//   portal isn't the order site) — square-online-order = production, square-online-order-test = TEST_ENV. See staffEnv.
 //
 // Actions (POST ?action=…): config · menu · quote · pay · status · sweep · ship_days · ship_orders · ship_mark ·
 // ship_email · track                                                            verify_jwt = false
@@ -180,13 +184,16 @@ const listEnv = (name: string, dflt: string[]) => {
   const v = (Deno.env.get(name) ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
   return v.length ? v : dflt;
 };
-// true only in square-online-order-test (staging's copy, see TEST COPY at the top): Square SANDBOX, always
+// true only in square-online-order-test (staging's copy, see TEST COPY at the top): always TEST_ENV
 const TEST_COPY = true;
+// the test copy's Square (v18.1, 2026-11-15): "production" = real cards + real orders, "sandbox" = test cards only
+const TEST_ENV: Env = "production";
 const envFor = (req: Request): Env =>
-  !TEST_COPY && listEnv("ORDER_LIVE_ORIGINS", LIVE_ORIGINS).includes((req.headers.get("Origin") ?? "").trim().toLowerCase()) ? "production" : "sandbox";
+  TEST_COPY ? TEST_ENV
+  : listEnv("ORDER_LIVE_ORIGINS", LIVE_ORIGINS).includes((req.headers.get("Origin") ?? "").trim().toLowerCase()) ? "production" : "sandbox";
 // The staff side (ship list, ship days, tracking) is called from the staff portal and pg_cron, never from the order
-// site, so the page's Origin can't pick it: the live function works the live Square orders, the test copy the sandbox's (v17.2).
-const staffEnv = (): Env => (TEST_COPY ? "sandbox" : "production");
+// site, so the page's Origin can't pick it: the live function works the live Square orders, the test copy TEST_ENV's (v17.2).
+const staffEnv = (): Env => (TEST_COPY ? TEST_ENV : "production");
 const liveShop = (shop: Shop) => listEnv("ORDER_LIVE_SHOPS", LIVE_SHOPS).includes(shop);
 const credsFor = (e: Env) => e === "production"
   ? { token: Deno.env.get("SQUARE_TICKET_ACCESS_TOKEN") ?? Deno.env.get("SQUARE_ACCESS_TOKEN"), appId: Deno.env.get("SQUARE_TICKET_APP_ID") ?? null, location: null as string | null }
@@ -1549,7 +1556,7 @@ async function shipEmail(req: Request, b: any) {
 async function track(req: Request, b: any) {
   await needStaff(req, b);
   const out = { ok: true, checked: 0, emailed: [] as string[], errors: [] as string[], needs_migration: false };
-  for (const e of (TEST_COPY ? ["sandbox"] : ["production"]) as Env[]) { // the test copy: the sandbox's test orders only
+  for (const e of [staffEnv()]) { // the test copy: TEST_ENV's orders only
     const list = (await shipOrders(e, true)).filter((o) => o.tracking_number && !o.tracking_emailed && !o.refunded);
     if (!list.length) continue;
     const { data, error } = await admin.from("online_orders").select("square_order_id, tracking_emailed_at").in("square_order_id", list.map((o) => o.id));
