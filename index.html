@@ -1311,6 +1311,21 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
 }
 @media print{ .sn-zoom{ display:none !important; } }
 </style>
+<!-- STUDIO (2026-11-14): the purple home tile that opens GREYS Studio, the in-house design tool (studio/index.html, manager sign-in). -->
+<style id="studio-tile">
+@media screen{
+.dash .wg-studio{ --fg:#fff; --fg2:rgba(255,255,255,.86); --chip:rgba(255,255,255,.16); background:linear-gradient(155deg,#8b5cf6 0%,#6d28d9 55%,#4c1d95 100%); }
+.dash .wg-studio .wg-art{ opacity:.16; }
+.wg-studio-sub{ display:block; font-size:.8rem; font-weight:700; line-height:1.3; color:var(--fg2); }
+.wg-studio-dots{ display:flex; gap:6px; margin-top:auto; }
+.wg-studio-dots i{ display:block; width:18px; height:18px; border-radius:50%; box-shadow:0 0 0 2px rgba(255,255,255,.9), 0 4px 8px -4px rgba(0,0,0,.6); }
+.wg-studio-dots i:nth-child(1){ background:#06273a; }
+.wg-studio-dots i:nth-child(2){ background:#e6b33c; }
+.wg-studio-dots i:nth-child(3){ background:#f6ead0; }
+.wg-studio-dots i:nth-child(4){ background:#e8735a; }
+.dash .wg-studio .wg-foot{ margin-top:0; }
+}
+</style>
 <style id="ship-day">
 /* SHIP DAYS on the calendar (2026-11-12) — the tag, in every theme layer above */
 .t-ship{ background:rgba(14,116,144,0.13); color:#0e7490; }
@@ -1405,6 +1420,14 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
         <span class="wg-head"><span class="wg-t">Chat</span><span class="wg-chip" id="wgChatN" hidden></span></span>
         <span class="wg-list" id="wgChatList"></span>
         <span class="wg-foot" id="wgChatFoot">Channels, DMs and clients</span>
+      </button>
+      <!-- STUDIO: GREYS Studio (posts, flyers, signs, menus). Opens /studio/; designs save to Supabase studio_designs. -->
+      <button class="wg wg-studio" id="tile-studio" style="--i:7" onclick="location.href='/studio/?from=home'" aria-label="GREYS Studio: design posts, flyers and signs" data-tile="studio" data-size-def="2x1" data-name="Studio" data-icon="ti-palette" data-swatch="#6d28d9" data-ink="#ffffff">
+        <i class="ti ti-palette wg-art" aria-hidden="true"></i>
+        <span class="wg-head"><span class="wg-t">Studio</span></span>
+        <span class="wg-studio-sub">Social posts, flyers, signs &amp; menus</span>
+        <span class="wg-studio-dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span class="wg-foot">Templates in GREYS colors</span>
       </button>
       <!-- CALENDAR: the next 7 days as a tile, a week per ‹ › step. Fit all = the whole week; the chevron folds it to title only (HOME-V8). -->
       <div class="wg wg-cal" id="tile-cal" style="--i:7" data-tile="calendar" data-name="Calendar" data-icon="ti-calendar" data-swatch="#ffffff" data-ink="#161a1f" data-size-def="3x3" data-full="1">
