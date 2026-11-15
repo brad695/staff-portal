@@ -45,15 +45,16 @@
     const note = $('#designs-note');
     note.textContent = S.slow ? 'Can’t reach saved designs yet. Showing what’s loaded.' : S.dbError ? 'Saved designs couldn’t load. Reload to try again.' : S.mode === 'local' ? 'Kept in this browser. Open on claude.ai to save to the cloud.' : '';
     if (!S.designsLoaded) { for (let i = 0; i < 4; i++) g.append(h('div', { class: 'skel' })); return; }
-    if (!S.designs.length) { renderFilter(0, 0); g.append(h('div', { class: 'empty' }, h('b', null, 'No designs yet. '), 'Pick a size above or start from a GREYS template below.')); return; }
-    // filter chips (only once there are cheese cards to split out) + search
-    const isCard = (d) => d.kind === 'cheese-card';
-    const nCards = S.designs.filter(isCard).length;
-    if (!nCards && homeFilter !== 'all') homeFilter = 'all';
-    renderFilter(nCards, S.designs.length - nCards);
+    if (!S.designs.length) { renderFilter({ cards: 0, wine: 0 }, 0); g.append(h('div', { class: 'empty' }, h('b', null, 'No designs yet. '), 'Pick a size above or start from a GREYS template below.')); return; }
+    // filter chips (only once there are cheese or wine cards to split out) + search
+    const n = { cards: 0, wine: 0 };
+    S.designs.forEach((d) => { if (d.kind === CARD_KINDS.cards) n.cards++; else if (d.kind === CARD_KINDS.wine) n.wine++; });
+    const isCard = (d) => d.kind === CARD_KINDS.cards || d.kind === CARD_KINDS.wine;
+    if (homeFilter !== 'all' && !(CARD_KINDS[homeFilter] ? n[homeFilter] : n.cards + n.wine)) homeFilter = 'all';
+    renderFilter(n, S.designs.length - n.cards - n.wine);
     const q = fold($('#designs-q').value);
     let list = S.designs;
-    if (homeFilter === 'cards') list = list.filter(isCard).slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
+    if (CARD_KINDS[homeFilter]) list = list.filter((d) => d.kind === CARD_KINDS[homeFilter]).slice().sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
     else if (homeFilter === 'other') list = list.filter((d) => !isCard(d));
     if (q) list = list.filter((d) => fold(d.name).includes(q));
     if (!list.length) { g.append(h('div', { class: 'empty' }, h('b', null, 'Nothing matches. '), q ? 'Try a different search.' : 'Pick another filter.')); return; }
@@ -66,13 +67,15 @@
     });
   }
   let homeFilter = 'all';
+  const CARD_KINDS = { cards: 'cheese-card', wine: 'wine-card' }; // filter chip -> design kind
   const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  function renderFilter(nCards, nOther) {
+  function renderFilter(counts, nOther) {
     const box = $('#designs-filter');
     box.innerHTML = '';
+    const nCards = counts.cards + counts.wine;
     $('#designs-q').hidden = nCards + nOther < 7;
     if (!nCards) return;
-    [['all', 'All', nCards + nOther], ['cards', 'Cheese cards', nCards], ['other', 'Everything else', nOther]].forEach(([k, label, n]) => {
+    [['all', 'All', nCards + nOther], ['cards', 'Cheese cards', counts.cards], ['wine', 'Wine cards', counts.wine], ['other', 'Everything else', nOther]].filter(([k, , n]) => k === 'all' || n).forEach(([k, label, n]) => {
       box.append(h('button', { class: 'chip' + (homeFilter === k ? ' on' : ''), 'aria-pressed': homeFilter === k ? 'true' : 'false', onclick: () => { homeFilter = k; renderDesigns(); } }, `${label} · ${n}`));
     });
   }

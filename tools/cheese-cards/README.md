@@ -1,7 +1,8 @@
-# Cheese counter cards → GREYS Studio
+# Cheese and wine counter cards → GREYS Studio
 
-Makes one Studio design per cheese from `studio/data/cheese-cards.json`, using the Studio's own
-"Cheese counter card" template and renderer, so the cards open and edit like any other design.
+Makes one Studio design per cheese from `studio/data/cheese-cards.json`, or per wine from
+`studio/data/wine-cards.json` (`--wine`), using the Studio's own "Cheese counter card" /
+"Wine counter card" templates and renderer, so the cards open and edit like any other design.
 
 ## Add or change cheeses
 Edit `studio/data/cheese-cards.json`. One entry per Square item:
@@ -15,6 +16,19 @@ Edit `studio/data/cheese-cards.json`. One entry per Square item:
 | `desc` | tasting note, 2–3 lines (about 100 characters) |
 | `price` | e.g. `$38.00 / lb`, `$14.00 each` |
 
+### Wine cards
+`studio/data/wine-cards.json` has the same fields, with these differences:
+
+| field | what goes on the card |
+|---|---|
+| `design_id` | `dwc` + the Square item id, lowercased |
+| `sub` | the producer (or a style word when the producer isn't known) |
+| `line` | the rust line, parts joined with `  ·  ` — the place, plus the grape when the title doesn't already say it. `origin` and `grape` keep the full detail |
+| `type` | picks the glass on the badge: `red`, `white`, `rose`, `orange`, `sparkling`, `sparkling-rose`, `dessert` or `port` (`studio/graphics/wine-*.svg`) |
+| `price` | e.g. `$27.00` |
+
+`skipped` lists Square wines that sold but have no card yet, and why.
+
 Text is fitted automatically: titles shrink to one line, the gold line and origin line stay on one line,
 the note shrinks if it would run past the rule. `build.js` prints anything that still doesn't fit.
 
@@ -25,10 +39,11 @@ npm i
 node build.js            # all cards -> out/rows.json (studio_designs rows with thumbnails)
 node build.js --png      # also 300 dpi PNGs in out/png
 node build.js --only dccabc123,dccdef456
+node build.js --wine --png   # wine cards -> out-wine/rows.json and out-wine/png
 ```
 
 ## Load into the Studio
-`out/rows.json` is too big for one SQL statement. Push it to a throwaway branch, pull it into the
+`out/rows.json` (or `out-wine/rows.json`) is too big for one SQL statement. Push it to a throwaway branch, pull it into the
 database with the `http` extension, then delete the branch:
 ```sql
 insert into studio_designs (id,name,w,h,unit,kind,page_count,thumb,pages,created_at,updated_at)
