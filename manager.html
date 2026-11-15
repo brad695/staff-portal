@@ -634,6 +634,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab-head">Marketing</div>
     <div class="tab" onclick="mtab('campaigns')">✉️ Email Campaigns</div>
     <div class="tab" onclick="mtab('social')">📣 Social Posts</div>
+    <div class="tab" onclick="location.href='/studio/'">🎨 Design Studio</div>
     <div class="tab" onclick="mtab('greysie')">🤖 Ask Greysie</div>
     <div class="tab-head">Catering</div>
     <div class="tab" onclick="mtab('catering')">💼 Catering Leads <span id="catBadge" class="pill pill-req" style="display:none;margin-left:4px;"></span></div>
@@ -14859,6 +14860,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
               <div class="rf"><label>Image</label>
                 <div class="emc-inline">
                   <button type="button" class="btn btn-ghost btn-sm" id="socPick">Choose image</button>
+                  <a class="btn btn-ghost btn-sm" href="/studio/?from=social" title="Make the image in GREYS Studio; its Share button sends it here as a draft">🎨 Design in Studio</a>
                   <input type="file" id="socFile" accept="image/*" style="display:none;" />
                   <input id="socUrl" placeholder="…or paste a Canva / image URL" />
                   <button type="button" class="btn btn-ghost btn-sm" id="socImport">Import</button>
