@@ -42,10 +42,23 @@
   const ms = (t) => (t ? Date.parse(t) : 0);
   const metaOf = (r) => ({ id: r.id, name: r.name, w: r.w, h: r.h, unit: r.unit, kind: r.kind, pageCount: r.page_count, thumb: r.thumb, createdAt: ms(r.created_at), updatedAt: ms(r.updated_at) });
 
+  // The list loads without thumbnails; thumbs are fetched only for designs that are new or changed since the
+  // last load, so refreshing a home screen with hundreds of cheese cards stays light.
+  const thumbs = new Map(); // id -> { u: updated_at, t: thumb }
   async function loadDesigns() {
-    const { data, error } = await sb.from('studio_designs').select('id,name,w,h,unit,kind,page_count,thumb,created_at,updated_at').order('updated_at', { ascending: false }).limit(300);
+    const { data, error } = await sb.from('studio_designs').select('id,name,w,h,unit,kind,page_count,created_at,updated_at').order('updated_at', { ascending: false }).limit(1000);
     if (error) { S.dbError = error.message; console.warn(error); }
-    else { S.designs = (data || []).map(metaOf); S.dbError = null; }
+    else {
+      const rows = data || [];
+      const need = rows.filter((r) => { const c = thumbs.get(r.id); return !c || c.u !== r.updated_at; }).map((r) => r.id);
+      for (let i = 0; i < need.length; i += 100) {
+        const { data: th, error: e2 } = await sb.from('studio_designs').select('id,thumb,updated_at').in('id', need.slice(i, i + 100));
+        if (e2) { console.warn(e2); break; }
+        (th || []).forEach((t) => thumbs.set(t.id, { u: t.updated_at, t: t.thumb }));
+      }
+      S.designs = rows.map((r) => metaOf(Object.assign({}, r, { thumb: (thumbs.get(r.id) || {}).t || '' })));
+      S.dbError = null;
+    }
     S.designsLoaded = true;
     GS.bus.emit('designs');
   }

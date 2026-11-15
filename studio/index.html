@@ -87,6 +87,10 @@ textarea.input{height:auto;padding:10px 12px;resize:vertical;min-height:72px}
 .home-sec{padding:26px 28px 6px;max-width:1440px}
 .sec-head{display:flex;align-items:baseline;gap:4px 12px;margin-bottom:14px;flex-wrap:wrap}
 .sec-head h2{margin:0;font:800 22px/1.1 var(--display);color:var(--navy)}
+.sec-head .chips{align-self:center}
+.dsearch{align-self:center;height:34px;width:220px;max-width:100%;border:1px solid var(--line);border-radius:999px;padding:0 14px;background:#fff;font:600 13.5px var(--body);color:var(--ink)}
+.dsearch:focus{outline:none;border-color:var(--navy)}
+.dsearch[hidden],#designs-filter:empty{display:none}
 .grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fill,minmax(178px,1fr))}
 .card{display:flex;flex-direction:column;gap:8px;background:none;border:0;padding:0;text-align:left;min-width:0}
 .thumb{position:relative;display:flex;align-items:center;justify-content:center;aspect-ratio:1/1;border-radius:12px;background:#E3E7EB;overflow:hidden;box-shadow:var(--shadow);transition:transform .15s,box-shadow .15s}
@@ -288,6 +292,7 @@ textarea.ta{position:absolute;border:0;outline:none;resize:none;overflow:hidden;
   .btn.gold#ed-download .lbl{display:none}
   .hero{padding:24px 18px 20px}
   .home-sec{padding:20px 16px 4px}
+  .dsearch{width:100%}
   .grid{grid-template-columns:repeat(2,1fr);gap:12px}
   .ed-body{flex-direction:column}
   .rail{order:3;width:auto;height:62px;flex-direction:row;border-right:0;border-top:1px solid var(--line);padding:4px 6px calc(4px + env(safe-area-inset-bottom));overflow-x:auto;gap:0;justify-content:space-between}
@@ -331,7 +336,7 @@ textarea.ta{position:absolute;border:0;outline:none;resize:none;overflow:hidden;
         <div class="size-row" id="size-row"></div>
       </section>
       <section class="home-sec">
-        <div class="sec-head"><h2>Your designs</h2><span class="muted" id="designs-note"></span></div>
+        <div class="sec-head"><h2>Your designs</h2><span class="muted" id="designs-note"></span><div class="grow"></div><div class="chips" id="designs-filter"></div><input type="search" id="designs-q" class="dsearch" placeholder="Search designs" aria-label="Search your designs" autocomplete="off"></div>
         <div class="grid" id="home-designs"></div>
       </section>
       <section class="home-sec" style="padding-bottom:40px">

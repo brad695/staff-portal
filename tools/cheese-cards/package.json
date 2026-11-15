@@ -1,0 +1,12 @@
+{
+  "name": "greys-cheese-cards",
+  "private": true,
+  "description": "Builds GREYS Studio cheese counter cards from studio/data/cheese-cards.json",
+  "scripts": { "build": "node build.js" },
+  "dependencies": {
+    "@fontsource/barlow-condensed": "^5.2.0",
+    "@fontsource/league-spartan": "^5.2.0",
+    "@fontsource/nunito-sans": "^5.2.0",
+    "playwright": "^1.50.0"
+  }
+}
