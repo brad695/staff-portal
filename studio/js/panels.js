@@ -196,6 +196,11 @@
       if (shapes.length) { const g = h('div', { class: 'tiles four' }); shapes.forEach((k) => g.append(shapeTile(k, () => addShape(k)))); body.append(sec('Shapes'), g); }
       const frames = GS.FRAME_LIST.filter((k) => m('frame photo ' + (k === 'rrect' ? 'rounded' : GS.SHAPES[k].label)));
       if (frames.length) { const g = h('div', { class: 'tiles four' }); frames.forEach((k) => g.append(shapeTile(k, () => addFrame(k), { frame: true }))); body.append(sec('Photo frames'), h('p', { class: 'muted', style: { margin: '-4px 0 8px', fontSize: '12.5px' } }, 'Drop a photo on a frame to fill it.'), g); }
+      if (m('qr code link scan')) {
+        const qrb = h('button', { class: 'qr-add', onclick: () => GS.qrDialog('', (v) => { const s = Math.min(E.design.w, E.design.h) * 0.28; E.add(GS.mk.qr({ data: v, w: s, h: s })); afterAdd(); }) },
+          GS.iconEl('qr', 30), h('span', null, h('b', null, 'QR code'), h('small', null, 'Link a flyer to tickets, the menu or ordering')));
+        body.append(sec('QR code'), qrb);
+      }
       const icons = Object.keys(GS.ICONS).filter((k) => m(GS.ICONS[k].label + ' graphic'));
       if (icons.length) { const g = h('div', { class: 'tiles four' }); icons.forEach((k) => g.append(iconTile(k))); body.append(sec('Graphics'), g); }
       if (!body.children.length) body.append(h('div', { class: 'empty' }, 'Nothing matches “' + s + '”.'));
@@ -218,6 +223,13 @@
     E.add(el);
     afterAdd();
     if (!GS.isMobile()) setTimeout(() => E.startEdit(el.id), 30);
+  };
+  // menus and price signs: Tab between the item and the price lines prices up with dot leaders
+  P.addPriceList = function () {
+    const u = E.u(), d = E.design;
+    E.add(GS.mk.text({ text: 'Comté, 24 months\t$28\nHumboldt Fog\t$32\nManchego\t$24', font: NS, weight: 700, size: 34 * u, w: d.w * 0.72, align: 'left', lh: 1.55, color: inkFor() }));
+    afterAdd();
+    GS.toast('Press Tab between an item and its price. Prices line up on the right.');
   };
   GS.bus.on('addtext', () => P.addText('body'));
   const COMBOS = [
@@ -250,7 +262,8 @@
     const add = h('div', { class: 'txtadd' },
       h('button', { onclick: () => P.addText('heading'), style: { font: `800 26px ${GS.fontStack(LS)}` } }, 'Add a heading'),
       h('button', { onclick: () => P.addText('sub'), style: { font: `700 19px ${GS.fontStack(BC)}` } }, 'Add a subheading'),
-      h('button', { onclick: () => P.addText('body'), style: { font: `400 14px ${GS.fontStack(NS)}` } }, 'Add a little bit of body text'));
+      h('button', { onclick: () => P.addText('body'), style: { font: `400 14px ${GS.fontStack(NS)}` } }, 'Add a little bit of body text'),
+      h('button', { class: 'pl', onclick: () => P.addPriceList(), style: { font: `700 14px ${GS.fontStack(NS)}` } }, h('span', null, 'Price list'), h('i', null), h('span', null, '$28')));
     w.append(sec('Click to add text'), add);
     const g = h('div', { class: 'combos' });
     COMBOS.forEach((c) => {
@@ -483,6 +496,7 @@
       else if (el.type === 'shape') { el.fill = c; el.grad = null; }
       else if (el.type === 'icon') el.fill = c;
       else if (el.type === 'line') el.color = c;
+      else if (el.type === 'qr') el.fg = c;
       else if (el.type === 'image') el.border = Object.assign({ w: Math.max(2, 8 * E.u()) }, el.border || {}, { c });
     });
   }

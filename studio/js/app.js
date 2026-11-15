@@ -129,7 +129,9 @@
     saveState = 'saved';
     updateStatus();
     GS.TB.render();
+    GS.bus.emit('opened', design, opts);
   }
+  UI.openDesign = openDesign;
   UI.openById = async function (id) {
     showEditor();
     $('#ctx').innerHTML = '<span class="lbl">Opening…</span>';
@@ -257,14 +259,19 @@
     const d = E.design;
     const print = d.unit === 'in';
     const maxS = GS.X.maxScale(d);
-    let type = print ? 'pdf' : 'png', scale = print ? Math.min(3.125, maxS) : d.w <= 700 ? Math.min(2, maxS) : 1, which = 'all', transparent = false;
+    let type = print ? 'pdf' : 'png', scale = print ? Math.min(3.125, maxS) : d.w <= 700 ? Math.min(2, maxS) : 1, which = 'all', transparent = false, marks = print;
     const body = h('div');
     const typeSeg = h('div', { class: 'seg' }), scaleSeg = h('div', { class: 'seg' }), pageSeg = h('div', { class: 'seg' });
     const tr = h('input', { type: 'checkbox', id: 'ex-tr' });
     const trRow = h('label', { class: 'tog', for: 'ex-tr' }, 'Transparent background', tr);
+    const mk = h('input', { type: 'checkbox', id: 'ex-marks', checked: marks });
+    const mkRow = h('label', { class: 'tog', for: 'ex-marks' }, h('span', null, 'Crop marks & bleed', h('small', { class: 'muted', style: { display: 'block', fontWeight: 600 } }, 'For a print shop: ⅛ in bleed past the edges')), mk);
     const info = h('p', { class: 'muted', style: { margin: '12px 0 0', fontSize: '13px' } });
+    const lowN = GS.X.lowResCount(d);
+    const warn = lowN ? h('p', { class: 'banner warn', style: { margin: '12px 0 0' } }, GS.iconEl('warn', 16), `${lowN} photo${lowN > 1 ? 's' : ''} ${print ? 'may print blurry (under 150 dpi)' : 'may look blurry (stretched)'}. Click a photo to see which.`) : null;
     const prev = h('div', { class: 'dl-prev', hidden: true });
     tr.addEventListener('change', () => (transparent = tr.checked));
+    mk.addEventListener('change', () => (marks = mk.checked));
     const scales = () => (print ? [[1, 'Screen'], [2, '2×'], [3.125, 'Print · 300 dpi']] : [[1, '1×'], [2, '2×'], [3, '3×']]).filter(([s]) => s <= maxS + 0.001);
     const draw = () => {
       typeSeg.innerHTML = ''; scaleSeg.innerHTML = ''; pageSeg.innerHTML = '';
@@ -274,13 +281,14 @@
       sc.forEach(([s, l]) => scaleSeg.append(h('button', { class: scale === s ? 'on' : '', onclick: () => { scale = s; draw(); } }, l)));
       [['current', 'This page'], ['all', `All ${d.pages.length} pages`]].forEach(([k, l]) => pageSeg.append(h('button', { class: which === k ? 'on' : '', onclick: () => { which = k; draw(); } }, l)));
       trRow.hidden = type !== 'png';
+      mkRow.hidden = type !== 'pdf';
       const pw = Math.round(d.w * scale), ph = Math.round(d.h * scale);
       const many = which === 'all' && d.pages.length > 1;
       info.textContent = `${pw} × ${ph} px` + (print ? ` · ${GS.sizeLabel(d)}` : '') + (many && type !== 'pdf' ? ' · pages come zipped together' : '') + (type === 'pdf' ? ' · best for printing' : type === 'jpg' ? ' · smallest file' : ' · best for social and email');
     };
     body.append(h('span', { class: 'flabel', style: { marginTop: 0 } }, 'File type'), typeSeg, h('span', { class: 'flabel' }, 'Size'), scaleSeg);
     if (d.pages.length > 1) body.append(h('span', { class: 'flabel' }, 'Pages'), pageSeg);
-    body.append(trRow, info, prev);
+    body.append(...[trRow, mkRow, info, warn, prev].filter(Boolean));
     draw();
     const dl = GS.Store.caps.downloads;
     if (!dl) body.append(h('p', { class: 'banner', style: { marginTop: '12px' } }, 'Downloads work when GREYS Studio is open on claude.ai. Here you can copy the image or right-click the preview to save it.'));
@@ -290,7 +298,7 @@
       btns.forEach((b) => (b.disabled = true));
       GS.toast('Preparing your file…');
       try {
-        const out = await GS.X.exportBlob({ design: d, pages, type: mode === 'copy' ? 'png' : type, scale, transparent });
+        const out = await GS.X.exportBlob({ design: d, pages, type: mode === 'copy' ? 'png' : type, scale, transparent, marks: type === 'pdf' && marks });
         if (/^image\//.test(out.blob.type)) { prev.hidden = false; prev.innerHTML = ''; prev.append(h('img', { src: URL.createObjectURL(out.blob), alt: 'Export preview' })); }
         if (mode === 'copy') { await GS.X.copyImage(out.blob); GS.toast('Image copied', 'ok'); }
         else { await GS.X.save(out.filename, out.blob); GS.toast('Saved ' + out.filename, 'ok'); m.close(); }

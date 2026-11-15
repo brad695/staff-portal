@@ -116,6 +116,47 @@
     GS.bus.emit('designs');
   };
 
+  // ---------- version history (table studio_versions; off until supabase/sql/2026-11-15_studio_versions.sql runs) ----------
+  const KEEP_VERSIONS = 40;
+  let verCheck = null;
+  S.versions = {
+    available() {
+      if (!verCheck) verCheck = (async () => {
+        await S.ready;
+        const { error } = await sb.from('studio_versions').select('id').limit(1);
+        return !error;
+      })();
+      return verCheck;
+    },
+    async list(designId) {
+      if (!(await S.versions.available())) return null;
+      const { data, error } = await sb.from('studio_versions').select('id,name,page_count,thumb,reason,created_at').eq('design_id', designId).order('created_at', { ascending: false }).limit(KEEP_VERSIONS);
+      if (error) throw new Error(error.message);
+      return (data || []).map((v) => ({ id: v.id, name: v.name, pageCount: v.page_count, thumb: v.thumb, reason: v.reason, at: ms(v.created_at) }));
+    },
+    async latestAt(designId) {
+      if (!(await S.versions.available())) return 0;
+      const { data } = await sb.from('studio_versions').select('created_at').eq('design_id', designId).order('created_at', { ascending: false }).limit(1);
+      return data && data[0] ? ms(data[0].created_at) : 0;
+    },
+    async get(id) {
+      const { data, error } = await sb.from('studio_versions').select('*').eq('id', id).maybeSingle();
+      if (error) throw new Error(error.message);
+      return data && { id: data.id, name: data.name, w: data.w, h: data.h, unit: data.unit, pages: data.pages || [], at: ms(data.created_at) };
+    },
+    // snapshot = { id (design id), name, w, h, unit, pages }
+    async add(snapshot, thumb, reason) {
+      if (!(await S.versions.available())) return false;
+      const row = { design_id: snapshot.id, name: snapshot.name || '', w: Math.round(snapshot.w), h: Math.round(snapshot.h), unit: snapshot.unit || 'px', page_count: snapshot.pages.length, thumb: thumb || '', pages: snapshot.pages, reason: reason || 'auto' };
+      const { error } = await sb.from('studio_versions').insert(row);
+      if (error) { console.warn('version not saved', error.message); return false; }
+      // keep the newest KEEP_VERSIONS for this design
+      const { data: old } = await sb.from('studio_versions').select('id').eq('design_id', snapshot.id).order('created_at', { ascending: false }).range(KEEP_VERSIONS, KEEP_VERSIONS + 50);
+      if (old && old.length) await sb.from('studio_versions').delete().in('id', old.map((o) => o.id));
+      return true;
+    },
+  };
+
   // ---------- images ----------
   // Downscale big photos, turn SVG / HEIC / GIF into PNG or JPEG the bucket accepts.
   async function normalizeImage(file) {

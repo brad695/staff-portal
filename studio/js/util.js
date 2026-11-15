@@ -163,6 +163,18 @@
     folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     eyedrop: '<path d="M15 4l5 5-2 2-1-1-7 7H7v-3l7-7-1-1z"/><path d="M4 20l3-3"/>',
     curve: '<path d="M4 17c3-8 13-8 16 0"/><path d="M8 11.5l-1-2.5M12 9.5V7M16 11.5l1-2.5"/>',
+    leaders: '<path d="M3 8h6M15 8h6M3 16h8M17 16h4"/><circle cx="11" cy="8" r=".6" fill="currentColor"/><circle cx="13" cy="8" r=".6" fill="currentColor"/><circle cx="13.5" cy="16" r=".6" fill="currentColor"/><circle cx="15.3" cy="16" r=".6" fill="currentColor"/>',
+    cutout: '<path d="M6.5 3.5h-2a1 1 0 0 0-1 1v2M17.5 3.5h2a1 1 0 0 1 1 1v2M6.5 20.5h-2a1 1 0 0 1-1-1v-2M17.5 20.5h2a1 1 0 0 0 1-1v-2"/><circle cx="12" cy="9.5" r="3"/><path d="M6.5 18c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5"/>',
+    warn: '<path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.2v.3"/>',
+    star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/>',
+    qr: '<rect x="3.5" y="3.5" width="6" height="6" rx="1"/><rect x="14.5" y="3.5" width="6" height="6" rx="1"/><rect x="3.5" y="14.5" width="6" height="6" rx="1"/><path d="M14.5 14.5h2.5v2.5h-2.5zM18 18h2.5v2.5H18zM14.5 19.5h1M19.5 14.5v1"/>',
+    ruler: '<rect x="2.5" y="8" width="19" height="8" rx="1.5"/><path d="M6 8v3M9.5 8v4.5M13 8v3M16.5 8v4.5M20 8v3"/>',
+    magnet: '<path d="M6 4v8a6 6 0 0 0 12 0V4h-4v8a2 2 0 0 1-4 0V4z"/><path d="M6 8h4M14 8h4"/>',
+    history: '<path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.5"/><path d="M4 4v4.5h4.5M12 8v4.5l3 2"/>',
+    find: '<circle cx="10.5" cy="10.5" r="6"/><path d="M20 20l-5-5M8 10.5h5"/>',
+    bulk: '<rect x="7" y="3" width="13" height="13" rx="1.6"/><path d="M4 7v12a1 1 0 0 0 1 1h12"/><path d="M10 7.5h7M10 11h7"/>',
+    keyboard: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.5M9.5 10h.5M13 10h.5M16.5 10h1M6 14h12"/>',
+    tools: '<path d="M14.5 6.5a4 4 0 0 0-5.3 5.3L4 17l3 3 5.2-5.2a4 4 0 0 0 5.3-5.3l-2.6 2.6-2.4-.6-.6-2.4z"/>',
   };
   GS.icon = function (name, size = 20, extra = '') {
     return `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${I[name] || ''}</svg>`;

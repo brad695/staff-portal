@@ -26,7 +26,7 @@
     if (!E.design) return [];
     for (const p of E.design.pages) {
       add(p.bg && p.bg.color);
-      for (const el of p.els) { add(el.color); add(el.fill); add(el.bgc); el.stroke && add(el.stroke.c); el.border && add(el.border.c); }
+      for (const el of p.els) { add(el.color); add(el.fill); add(el.bgc); add(el.fg); el.stroke && add(el.stroke.c); el.border && add(el.border.c); }
     }
     return [...set].slice(0, 21);
   }
@@ -87,25 +87,39 @@
       const info = GS.fontInfo(cur.font);
       info.w.forEach((w) => weights.append(h('button', { class: 'chip' + ((cur.weight || 400) === w ? ' on' : ''), style: { fontFamily: GS.fontStack(cur.font), fontWeight: w }, onclick: () => { GS.loadFamily(cur.font); commit({ weight: w }); drawWeights(); } }, WNAMES[w] || w)));
     };
+    // favorite fonts (starred) sit on top; kept in this browser
+    const favs = () => (GS.Store.pref && GS.Store.pref('favFonts')) || [];
+    const setFavs = (v) => GS.Store.pref && GS.Store.pref('favFonts', v);
+    const makeRow = (f) => {
+      const cur = (E.selEls().find((e) => e.type === 'text') || el).font;
+      const isFav = favs().includes(f.f);
+      const star = h('span', { class: 'star' + (isFav ? ' on' : ''), role: 'button', tabindex: '0', title: isFav ? 'Remove from favorites' : 'Add to favorites', 'aria-label': (isFav ? 'Unstar ' : 'Star ') + f.f, html: GS.icon('star', 16),
+        onclick: (e) => { e.stopPropagation(); const fv = favs(); setFavs(fv.includes(f.f) ? fv.filter((x) => x !== f.f) : [f.f].concat(fv).slice(0, 12)); draw(); } });
+      const row = h('button', { class: 'fontrow' + (cur === f.f ? ' on' : ''), dataset: { f: f.f }, style: { fontFamily: GS.fontStack(f.f) }, onclick: () => {
+        const s = E.selEls().find((e) => e.type === 'text') || el;
+        const w = GS.nearestWeight(f.f, s.weight || 400);
+        GS.loadFamily(f.f).then(() => E.render());
+        commit((x) => { if (x.type === 'text') { x.font = f.f; x.weight = w; if (!f.i) x.ital = false; } });
+        list.querySelectorAll('.fontrow').forEach((r) => r.classList.toggle('on', r.dataset.f === f.f));
+        drawWeights();
+        GS.bus.emit('fontchosen');
+      } }, h('span', { class: 'fname' }, f.f), f.c === 'Brand' ? h('small', null, 'GREYS') : null, star);
+      if (f.c === 'Brand') GS.loadFamily(f.f);
+      else if (io) io.observe(row); else GS.previewFamily(f.f);
+      return row;
+    };
     const draw = () => {
       list.innerHTML = '';
       const q = search.value.trim().toLowerCase();
+      const fv = favs().filter((n) => GS.FONTS.some((f) => f.f === n));
+      if (!q && fv.length) {
+        list.append(h('div', { class: 'psec', style: { margin: '6px 0 2px' } }, h('h4', null, 'Your favorites')));
+        fv.forEach((n) => list.append(makeRow(GS.fontInfo(n))));
+      }
       let lastCat = '';
       GS.FONTS.filter((f) => !q || f.f.toLowerCase().includes(q) || f.c.toLowerCase().includes(q)).forEach((f) => {
         if (f.c !== lastCat && !q) { lastCat = f.c; list.append(h('div', { class: 'psec', style: { margin: '10px 0 2px' } }, h('h4', null, f.c === 'Brand' ? 'GREYS brand fonts' : f.c))); }
-        const cur = (E.selEls().find((e) => e.type === 'text') || el).font;
-        const row = h('button', { class: 'fontrow' + (cur === f.f ? ' on' : ''), dataset: { f: f.f }, style: { fontFamily: GS.fontStack(f.f) }, onclick: () => {
-          const s = E.selEls().find((e) => e.type === 'text') || el;
-          const w = GS.nearestWeight(f.f, s.weight || 400);
-          GS.loadFamily(f.f).then(() => E.render());
-          commit((x) => { if (x.type === 'text') { x.font = f.f; x.weight = w; if (!f.i) x.ital = false; } });
-          list.querySelectorAll('.fontrow').forEach((r) => r.classList.toggle('on', r.dataset.f === f.f));
-          drawWeights();
-          GS.bus.emit('fontchosen');
-        } }, f.f, f.c === 'Brand' ? h('small', null, 'GREYS') : null);
-        list.append(row);
-        if (f.c === 'Brand') GS.loadFamily(f.f);
-        else if (io) io.observe(row); else GS.previewFamily(f.f);
+        list.append(makeRow(f));
       });
     };
     search.addEventListener('input', draw);
@@ -115,10 +129,17 @@
   };
 
   // ---------- Popovers ----------
+  const BLENDS = [['normal', 'Normal'], ['multiply', 'Multiply'], ['screen', 'Screen'], ['overlay', 'Overlay'], ['soft-light', 'Soft light'], ['color', 'Color']];
   function transparencyPop(anchor) {
     const sel = E.selEls();
     const v = Math.round((sel[0].op ?? 1) * 100);
-    GS.pop.open(anchor, GS.slider({ label: 'Transparency', min: 0, max: 100, value: v, onInput: (x) => live({ op: x / 100 }), onChange: (x) => commit({ op: x / 100 }) }), { title: 'Transparency' });
+    const w = h('div', null, GS.slider({ label: 'Transparency', min: 0, max: 100, value: v, onInput: (x) => live({ op: x / 100 }), onChange: (x) => commit({ op: x / 100 }) }));
+    // blend modes: multiply drops a white background out of a logo, screen lifts a dark one, color tints a photo
+    const g = h('div', { class: 'blends' });
+    const cur = sel[0].blend || 'normal';
+    BLENDS.forEach(([k, l]) => g.append(h('button', { class: 'chip' + (cur === k ? ' on' : ''), onclick: () => { commit({ blend: k === 'normal' ? undefined : k }); transparencyPop(anchor); } }, l)));
+    w.append(h('div', { class: 'psec' }, h('h4', null, 'Blend with what’s behind')), g);
+    GS.pop.open(anchor, w, { title: 'Transparency & blend' });
   }
   function spacingPop(anchor) {
     const el = E.selEls()[0];
@@ -201,23 +222,46 @@
       d.append(h('button', { class: 'btn sm', onclick: () => E.distribute('h') }, GS.iconEl('disth', 16), 'Space evenly ↔'), h('button', { class: 'btn sm', onclick: () => E.distribute('v') }, GS.iconEl('distv', 16), 'Space evenly ↕'));
       w.append(d);
     }
+    if (sel.length >= 2) {
+      w.append(h('div', { class: 'psec' }, h('h4', null, 'Match the first one you picked')));
+      w.append(h('div', { class: 'row2' }, h('button', { class: 'btn sm', onclick: () => E.matchSize('w') }, 'Same width'), h('button', { class: 'btn sm', onclick: () => E.matchSize('h') }, 'Same height')));
+    }
     if (sel.length === 1) {
       const el = sel[0];
+      // print designs show inches (96 px to the inch inside), everything else pixels
+      const inch = E.design.unit === 'in', k = inch ? 96 : 1, dec = inch ? 3 : 1;
+      const lockable = el.type !== 'text' && el.type !== 'line';
+      let ratioOn = lockable && (el.type === 'image' || el.type === 'qr' || el.type === 'icon');
+      if (el.type === 'qr') ratioOn = true;
+      const inputs = {};
       const f = (label, key, ro) => {
-        const inp = h('input', { class: 'input', type: 'number', value: GS.round(key === 'rot' ? el.rot || 0 : el[key], 1), disabled: ro || el.lock, 'aria-label': label, style: { height: '34px' } });
+        const raw = key === 'rot' ? el.rot || 0 : el[key];
+        const inp = h('input', { class: 'input', type: 'number', step: key === 'rot' ? 1 : inch ? 0.01 : 1, value: GS.round(key === 'rot' ? raw : raw / k, key === 'rot' ? 1 : dec), disabled: ro || el.lock, 'aria-label': label, style: { height: '34px' } });
+        inputs[key] = inp;
         inp.addEventListener('change', () => {
-          const v = +inp.value;
+          let v = +inp.value;
           if (!isFinite(v)) return;
+          if (key !== 'rot') v *= k;
           commit((e) => {
-            if (key === 'w' && e.type === 'text') { const s = Math.max(1, v); e.w = s; }
-            else if (key === 'w' || key === 'h') e[key] = Math.max(1, v);
-            else e[key] = v;
+            if (key === 'w' && e.type === 'text') e.w = Math.max(1, v);
+            else if (key === 'w' || key === 'h') {
+              const nv = Math.max(1, v), r = e.h / e.w;
+              e[key] = nv;
+              if (ratioOn || e.type === 'qr') { if (key === 'w') e.h = nv * r; else e.w = nv / r; }
+            } else e[key] = v;
           });
+          const e2 = E.selEls()[0];
+          if (e2) ['x', 'y', 'w', 'h'].forEach((q) => { if (inputs[q] && q !== key) inputs[q].value = GS.round(e2[q] / k, dec); });
         });
-        return h('label', null, h('span', { class: 'flabel', style: { margin: '6px 0 4px' } }, label), inp);
+        return h('label', null, h('span', { class: 'flabel', style: { margin: '6px 0 4px' } }, label + (key !== 'rot' ? (inch ? ' (in)' : ' (px)') : '')), inp);
       };
       w.append(h('div', { class: 'psec' }, h('h4', null, 'Size & position')));
       w.append(h('div', { class: 'row2' }, f('X', 'x'), f('Y', 'y'), f('Width', 'w', el.type === 'text' && el.curve), f('Height', 'h', el.type === 'text' || el.type === 'line'), f('Rotation °', 'rot')));
+      if (lockable && el.type !== 'qr') {
+        const lk = h('input', { type: 'checkbox', checked: ratioOn, id: 'pos-ratio' });
+        lk.addEventListener('change', () => (ratioOn = lk.checked));
+        w.append(h('label', { class: 'tog', for: 'pos-ratio' }, 'Keep proportions', lk));
+      }
     }
     GS.pop.open(anchor, w, { title: 'Position', onClose: () => TB.render() });
   }
@@ -251,7 +295,8 @@
     const el = E.selEls()[0];
     const w = h('div');
     const on = h('input', { type: 'checkbox', checked: !!el.grad, id: 'gr-on' });
-    on.addEventListener('change', () => { commit((e) => { e.grad = on.checked ? { a: e.fill && e.fill !== 'none' ? e.fill : '#E6B33C', b: '#06273A', angle: 180 } : null; }); gradientPop(anchor); });
+    const startOf = (e) => (e.type === 'text' ? (e.color && e.color[0] === '#' ? e.color.slice(0, 7) : '#E6B33C') : e.fill && e.fill !== 'none' ? e.fill : '#E6B33C');
+    on.addEventListener('change', () => { commit((e) => { if (e.type !== 'text' && e.type !== 'shape') return; e.grad = on.checked ? { a: startOf(e), b: GS.isDark(startOf(e)) ? '#E6B33C' : '#06273A', angle: e.type === 'text' ? 90 : 180 } : null; }); gradientPop(anchor); });
     w.append(h('label', { class: 'tog', for: 'gr-on' }, 'Use a gradient fill', on));
     if (el.grad) {
       const g = el.grad;
@@ -373,9 +418,10 @@
     inp.addEventListener('change', () => { const v = GS.clamp(+inp.value || el.size, 1, 2000); setSize(v); });
     inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); e.stopPropagation(); });
     out.push(h('div', { class: 'sizebox' }, h('button', { 'aria-label': 'Smaller', onmousedown: keepFocus, onclick: () => step(-Math.max(1, Math.round(el.size * 0.06))), html: GS.icon('minus', 14) }), inp, h('button', { 'aria-label': 'Bigger', onmousedown: keepFocus, onclick: () => step(Math.max(1, Math.round(el.size * 0.06))), html: GS.icon('plus', 14) })));
-    const cb = h('button', { class: 'tb', title: 'Text color', 'aria-label': 'Text color', onmousedown: keepFocus, onclick: () => TB.colorPicker(cb, el.color, (c, fin) => (fin ? commit : live)((x) => { if (x.type === 'text') x.color = c; }), { title: 'Text color', onClose: () => TB.render() }) },
-      h('span', { class: 'tcolor' }, 'A', h('i', { style: { background: el.color } })));
+    const cb = h('button', { class: 'tb', title: 'Text color', 'aria-label': 'Text color', onmousedown: keepFocus, onclick: () => TB.colorPicker(cb, el.color, (c, fin) => (fin ? commit : live)((x) => { if (x.type === 'text') { x.color = c; if (x.grad) x.grad = null; } }), { title: 'Text color', onClose: () => TB.render() }) },
+      h('span', { class: 'tcolor' }, 'A', h('i', { style: { background: el.grad ? `linear-gradient(90deg, ${el.grad.a}, ${el.grad.b})` : el.color } })));
     out.push(cb);
+    out.push(tb('paint', 'Gradient text', (e, b) => gradientPop(b), { on: !!el.grad }));
     const bw = GS.boldWeight(el.font);
     out.push(tb('bold', 'Bold', () => commit((x) => { if (x.type === 'text') x.weight = (x.weight || 400) >= 600 ? GS.nearestWeight(x.font, 400) : GS.boldWeight(x.font); }), { on: (el.weight || 400) >= 600 }));
     out.push(tb('italic', 'Italic', () => commit((x) => { if (x.type === 'text') x.ital = !x.ital; }), { on: !!el.ital }));
@@ -384,6 +430,11 @@
     const nextAlign = { left: 'center', center: 'right', right: 'left' };
     out.push(tb('align' + (el.align || 'left'), 'Alignment', () => commit((x) => { if (x.type === 'text') x.align = nextAlign[x.align || 'left']; })));
     out.push(tb('spacing', 'Spacing', (e, b) => spacingPop(b)));
+    if (/\t/.test(el.text || '') && !el.curve) {
+      // price lists: switch the leaders between dots, a rule and nothing
+      const next = { dots: 'line', line: 'none', none: 'dots' }, cur = el.lead || 'dots';
+      out.push(tb('leaders', 'Price-list leaders: ' + { dots: 'dots', line: 'line', none: 'none' }[cur], () => commit((x) => { if (x.type === 'text') x.lead = next[x.lead || 'dots'] === 'dots' ? undefined : next[x.lead || 'dots']; }), { label: { dots: 'Dots', line: 'Rule', none: 'No leaders' }[cur] }));
+    }
     out.push(tb('effects', 'Effects', (e, b) => effectsPop(b), { label: GS.isMobile() ? '' : 'Effects' }));
     if (!E.editing && sel.length === 1 && !el.lock) out.push(tb('edit', 'Edit text', () => E.startEdit(el.id), { label: GS.isMobile() ? 'Edit' : '' }));
     void bw;
@@ -438,6 +489,12 @@
     } else if (el.type === 'line') {
       const cb = h('button', { class: 'tb', title: 'Line color', onclick: () => TB.colorPicker(cb, el.color, (c, fin) => (fin ? commit : live)({ color: c }), { title: 'Line color', onClose: () => TB.render() }) }, h('span', { class: 'sw', style: { background: el.color } }));
       add(cb, tb('line', 'Line style', (e, b) => linePop(b), { label: 'Style' }), tb('effects', 'Shadow', (e, b) => effectsPop(b)));
+    } else if (el.type === 'qr') {
+      const cb = h('button', { class: 'tb', title: 'QR color', 'aria-label': 'QR color', onclick: () => TB.colorPicker(cb, el.fg, (c, fin) => (fin ? commit : live)((x) => { if (x.type === 'qr') x.fg = c; }), { title: 'QR code color', onClose: () => TB.render() }) }, h('span', { class: 'sw', style: { background: el.fg } }));
+      const solid = el.bg && el.bg !== 'none';
+      add(tb('edit', 'Change the link', () => TB.editQR(el.id), { label: GS.isMobile() ? 'Link' : 'Edit link' }), cb,
+        tb('background', solid ? 'Remove the white background' : 'Put it on a white background', () => commit((x) => { if (x.type === 'qr') x.bg = solid ? 'none' : '#FFFFFF'; }), { label: solid ? 'White box' : 'No box', on: solid }));
+      if (el.fg && GS.isDark(el.fg) === false && !solid) add(h('span', { class: 'warnchip', title: 'Phones read dark codes on light backgrounds best.' }, 'Light code: test the scan'));
     } else if (el.type === 'image') {
       if (!el.src) {
         add(tb('image', 'Choose a photo', () => GS.UI.replaceImage(el.id), { label: 'Add photo' }), tb('uploads', 'Upload from device', () => GS.UI.uploadInto(el.id), { label: GS.isMobile() ? '' : 'Upload' }), tb('shape', 'Frame shape', (e, b) => maskPop(b)), tb('border', 'Border & corners', (e, b) => borderPop(b, el)));
@@ -447,9 +504,12 @@
         add(tb('replace', 'Replace photo', () => GS.UI.replaceImage(el.id), { label: GS.isMobile() ? '' : 'Replace' }));
         if (el.fit !== 'contain') add(tb('crop', 'Crop (double-click)', () => E.startCrop(el.id), { label: GS.isMobile() ? '' : 'Crop' }));
         add(tb('adjust', 'Adjust & filters', (e, b) => adjustPop(b), { label: GS.isMobile() ? '' : 'Adjust' }));
+        if (GS.BG) add(tb('cutout', 'Remove the background (free, runs on this device)', () => GS.BG.open(el.id), { label: GS.isMobile() ? '' : 'BG remover' }));
         if (el.fit !== 'contain') add(tb('shape', 'Frame shape', (e, b) => maskPop(b)));
         add(tb('border', 'Border & corners', (e, b) => borderPop(b, el)), tb('effects', 'Shadow', (e, b) => effectsPop(b)), tb('flip', 'Flip', () => E.flip('h')));
         if (el.fit !== 'contain') add(tb('background', 'Use as page background', () => E.setAsBackground(), { label: GS.isMobile() ? '' : 'Set as background' }));
+        const lr = R.lowRes(el, E.design);
+        if (lr) add(h('span', { class: 'warnchip', title: lr.text, role: 'note', 'aria-label': lr.text }, GS.iconEl('warn', 15), lr.dpi ? lr.dpi + ' dpi' : 'Low res'));
       }
     }
     add(common(sel));
@@ -463,9 +523,16 @@
         h('button', { class: 'btn gold sm', onclick: () => E.endCrop() }, 'Done')));
     }
   }
+  TB.editQR = function (id) {
+    const el = E.byId(id);
+    if (!el || el.type !== 'qr' || el.lock) return;
+    GS.qrDialog(el.data, (v) => E.update((x) => { if (x.type === 'qr') x.data = v; }, { ids: [id] }));
+  };
+  GS.bus.on('editqr', (id) => TB.editQR(id));
   GS.bus.on('sel', () => TB.render());
   GS.bus.on('change', () => TB.render());
   GS.bus.on('history', () => TB.render());
+  GS.bus.on('imgloaded', GS.debounce(() => { if (E.selEls().some((e) => e.type === 'image')) TB.render(); }, 200));
   const popClose = GS.pop.close;
   GS.pop.close = function () { const was = GS.pop.isOpen(); popClose(); if (was && TB.stale) TB.render(); };
 })();

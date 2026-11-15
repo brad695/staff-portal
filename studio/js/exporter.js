@@ -7,17 +7,23 @@
   X.maxScale = (d) => GS.clamp(Math.sqrt(MAX_PIXELS / (d.w * d.h)), 0.1, 6);
   X.fileBase = (d) => (String(d.name || 'GREYS design').replace(/[\\/:*?"<>|#%]+/g, '').replace(/\s+/g, ' ').trim().slice(0, 80) || 'GREYS design');
 
+  // opts.bleed (design px): render that much extra on every side (background extended, nothing clipped at the trim)
   X.renderPage = function (design, page, scale, opts = {}) {
+    const b = opts.bleed || 0;
     const cv = document.createElement('canvas');
-    cv.width = Math.max(1, Math.round(design.w * scale));
-    cv.height = Math.max(1, Math.round(design.h * scale));
+    cv.width = Math.max(1, Math.round((design.w + b * 2) * scale));
+    cv.height = Math.max(1, Math.round((design.h + b * 2) * scale));
     const ctx = cv.getContext('2d');
     if (opts.flatten) { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, cv.width, cv.height); }
-    ctx.setTransform(cv.width / design.w, 0, 0, cv.height / design.h, 0, 0);
+    const sx = cv.width / (design.w + b * 2), sy = cv.height / (design.h + b * 2);
+    ctx.setTransform(sx, 0, 0, sy, b * sx, b * sy);
     ctx.imageSmoothingQuality = 'high';
-    GS.R.drawPage(ctx, design, page, { scale, exporting: true, transparent: !!opts.transparent });
+    GS.R.drawPage(ctx, design, page, { scale, exporting: true, transparent: !!opts.transparent, bleed: b || undefined });
     return cv;
   };
+  X.BLEED = 12; // 1/8 in at 96 px to the inch
+  // photos that will print soft (print designs) or look stretched (screen designs)
+  X.lowResCount = (design) => design.pages.reduce((n, p) => n + p.els.filter((el) => !el.hidden && el.type === 'image' && GS.R.lowRes(el, design)).length, 0);
 
   // opts: {design, pages:[idx], type:'png'|'jpg'|'pdf', scale, transparent}
   X.exportBlob = async function (opts) {
@@ -28,7 +34,7 @@
     await new Promise((r) => setTimeout(r, 30));
     const idxs = opts.pages && opts.pages.length ? opts.pages : design.pages.map((_, i) => i);
     const base = X.fileBase(design);
-    if (type === 'pdf') return { blob: await makePDF(design, idxs, scale), filename: base + '.pdf' };
+    if (type === 'pdf') return { blob: await makePDF(design, idxs, scale, { marks: !!opts.marks }), filename: base + (opts.marks ? ' - print' : '') + '.pdf' };
     const mime = type === 'jpg' ? 'image/jpeg' : 'image/png';
     const ext = type === 'jpg' ? 'jpg' : 'png';
     const files = [];
@@ -42,7 +48,9 @@
     return { blob: zipped, filename: base + '.zip' };
   };
 
-  async function makePDF(design, idxs, scale) {
+  // PDF pages hold one JPEG each (fonts and effects come out exactly as on screen). With opts.marks the page
+  // gets 1/8 in bleed past the trim, crop marks in a 1/4 in margin, and TrimBox/BleedBox for the print shop.
+  async function makePDF(design, idxs, scale, opts = {}) {
     const enc = new TextEncoder();
     const chunks = [];
     let offset = 0;
@@ -50,16 +58,31 @@
     const push = (d) => { const b = typeof d === 'string' ? enc.encode(d) : d; chunks.push(b); offset += b.length; };
     const obj = (num, body) => { offsets[num] = offset; push(`${num} 0 obj\n${body}\nendobj\n`); };
     const n = idxs.length;
-    const W = GS.round(design.w * 0.75, 2), H = GS.round(design.h * 0.75, 2);
+    const r2 = (v) => GS.round(v, 2);
+    const W = r2(design.w * 0.75), H = r2(design.h * 0.75);
+    const bl = opts.marks ? X.BLEED : 0;
+    const B = r2(bl * 0.75), P = opts.marks ? r2(B + 18) : 0; // bleed and page margin, in points
+    const MW = r2(W + P * 2), MH = r2(H + P * 2);
     push('%PDF-1.4\n%âãÏÓ\n');
     obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
     obj(2, `<< /Type /Pages /Kids [${idxs.map((_, i) => `${3 + i * 3} 0 R`).join(' ')}] /Count ${n} >>`);
+    let marks = '';
+    if (opts.marks) {
+      const g = 3, L = [];
+      for (const cx of [P, r2(P + W)]) for (const cy of [P, r2(P + H)]) {
+        const hx = cx === P ? [0, r2(P - B - g)] : [r2(P + W + B + g), MW];
+        const vy = cy === P ? [0, r2(P - B - g)] : [r2(P + H + B + g), MH];
+        L.push(`${hx[0]} ${cy} m ${hx[1]} ${cy} l S`, `${cx} ${vy[0]} m ${cx} ${vy[1]} l S`);
+      }
+      marks = ` 0 G 0.5 w ${L.join(' ')}`;
+    }
     for (let i = 0; i < n; i++) {
-      const cv = X.renderPage(design, design.pages[idxs[i]], scale, { flatten: true });
+      const cv = X.renderPage(design, design.pages[idxs[i]], scale, { flatten: true, bleed: bl });
       const bytes = new Uint8Array(await (await GS.canvasToBlob(cv, 'image/jpeg', 0.93)).arrayBuffer());
       const pn = 3 + i * 3, cn = pn + 1, inum = pn + 2;
-      obj(pn, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /XObject << /Im0 ${inum} 0 R >> >> /Contents ${cn} 0 R >>`);
-      const content = `q ${W} 0 0 ${H} 0 0 cm /Im0 Do Q`;
+      const boxes = opts.marks ? ` /TrimBox [${P} ${P} ${r2(P + W)} ${r2(P + H)}] /BleedBox [${r2(P - B)} ${r2(P - B)} ${r2(P + W + B)} ${r2(P + H + B)}]` : '';
+      obj(pn, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${MW} ${MH}]${boxes} /Resources << /XObject << /Im0 ${inum} 0 R >> >> /Contents ${cn} 0 R >>`);
+      const content = `q ${r2(W + B * 2)} 0 0 ${r2(H + B * 2)} ${r2(P - B)} ${r2(P - B)} cm /Im0 Do Q${marks}`;
       obj(cn, `<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
       offsets[inum] = offset;
       push(`${inum} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${cv.width} /Height ${cv.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${bytes.length} >>\nstream\n`);

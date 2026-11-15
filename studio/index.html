@@ -308,6 +308,80 @@ textarea.ta{position:absolute;border:0;outline:none;resize:none;overflow:hidden;
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
+/* 2026-11-15: features from the Canva research — rulers & guides, QR, price lists, BG remover, history, tools */
+.ruler{position:absolute;pointer-events:auto;z-index:3;display:block;background:#F4F6F8}
+.ruler[hidden]{display:none}
+.ruler.top{left:20px;top:0;cursor:ns-resize}
+.ruler.left{left:0;top:20px;cursor:ew-resize}
+.ruler.corner{left:0;top:0;width:20px;height:20px;border:0;padding:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--sub);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.ruler.corner:hover{color:var(--danger)}
+.uguide{position:absolute;pointer-events:auto;z-index:2}
+.uguide.v{top:0;bottom:0;width:7px;cursor:ew-resize}
+.uguide.h{left:0;right:0;height:7px;cursor:ns-resize}
+.uguide::after{content:'';position:absolute;background:#00A3C4}
+.uguide.v::after{left:3px;top:0;bottom:0;width:1px}
+.uguide.h::after{top:3px;left:0;right:0;height:1px}
+.uguide.live::after{background:#0086A3}
+.uguide:hover::after{background:#FF2E8A}
+.safe{position:absolute;border:1px dashed rgba(0,163,196,.75);pointer-events:none}
+.bleed{position:absolute;border:1px dashed rgba(194,65,45,.75);pointer-events:none}
+.warnchip{display:inline-flex;align-items:center;gap:5px;flex:none;height:28px;padding:0 10px;margin-left:4px;border-radius:999px;background:#FFF1D6;color:#7A4B00;font-size:12px;font-weight:800;white-space:nowrap}
+.banner.warn{background:#FFF1D6;color:#7A4B00}
+.blends{display:flex;flex-wrap:wrap;gap:6px}
+.fontrow .fname{flex:1;overflow:hidden;text-overflow:ellipsis}
+.fontrow small{margin-left:8px}
+.fontrow .star{display:inline-flex;margin-left:8px;color:#B8C2CC;border-radius:6px;padding:2px}
+.fontrow .star:hover{color:#E6B33C;background:#fff}
+.fontrow .star.on{color:#E6B33C}
+.fontrow .star.on svg{fill:currentColor}
+.txtadd button.pl{display:flex;align-items:baseline;gap:6px}
+.txtadd button.pl i{flex:1;border-bottom:2px dotted #9AA6B1;transform:translateY(-3px)}
+.qr-add{display:flex;align-items:center;gap:12px;width:100%;border:1px solid var(--line);background:#fff;border-radius:10px;padding:12px 14px;text-align:left;color:var(--navy)}
+.qr-add:hover{border-color:#B8C2CC;background:var(--soft)}
+.qr-add span{display:flex;flex-direction:column;gap:2px}
+.qr-add small{color:var(--sub);font-weight:600;font-size:12px}
+.tools-menu{min-width:280px}
+.onoff{font-size:11px;font-weight:800;padding:1px 7px;border-radius:999px;background:var(--soft);color:var(--sub)}
+.onoff.on{background:#DDF3EA;color:var(--ok)}
+.fr-res{margin-top:10px;display:flex;flex-direction:column;gap:4px;max-height:240px;overflow:auto}
+.fr-res p{margin:0 0 4px;font-size:13px}
+.fr-hit{display:flex;gap:6px;align-items:baseline;border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;text-align:left;font-size:13px;white-space:nowrap;overflow:hidden}
+.fr-hit b{flex:none;color:var(--navy)}
+.fr-hit mark{background:#FFE58F;border-radius:3px;padding:0 1px}
+.fr-hit span{overflow:hidden;text-overflow:ellipsis}
+.input.mono{height:auto;padding:10px 12px;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre;overflow:auto;resize:vertical}
+.bk-map h4{margin:12px 0 6px;font-size:12.5px;font-weight:800;color:#3A4A56}
+.bk-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center;padding:4px 0}
+.bk-el{font-size:13px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bk-holes{display:flex;flex-wrap:wrap;gap:4px}
+.bk-holes code{font-size:12px;padding:2px 6px;border-radius:6px;background:#DDF3EA;color:var(--ok)}
+.bk-holes code.bad{background:#FBE3DE;color:var(--danger)}
+.vh{display:grid;grid-template-columns:200px 1fr;gap:14px;min-height:300px}
+.vh-list{display:flex;flex-direction:column;gap:6px;max-height:380px;overflow:auto;padding-right:2px}
+.vh-item{display:flex;gap:8px;align-items:center;border:1px solid var(--line);background:#fff;border-radius:9px;padding:6px;text-align:left}
+.vh-item.on{border-color:var(--sel);box-shadow:0 0 0 1px var(--sel)}
+.vh-item img{width:46px;height:46px;object-fit:contain;background:var(--soft);border-radius:6px;flex:none}
+.vh-item b{display:block;font-size:12.5px}
+.vh-item small{color:var(--sub);font-size:11.5px;font-weight:600}
+.vh-prev{display:flex;flex-direction:column;gap:10px;align-items:center;text-align:center}
+.vh-prev img{max-width:100%;max-height:240px;box-shadow:var(--shadow);background:#fff}
+.vh-prev p{margin:0;font-size:13px}
+.vh-btns{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.keys{display:grid;grid-template-columns:1fr auto;gap:8px 14px;font-size:13px;align-items:center}
+.keys kbd{font:700 12px var(--body);background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:3px 7px;white-space:nowrap}
+.bg-stage{display:flex;align-items:center;justify-content:center;min-height:200px;border-radius:12px;padding:10px;background-color:#fff;background-image:linear-gradient(45deg,#E9EDF1 25%,transparent 25%),linear-gradient(-45deg,#E9EDF1 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#E9EDF1 75%),linear-gradient(-45deg,transparent 75%,#E9EDF1 75%);background-size:18px 18px;background-position:0 0,0 9px,9px -9px,-9px 0}
+.bg-view{max-width:100%;display:block}
+.bg-status{margin:10px 0 8px;font-size:13px;font-weight:700}
+.bg-ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+@media (max-width:759px){
+  #ed-tools{width:36px;padding:0}
+  #ed-tools .lbl{display:none}
+  .vh{grid-template-columns:1fr}
+  .vh-list{max-height:180px;flex-direction:row;overflow-x:auto}
+  .vh-item{flex:none;width:170px}
+  .bk-row{grid-template-columns:1fr}
+}
+
 /* staff portal: manager sign-in gate + Share */
 .gate{position:fixed;inset:0;z-index:90;background:linear-gradient(160deg,var(--navy2),var(--navy) 70%);display:flex;align-items:center;justify-content:center;padding:20px}
 .gate-card{width:min(380px,100%);background:#fff;border-radius:18px;padding:26px 24px;box-shadow:0 20px 60px rgba(0,0,0,.35);display:flex;flex-direction:column;gap:12px}
@@ -358,6 +432,7 @@ textarea.ta{position:absolute;border:0;outline:none;resize:none;overflow:hidden;
         <button class="ibtn light" id="ed-redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)"></button>
       </div>
       <div id="ed-status" class="status"></div>
+      <button class="btn ghost-light sm" id="ed-tools" title="Find & replace, bulk create, version history, rulers…" aria-label="Tools"></button>
       <button class="btn ghost-light sm" id="ed-resize"></button>
       <button class="btn gold" id="ed-download"></button>
     </header>
@@ -402,11 +477,15 @@ textarea.ta{position:absolute;border:0;outline:none;resize:none;overflow:hidden;
 <script src="js/render.js"></script>
 <script src="js/store-sb.js"></script>
 <script src="js/templates.js"></script>
+<script src="js/vendor/qrcode.js"></script>
+<script src="js/qr.js"></script>
 <script src="js/exporter.js"></script>
 <script src="js/editor.js"></script>
 <script src="js/toolbar.js"></script>
 <script src="js/panels.js"></script>
 <script src="js/app.js"></script>
+<script src="js/tools.js"></script>
+<script src="js/bgremove.js"></script>
 <script src="js/portal.js"></script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->
 <script>(function(){if(location.hostname.indexOf("staging")<0)return;document.title="[STAGING] "+document.title;var m=document.createElement("meta");m.name="robots";m.content="noindex";document.head.appendChild(m);var b=document.createElement("div");b.textContent="STAGING \u2014 test copy. Same live database: data changes, emails and Square actions are REAL.";b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#c62828;color:#fff;font:600 12px/1.2 system-ui,sans-serif;text-align:center;padding:5px 8px;pointer-events:none;opacity:.92";document.body.appendChild(b);})();</script>
