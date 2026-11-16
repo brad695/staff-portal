@@ -19733,8 +19733,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 #panel-cardprint .pc-nm{ flex:1 1 auto; min-width:0; }
 #panel-cardprint .pc-nm b, #panel-cardprint .pc-nm span{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #panel-cardprint .pc-nm b{ font-size:.88rem; font-weight:700; color:var(--ink); }
-#panel-cardprint .pc-nm span{ margin-top:1px; font-size:.76rem; color:var(--sub); min-height:1em; }
-#panel-cardprint .pc-list .pc-nm b{ white-space:normal; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-height:1.25; }
+#panel-cardprint .pc-nm span{ margin-top:1px; font-size:.76rem; color:var(--sub); }
+/* a name with no second line (the wines), and every name on the print list, may run to two lines instead of being cut off */
+#panel-cardprint .pc-nm.solo b, #panel-cardprint .pc-list .pc-nm b{ white-space:normal; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-height:1.25; }
 #panel-cardprint .pc-tag{ display:inline-block; margin-right:6px; padding:0 6px; border-radius:5px; background:#f3e8ee; color:#7a1f47; font-style:normal; font-size:.64rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
 #panel-cardprint .pc-add{ flex:none; white-space:nowrap; min-height:34px; }
 #panel-cardprint .pc-qty{ display:inline-flex; align-items:center; flex:none; border:1px solid #d8dce2; border-radius:8px; background:#fff; overflow:hidden; }
@@ -19930,9 +19931,10 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   }
   function row(c, o){
     o = o || {};
+    const sub = (c.kind === KIND.wine && !o.plain ? '<i class="pc-tag">Wine</i>' : '') + h(c.s);
     return '<div class="pc-row' + (o.top ? ' top' : '') + '" data-id="' + h(c.id) + '">' +
       '<img class="pc-th" data-th="' + h(c.id) + '" alt="" src="' + h(thumbUrl(c.id) || BLANK) + '">' +
-      '<div class="pc-nm" title="' + h(c.name) + '"><b>' + h(c.t) + '</b><span>' + (c.kind === KIND.wine && !o.plain ? '<i class="pc-tag">Wine</i>' : '') + h(c.s) + '</span></div>' +
+      '<div class="pc-nm' + (c.s ? '' : ' solo') + '" title="' + h(c.name) + '"><b>' + h(c.t) + '</b>' + (sub ? '<span>' + sub + '</span>' : '') + '</div>' +
       control(c.id) +
       (o.remove ? '<button type="button" class="pc-x" data-pc="remove" data-v="' + h(c.id) + '" aria-label="Remove ' + h(c.name) + '" title="Remove">×</button>' : '') + '</div>';
   }
