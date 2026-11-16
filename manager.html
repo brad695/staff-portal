@@ -632,6 +632,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab-head">Cheese Case</div>
     <div class="tab" onclick="mtab('plu')">🧀 New Case Entry</div>
     <div class="tab" onclick="mtab('jamlabels')">🏷️ Jam Labels</div>
+    <div class="tab" onclick="mtab('cardprint')">🖨️ Print Cards</div>
     <div class="tab-head">Marketing</div>
     <div class="tab" onclick="mtab('campaigns')">✉️ Email Campaigns</div>
     <div class="tab" onclick="mtab('social')">📣 Social Posts</div>
@@ -1601,6 +1602,35 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       <iframe id="jlFrame" class="jl-frame" title="Greys Label Studio" data-src="/labels"></iframe>
     </div>
   </div>
+  <!-- 🖨️ PRINT CARDS (2026-11-16): pick counter cards (GREYS Studio's cheese and wine cards) and print them 6 to a
+       letter sheet with cut marks (script: PRINT CARDS TAB, near the end) -->
+  <div id="panel-cardprint" class="panel">
+    <div class="pc-wrap">
+      <div class="pc-side">
+        <div class="section-card">
+          <h2>🧀 Add cards</h2>
+          <div class="hint">Find a cheese and add its counter card to the print list. These are the cards in <a href="/studio/" target="_blank" rel="noopener">GREYS Studio</a> — change one there and it prints the new way here.</div>
+          <div class="toolbar"><div class="chips" id="pcTabs" role="group" aria-label="Which cards to show"></div></div>
+          <form class="pc-search" id="pcForm" autocomplete="off" novalidate>
+            <input type="search" id="pcQ" placeholder="Search cheeses…" aria-label="Search the cards" enterkeyhint="search">
+          </form>
+          <div class="pc-results" id="pcResults"><div class="rec-empty">Loading the cards…</div></div>
+          <div class="pc-foot" id="pcFoot"></div>
+        </div>
+        <div class="section-card">
+          <h2>📋 Print list <span class="pc-count" id="pcCount"></span></h2>
+          <div class="pc-listacts" id="pcListActs"></div>
+          <div class="pc-list" id="pcList"><div class="rec-empty">Nothing here yet.</div></div>
+        </div>
+      </div>
+      <div class="section-card pc-out">
+        <h2>🖨️ Sheets</h2>
+        <div class="pc-bar" id="pcBar"></div>
+        <div class="pc-msg" id="pcMsg" role="status" aria-live="polite"></div>
+        <div class="pc-sheets" id="pcSheets"></div>
+      </div>
+    </div>
+  </div>
   <div id="panel-campaigns" class="panel">
     <div class="section-card">
       <div class="emc-top">
@@ -1913,6 +1943,25 @@ async function thRenderPicker(el, opts){
 }
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtDisplay(d){ if(!d) return ''; return new Date(d+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}); }
+
+/* ── GREYS Studio's renderer, for the tabs that draw Studio designs here: Cheese Entry's counter cards and Print Cards.
+   One shared, ordered load — each file is fetched and run once however many callers ask at once, and a file that
+   failed can be asked for again. loadStudioJs() = the renderer + cards.js; loadStudioJs(['sheets']) adds sheets.js. ── */
+const STUDIO_JS = ['util','fonts','shapes','render','templates','cards'];
+const studioJsLoads = {};
+function studioJsFile(f){
+  if (!studioJsLoads[f]) studioJsLoads[f] = new Promise((ok, bad) => {
+    const s = document.createElement('script');
+    s.src = '/studio/js/' + f + '.js';
+    s.onload = () => ok();
+    s.onerror = () => { delete studioJsLoads[f]; s.remove(); bad(new Error("GREYS Studio didn't load (" + f + '.js)')); };
+    document.head.appendChild(s);
+  });
+  return studioJsLoads[f];
+}
+function loadStudioJs(extra){
+  return STUDIO_JS.concat(extra || []).reduce((p, f) => p.then(() => studioJsFile(f)), Promise.resolve());
+}
 
 /* ── Sign-in: one master password (hidden shared manager account) ── */
 const MANAGER_EMAIL = 'manager@greyscheese.com';
@@ -13583,7 +13632,6 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
      lowercased, like the batch cards (the cheese's own id when it isn't in Square). An existing card is never replaced.
      Rows without a card get a "+ Card" button (retry, or a card for a cheese from before this). */
   const CARD_FN = SB_URL + '/functions/v1/studio-ai';
-  const STUDIO_JS = ['util','fonts','shapes','render','templates','cards'];
   const isCheese = (i) => !!i && String(i.category || '').trim().toLowerCase() === 'cheese';
   const idPart = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const cardIdFor = (i) => 'dcc' + idPart(i.square_item_id || i.id);
@@ -13597,20 +13645,8 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     if (m.key === 'fixed') return '$' + Number(i.price).toFixed(2) + ' each';
     return '';
   }
-  // the Studio's own renderer, loaded once and only when a card is made
-  let studioLoad = null;
-  function loadStudio(){
-    if (window.GS && window.GS.Cards) return Promise.resolve();
-    if (studioLoad) return studioLoad;
-    studioLoad = STUDIO_JS.reduce((p, f) => p.then(() => new Promise((ok, bad) => {
-      const s = document.createElement('script');
-      s.src = '/studio/js/' + f + '.js';
-      s.onload = ok;
-      s.onerror = () => bad(new Error("GREYS Studio didn't load (" + f + '.js)'));
-      document.head.appendChild(s);
-    })), Promise.resolve()).catch(err => { studioLoad = null; throw err; });
-    return studioLoad;
-  }
+  // the Studio's own renderer, loaded once and only when a card is made (loadStudioJs, shared with the Print Cards tab)
+  const loadStudio = () => loadStudioJs();
   async function makeCard(i){
     await loadStudio();
     const res = await fetch(CARD_FN, { method:'POST', headers:authHeaders(), body: JSON.stringify({
@@ -19663,6 +19699,515 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   setInterval(function(){ if (!document.hidden && panel.classList.contains('active')) load(false); }, 120000);
   (async function(){ for (var i = 0; i < 40; i++) { var s = await session(); if (s) { if (!started) load(false); return; } await new Promise(function(r){ setTimeout(r, 3000); }); } })();
   window.__ship = { state: st, load: load, print: printList };
+})();
+</script>
+<!-- PRINT CARDS TAB (2026-11-16, Maverick: "now that the cheese cards are built, lets make a page builder for them to
+     print, have a form able to add which ever cheese they want to print. put it the cheese case section as a tab"):
+     the 🖨️ Print Cards tab (Cheese Case section).
+     CARDS: studio_designs rows of kind cheese-card / wine-card (GREYS Studio; managers only). The list loads names
+       only; thumbnails are fetched for the rows on screen and for the cards on the print list.
+     PRINT LIST: [{ id, n }] in the order added, kept in localStorage (greys_cardprint_v1) so a reload keeps it.
+     SHEETS: studio/js/sheets.js (GS.Sheets) lays the list out 6 to a letter sheet, each card 4 × 3 in, with cut
+       marks. The preview is drawn from that same layout with the thumbnails, so what shows is what prints.
+     PRINT / DOWNLOAD PDF: the cards' designs are fetched fresh, drawn at 300 dpi with the Studio's own renderer and
+       brand fonts (loadStudioJs, shared with Cheese Entry) and written into one PDF at true size. Print opens the
+       print dialog on that PDF (Chrome / Edge on a computer); other browsers get the PDF in a new tab. A card whose
+       fonts or picture didn't load stops the job with a message instead of printing wrong.
+     Other tabs can queue cards: cardPrintAdd(['dcc…', …]) adds them to the print list. -->
+<style id="pc-style">
+#panel-cardprint .pc-wrap{ display:grid; grid-template-columns:minmax(330px,410px) minmax(0,1fr); gap:18px; align-items:start; }
+#panel-cardprint .pc-side, #panel-cardprint .pc-out{ min-width:0; }
+#panel-cardprint .hint a{ color:#0b6aa9; font-weight:700; text-decoration:none; }
+#panel-cardprint .hint a:hover{ text-decoration:underline; }
+#panel-cardprint .toolbar{ margin-bottom:12px; }
+#panel-cardprint .pc-search input{ width:100%; box-sizing:border-box; min-height:44px; padding:0 12px; border:1px solid #d8dce2; border-radius:8px;
+  background:#fff; color:var(--ink); font:inherit; font-size:16px; }
+#panel-cardprint .pc-search input:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+#panel-cardprint .pc-results{ margin-top:10px; max-height:min(38vh,330px); min-height:92px; overflow:auto; border:1px solid var(--line); border-radius:10px; background:#fff; }
+#panel-cardprint .pc-list{ border:1px solid var(--line); border-radius:10px; background:#fff; overflow:hidden; }
+#panel-cardprint .rec-empty{ padding:22px 16px; font-size:.86rem; line-height:1.5; }
+#panel-cardprint .pc-row{ display:flex; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid var(--line-soft); }
+#panel-cardprint .pc-row:last-child{ border-bottom:none; }
+#panel-cardprint .pc-row.top{ background:#f1f6f9; box-shadow:inset 3px 0 0 var(--accent); }
+#panel-cardprint .pc-th{ display:block; width:64px; height:48px; flex:none; border-radius:5px; border:1px solid var(--line); background:#eef0f3; object-fit:cover; }
+#panel-cardprint .pc-nm{ flex:1 1 auto; min-width:0; }
+#panel-cardprint .pc-nm b, #panel-cardprint .pc-nm span{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#panel-cardprint .pc-nm b{ font-size:.88rem; font-weight:700; color:var(--ink); }
+#panel-cardprint .pc-nm span{ margin-top:1px; font-size:.76rem; color:var(--sub); min-height:1em; }
+#panel-cardprint .pc-list .pc-nm b{ white-space:normal; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-height:1.25; }
+#panel-cardprint .pc-tag{ display:inline-block; margin-right:6px; padding:0 6px; border-radius:5px; background:#f3e8ee; color:#7a1f47; font-style:normal; font-size:.64rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase; }
+#panel-cardprint .pc-add{ flex:none; white-space:nowrap; min-height:34px; }
+#panel-cardprint .pc-qty{ display:inline-flex; align-items:center; flex:none; border:1px solid #d8dce2; border-radius:8px; background:#fff; overflow:hidden; }
+#panel-cardprint .pc-qty button{ width:34px; height:34px; border:0; border-radius:0 !important; background:#fff; color:var(--ink); font:inherit; font-size:1.1rem; font-weight:700; line-height:1; cursor:pointer; }
+#panel-cardprint .pc-qty button:hover{ background:#f1f4f7; }
+#panel-cardprint .pc-qty button:disabled{ opacity:.4; cursor:default; }
+#panel-cardprint .pc-qty b{ min-width:28px; padding:0 2px; text-align:center; font-size:.88rem; font-weight:800; color:var(--ink); }
+#panel-cardprint .pc-x{ flex:none; width:32px; height:34px; border:0; background:none; color:#8a94a0; font:inherit; font-size:1.25rem; line-height:1; cursor:pointer; }
+#panel-cardprint .pc-x:hover{ background:#fdf1ef; color:#b3261e; }
+#panel-cardprint .pc-more{ display:block; width:100%; min-height:42px; border:0; border-top:1px solid var(--line-soft); border-radius:0 !important; background:#f7f8fa; color:#0b6aa9; font:inherit; font-size:.84rem; font-weight:700; cursor:pointer; }
+#panel-cardprint .pc-more:hover{ background:#eef1f4; }
+#panel-cardprint .pc-foot{ display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:22px; margin-top:10px; }
+#panel-cardprint .pc-hint{ font-size:.78rem; color:var(--sub); }
+#panel-cardprint .pc-link{ border:0; background:none; padding:4px 0; color:#0b6aa9; font:inherit; font-size:.82rem; font-weight:700; cursor:pointer; }
+#panel-cardprint .pc-link:hover{ text-decoration:underline; }
+#panel-cardprint .pc-count{ font-family:'Inter',sans-serif; font-size:.8rem; font-weight:600; color:var(--sub); }
+#panel-cardprint .pc-listacts{ display:flex; align-items:center; gap:10px; margin:10px 0 12px; }
+#panel-cardprint .pc-listacts:empty{ display:none; }
+#panel-cardprint .pc-listacts .pc-clear{ margin-left:auto; color:#b3261e; }
+#panel-cardprint .pc-bar{ display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; margin-top:8px; padding:10px 0 12px; background:#fff; }
+#panel-cardprint .pc-sum{ flex:1 1 220px; font-size:.98rem; color:var(--ink); }
+#panel-cardprint .pc-sum b{ font-weight:800; }
+#panel-cardprint .pc-sum small{ display:block; margin-top:2px; font-size:.8rem; color:var(--sub); }
+#panel-cardprint .pc-acts{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; }
+#panel-cardprint .pc-acts .btn{ min-height:42px; }
+#panel-cardprint .pc-acts .btn:disabled{ opacity:.5; cursor:default; }
+#panel-cardprint .pc-opt{ display:inline-flex; align-items:center; gap:7px; margin-right:6px; font-size:.84rem; font-weight:600; color:#3f4854; cursor:pointer; }
+#panel-cardprint .pc-opt input{ width:18px; height:18px; accent-color:#06273a; }
+#panel-cardprint .pc-tip{ flex-basis:100%; font-size:.8rem; line-height:1.5; color:var(--sub); }
+#panel-cardprint .pc-tip b{ color:var(--ink); }
+#panel-cardprint .pc-msg{ display:none; align-items:center; gap:10px; margin:0 0 12px; padding:10px 12px; border-radius:8px; background:#f1f6f9; color:#22303c; font-size:.86rem; font-weight:600; line-height:1.45; }
+#panel-cardprint .pc-msg.show{ display:flex; }
+#panel-cardprint .pc-msg.ok{ background:#e9f7f1; color:#065f46; }
+#panel-cardprint .pc-msg.bad{ background:#fdf1ef; color:#b3261e; }
+#panel-cardprint .pc-msg .pc-link{ margin-left:auto; flex:none; }
+#panel-cardprint .pc-spin{ flex:none; width:16px; height:16px; border-radius:50%; border:2px solid #b9c9d8; border-top-color:#06273a; animation:pcSpin .8s linear infinite; }
+@keyframes pcSpin{ to{ transform:rotate(360deg); } }
+#panel-cardprint .pc-sheets{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:18px; padding:18px; border-radius:12px; background:#e7ebef; }
+#panel-cardprint .pc-sheets.one{ grid-template-columns:minmax(0,430px); justify-content:center; }
+#panel-cardprint .pc-sheet{ margin:0; min-width:0; }
+#panel-cardprint .pc-sheet svg{ display:block; width:100%; height:auto; background:#fff; box-shadow:0 1px 3px rgba(18,26,38,.18), 0 8px 22px rgba(18,26,38,.12); }
+#panel-cardprint .pc-sheet figcaption{ margin-top:8px; text-align:center; font-size:.76rem; font-weight:700; color:#5a6472; }
+#panel-cardprint .pc-slot{ fill:none; stroke:#c5ccd5; stroke-width:1.3; stroke-dasharray:7 6; }
+#panel-cardprint .pc-ph{ fill:#eef0f3; }
+#panel-cardprint .pc-mark{ fill:none; stroke:#111; stroke-width:.8; }
+#panel-cardprint .pc-wait{ grid-column:1/-1; padding:30px 10px; text-align:center; font-size:.86rem; color:var(--sub); }
+@media (min-width:1001px){
+  /* the sheet count and the Print button stay in reach while the sheets scroll */
+  #panel-cardprint .pc-bar{ position:sticky; top:0; z-index:4; margin:8px -24px 12px; padding:12px 24px; border-bottom:1px solid var(--line-soft); }
+}
+@media (max-width:1000px){
+  #panel-cardprint .pc-wrap{ grid-template-columns:minmax(0,1fr); gap:0; }
+  #panel-cardprint .pc-results{ max-height:min(48vh,400px); }
+}
+@media (max-width:640px){
+  #panel-cardprint .pc-qty button{ width:40px; height:40px; }
+  #panel-cardprint .pc-x{ width:36px; height:40px; }
+  #panel-cardprint .pc-add{ min-height:40px; }
+  #panel-cardprint .pc-th{ width:56px; height:42px; }
+  #panel-cardprint .pc-acts{ width:100%; }
+  #panel-cardprint .pc-acts .btn{ flex:1 1 130px; min-height:46px; }
+  #panel-cardprint .pc-opt{ flex-basis:100%; }
+  #panel-cardprint .pc-sheets{ padding:12px; gap:14px; grid-template-columns:minmax(0,1fr); }
+}
+</style>
+<script>
+(function(){
+  const panel = document.getElementById('panel-cardprint');
+  if (!panel || typeof sb === 'undefined') return;
+  const $ = (id) => document.getElementById(id);
+  const KIND = { cheese:'cheese-card', wine:'wine-card' };
+  const LS = 'greys_cardprint_v1', STEP = 40, MAXN = 99, NEWEST = 30, DPI = 300;
+  const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+  const h = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+  const st = { cards:[], byId:{}, ready:false, err:'', libErr:'', tab:'cheese', q:'', shown:STEP,
+               list:[], marks:true, busy:'', note:null, undo:null };
+  const thumbs = new Map();   // card id -> { u: updated_at, url }
+  const asking = new Set();   // thumbnails on their way
+  const jpgs = new Map();     // card id -> { u: updated_at, img } — cards already drawn for print
+  const lib = () => (window.GS && window.GS.Sheets) || null;
+  const qty = (id) => { const x = st.list.find((l) => l.id === id); return x ? x.n : 0; };
+  const total = () => st.list.reduce((a, x) => a + x.n, 0);
+
+  /* ---------- the print list ---------- */
+  function save(){ try { localStorage.setItem(LS, JSON.stringify({ list: st.list, marks: st.marks })); } catch (_) {} }
+  function restore(){
+    try {
+      const d = JSON.parse(localStorage.getItem(LS) || 'null');
+      if (!d) return;
+      if (typeof d.marks === 'boolean') st.marks = d.marks;
+      const seen = {};
+      (Array.isArray(d.list) ? d.list : []).forEach((x) => {
+        if (!x || typeof x.id !== 'string' || seen[x.id] || qty(x.id)) return;
+        seen[x.id] = 1;
+        st.list.push({ id: x.id, n: Math.max(1, Math.min(MAXN, Math.floor(+x.n) || 1)) });
+      });
+    } catch (_) {}
+  }
+  function setQty(id, n){
+    n = Math.max(0, Math.min(MAXN, n));
+    const i = st.list.findIndex((x) => x.id === id);
+    if (!n) { if (i >= 0) st.list.splice(i, 1); }
+    else if (i >= 0) st.list[i].n = n;
+    else if (st.byId[id]) st.list.push({ id, n });
+    st.note = null; st.undo = null;
+    save();
+  }
+
+  /* ---------- the cards ---------- */
+  let loading = null;
+  function loadCards(){
+    if (!loading) loading = fetchCards().then(() => { loading = null; draw(); });
+    return loading;
+  }
+  async function fetchCards(){
+    try {
+      const rows = [];
+      for (let from = 0; from < 20000; from += 1000) {
+        const r = await sb.from('studio_designs').select('id,name,kind,created_at,updated_at')
+          .in('kind', [KIND.cheese, KIND.wine]).order('id').range(from, from + 999);
+        if (r.error) throw new Error(r.error.message);
+        rows.push(...(r.data || []));
+        if (!r.data || r.data.length < 1000) break;
+      }
+      st.cards = rows.map((r) => {
+        const name = String(r.name || 'Untitled'), i = name.indexOf(' — ');   // "Comté — Aged 18 months"
+        return { id: r.id, name, kind: r.kind, t: i > 0 ? name.slice(0, i) : name, s: i > 0 ? name.slice(i + 3) : '',
+                 key: fold(name), at: Date.parse(r.created_at) || 0, u: r.updated_at };
+      }).sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity:'base' }));
+      st.byId = {};
+      st.cards.forEach((c) => { st.byId[c.id] = c; });
+      // a card changed in the Studio since its thumbnail was fetched: fetch it again
+      thumbs.forEach((t, id) => { const c = st.byId[id]; if (!c || c.u !== t.u) { if (/^blob:/.test(t.url)) URL.revokeObjectURL(t.url); thumbs.delete(id); } });
+      if (!st.ready) restore();
+      st.list = st.list.filter((x) => st.byId[x.id]);
+      st.ready = true; st.err = '';
+    } catch (e) { st.err = (e && e.message) || 'something went wrong'; }
+  }
+  function inTab(tab){
+    if (tab === 'new') return st.cards.slice().sort((a, b) => b.at - a.at || a.name.localeCompare(b.name)).slice(0, NEWEST);
+    return st.cards.filter((c) => c.kind === KIND[tab]);
+  }
+  // every word typed has to be in the name; names where it starts the name, then a word, come first ("brie" before "Gabriel")
+  function matches(tab){
+    const a = inTab(tab || st.tab), terms = fold(st.q).split(/\s+/).filter(Boolean).map((t) => {
+      const e = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return { t, name: new RegExp('^' + e), word: new RegExp('(^|[^a-z0-9])' + e) };
+    });
+    if (!terms.length) return a;
+    const rank = (c) => { let r = 0; for (const x of terms) { if (!c.key.includes(x.t)) return -1; r = Math.max(r, x.name.test(c.key) ? 0 : x.word.test(c.key) ? 1 : 2); } return r; };
+    return a.map((c) => [rank(c), c]).filter((x) => x[0] >= 0).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
+  }
+
+  /* ---------- thumbnails ---------- */
+  function blobUrl(dataUrl){
+    try {
+      const m = /^data:([^;,]+)(;base64)?,(.*)$/.exec(dataUrl);
+      if (!m) return dataUrl;
+      const bin = m[2] ? atob(m[3]) : decodeURIComponent(m[3]), u8 = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      return URL.createObjectURL(new Blob([u8], { type: m[1] }));
+    } catch (_) { return dataUrl; }
+  }
+  const thumbUrl = (id) => { const t = thumbs.get(id); return t ? t.url : ''; };
+  function paintThumb(id){
+    const u = thumbUrl(id);
+    if (!u) return;
+    panel.querySelectorAll('[data-th="' + CSS.escape(id) + '"]').forEach((el) => { if (el.tagName === 'IMG') el.src = u; else el.setAttribute('href', u); });
+  }
+  async function askThumbs(ids){
+    const need = ids.filter((id, i) => st.byId[id] && !thumbs.has(id) && !asking.has(id) && ids.indexOf(id) === i);
+    need.forEach((id) => asking.add(id));
+    for (let i = 0; i < need.length; i += 50) {
+      const part = need.slice(i, i + 50);
+      try {
+        const r = await sb.from('studio_designs').select('id,thumb,updated_at').in('id', part);
+        if (r.error) throw new Error(r.error.message);
+        (r.data || []).forEach((t) => { thumbs.set(t.id, { u: t.updated_at, url: t.thumb ? blobUrl(t.thumb) : '' }); paintThumb(t.id); });
+      } catch (_) { /* those rows keep their gray box; the next draw asks again */ }
+      part.forEach((id) => asking.delete(id));
+    }
+  }
+
+  /* ---------- drawing ---------- */
+  function control(id){
+    const n = qty(id), v = h(id);
+    return n
+      ? '<span class="pc-qty" role="group" aria-label="Copies to print"><button type="button" data-pc="sub" data-v="' + v + '" aria-label="One fewer copy">−</button>' +
+        '<b>' + n + '</b><button type="button" data-pc="add" data-v="' + v + '" aria-label="One more copy"' + (n >= MAXN ? ' disabled' : '') + '>+</button></span>'
+      : '<button type="button" class="btn btn-ghost btn-sm pc-add" data-pc="add" data-v="' + v + '">＋ Add</button>';
+  }
+  function row(c, o){
+    o = o || {};
+    return '<div class="pc-row' + (o.top ? ' top' : '') + '" data-id="' + h(c.id) + '">' +
+      '<img class="pc-th" data-th="' + h(c.id) + '" alt="" src="' + h(thumbUrl(c.id) || BLANK) + '">' +
+      '<div class="pc-nm" title="' + h(c.name) + '"><b>' + h(c.t) + '</b><span>' + (c.kind === KIND.wine && !o.plain ? '<i class="pc-tag">Wine</i>' : '') + h(c.s) + '</span></div>' +
+      control(c.id) +
+      (o.remove ? '<button type="button" class="pc-x" data-pc="remove" data-v="' + h(c.id) + '" aria-label="Remove ' + h(c.name) + '" title="Remove">×</button>' : '') + '</div>';
+  }
+  function drawTabs(){
+    const n = { cheese: 0, wine: 0 };
+    st.cards.forEach((c) => { if (c.kind === KIND.wine) n.wine++; else n.cheese++; });
+    if ((st.tab === 'wine' && !n.wine) || (st.tab === 'new' && st.cards.length <= 8)) st.tab = 'cheese';
+    const tabs = [['cheese', 'Cheese' + (st.ready ? ' · ' + n.cheese : '')]];
+    if (n.wine) tabs.push(['wine', 'Wine · ' + n.wine]);
+    if (st.cards.length > 8) tabs.push(['new', 'Newest']);
+    $('pcTabs').innerHTML = tabs.map((t) => '<button type="button" class="chip' + (st.tab === t[0] ? ' on' : '') + '" data-pc="tab" data-v="' + t[0] +
+      '" aria-pressed="' + (st.tab === t[0]) + '">' + h(t[1]) + '</button>').join('');
+    $('pcQ').placeholder = st.tab === 'wine' ? 'Search wines…' : st.tab === 'new' ? 'Search the newest cards…' : 'Search cheeses…';
+  }
+  function drawPicker(){
+    const box = $('pcResults'), foot = $('pcFoot');
+    if (!st.ready) {
+      box.innerHTML = st.err
+        ? '<div class="rec-empty">Couldn’t load the cards: ' + h(st.err) + '<br><button type="button" class="btn btn-ghost btn-sm" data-pc="reload" style="margin-top:10px;">Try again</button></div>'
+        : '<div class="rec-empty">Loading the cards…</div>';
+      foot.innerHTML = '';
+      return;
+    }
+    const all = matches(), rows = all.slice(0, st.shown), typed = st.q.trim(), keep = box.scrollTop;
+    let html = rows.map((c, i) => row(c, { top: !!typed && i === 0, plain: st.tab === 'wine' })).join('');
+    if (all.length > rows.length) html += '<button type="button" class="pc-more" data-pc="more">Show ' + Math.min(STEP, all.length - rows.length) + ' more</button>';
+    if (!all.length) {
+      // nothing on this tab, but the other kind has it: say so instead of a dead end
+      const other = typed ? ['cheese', 'wine'].filter((k) => k !== st.tab).map((k) => [k, matches(k).length]).filter((x) => x[1])[0] : null;
+      html = '<div class="rec-empty">' + (!st.cards.length ? 'No counter cards yet. A card is made each time a cheese is saved in New Case Entry.'
+        : typed ? 'Nothing here matches “' + h(typed) + '”.' : 'No cards here yet.') +
+        (other ? '<br><button type="button" class="pc-link" data-pc="tab" data-v="' + other[0] + '">' + plural(other[1], other[0] + ' card') + (other[1] === 1 ? ' does' : ' do') + ' — show ' + (other[1] === 1 ? 'it' : 'them') + '</button>' : '') + '</div>';
+    }
+    box.innerHTML = html;
+    box.scrollTop = keep;
+    const fresh = all.filter((c) => !qty(c.id)).length;
+    foot.innerHTML = all.length ? '<span class="pc-hint">' + (typed ? 'Enter adds the top one' : plural(all.length, 'card')) + '</span>' +
+      (fresh > 1 ? '<button type="button" class="pc-link" data-pc="addall">Add all ' + fresh + '</button>' : '') : '';
+    askThumbs(rows.map((c) => c.id));
+  }
+  function drawList(){
+    const n = total();
+    $('pcCount').textContent = n ? plural(n, 'card') : '';
+    $('pcListActs').innerHTML = st.list.length
+      ? '<span class="pc-hint">Copies of every card</span><span class="pc-qty" role="group" aria-label="Copies of every card">' +
+        '<button type="button" data-pc="less" aria-label="One fewer of every card">−</button><button type="button" data-pc="extra" aria-label="One more of every card">+</button></span>' +
+        '<button type="button" class="pc-link pc-clear" data-pc="clear">Clear list</button>'
+      : '';
+    $('pcList').innerHTML = st.list.length ? st.list.map((x) => row(st.byId[x.id], { remove: true })).join('')
+      : '<div class="rec-empty">Nothing here yet — add a cheese above.</div>';
+    askThumbs(st.list.map((x) => x.id));
+  }
+  function drawBar(){
+    const S = lib(), per = S ? S.plan().per : 6, n = total(), sheets = Math.ceil(n / per), spare = sheets * per - n, off = !n || !!st.busy;
+    $('pcBar').innerHTML = '<div class="pc-sum">' +
+      (n ? '<b>' + plural(sheets, 'sheet') + '</b> · ' + plural(n, 'card') + '<small>' + (spare ? 'Room for ' + spare + ' more on the last sheet.' : sheets === 1 ? 'The sheet is full.' : 'Every sheet is full.') + '</small>'
+         : '<b>No cards yet</b><small>Add cheeses from the list and the sheets build themselves.</small>') + '</div>' +
+      '<div class="pc-acts"><label class="pc-opt"><input type="checkbox" id="pcMarks"' + (st.marks ? ' checked' : '') + '> Cut marks</label>' +
+      '<button type="button" class="btn btn-ghost" data-pc="pdf"' + (off ? ' disabled' : '') + '>Download PDF</button>' +
+      '<button type="button" class="btn btn-gold" data-pc="print"' + (off ? ' disabled' : '') + '>🖨 Print</button></div>' +
+      '<div class="pc-tip">Letter paper · 6 cards to a sheet · each card 4 × 3 in. Print at <b>100%</b> (“Actual size”, not “Fit to page”) on card stock' +
+      (st.marks ? ', then cut from mark to mark.' : '.') + '</div>';
+  }
+  function sheet(S, P, ids, i, n){
+    const blank = !ids.length;
+    let s = '<figure class="pc-sheet"><svg viewBox="0 0 ' + P.W + ' ' + P.H + '" role="img" aria-label="' + (blank ? 'An empty sheet' : 'Sheet ' + (i + 1) + ' of ' + n) + '">';
+    P.slots.forEach((sl, j) => {
+      const id = ids[j], c = id && st.byId[id], box = ' x="' + sl.x + '" y="' + sl.y + '" width="' + sl.w + '" height="' + sl.h + '"';
+      if (!c) { s += '<rect class="pc-slot" x="' + (sl.x + 4) + '" y="' + (sl.y + 4) + '" width="' + (sl.w - 8) + '" height="' + (sl.h - 8) + '" rx="4"/>'; return; }
+      const u = thumbUrl(id);
+      s += '<rect class="pc-ph"' + box + '/><image data-th="' + h(id) + '"' + box + ' preserveAspectRatio="xMidYMid meet"' + (u ? ' href="' + h(u) + '"' : '') + '><title>' + h(c.name) + '</title></image>';
+    });
+    if (st.marks && !blank) s += '<path class="pc-mark" d="' + S.marks(P, ids.length).map((m) => 'M' + m[0] + ' ' + m[1] + 'L' + m[2] + ' ' + m[3]).join('') + '"/>';
+    return s + '</svg><figcaption>' + (blank ? 'The first card lands top left' : 'Sheet ' + (i + 1) + ' of ' + n) + '</figcaption></figure>';
+  }
+  function drawSheets(){
+    const box = $('pcSheets'), S = lib();
+    if (!S) {
+      box.innerHTML = st.libErr
+        ? '<div class="pc-wait">Couldn’t load the sheet layout (' + h(st.libErr) + '). <button type="button" class="pc-link" data-pc="lib">Try again</button></div>'
+        : '<div class="pc-wait">Loading…</div>';
+      return;
+    }
+    const P = S.plan(), pages = S.pages(st.list, P.per);
+    box.classList.toggle('one', pages.length < 2);   // a single sheet is shown bigger
+    box.innerHTML = pages.length ? pages.map((ids, i) => sheet(S, P, ids, i, pages.length)).join('') : sheet(S, P, [], 0, 1);
+  }
+  function drawMsg(){
+    const el = $('pcMsg');
+    if (st.busy) { el.className = 'pc-msg show'; el.innerHTML = '<span class="pc-spin"></span><span>' + h(st.busy) + '</span>'; }
+    else if (st.note) {
+      el.className = 'pc-msg show ' + (st.note.bad ? 'bad' : 'ok');
+      el.innerHTML = '<span>' + h(st.note.text) + '</span>' + (st.undo ? '<button type="button" class="pc-link" data-pc="undo">Undo</button>' : '');
+    } else { el.className = 'pc-msg'; el.textContent = ''; }
+  }
+  function draw(){ drawTabs(); drawPicker(); drawList(); drawBar(); drawSheets(); drawMsg(); }
+  // after a click the rows are drawn again: put the keyboard back on the same control
+  function redraw(){
+    const a = document.activeElement, on = a && a !== document.body && panel.contains(a) && a.getAttribute;
+    const key = on ? { cp: a.getAttribute('data-pc'), v: a.getAttribute('data-v'), at: a.closest('.pc-list') ? 'pcList' : a.closest('.pc-results') ? 'pcResults' : '' } : null;
+    draw();
+    if (!key || !key.cp) return;
+    const scope = key.at ? $(key.at) : panel, v = key.v ? '[data-v="' + CSS.escape(key.v) + '"]' : '';
+    const el = scope.querySelector('[data-pc="' + key.cp + '"]' + v) || (v && scope.querySelector('button' + v));
+    if (el && !el.disabled) el.focus({ preventScroll: true });
+  }
+
+  /* ---------- the PDF ---------- */
+  async function build(){
+    const say = (t) => { st.busy = t; drawMsg(); };
+    const want = st.list.map((x) => ({ id: x.id, n: x.n }));
+    say('Getting the cards…');
+    await loadStudioJs(['sheets']);
+    const S = window.GS.Sheets, P = S.plan(), ids = want.map((x) => x.id), got = {};
+    for (let i = 0; i < ids.length; i += 40) {
+      const r = await sb.from('studio_designs').select('id,name,w,h,unit,kind,pages,updated_at').in('id', ids.slice(i, i + 40));
+      if (r.error) throw new Error('Couldn’t get the cards: ' + r.error.message);
+      (r.data || []).forEach((d) => { if (d.pages && d.pages.length) got[d.id] = d; });
+    }
+    // cards drawn earlier are reused unless they were changed in the Studio since
+    const todo = ids.filter((id) => got[id] && !(jpgs.has(id) && jpgs.get(id).u === got[id].updated_at))
+      .map((id) => { const d = got[id]; return { id: d.id, name: d.name, w: d.w, h: d.h, unit: d.unit, kind: d.kind, pages: d.pages }; });
+    if (todo.length) {
+      say('Loading the card fonts…');
+      const missing = await S.fonts(todo);
+      if (missing.length) throw new Error('The card fonts didn’t load (' + missing.join(', ') + '). Check the connection and try again.');
+      for (let i = 0; i < todo.length; i++) {
+        say('Drawing card ' + (i + 1) + ' of ' + todo.length + '…');
+        let img;
+        try { img = await S.jpeg(todo[i], DPI); }
+        catch (e) {
+          throw new Error(e && e.code === 'picture' ? 'A picture on “' + todo[i].name + '” didn’t load. Try again, or open that card in GREYS Studio and check it.'
+            : 'Couldn’t draw “' + todo[i].name + '”: ' + ((e && e.message) || e));
+        }
+        jpgs.set(todo[i].id, { u: got[todo[i].id].updated_at, img });
+      }
+    }
+    const list = want.filter((x) => got[x.id]), gone = want.filter((x) => !got[x.id]).map((x) => x.id);
+    if (!list.length) throw new Error('Those cards aren’t in GREYS Studio any more. Add them again.');
+    say('Building the sheets…');
+    const images = {};
+    list.forEach((x) => { images[x.id] = jpgs.get(x.id).img; });
+    const pages = S.pages(list, P.per);
+    const blob = S.pdf({ layout: P.key, pages, images, marks: st.marks, title: JOB });
+    return { blob, sheets: pages.length, cards: list.reduce((a, x) => a + x.n, 0), gone };
+  }
+  function fileName(){
+    const d = new Date(), z = (v) => String(v).padStart(2, '0');
+    return 'GREYS-cards-' + d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + '.pdf';
+  }
+  function download(url, name){
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  // Chrome and Edge on a computer print a PDF straight from a hidden frame; anything else gets it in a new tab
+  const DIRECT = !!window.chrome && !/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  const direct = () => (window.__cardPrint && typeof window.__cardPrint.direct === 'boolean' ? window.__cardPrint.direct : DIRECT);
+  const JOB = 'GREYS counter cards';
+  let frame = null, lastUrl = '';
+  function printFrame(url){
+    if (frame) frame.remove();
+    const f = frame = document.createElement('iframe');
+    let done = false;
+    f.title = 'Cards to print'; f.tabIndex = -1; f.setAttribute('aria-hidden', 'true');
+    f.style.cssText = 'position:fixed;right:0;bottom:0;width:2px;height:2px;border:0;opacity:0;pointer-events:none;';
+    f.onload = () => setTimeout(() => {
+      if (done || f !== frame) return;
+      done = true;
+      // the print job (and "Save as PDF") is named after the page: give it the cards' name for a moment
+      const was = document.title;
+      document.title = JOB;
+      try { f.contentWindow.print(); } catch (_) { window.open(url, '_blank'); }
+      setTimeout(() => { if (document.title === JOB) document.title = was; }, 2000);
+    }, 350);
+    f.src = url;
+    document.body.appendChild(f);
+  }
+  async function run(what){
+    if (st.busy || !total()) return;
+    let win = null;
+    if (what === 'print' && !direct()) {   // opened now, while the click still counts, so it isn't blocked as a pop-up
+      try {
+        win = window.open('', '_blank');
+        if (win) win.document.write('<!doctype html><title>GREYS cards</title><p style="font:16px system-ui,sans-serif;padding:28px;color:#333">Building your sheets…</p>');
+      } catch (_) { win = null; }
+    }
+    st.note = null; st.undo = null; st.busy = 'Getting the cards…';
+    drawBar(); drawMsg();
+    try {
+      const r = await build(), url = URL.createObjectURL(r.blob), name = fileName(), size = plural(r.sheets, 'sheet');
+      if (lastUrl) { const old = lastUrl; setTimeout(() => URL.revokeObjectURL(old), 60000); }
+      lastUrl = url;
+      let text;
+      if (what === 'pdf') { download(url, name); text = 'Saved ' + name + ' (' + size + '). Print it at 100% (“Actual size”).'; }
+      else if (direct()) { printFrame(url); text = size + ' sent to the print window — keep the scale at 100%. Nothing opened? Use Download PDF.'; }
+      else if (win && !win.closed) { win.location.replace(url); text = 'The sheets opened in a new tab — print from there at 100% (“Actual size”).'; }
+      else { download(url, name); text = 'Saved ' + name + ' (' + size + '). Open it and print at 100% (“Actual size”).'; }
+      if (r.gone.length) {
+        st.list = st.list.filter((x) => r.gone.indexOf(x.id) < 0); save();
+        text += ' ' + plural(r.gone.length, 'card') + ' no longer in GREYS Studio ' + (r.gone.length === 1 ? 'was' : 'were') + ' left out.';
+      }
+      st.note = { text };
+    } catch (e) {
+      if (win) { try { win.close(); } catch (_) {} }
+      st.note = { text: (e && e.message) || 'Something went wrong. Try again.', bad: true };
+    }
+    st.busy = '';
+    draw();
+  }
+
+  /* ---------- events ---------- */
+  panel.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-pc]');
+    if (!b || b.disabled) return;
+    const a = b.getAttribute('data-pc'), v = b.getAttribute('data-v');
+    if (a === 'pdf' || a === 'print') { run(a); return; }
+    if (a === 'add') setQty(v, qty(v) + 1);
+    else if (a === 'sub') setQty(v, qty(v) - 1);
+    else if (a === 'remove') setQty(v, 0);
+    else if (a === 'extra' || a === 'less') { st.list.forEach((x) => { x.n = Math.max(1, Math.min(MAXN, x.n + (a === 'extra' ? 1 : -1))); }); st.note = null; st.undo = null; save(); }
+    else if (a === 'addall') { matches().forEach((c) => { if (!qty(c.id)) st.list.push({ id: c.id, n: 1 }); }); st.note = null; st.undo = null; save(); }
+    else if (a === 'clear') { st.undo = st.list; st.list = []; st.note = { text: 'Print list cleared.' }; save(); }
+    else if (a === 'undo') { if (st.undo) st.list = st.undo.filter((x) => st.byId[x.id]); st.undo = null; st.note = null; save(); }
+    else if (a === 'tab') { st.tab = v; st.shown = STEP; $('pcResults').scrollTop = 0; }
+    else if (a === 'more') st.shown += STEP;
+    else if (a === 'reload') { st.err = ''; loadCards(); }
+    else if (a === 'lib') loadLib();
+    else return;
+    redraw();
+  });
+  $('pcQ').addEventListener('input', () => { st.q = $('pcQ').value; st.shown = STEP; $('pcResults').scrollTop = 0; drawPicker(); });
+  // Enter in the search box adds the top match
+  $('pcForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const top = st.ready && st.q.trim() ? matches()[0] : null;
+    if (!top) return;
+    setQty(top.id, qty(top.id) + 1);
+    draw();
+    $('pcQ').select();
+  });
+  panel.addEventListener('change', (e) => {
+    if (e.target.id !== 'pcMarks') return;
+    st.marks = e.target.checked; save();
+    drawBar(); drawSheets();
+    $('pcMarks').focus({ preventScroll: true });
+  });
+  // Ctrl/⌘+P on this tab prints the sheets, not the console page
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && String(e.key).toLowerCase() === 'p' && panel.classList.contains('active') && total() && !st.busy) {
+      e.preventDefault();
+      run('print');
+    }
+  });
+
+  /* ---------- start ---------- */
+  function loadLib(){
+    st.libErr = '';
+    return studioJsFile('sheets').then(() => { drawBar(); drawSheets(); }, (e) => { st.libErr = (e && e.message) || 'no connection'; drawSheets(); });
+  }
+  let started = false;
+  // fresh whenever the tab is opened, so a card made a minute ago in Cheese Entry or the Studio is here
+  function open(){
+    if (!started) { started = true; draw(); loadLib(); }
+    loadCards();
+  }
+  new MutationObserver(() => { if (panel.classList.contains('active')) open(); }).observe(panel, { attributes:true, attributeFilter:['class'] });
+  if (panel.classList.contains('active')) open();
+
+  // other tabs can queue cards for printing: cardPrintAdd(['dcc…']) (ids of studio_designs cards)
+  window.cardPrintAdd = function(ids){
+    const add = () => { [].concat(ids || []).forEach((id) => { if (st.byId[id] && !qty(id)) st.list.push({ id, n: 1 }); }); save(); draw(); };
+    if (st.ready) add(); else loadCards().then(() => { if (st.ready) add(); });
+  };
+  window.__cardPrint = { state: st, load: loadCards, build, run };
 })();
 </script>
 <!-- STAGING-BAR: shows only when the hostname contains "staging" (greys-staff-portal-staging.onrender.com) -->

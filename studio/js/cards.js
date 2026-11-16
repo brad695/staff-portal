@@ -5,7 +5,11 @@
    Needs util.js, fonts.js, shapes.js, render.js and templates.js loaded first. */
 (function () {
   const GS = (window.GS = window.GS || {}), R = GS.R;
-  GS.Store = GS.Store || { resolveURL: async (ref) => ref }; // badge pictures are plain /studio/graphics/ paths
+  // Outside the Studio page there is no store: badge pictures are plain /studio/graphics/ paths, and a card someone
+  // edited in the Studio may hold a library photo (p:) or graphic (g:), which live under /studio/ too.
+  GS.Store = GS.Store || {
+    resolveURL: async (ref) => !ref ? null : ref.startsWith('p:') ? '/studio/photos/' + ref.slice(2) : ref.startsWith('g:') ? '/studio/graphics/' + ref.slice(2) : /^(a|d):/.test(ref) ? null : ref,
+  };
 
   const MILKS = ['cow', 'goat', 'sheep'];
   const GLASSES = ['red', 'white', 'rose', 'orange', 'sparkling', 'sparkling-rose', 'dessert', 'port'];

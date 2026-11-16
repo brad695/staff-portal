@@ -11,6 +11,12 @@ Cheese Entry in `manager.html`: since 2026-11-15 every new cheese saved there ge
 Rows on the Running PLU list without a card have a "+ Card" button. Change the layout in `cards.js`
 and both places follow; `tests/test-cheese-entry-cards.js` covers the Cheese Entry side.
 
+## Print the cards
+Staff print cards from the manager console: **Cheese Case ▸ Print Cards** (`/manager#cardprint`). Search, add the
+cheeses (and wines), set copies, then Print or Download PDF: 6 to a letter sheet, each card 4 × 3 in, with cut marks,
+drawn at 300 dpi from the designs as they are in the Studio right now. The sheet layout and the PDF live in
+`studio/js/sheets.js` (`GS.Sheets`); `tests/test-card-print.js` covers the tab.
+
 ## Add or change cheeses
 Edit `studio/data/cheese-cards.json`. One entry per Square item:
 
