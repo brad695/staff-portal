@@ -1336,6 +1336,27 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     #panel-plu td.td-actions .btn{ margin:2px 3px 2px 0; }
     #panel-plu .plu-search{ border:1px solid var(--line); border-radius:var(--r); padding:7px 10px; font-family:inherit; font-size:0.84rem; width:200px; }
 
+    /* counter cards: every new cheese gets a GREYS Studio card (studio/js/cards.js + studio-ai "cheese-card") */
+    #panel-plu a.btn{ display:inline-block; text-decoration:none; }
+    #panel-plu .cn-row{ display:flex; gap:12px; align-items:center; margin-top:8px; padding:10px 13px; border-radius:var(--r);
+      background:#eef3f8; color:#2b4a63; font-size:0.84rem; line-height:1.45; }
+    #panel-plu .cn-row.ok{ background:#e7f4ec; color:#0a5c40; }
+    #panel-plu .cn-row.err{ background:#fbeae8; color:var(--wax); }
+    #panel-plu .cn-row .cn-txt{ flex:1; min-width:0; }
+    #panel-plu .cn-row .cn-sub{ color:var(--sub); font-size:0.78rem; }
+    #panel-plu .cn-row .cn-check{ color:#8a6d1a; font-size:0.78rem; margin-top:2px; }
+    #panel-plu .cn-row a{ color:#2b6cb0; font-weight:700; text-decoration:none; white-space:nowrap; }
+    #panel-plu .cn-row a:hover{ text-decoration:underline; }
+    #panel-plu .cn-thumb{ width:92px; height:69px; flex:none; border-radius:6px; background:#fff; object-fit:cover;
+      box-shadow:0 1px 3px rgba(0,0,0,.18); }
+    #panel-plu .cn-spin{ width:16px; height:16px; flex:none; border-radius:50%; border:2px solid #b9c9d8; border-top-color:#2b4a63;
+      animation:cnspin .8s linear infinite; }
+    @keyframes cnspin{ to{ transform:rotate(360deg); } }
+    @media (max-width:700px){
+      #panel-plu .cn-row{ flex-wrap:wrap; }
+      #panel-plu .cn-row > a{ flex-basis:100%; padding-left:104px; }
+    }
+
     /* ── phone: form stacks two-up, list becomes cards instead of a sideways scroll ── */
     @media (max-width:900px){
       #panel-plu .plu-grid{ grid-template-columns:repeat(2,1fr); }
@@ -1460,7 +1481,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       <div class="plu-top">
         <div>
           <h2 id="pluTitle">🧀 New Case Entry</h2>
-          <div class="hint" id="pluHint" style="margin-bottom:0;">Cheese goes to DateCodeGenie + Square. Wine/Retail goes to the PLU list + Square only (no DateCodeGenie).</div>
+          <div class="hint" id="pluHint" style="margin-bottom:0;">Cheese goes to DateCodeGenie + Square, and gets a counter card in GREYS Studio. Wine/Retail goes to the PLU list + Square only (no DateCodeGenie).</div>
           <div class="kind-switch" id="pluKindSwitch" role="group" aria-label="Item kind">
             <button type="button" class="on" data-kind="cheese">Cheese</button>
             <button type="button" data-kind="retail">Wine / Retail</button>
@@ -1525,6 +1546,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
         </div>
         <div class="sq-hint" id="pluSqHint"></div>
         <div class="notice" id="pluNotice"></div>
+        <div id="pluCardNote" aria-live="polite"></div>
       </form>
     </div>
 
@@ -13964,6 +13986,9 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
   const DCG_LOCATIONS = { MEMPHIS:'24755', NASHVILLE:'28711' };
 
   let items = [], nextPlu = null, overridePlu = false, editingId = null, entryKind = 'cheese';
+  // counter cards (GREYS Studio): ids of the cheese-card designs, jobs running now, and the last few results shown under the form
+  let cardIds = new Set(), cardsOn = false;
+  const cardJobs = {}, cardLog = [];
   const categoriesForKind = (kind) => kind === 'retail' ? RETAIL_CATEGORIES : CHEESE_CATEGORIES;
   const isRetailItem = (i) => (i && (i.item_kind === 'retail' || i.item_kind === 'wine')) || false;
   const kindLabel = (i) => isRetailItem(i) ? 'Wine/Retail' : 'Cheese';
@@ -14073,16 +14098,121 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     n.textContent = text || '';
   }
 
+  /* ---------- counter cards ----------
+     Maverick, 2026-11-15: "anytime we put a new cheese into the system it also generates that card".
+     After a cheese (category Cheese) is saved, studio-ai looks it up on the web (milk, origin, raw/pasteurized, a tasting
+     note), studio/js/cards.js lays out the same "Cheese counter card" the 130 batch cards use, and the card is saved
+     to studio_designs — so it shows up in GREYS Studio under Cheese cards. Design id = 'dcc' + the Square item id,
+     lowercased, like the batch cards (the cheese's own id when it isn't in Square). An existing card is never replaced.
+     Rows without a card get a "+ Card" button (retry, or a card for a cheese from before this). */
+  const CARD_FN = SB_URL + '/functions/v1/studio-ai';
+  const STUDIO_JS = ['util','fonts','shapes','render','templates','cards'];
+  const isCheese = (i) => !!i && String(i.category || '').trim().toLowerCase() === 'cheese';
+  const idPart = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cardIdFor = (i) => 'dcc' + idPart(i.square_item_id || i.id);
+  const cardIdOf = (i) => [i.square_item_id ? 'dcc' + idPart(i.square_item_id) : null, 'dcc' + idPart(i.id)]
+    .find(id => id && cardIds.has(id)) || null;
+  const studioUrl = (id) => '/studio/?from=plu#d-' + encodeURIComponent(id);
+  // what the card says under the rule: "$38.00 / lb", "$14.00 each" — same rule as the register (priceMode)
+  function cardPrice(i){
+    const m = priceMode(i);
+    if (m.key === 'weight') return '$' + Number(i.price_per_lb).toFixed(2) + ' / ' + UNIT_WORD[m.unit];
+    if (m.key === 'fixed') return '$' + Number(i.price).toFixed(2) + ' each';
+    return '';
+  }
+  // the Studio's own renderer, loaded once and only when a card is made
+  let studioLoad = null;
+  function loadStudio(){
+    if (window.GS && window.GS.Cards) return Promise.resolve();
+    if (studioLoad) return studioLoad;
+    studioLoad = STUDIO_JS.reduce((p, f) => p.then(() => new Promise((ok, bad) => {
+      const s = document.createElement('script');
+      s.src = '/studio/js/' + f + '.js';
+      s.onload = ok;
+      s.onerror = () => bad(new Error("GREYS Studio didn't load (" + f + '.js)'));
+      document.head.appendChild(s);
+    })), Promise.resolve()).catch(err => { studioLoad = null; throw err; });
+    return studioLoad;
+  }
+  async function makeCard(i){
+    await loadStudio();
+    const res = await fetch(CARD_FN, { method:'POST', headers:authHeaders(), body: JSON.stringify({
+      kind:'cheese-card', cheese:{ name: i.name || '', marketing_name: i.marketing_name || '' } }) });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !j.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    const info = j.data || {}, C = window.GS.Cards;
+    const c = { design_id: cardIdFor(i), title: info.title || i.marketing_name || i.name, sub: info.sub || '',
+      origin: info.origin || '', milk: info.milk || '', treat: info.treat || '', desc: info.desc || '', price: cardPrice(i) };
+    const line = C.lineOf(c, 'cheese');
+    if (!(await C.loadFonts([c.title, c.sub, line, c.desc, c.price].join(' '))))
+      throw new Error("the card fonts didn't load — check the connection and try again");
+    const { d, diag } = C.build(c, 'cheese');
+    await C.prep(d);
+    // what the card was made from, so it can be rebuilt later (e.g. with a new price)
+    d.pages[0].card = { title: c.title, sub: c.sub, origin: c.origin, milk: c.milk, treat: c.treat, desc: c.desc, price: c.price,
+      found: info.found === true, note: info.note || '', sources: info.sources || [], cheese_id: i.id,
+      square_item_id: i.square_item_id || null, made_by: 'cheese-entry', made_at: new Date().toISOString() };
+    const thumb = C.thumb(d);
+    const { data, error } = await sb.from('studio_designs')
+      .upsert(C.row(d, thumb, Date.now()), { onConflict:'id', ignoreDuplicates:true }).select('id');
+    if (error) throw new Error(error.message);
+    cardIds.add(d.id);
+    return { id: d.id, name: d.name, thumb, line, found: info.found === true, note: info.note || '',
+      fit: diag.warn || [], existed: !(data && data.length) };
+  }
+  function renderCardNote(){
+    const box = $('pluCardNote');
+    if (!box) return;
+    box.innerHTML = cardLog.slice(0, 3).map(x => {
+      if (x.state === 'busy') return '<div class="cn-row"><span class="cn-spin"></span><div class="cn-txt">Making the counter card for <b>'+
+        esc(x.cheese)+'</b> — looking up the milk, origin and tasting notes…</div></div>';
+      if (x.state === 'err') return '<div class="cn-row err"><div class="cn-txt">Couldn\'t make the counter card for <b>'+esc(x.cheese)+'</b>: '+
+        esc(x.msg)+'</div><button type="button" class="btn btn-ghost btn-sm" data-card="'+esc(x.id)+'">Try again</button></div>';
+      const r = x.res, checks = [];
+      if (r.existed) checks.push('This cheese already had a card — it was left as it was.');
+      if (!r.found) checks.push("Couldn't find this exact cheese online — check the card." + (r.note ? ' ' + r.note : ''));
+      else if (r.note) checks.push('Check: ' + r.note);
+      if (r.fit.length) checks.push('Text to tidy in Studio: ' + r.fit.join(', ') + '.');
+      return '<div class="cn-row ok"><img class="cn-thumb" alt="" src="'+esc(r.thumb)+'"><div class="cn-txt"><b>Counter card ready:</b> '+
+        esc(r.name)+(r.line ? '<div class="cn-sub">'+esc(r.line)+'</div>' : '')+
+        checks.map(t => '<div class="cn-check">'+esc(t)+'</div>').join('')+'</div>'+
+        '<a href="'+esc(studioUrl(r.id))+'" target="_blank" rel="noopener">Open in Studio ↗</a></div>';
+    }).join('');
+  }
+  // the table re-draws from saved values, so don't redraw under someone mid-edit; Save/Cancel redraws anyway
+  const softRender = () => { if (!editingId) render(); };
+  async function queueCard(i){
+    if (!i || cardJobs[i.id]) return;
+    cardJobs[i.id] = true;
+    const x = { id: i.id, cheese: i.marketing_name || i.name, state: 'busy' };
+    for (let k = cardLog.length - 1; k >= 0; k--) if (cardLog[k].id === i.id) cardLog.splice(k, 1);
+    cardLog.unshift(x);
+    renderCardNote(); softRender();
+    try { x.res = await makeCard(i); x.state = 'ok'; }
+    catch(err){ x.state = 'err'; x.msg = (err && err.message) || 'something went wrong'; }
+    finally { delete cardJobs[i.id]; renderCardNote(); softRender(); }
+  }
+  $('pluCardNote').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-card]');
+    if (!b) return;
+    const it = items.find(x => x.id === b.dataset.card);
+    if (it) queueCard(it);
+  });
+
   /* ---------- load ---------- */
   async function load(){
     try {
-      const [itemsRes, pluRes] = await Promise.all([
+      const [itemsRes, pluRes, cardRes] = await Promise.all([
         sb.from('cheese_items').select('*').order('plu',{ascending:false,nullsFirst:true}).limit(2000),
-        sb.rpc('next_plu')
+        sb.rpc('next_plu'),
+        sb.from('studio_designs').select('id').eq('kind','cheese-card').limit(5000)
       ]);
       if (itemsRes.error) throw new Error(itemsRes.error.message);
       items = itemsRes.data || [];
       nextPlu = pluRes.error ? null : pluRes.data;
+      // no read on studio_designs (not a Studio account) -> no card buttons and no cards on save
+      cardsOn = !cardRes.error;
+      if (cardsOn) cardIds = new Set((cardRes.data || []).map(r => r.id).concat([...cardIds]));
       render();
     } catch(e){
       setNotice('err', "Couldn't load the PLU list: " + e.message);
@@ -14120,7 +14250,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     $('pluTitle').textContent = retail ? '🍷 New Wine / Retail Entry' : '🧀 New Case Entry';
     $('pluHint').textContent = retail
       ? 'Adds to the running PLU list and Square only. DateCodeGenie is skipped. Barcode optional.'
-      : 'Cheese goes to DateCodeGenie + Square. Wine/Retail goes to the PLU list + Square only (no DateCodeGenie).';
+      : 'Cheese goes to DateCodeGenie + Square, and gets a counter card in GREYS Studio. Wine/Retail goes to the PLU list + Square only (no DateCodeGenie).';
     ['pf_storesFld','pf_printerFld','pf_hotFld'].forEach(id => {
       const el = $(id); if (el) el.hidden = retail;
     });
@@ -14270,6 +14400,12 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
         btns.push('<button type="button" class="btn btn-ghost btn-sm" data-retry="'+i.id+'" data-target="dcg">→ DCG</button>');
       if (i.square_status === 'error' || i.square_status === 'skipped')
         btns.push('<button type="button" class="btn btn-ghost btn-sm" data-retry="'+i.id+'" data-target="square">→ Square</button>');
+      if (cardsOn && isCheese(i)){
+        const cid = cardIdOf(i);
+        if (cid) btns.push('<a class="btn btn-ghost btn-sm" href="'+esc(studioUrl(cid))+'" target="_blank" rel="noopener" title="Open its counter card in GREYS Studio">Card ↗</a>');
+        else if (cardJobs[i.id]) btns.push('<button type="button" class="btn btn-ghost btn-sm" disabled>Making card…</button>');
+        else btns.push('<button type="button" class="btn btn-ghost btn-sm" data-card="'+i.id+'" title="Look this cheese up and make its counter card in GREYS Studio">+ Card</button>');
+      }
       const meta = [i.printer_profile || 'no printer profile',
         i.hot_buttons !== false ? 'hot buttons on' : 'hot buttons off',
         storeNames(i.dcg_locations)].join(' · ');
@@ -14350,6 +14486,8 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
       overridePlu = false; $('pf_plu').disabled = true; $('pf_pluToggle').textContent = 'override';
       applyEntryKindUI();
       await load();
+      // every new cheese gets its counter card; it runs on its own, so the next cheese can be entered meanwhile
+      if (cardsOn && isCheese(it)) queueCard(items.find(x => x.id === it.id) || it);
       $('pf_name').focus();
     } catch(err){
       setNotice('err','Save failed: ' + err.message);
@@ -14401,6 +14539,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
 
     if (ds.edit){ editingId = ds.edit; render(); return; }
     if (ds.cancel){ editingId = null; render(); return; }
+    if (ds.card){ queueCard(items.find(x => x.id === ds.card)); return; }
 
     if (ds.assignplu){
       btn.disabled = true; btn.textContent = 'assigning…';

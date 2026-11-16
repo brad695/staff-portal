@@ -30,8 +30,8 @@
   pw.addEventListener('keydown', (e) => { if (e.key === 'Enter') signIn(); });
   boot();
 
-  // ---------- chrome: back to wherever Studio was opened from (?from=home|social, else the referrer), refresh the list on the way home ----------
-  const BACKS = { home: ['/', 'Back to the staff portal'], social: ['/manager#social', 'Back to Social Posts'], manager: ['/manager', 'Back to the manager console'] };
+  // ---------- chrome: back to wherever Studio was opened from (?from=home|social|plu, else the referrer), refresh the list on the way home ----------
+  const BACKS = { home: ['/', 'Back to the staff portal'], social: ['/manager#social', 'Back to Social Posts'], plu: ['/manager#plu', 'Back to Cheese Entry'], manager: ['/manager', 'Back to the manager console'] };
   function cameFrom() {
     let k = null;
     try {
