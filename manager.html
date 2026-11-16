@@ -20314,6 +20314,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   }
 
   /* ---------- the PDF ---------- */
+  // a pause that lets the page repaint the progress line between cards (a timer would crawl in a background tab)
+  const breathe = () => new Promise((r) => { const c = new MessageChannel(); c.port1.onmessage = () => { c.port1.close(); r(); }; c.port2.postMessage(0); });
   async function build(){
     const say = (t) => { st.busy = t; drawMsg(); };
     const want = st.list.map((x) => ({ id: x.id, n: x.n }));
@@ -20334,6 +20336,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       if (missing.length) throw new Error('The card fonts didn’t load (' + missing.join(', ') + '). Check the connection and try again.');
       for (let i = 0; i < todo.length; i++) {
         say('Drawing card ' + (i + 1) + ' of ' + todo.length + '…');
+        await breathe();
         let img;
         try { img = await S.jpeg(todo[i], DPI); }
         catch (e) {

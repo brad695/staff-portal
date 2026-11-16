@@ -279,6 +279,7 @@ const white = (p) => p[0] > 245 && p[1] > 245 && p[2] > 245;
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "card-print-desktop.png"), fullPage: true });
 
     // ---- the PDF ----
+    await page.evaluate(() => { window.__toBlob = 0; const was = HTMLCanvasElement.prototype.toBlob; HTMLCanvasElement.prototype.toBlob = function () { window.__toBlob++; return was.apply(this, arguments); }; });
     const a = await pdfOf(page);
     const A = readPdf(a.s);
     if (SHOTS) fs.writeFileSync(path.join(SHOTS, "cards-11.pdf"), a.buf);
@@ -287,6 +288,7 @@ const white = (p) => p[0] > 245 && p[1] > 245 && p[2] > 245;
     t("…every card exactly 4 × 3 in, on the 2 × 3 grid", A.pages.every((p) => p.cards.every((c, j) => c.w === 288 && c.h === 216 && c.x === [18, 306][j % 2] && c.y === [504, 288, 72][Math.floor(j / 2)])), A.pages[0].cards);
     t("…each card's picture stored once, at 300 dpi", A.images.length === 5 && A.images.every((i) => i.w === 1200 && i.h === 900 && i.len > 20000), A.images);
     t("…copies point at the same picture", A.pages[0].cards[0].img === A.pages[0].cards[1].img && A.pages[0].cards[1].img !== A.pages[0].cards[2].img);
+    t("the cards are encoded right away, never waiting on canvas.toBlob (a second or more per card in a real Chrome)", (await page.evaluate(() => window.__toBlob)) === 0);
     t("…and the PDF asks the print dialog for 100% (no fit-to-page)", A.noScale);
     const key = (m) => m.join(",");
     const m0 = A.pages[0].marks.map(key), m1 = A.pages[1].marks.map(key);

@@ -126,8 +126,10 @@
     ctx.setTransform(cv.width / design.w, 0, 0, cv.height / design.h, 0, 0);
     ctx.imageSmoothingQuality = 'high';
     R.drawPage(ctx, design, page, { scale: s, exporting: true });
-    const blob = await GS.canvasToBlob(cv, 'image/jpeg', quality || 0.94);
-    return { bytes: new Uint8Array(await blob.arrayBuffer()), w: cv.width, h: cv.height };
+    // toDataURL, not toBlob: toBlob waits for the browser to go idle, which can take a second or two per card
+    const bin = atob(cv.toDataURL('image/jpeg', quality || 0.94).split(',')[1]), bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return { bytes, w: cv.width, h: cv.height };
   }
 
   // ---------- PDF ----------
