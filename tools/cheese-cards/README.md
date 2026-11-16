@@ -4,6 +4,13 @@ Makes one Studio design per cheese from `studio/data/cheese-cards.json`, or per 
 `studio/data/wine-cards.json` (`--wine`), using the Studio's own "Cheese counter card" /
 "Wine counter card" templates and renderer, so the cards open and edit like any other design.
 
+The layout rules (text fitting, the milk / glass badge) live in `studio/js/cards.js`, shared with
+Cheese Entry in `manager.html`: since 2026-11-15 every new cheese saved there gets its card on its own
+(studio-ai `cheese-card` looks the cheese up on the web, `cards.js` lays it out, the row goes into
+`studio_designs` with `do nothing` on conflict). Those cards keep their fields in `pages[0].card`.
+Rows on the Running PLU list without a card have a "+ Card" button. Change the layout in `cards.js`
+and both places follow; `tests/test-cheese-entry-cards.js` covers the Cheese Entry side.
+
 ## Add or change cheeses
 Edit `studio/data/cheese-cards.json`. One entry per Square item:
 
