@@ -19,8 +19,9 @@
 //               pre-order IS a Square order and would otherwise show twice.
 //               Square rows are filtered: catering-category orders any time,
 //               everything else only if due at or before 12:00 PM.
-//               Also every catering lead with a saved BEO (invoice or not),
-//               carrying beo_pdf: a signed link to the beo-pdf function.
+//               Also every catering lead that is booked (signed / invoiced /
+//               deposit paid / paid) or has a saved BEO; a lead with a BEO
+//               carries beo_pdf: a signed link to the beo-pdf function.
 //               Also exp_beo: { <experience booking code>: <signed beo-pdf link> }
 //               so the calendar's Experience entries open their BEO (2026-11-03).
 //               Order-form pre-orders (the portal's Snap Order tile, 2026-11-05) carry
@@ -434,6 +435,14 @@ function formChannel(p: Record<string, any>) {
 // fulfillment, so it never reaches the mirror — the lead itself is the source.
 // Every lead with a saved BEO shows at its event date/time, invoice or not;
 // lost leads and hide_on_calendar leads don't.
+//
+// 2026-11-17, Maverick: "when we book any event in the catering leads those need
+// to be showing up on the staff portal calendar." A lead that was invoiced with
+// no BEO saved yet was missing. Now a lead also shows as soon as it is booked,
+// BEO or not. "Booked" is the same list of stages the portal home tile and Greys
+// Chat use. Without a BEO the tile lists what was invoiced / proposed and has no
+// BEO link.
+const BOOKED_STAGES = ["signed", "invoiced", "deposit_paid", "paid", "booked"];
 
 // Wall-clock date + "HH:MM" in shop time -> UTC ISO, right on both sides of DST.
 function chicagoISO(date: string, hhmm: string | null): string {
@@ -472,17 +481,17 @@ async function beoPdfLink(code: string) {
 async function beoLeads(from: string, to: string, loc: string | null) {
   const { data: leads, error } = await admin.from("catering_leads")
     .select("id,code,name,company,location,event_date,event_time,guests,stage,hide_on_calendar,beo")
-    .not("beo", "is", null)
     .gte("event_date", from).lte("event_date", to);
   if (error || !leads?.length) return { rows: [] as ReturnType<typeof feedRow>[], orderIds: new Set<string>() };
   const live = leads.filter((l) =>
+    (l.beo != null || BOOKED_STAGES.includes(String(l.stage ?? ""))) &&
     String(l.stage ?? "") !== "lost" && !l.hide_on_calendar &&
     // a lead with no shop on it stays visible everywhere, same as the other feeds
     (!loc || !l.location || String(l.location).toLowerCase().includes(loc))
   );
   if (!live.length) return { rows: [] as ReturnType<typeof feedRow>[], orderIds: new Set<string>() };
   const { data: quotes } = await admin.from("catering_quotes")
-    .select("lead_id,status,total_cents,amount_paid_cents,square_invoice_id,invoice_number,square_order_id,ticket_order_id,ticket_cancel_order_id,created_at")
+    .select("lead_id,status,items,total_cents,amount_paid_cents,square_invoice_id,invoice_number,square_order_id,ticket_order_id,ticket_cancel_order_id,created_at")
     .in("lead_id", live.map((l) => l.id))
     .order("created_at", { ascending: false });
   // Square orders that belong to these jobs (invoice order, kitchen-ticket order)
@@ -495,9 +504,17 @@ async function beoLeads(from: string, to: string, loc: string | null) {
     const qs = (quotes ?? []).filter((q) => q.lead_id === l.id && q.status !== "canceled");
     const q = qs.find((x) => x.square_invoice_id) ?? qs[0] ?? null;   // the invoice if there is one, else the newest proposal
     const tm = /^(\d{1,2}):(\d{2})/.exec(String(l.event_time ?? ""));
-    const items = (((l.beo as Record<string, any>)?.menu ?? []) as Record<string, any>[])
-      .filter((r) => String(r?.item ?? "").trim())
-      .map((r) => ({ name: String(r.item).trim(), qty: Number(r.qty) || 1 }));
+    const hasBeo = l.beo != null;
+    // With a BEO: its menu. Booked with no BEO yet: the lines on the invoice / proposal.
+    const items = hasBeo
+      ? (((l.beo as Record<string, any>)?.menu ?? []) as Record<string, any>[])
+        .filter((r) => String(r?.item ?? "").trim())
+        .map((r) => ({ name: String(r.item).trim(), qty: Number(r.qty) || 1 }))
+      : ((Array.isArray(q?.items) ? q.items : []) as Record<string, any>[])
+        .filter((r) => String(r?.name ?? "").trim())
+        .map((r) => ({ name: String(r.name).trim(), qty: Number(r.qty) || 1 }));
+    // null = no invoice; otherwise " #000123" (or "" when Square gave no number)
+    const invNo = q?.square_invoice_id ? (q.invoice_number ? " #" + q.invoice_number : "") : null;
     const total = Number(q?.total_cents ?? 0), paid = Number(q?.amount_paid_cents ?? 0);
     return feedRow({
       at: chicagoISO(String(l.event_date), tm ? `${tm[1]}:${tm[2]}` : null),
@@ -509,9 +526,11 @@ async function beoLeads(from: string, to: string, loc: string | null) {
       total_cents: total,
       paid: total > 0 && paid >= total,
       note: null,
-      channel: q?.square_invoice_id ? `BEO · invoice${q.invoice_number ? " #" + q.invoice_number : ""}` : "BEO · no invoice yet",
+      channel: hasBeo
+        ? (invNo != null ? `BEO · invoice${invNo}` : "BEO · no invoice yet")
+        : (invNo != null ? `Invoice${invNo} · no BEO yet` : "Booked · no BEO yet"),
       beo_code: l.code,
-      beo_pdf: await beoPdfLink(String(l.code)),
+      beo_pdf: hasBeo ? await beoPdfLink(String(l.code)) : null,
       guests: l.guests ?? null,
       time_tbd: !tm,
     }, "beo");
