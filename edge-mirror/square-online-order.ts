@@ -128,7 +128,31 @@
 //   v17.2 (2026-11-12, go-live): the staff actions pick Square by function, not by the caller's Origin (the staff
 //   portal isn't the order site) — square-online-order = production, square-online-order-test = TEST_ENV. See staffEnv.
 //
-// Actions (POST ?action=…): config · menu · quote · pay · status · sweep · ship_days · ship_orders · ship_mark ·
+// GIFT CARDS (v19, 2026-11-16, Maverick: "anywhere we are taking payments, we need to also take gift cards. make sure
+// online ordering especially has it"): a GREYS (Square) gift card pays for a pickup or a shipped order — all of it, or
+// all it can with a card or Google Pay for the rest. The number is typed into Square's own gift card field on the page
+// (Web Payments SDK giftCard()); this function only ever sees a one-time token.
+//   gift_balance { location, nonce } → { balance_cents, last4 }: the page's "Apply" (GiftCards from-nonce).
+//   pay { …, gift_source_id, gift_cents }: gift_cents = what the page showed the gift card paying. source_id (the card)
+//     is only needed when the gift card doesn't cover everything.
+//   WHO PAYS WHAT is giftPlan() — the page has the same function, shows that split, and pay refuses any other:
+//     the gift card pays all it can of the order + tip; if that isn't everything the card pays the rest, at least $1.00
+//     (Square's smallest card payment), so the gift card holds back up to a dollar. The tip rides on the card as far as
+//     the card's share allows and the rest of it on the gift card (Square takes a tip on either).
+//   HOW: the gift card covers it all → ONE payment, exactly like a card (autocomplete).
+//        gift card + card → both are only AUTHORIZED (autocomplete false; Square lets an authorization go by itself
+//        after 30 minutes), then PayOrder captures the two together. If either is refused the other is voided: nothing
+//        is charged and no balance stays held.
+//   The gift card is asked for exactly what the page showed, never "whatever is on it": if its balance changed in the
+//   meantime Square refuses it (INSUFFICIENT_FUNDS + GIFT_CARD_AVAILABLE_AMOUNT) and the customer is told the new
+//   balance — nothing is charged.
+//   menu.pay.gift_cards tells the page to offer it. Secret ORDER_GIFT_CARDS=off hides it and refuses it (kill switch).
+//   online_orders: gift_cents, gift_payment_id, gift_last4 (migration online_orders_gift); `card` reads
+//   "Gift card ····1234 $20.00 + VISA ····4242 $12.40". Refunds are made in Square, tender by tender.
+//   Tried against the Square sandbox 2026-11-16: a split with the tip on the card, on the gift card and on both; gift
+//   card only with a tip; INSUFFICIENT_FUNDS; a voided hold goes back on the gift card.
+//
+// Actions (POST ?action=…): config · menu · quote · gift_balance · pay · status · sweep · ship_days · ship_orders · ship_mark ·
 // ship_email · track                                                            verify_jwt = false
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -309,6 +333,7 @@ class PublicError extends Error {
 class SquareError extends Error {
   status = 500;
   codes: string[] = [];
+  detail: Record<string, string> = {}; // code → Square's detail text (GIFT_CARD_AVAILABLE_AMOUNT carries the balance)
 }
 
 function corsFor(req: Request) {
@@ -340,6 +365,7 @@ async function square(path: string, init: RequestInit, e: Env): Promise<any> {
     const err = new SquareError(errs.length ? errs.map((x) => x.detail || x.code).join("; ") : `Square error (${res.status})`);
     err.status = res.status;
     err.codes = errs.map((x) => String(x.code || ""));
+    err.detail = Object.fromEntries(errs.map((x) => [String(x.code || ""), String(x.detail ?? "")]));
     throw err;
   }
   return data;
@@ -750,7 +776,7 @@ async function paymentLocation(shop: Shop, e: Env): Promise<string> {
 async function payConfig(shop: Shop, e: Env) {
   let location_id: string | null = null, reach_error: string | null = null;
   try { location_id = await paymentLocation(shop, e); } catch (err) { reach_error = String((err as Error).message).slice(0, 300); }
-  return { env: e, app_id: credsFor(e).appId, location_id, script_src: scriptFor(e), reachable: !!location_id, reach_error };
+  return { env: e, app_id: credsFor(e).appId, location_id, script_src: scriptFor(e), reachable: !!location_id, reach_error, gift_cards: giftOn() };
 }
 
 // ---------- cart → priced lines ----------
@@ -1195,7 +1221,8 @@ async function payShip(req: Request, b: any) {
   if (why) throw new PublicError(why, 409);
   const shop = c.from;
   const sourceId = clean(b.source_id, 400);
-  if (!/^[A-Za-z0-9_\-:.]{8,400}$/.test(sourceId)) throw new PublicError("Please re-enter your card.");
+  const gift = readGift(b); // a GREYS gift card pays some or all of it (GIFT CARDS at the top)
+  if (!(gift && !sourceId) && !TOKEN_OK.test(sourceId)) throw new PublicError("Please re-enter your card.");
   const verificationToken = clean(b.verification_token, 4000);
   const cc = b.customer ?? {};
   const first = clean(cc.first_name, 60), last = clean(cc.last_name, 60);
@@ -1288,9 +1315,22 @@ async function payShip(req: Request, b: any) {
     throw new PublicError(`Your total is now ${money(charge)} — please review it and place the order again. Nothing was charged.`, 409, { totals: { ...t, shipping_cents: shipCents, tip_cents: 0 } });
   }
 
+  const shippingAddress = {
+    address_line_1: to.address1, ...(to.address2 ? { address_line_2: to.address2 } : {}), locality: to.city,
+    administrative_district_level_1: to.state, postal_code: to.zip, country: "US",
+    first_name: to.name.split(" ")[0], ...(to.name.includes(" ") ? { last_name: to.name.split(" ").slice(1).join(" ") } : {}),
+  };
   let pmt: any;
+  let gp: GiftPaid | null = null; // set when a gift card paid some or all of it
   try {
-    const p = await square("/v2/payments", {
+    if (gift) {
+      gp = await payWithGift({
+        e, orderId: oid, locationId, code, email, total: charge, tip: 0, gift, sourceId, verificationToken,
+        extra: { shipping_address: shippingAddress },
+        note: `Online order ${code} · ship to ${to.city}, ${to.state}${wallet ? " · " + wallet : ""}`,
+      });
+    }
+    const p = gp ? { payment: gp.primary } : await square("/v2/payments", {
       method: "POST",
       body: JSON.stringify({
         idempotency_key: ("q" + (await sha256hex(oid + "|" + sourceId))).slice(0, 45),
@@ -1301,11 +1341,7 @@ async function payShip(req: Request, b: any) {
         order_id: oid,
         reference_id: code,
         buyer_email_address: email,
-        shipping_address: {
-          address_line_1: to.address1, ...(to.address2 ? { address_line_2: to.address2 } : {}), locality: to.city,
-          administrative_district_level_1: to.state, postal_code: to.zip, country: "US",
-          first_name: to.name.split(" ")[0], ...(to.name.includes(" ") ? { last_name: to.name.split(" ").slice(1).join(" ") } : {}),
-        },
+        shipping_address: shippingAddress,
         note: `Online order ${code} · ship to ${to.city}, ${to.state}${wallet ? " · " + wallet : ""}`,
         autocomplete: true,
       }),
@@ -1313,17 +1349,19 @@ async function payShip(req: Request, b: any) {
     pmt = p?.payment ?? {};
     if (pmt.status !== "COMPLETED" && pmt.status !== "APPROVED") throw Object.assign(new SquareError("payment " + pmt.status), { codes: ["GENERIC_DECLINE"] });
   } catch (err) {
-    await fail((wallet ? wallet + ": " : "") + String((err as Error).message));
+    await fail((gift ? "with a gift card — " : "") + (wallet ? wallet + ": " : "") + String((err as Error).message));
     if (err instanceof SquareError && (err.status < 500 || err.codes.length)) throw new PublicError(cardMessage(err) + " Nothing was charged.", 402);
     throw err;
   }
   const cardLine = pmt.card_details?.card ? `${String(pmt.card_details.card.card_brand || "Card").replace(/_/g, " ")} ····${pmt.card_details.card.last_4}` : null;
-  const card = wallet ? (cardLine ? `${wallet} · ${cardLine}` : wallet) : cardLine;
-  await admin.from("online_orders").update({
-    status: "paid", square_payment_id: pmt.id, receipt_url: pmt.receipt_url ?? null, card, error: null, paid_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-  }).eq("square_order_id", oid);
+  const card = gp ? giftLabel(gp, wallet) : wallet ? (cardLine ? `${wallet} · ${cardLine}` : wallet) : cardLine;
+  const receiptUrl: string | null = (gp ? gp.receipt_url : pmt.receipt_url) ?? null;
+  const paidRow = { status: "paid", square_payment_id: pmt.id, receipt_url: receiptUrl, card, error: null, paid_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+  const pu = await admin.from("online_orders").update(gp ? { ...paidRow, ...giftCols(gp) } : paidRow).eq("square_order_id", oid);
+  // the gift card columns aren't there (migration online_orders_gift): still mark it paid
+  if (gp && pu.error) await admin.from("online_orders").update(paidRow).eq("square_order_id", oid);
   delete shipCache[e]; // the next menu and packing list count this box
-  const out = result({ card, receipt_url: pmt.receipt_url ?? null }, null);
+  const out = { ...result({ card, receipt_url: receiptUrl }, null), ...(gp ? giftOut(gp) : {}) };
   const sent = await mailShipConfirmation(out, cust, to, note).catch((err) => { console.error("mail", code, err); return false; });
   await admin.from("online_orders").update({ email_sent: sent }).eq("square_order_id", oid);
   return { ...out, email_sent: sent };
@@ -1368,7 +1406,8 @@ function shipOrderOf(o: any): ShipOrder | null {
   if (!o?.id || !f || (o.metadata?.fulfillment !== "ship" && o.source?.name !== "Greys online ordering")) return null;
   const sd = f.shipment_details ?? {}, r = sd.recipient ?? {}, a = r.address ?? {}, md = o.metadata ?? {};
   const tenders: any[] = Array.isArray(o.tenders) ? o.tenders : [];
-  const good = tenders.filter((t) => !["FAILED", "VOIDED"].includes(String(t?.card_details?.status ?? "")));
+  // AUTHORIZED = only held (a gift card + card payment in flight, v19): not paid until both are captured
+  const good = tenders.filter((t) => !["FAILED", "VOIDED", "AUTHORIZED"].includes(String(t?.card_details?.status ?? "")));
   const total = Number(o.total_money?.amount ?? 0), due = Number(o.net_amount_due_money?.amount);
   const paid = good.length > 0 || (Number.isFinite(due) && due <= 0 && total > 0 && o.state === "COMPLETED");
   const refundedCents = (Array.isArray(o.refunds) ? o.refunds : []).filter((x: any) => x?.status !== "REJECTED" && x?.status !== "FAILED")
@@ -1625,6 +1664,191 @@ async function quote(req: Request, b: any) {
   };
 }
 
+// ---------- gift cards (GIFT CARDS at the top) ----------
+const giftOn = () => (Deno.env.get("ORDER_GIFT_CARDS") ?? "on").trim().toLowerCase() !== "off";
+const TOKEN_OK = /^[A-Za-z0-9_\-:.]{8,400}$/;
+const usd = (amount: number) => ({ amount, currency: "USD" });
+const MIN_PAY = 100; // Square's smallest card payment is $1.00: neither the gift card nor the card is ever asked for less
+const GIFT_OFF = "Gift cards can't be used online right now. Please pay by card.";
+const GIFT_NO = "That gift card couldn't be used. Remove it and pay by card, or add it again.";
+
+// Who pays what. total = the order (tax in, no tip) · tip · have = what the gift card can put in.
+// null = this gift card can't be used on this order (under $1.00 on it, or the order is too small to split).
+// order.html carries the same function (giftPlan): it shows this split, and pay() refuses any other.
+type Split = { gift: number; card: number; gAmt: number; gTip: number; cAmt: number; cTip: number };
+function giftPlan(total: number, tip: number, have: number): Split | null {
+  const grand = total + tip;
+  if (!(total >= MIN_PAY) || !(have >= MIN_PAY) || !(tip >= 0)) return null;
+  if (have >= grand) return { gift: grand, card: 0, gAmt: total, gTip: tip, cAmt: 0, cTip: 0 };
+  const gift = Math.min(have, grand - MIN_PAY), card = grand - gift;
+  const cTip = Math.min(tip, card - MIN_PAY), gTip = tip - cTip;
+  const s = { gift, card, gAmt: gift - gTip, gTip, cAmt: card - cTip, cTip };
+  return s.gAmt >= MIN_PAY && s.cAmt >= MIN_PAY ? s : null;
+}
+
+// pay's gift card, if the page sent one: the one-time token and what the page showed it paying
+type Gift = { token: string; cents: number };
+function readGift(b: any): Gift | null {
+  const token = clean(b.gift_source_id, 400);
+  if (!token) return null;
+  if (!giftOn()) throw new PublicError(GIFT_OFF + " Nothing was charged.", 409);
+  const cents = Math.round(Number(b.gift_cents));
+  if (!TOKEN_OK.test(token) || !Number.isFinite(cents) || cents < 1) throw new PublicError("That gift card couldn't be read. Please add it again. Nothing was charged.");
+  return { token, cents };
+}
+
+// the page's "Apply": what's on the gift card they typed into Square's field
+async function giftBalance(req: Request, b: any) {
+  await rateLimit(req, "ordg", 30);
+  if (!giftOn()) throw new PublicError(GIFT_OFF, 409);
+  const nonce = clean(b.nonce, 400);
+  if (!TOKEN_OK.test(nonce)) throw new PublicError("Enter the gift card number first.");
+  const e = envFor(req);
+  let gc: any;
+  try {
+    gc = (await square("/v2/gift-cards/from-nonce", { method: "POST", body: JSON.stringify({ nonce }) }, e))?.gift_card ?? {};
+  } catch (err) {
+    if (!(err instanceof SquareError) || err.status >= 500) throw err;
+    // 401 / 403 = our Square access, not their card: say so in the log, and don't blame the number
+    if (err.status === 401 || err.status === 403) {
+      console.error("gift balance: Square refused us", err.status, err.codes.join(","));
+      throw new PublicError("Gift cards aren't working right now. Please pay by card, or call the shop.", 503);
+    }
+    throw new PublicError("We couldn't find that gift card. Check the number and try again.", 404);
+  }
+  if (String(gc.state) !== "ACTIVE") throw new PublicError("That gift card isn't active. Please ask the shop.", 409);
+  const balance = Math.round(Number(gc.balance_money?.amount ?? 0));
+  if (!(balance > 0)) throw new PublicError("That gift card has no balance left.", 409);
+  if (balance < MIN_PAY) throw new PublicError(`That gift card has ${money(balance)} left. Online it needs at least ${money(MIN_PAY)} — it still works in the shop.`, 409);
+  return { ok: true, env: e, balance_cents: balance, last4: String(gc.gan ?? "").slice(-4) || null };
+}
+
+// Square said no to the gift card: tell the customer why (a balance that changed comes back with the new balance)
+function giftRefused(err: unknown, asked: number): unknown {
+  if (!(err instanceof SquareError) || !(err.status < 500 || err.codes.length)) return err;
+  if (err.codes.includes("INSUFFICIENT_FUNDS")) {
+    const left = Math.round(Number(err.detail["GIFT_CARD_AVAILABLE_AMOUNT"]));
+    if (Number.isFinite(left) && left >= 0 && left < asked) {
+      return new PublicError(`That gift card has ${money(left)} on it now, so the amounts changed. Please review them and place the order again. Nothing was charged.`, 402, { gift_balance_cents: left });
+    }
+    return new PublicError("That gift card doesn't have enough on it. Remove it and add it again to see its balance. Nothing was charged.", 402, { gift_recheck: true });
+  }
+  return new PublicError(GIFT_NO + " Nothing was charged.", 402, { gift_recheck: true });
+}
+const paidState = (p: any) => p?.status === "APPROVED" || p?.status === "COMPLETED";
+// let go of authorizations that won't be captured (best effort — Square lets them go itself after 30 minutes)
+async function voidPayments(e: Env, ids: (string | null | undefined)[]) {
+  for (const id of ids) {
+    if (!id) continue;
+    try { await square(`/v2/payments/${encodeURIComponent(id)}/cancel`, { method: "POST", body: "{}" }, e); }
+    catch (err) { console.error("void", id, String((err as Error).message).slice(0, 200)); }
+  }
+}
+// Did the order's payments get captured? true / false, or null when Square can't be asked right now.
+async function orderCaptured(e: Env, orderId: string): Promise<boolean | null> {
+  for (let i = 0; i < 2; i++) {
+    try {
+      const o = (await square(`/v2/orders/${encodeURIComponent(orderId)}`, { method: "GET" }, e))?.order;
+      if (!o) return null;
+      const live = ((o.tenders ?? []) as any[]).filter((t) => !["FAILED", "VOIDED"].includes(String(t?.card_details?.status ?? "")));
+      return live.length > 0 && live.every((t) => String(t?.card_details?.status ?? "") === "CAPTURED");
+    } catch { await new Promise((r) => setTimeout(r, 400)); }
+  }
+  return null;
+}
+
+// Pay an order with a gift card, and a card for whatever the gift card doesn't cover (HOW at the top).
+// Throws with nothing charged and nothing left held; a PublicError is already worded for the customer.
+type GiftPaid = { primary: any; giftPay: any; cardPay: any | null; split: Split; last4: string | null; receipt_url: string | null };
+async function payWithGift(o: {
+  e: Env; orderId: string; locationId: string; code: string; email: string; note: string;
+  total: number; tip: number; gift: Gift; sourceId: string; verificationToken: string; extra?: Record<string, unknown>;
+}): Promise<GiftPaid> {
+  const s = giftPlan(o.total, o.tip, o.gift.cents);
+  if (!s || s.gift !== o.gift.cents) {
+    throw new PublicError("Your total changed, so the gift card amount did too. Please review it and place the order again. Nothing was charged.", 409, { gift_replan: true });
+  }
+  const split = s.card > 0;
+  if (split && !TOKEN_OK.test(o.sourceId)) {
+    throw new PublicError(`Your gift card covers ${money(s.gift)} of ${money(o.total + o.tip)}. Please add a card for the other ${money(s.card)}. Nothing was charged.`, 402);
+  }
+  const key = async (tag: string, ...parts: (string | number)[]) => (tag + (await sha256hex([o.orderId, ...parts].join("|")))).slice(0, 45);
+  const common = { location_id: o.locationId, order_id: o.orderId, reference_id: o.code, buyer_email_address: o.email };
+  const hold = { autocomplete: false, delay_duration: "PT30M" }; // held, not charged
+
+  // 1. the gift card: exactly what the page showed
+  let g: any;
+  try {
+    g = (await square("/v2/payments", {
+      method: "POST",
+      body: JSON.stringify({
+        idempotency_key: await key("g", o.gift.token, s.gAmt, s.gTip, split ? 2 : 1),
+        source_id: o.gift.token,
+        amount_money: usd(s.gAmt),
+        ...(s.gTip > 0 ? { tip_money: usd(s.gTip) } : {}),
+        ...common,
+        note: `${o.note} · gift card`,
+        ...(split ? hold : { autocomplete: true }),
+      }),
+    }, o.e))?.payment ?? {};
+  } catch (err) { throw giftRefused(err, s.gift); }
+  if (!paidState(g)) throw new PublicError(GIFT_NO + " Nothing was charged.", 402, { gift_recheck: true });
+  const last4 = String(g.card_details?.card?.last_4 ?? "") || null;
+  if (!split) return { primary: g, giftPay: g, cardPay: null, split: s, last4, receipt_url: g.receipt_url ?? null };
+
+  // 2. the card for the rest
+  let c: any = null;
+  try {
+    c = (await square("/v2/payments", {
+      method: "POST",
+      body: JSON.stringify({
+        idempotency_key: await key("c", o.sourceId, s.cAmt, s.cTip, g.id),
+        source_id: o.sourceId,
+        verification_token: o.verificationToken || undefined,
+        amount_money: usd(s.cAmt),
+        ...(s.cTip > 0 ? { tip_money: usd(s.cTip) } : {}),
+        ...common,
+        ...(o.extra ?? {}),
+        note: o.note,
+        ...hold,
+      }),
+    }, o.e))?.payment ?? {};
+    if (!paidState(c)) throw Object.assign(new SquareError("payment " + c?.status), { codes: ["GENERIC_DECLINE"] });
+  } catch (err) {
+    await voidPayments(o.e, [c?.id, g.id]);
+    throw err;
+  }
+  // 3. capture the two together
+  try {
+    await square(`/v2/orders/${encodeURIComponent(o.orderId)}/pay`, {
+      method: "POST",
+      body: JSON.stringify({ idempotency_key: await key("k", g.id, c.id), payment_ids: [g.id, c.id] }),
+    }, o.e);
+  } catch (err) {
+    // Square may have captured both with only its answer lost: look before letting anything go
+    const captured = await orderCaptured(o.e, o.orderId);
+    if (captured === false) { await voidPayments(o.e, [c.id, g.id]); throw err; }
+    if (captured === null) {
+      console.error("gift pay unconfirmed", o.code, o.orderId, String((err as Error).message).slice(0, 300));
+      throw new PublicError("We couldn't confirm your payment. Please don't order again yet — call the shop and we'll check it for you.", 502, { unconfirmed: true });
+    }
+  }
+  // No receipt link here: Square only makes one once a payment shows as captured, a few seconds after PayOrder
+  // (tried in the sandbox) — the customer has our confirmation email, and the order in Square shows both tenders.
+  return { primary: c, giftPay: g, cardPay: c, split: s, last4, receipt_url: null };
+}
+// how the payment reads on the order, the confirmation and the email
+function giftLabel(gp: GiftPaid, wallet: string | null) {
+  const g = "Gift card" + (gp.last4 ? " ····" + gp.last4 : "");
+  if (!gp.cardPay) return g;
+  const cd = gp.cardPay.card_details?.card;
+  const line = cd ? `${String(cd.card_brand || "Card").replace(/_/g, " ")} ····${cd.last_4}` : null;
+  const c = wallet ? (line ? `${wallet} · ${line}` : wallet) : line ?? "Card";
+  return `${g} ${money(gp.split.gift)} + ${c} ${money(gp.split.card)}`;
+}
+const giftCols = (gp: GiftPaid) => ({ gift_cents: gp.split.gift, gift_payment_id: gp.giftPay?.id ?? null, gift_last4: gp.last4 });
+const giftOut = (gp: GiftPaid) => ({ gift_cents: gp.split.gift, card_cents: gp.split.card, gift_last4: gp.last4 });
+
 function cardMessage(err: unknown) {
   const codes = err instanceof SquareError ? err.codes : [];
   const has = (...c: string[]) => codes.some((x) => c.includes(x));
@@ -1646,7 +1870,8 @@ async function pay(req: Request, b: any) {
   const e = envFor(req);
   if (!accepting(shop, e)) throw new PublicError(closedMsg(shop, e) ?? PAUSED_MSG, 409);
   const sourceId = clean(b.source_id, 400);
-  if (!/^[A-Za-z0-9_\-:.]{8,400}$/.test(sourceId)) throw new PublicError("Please re-enter your card.");
+  const gift = readGift(b); // a GREYS gift card pays some or all of it (GIFT CARDS at the top)
+  if (!(gift && !sourceId) && !TOKEN_OK.test(sourceId)) throw new PublicError("Please re-enter your card.");
   const verificationToken = clean(b.verification_token, 4000);
   const c = b.customer ?? {};
   const first = clean(c.first_name, 60), last = clean(c.last_name, 60);
@@ -1732,8 +1957,15 @@ async function pay(req: Request, b: any) {
   }
 
   let pmt: any;
+  let gp: GiftPaid | null = null; // set when a gift card paid some or all of it
   try {
-    const p = await square("/v2/payments", {
+    if (gift) {
+      gp = await payWithGift({
+        e, orderId: oid, locationId, code, email, total: t.total_cents, tip, gift, sourceId, verificationToken,
+        note: `Online order ${code} · ${shop}${wallet ? " · " + wallet : ""}`,
+      });
+    }
+    const p = gp ? { payment: gp.primary } : await square("/v2/payments", {
       method: "POST",
       body: JSON.stringify({
         idempotency_key: ("p" + (await sha256hex(oid + "|" + sourceId + "|" + tip))).slice(0, 45),
@@ -1752,16 +1984,18 @@ async function pay(req: Request, b: any) {
     pmt = p?.payment ?? {};
     if (pmt.status !== "COMPLETED" && pmt.status !== "APPROVED") throw Object.assign(new SquareError("payment " + pmt.status), { codes: ["GENERIC_DECLINE"] });
   } catch (err) {
-    await fail((wallet ? wallet + ": " : "") + String((err as Error).message));
+    await fail((gift ? "with a gift card — " : "") + (wallet ? wallet + ": " : "") + String((err as Error).message));
     if (err instanceof SquareError && (err.status < 500 || err.codes.length)) throw new PublicError(cardMessage(err) + " Nothing was charged.", 402);
     throw err;
   }
   const cardLine = pmt.card_details?.card ? `${String(pmt.card_details.card.card_brand || "Card").replace(/_/g, " ")} ····${pmt.card_details.card.last_4}` : null;
-  const card = wallet ? (cardLine ? `${wallet} · ${cardLine}` : wallet) : cardLine;
-  await admin.from("online_orders").update({
-    status: "paid", square_payment_id: pmt.id, receipt_url: pmt.receipt_url ?? null, card, error: null, paid_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-  }).eq("square_order_id", oid);
-  const out = result({ card, receipt_url: pmt.receipt_url ?? null }, null);
+  const card = gp ? giftLabel(gp, wallet) : wallet ? (cardLine ? `${wallet} · ${cardLine}` : wallet) : cardLine;
+  const receiptUrl: string | null = (gp ? gp.receipt_url : pmt.receipt_url) ?? null;
+  const paidRow = { status: "paid", square_payment_id: pmt.id, receipt_url: receiptUrl, card, error: null, paid_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+  const pu = await admin.from("online_orders").update(gp ? { ...paidRow, ...giftCols(gp) } : paidRow).eq("square_order_id", oid);
+  // the gift card columns aren't there (migration online_orders_gift): still mark it paid
+  if (gp && pu.error) await admin.from("online_orders").update(paidRow).eq("square_order_id", oid);
+  const out = { ...result({ card, receipt_url: receiptUrl }, null), ...(gp ? giftOut(gp) : {}) };
   const sent = await mailConfirmation(out, cust, note).catch((err) => { console.error("mail", code, err); return false; });
   await admin.from("online_orders").update({ email_sent: sent }).eq("square_order_id", oid);
   return { ...out, email_sent: sent };
@@ -1932,6 +2166,7 @@ Deno.serve(async (req) => {
     if (action === "config") return json(req, { ok: true, ...(await payConfig(shopOf(body.location || "memphis"), envFor(req))) });
     if (action === "quote") return json(req, await quote(req, body));
     if (action === "pay") return json(req, body.ship ? await payShip(req, body) : await pay(req, body));
+    if (action === "gift_balance") return json(req, await giftBalance(req, body));
     if (action === "status") return json(req, await status(body));
     if (action === "sweep") return json(req, await sweep(body));
     if (action === "ship_days" || action === "ship_orders" || action === "ship_mark" || action === "ship_email" || action === "track") await refreshSwitch();

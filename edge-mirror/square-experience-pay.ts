@@ -13,6 +13,9 @@
 //                              trigger on rb_reservations (rb_experience_lead_sync) opens a
 //                              Catering Lead with a BEO for it. If the order can't be built
 //                              the charge still goes through without one (square_order_error).
+//                              The add-ons they ticked (2026-11-14: chocolate fondue, $12.95 per guest)
+//                              ride on that line as priced modifiers, and what the package includes
+//                              (rb_experience_types.includes, 2026-11-08) as $0 ones.
 //   4. Square /v2/payments   — charges the card token against that order
 //   5. marks the reservation paid (external_id = square:<payment id>, square_order_id)
 //   6. emails the guest their GREYS confirmation (2026-11-07); never blocks or undoes the booking
@@ -28,7 +31,9 @@
 // See "20% gratuity + sales tax" below.
 //
 // The browser never sends a price: the price comes from rb_experience_types via
-// rb_create_experience_v2 (the browser only says which option, if the experience has options).
+// rb_create_experience_v2 (the browser only says which option, if the experience has options),
+// and the add-ons from rb_experience_addons (the browser only sends their keys, `addons`).
+// rb_reservations.total_cents = the package + its add-ons (addons / addons_cents say which).
 // It does send expected_cents, the total it showed; if that isn't what the server works out,
 // nothing is charged and the guest is asked to refresh (so no one pays more than they saw).
 //
@@ -39,7 +44,26 @@
 //   production → the same live SQUARE_TICKET_* app the classes use
 // So classes can be live while experiences are still being tested.
 //
-// Actions (POST ?action=… or {action}): config · pay · status (public)
+// GIFT CARDS (2026-11-16, Maverick: "anywhere we are taking payments, we need to also take gift cards"): a GREYS
+// (Square) gift card pays for an experience — all of it, or all it can with a card for the rest. The same rules and
+// the same code as square-online-order v19 (GIFT CARDS there): the number is typed into Square's own gift card field
+// on the page (Web Payments SDK giftCard()); this function only ever sees a one-time token.
+//   gift_balance { nonce } → { balance_cents, last4 }: the page's "Apply".
+//   pay { …, gift_source_id, gift_cents }: gift_cents = what the page showed the gift card paying. source_id (the card)
+//     is only needed when the gift card doesn't cover the whole total.
+//   giftPlan() says who pays what (the pages carry the same function; pay refuses any other split): the gift card
+//     pays all it can; a card is never asked for less than $1.00, so the gift card may hold back up to a dollar.
+//   Gift card only → ONE payment, exactly like a card. Gift card + card → both are only AUTHORIZED (Square lets an
+//     authorization go by itself after 30 minutes), then PayOrder captures the two together. If either is refused the
+//     other is voided and the booking is undone: nothing is charged, no balance stays held, the tables are let go.
+//     A split needs the Square order (PayOrder): if the order couldn't be built the guest is asked to pay by card.
+//   The gift card is asked for exactly what the page showed: a balance that changed comes back as
+//     gift_balance_cents with nothing charged.
+//   rb_reservations: gift_cents, gift_payment_id, gift_last4 (migration rb_reservations_gift). external_id stays the
+//     main payment (the card's when both paid). refund sends money back to the card first, then the gift card.
+//   config.gift_cards tells the pages to offer it; secret EXP_GIFT_CARDS=off hides it and refuses it (kill switch).
+//
+// Actions (POST ?action=… or {action}): config · gift_balance · pay · status (public)
 //                                        cancel · refund (staff — admin JWT)   verify_jwt = false
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -247,15 +271,48 @@ async function ensureVariation(expId: string): Promise<string> {
 
 const fmtCT = (iso: string) => new Date(iso).toLocaleString("en-US", { timeZone: "America/Chicago", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
+// The add-ons they took (2026-11-14, Jackie: "add a chocolate fondue to any experience for $12.95 per person").
+// rb_reservations.addons = [{label, price_cents, qty, …}] as rb_experience_addons priced them. They ride on the
+// experience's own line as priced modifiers: one line, so Square taxes exactly the amount charged here (two lines
+// can each round their tax and land a cent apart).
+function addonModifiers(r: any) {
+  return (Array.isArray(r?.addons) ? r.addons : [])
+    .map((a: any) => ({ name: clean(a?.label, 255) || "Add-on", quantity: String(Math.max(1, Math.floor(Number(a?.qty) || 1))),
+      base_price_money: { amount: Math.max(0, Math.round(Number(a?.price_cents) || 0)), currency: "USD" } }))
+    .filter((m: any) => m.base_price_money.amount > 0)
+    .slice(0, 10);
+}
+const addonsTotal = (mods: any[]) => mods.reduce((s, m) => s + m.base_price_money.amount * Number(m.quantity), 0);
+
+// What's in the package (Maverick 2026-11-08: "experience packages need to have items listed being
+// sold"). rb_experience_types.includes = [{item, per?: "party" | "guest"}], edited in the manager
+// console. Each item rides on the sale as a $0 modifier, so the Square order and receipt list it and
+// the total doesn't move; "per guest" counts the party (one raclette burner each). The BEO gets the
+// same list from rb_experience_lead_sync.
+function includedModifiers(r: any) {
+  const list = r?.rb_experience_types?.includes;
+  const party = Math.max(1, Math.floor(Number(r?.party_size) || 1));
+  return (Array.isArray(list) ? list : [])
+    .map((x: any) => ({ name: clean(x?.item, 255), per: x?.per }))
+    .filter((x: any) => x.name)
+    .slice(0, 30)
+    .map((x: any) => ({ name: x.name, quantity: x.per === "guest" ? String(party) : "1", base_price_money: { amount: 0, currency: "USD" } }));
+}
+
 async function createOrder(key: string, code: string, P: Priced, R: Rates, r: any, location_id: string): Promise<string> {
   const varId = await ensureVariation(r.experience_type_id);
   const when = fmtCT(r.starts_at);
   // the option they picked, and where an at-home party is — shows on the sale in Square
   const extra = [r.option_label, r.event_address ? "AT: " + r.event_address : null].filter(Boolean).join(" · ");
-  const d = await square("/v2/orders", {
+  // the line = the package, plus each add-on as a priced modifier: together they are the price charged
+  let paid = addonModifiers(r);
+  if (addonsTotal(paid) > P.price_cents) paid = [];
+  const base = P.price_cents - addonsTotal(paid);
+  const included = includedModifiers(r);
+  const build = (k: string, withItems: boolean) => square("/v2/orders", {
     method: "POST",
     body: JSON.stringify({
-      idempotency_key: key,
+      idempotency_key: k,
       order: {
         location_id,
         reference_id: code,
@@ -263,8 +320,9 @@ async function createOrder(key: string, code: string, P: Priced, R: Rates, r: an
         line_items: [{
           catalog_object_id: varId,
           quantity: "1",
-          base_price_money: { amount: P.price_cents, currency: "USD" },
+          base_price_money: { amount: base, currency: "USD" },
           note: [`Party of ${r.party_size} · ${when} · ${code}`, extra].filter(Boolean).join(" · ").slice(0, 2000),
+          ...(paid.length || (withItems && included.length) ? { modifiers: [...paid, ...(withItems ? included : [])] } : {}),
         }],
         // sales tax on the experience, and the 20% gratuity: the register's own objects in production
         taxes: [R.tax_id
@@ -277,6 +335,14 @@ async function createOrder(key: string, code: string, P: Priced, R: Rates, r: an
       },
     }),
   });
+  let d: any;
+  try { d = await build(key, true); }
+  catch (e) {
+    // Square turned the item list down: still make the itemized sale (with the priced add-ons), just without the list
+    if (!included.length || (e as any)?.status !== 400) throw e;
+    console.error("order items", code, String((e as Error).message || e).slice(0, 300));
+    d = await build(key.slice(0, 40) + ":plain", false);
+  }
   const o = d?.order;
   if (!o?.id) throw new Error("Square did not return an order");
   const total = Number(o.total_money?.amount);
@@ -304,8 +370,9 @@ type ConfirmInfo = {
   first: string; experience: string; option: string | null; startsAt: string; party: number; shop: string;
   atHome: boolean; address: string | null; totalCents: number; card: string | null; code: string;
   notes: string | null; receiptUrl: string | null; infoUrl: string | null; test: boolean;
-  // what the total is made of (2026-11-10)
+  // what the total is made of (2026-11-10): the package (priceCents), the add-ons, the gratuity and the tax
   priceCents?: number; gratuityCents?: number; taxCents?: number; gratuityPct?: string;
+  addons?: { label: string; qty: number; total_cents: number }[];
 };
 function confirmationEmail(d: ConfirmInfo) {
   const shop = SHOP_INFO[String(d.shop || "").toLowerCase()] ?? SHOP_INFO.memphis;
@@ -328,9 +395,12 @@ function confirmationEmail(d: ConfirmInfo) {
     row("When", `${cfEsc(cfDay(d.startsAt))} at <span style="white-space:nowrap">${cfEsc(cfTime(d.startsAt))}</span>`) +
     row("Where", where) +
     row("Guests", String(d.party)) +
+    ((d.addons || []).length ? row("Add-ons", (d.addons || []).map((a) => cfEsc(a.label) + (a.qty > 1 ? " for " + a.qty : "")).join("<br>")) : "") +
     row("Paid", cfEsc(cfMoney(d.totalCents)) + (d.card ? ` <span style="font:13px Arial,sans-serif;color:${CF.MUTE}">(${cfEsc(d.card)})</span>` : "") +
       (d.priceCents != null && (d.gratuityCents || d.taxCents)
-        ? `<br><span style="font:13px/1.5 Arial,sans-serif;color:${CF.MUTE}">${cfEsc(cfMoney(d.priceCents))} + ${cfEsc(String(Number(d.gratuityPct || 20)))}% gratuity ${cfEsc(cfMoney(d.gratuityCents || 0))} + sales tax ${cfEsc(cfMoney(d.taxCents || 0))}</span>`
+        ? `<br><span style="font:13px/1.5 Arial,sans-serif;color:${CF.MUTE}">${cfEsc(cfMoney(d.priceCents))}` +
+          (d.addons || []).map((a) => ` + ${cfEsc(a.label.toLowerCase())} ${cfEsc(cfMoney(a.total_cents))}`).join("") +
+          ` + ${cfEsc(String(Number(d.gratuityPct || 20)))}% gratuity ${cfEsc(cfMoney(d.gratuityCents || 0))} + sales tax ${cfEsc(cfMoney(d.taxCents || 0))}</span>`
         : "")) +
     row("Confirmation", `<b>${cfEsc(d.code)}</b>`) +
     (d.notes ? row("Your notes", cfEsc(d.notes)) : "") +
@@ -371,6 +441,203 @@ async function sendConfirmation(to: string, mail: { subject: string; html: strin
   return res.ok && (d as any).ok ? "sent" : "failed";
 }
 
+// ---------- gift cards (GIFT CARDS at the top) ----------
+const giftOn = () => (Deno.env.get("EXP_GIFT_CARDS") ?? "on").trim().toLowerCase() !== "off";
+const TOKEN_OK = /^[A-Za-z0-9_\-:.]{8,400}$/;
+const usd = (amount: number) => ({ amount, currency: "USD" });
+const usdTxt = (c: number) => "$" + (c / 100).toFixed(2);
+const MIN_PAY = 100; // Square's smallest card payment is $1.00: neither the gift card nor the card is ever asked for less
+const GIFT_OFF = "Gift cards can't be used online right now. Please pay by card.";
+const GIFT_NO = "That gift card couldn't be used. Remove it and pay by card, or add it again.";
+// a message for the guest that also carries fields for the page (gift_balance_cents, gift_recheck, …)
+const giftError = (msg: string, extra?: Record<string, unknown>) => Object.assign(new PublicError(msg), { extra: extra ?? {} });
+const sqErrs = (e: unknown) => ((((e as any)?.data?.errors) ?? []) as any[]);
+async function sha256hex(s: string) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Who pays what. total = the charge · tip (always 0 here: the gratuity is part of the total) · have = what the gift
+// card can put in. null = this gift card can't be used on this booking. Same function as square-online-order's and
+// the pages': they show this split, and pay() refuses any other.
+type Split = { gift: number; card: number; gAmt: number; gTip: number; cAmt: number; cTip: number };
+function giftPlan(total: number, tip: number, have: number): Split | null {
+  const grand = total + tip;
+  if (!(total >= MIN_PAY) || !(have >= MIN_PAY) || !(tip >= 0)) return null;
+  if (have >= grand) return { gift: grand, card: 0, gAmt: total, gTip: tip, cAmt: 0, cTip: 0 };
+  const gift = Math.min(have, grand - MIN_PAY), card = grand - gift;
+  const cTip = Math.min(tip, card - MIN_PAY), gTip = tip - cTip;
+  const s = { gift, card, gAmt: gift - gTip, gTip, cAmt: card - cTip, cTip };
+  return s.gAmt >= MIN_PAY && s.cAmt >= MIN_PAY ? s : null;
+}
+
+// pay's gift card, if the page sent one: the one-time token and what the page showed it paying
+type Gift = { token: string; cents: number };
+function readGift(b: any): Gift | null {
+  const token = clean(b.gift_source_id, 400);
+  if (!token) return null;
+  if (!giftOn()) throw giftError(GIFT_OFF + " Nothing was charged.", { gift_recheck: true });
+  const cents = Math.round(Number(b.gift_cents));
+  if (!TOKEN_OK.test(token) || !Number.isFinite(cents) || cents < 1) throw giftError("That gift card couldn't be read. Please add it again. Nothing was charged.", { gift_recheck: true });
+  return { token, cents };
+}
+
+// the page's "Apply": what's on the gift card they typed into Square's field
+async function giftBalance(req: Request, b: any) {
+  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
+  const hit = await admin.rpc("ticket_rate_hit", { p_bucket: ("xpg:" + ip).slice(0, 200), p_limit: 30, p_window_secs: 3600 });
+  if (!hit.error && hit.data === false) throw new PublicError("Too many tries from this connection. Please wait a bit, or call the shop.");
+  if (!giftOn()) throw new PublicError(GIFT_OFF);
+  const nonce = clean(b.nonce, 400);
+  if (!TOKEN_OK.test(nonce)) throw new PublicError("Enter the gift card number first.");
+  let gc: any;
+  try {
+    gc = (await square("/v2/gift-cards/from-nonce", { method: "POST", body: JSON.stringify({ nonce }) }))?.gift_card ?? {};
+  } catch (err) {
+    const st = Number((err as any)?.status);
+    if (!(err instanceof PublicError) || !(st < 500)) throw err;
+    // 401 / 403 = our Square access, not their card: say so in the log, and don't blame the number
+    if (st === 401 || st === 403) {
+      console.error("gift balance: Square refused us", st, sqErrs(err).map((x) => x?.code).join(","));
+      throw new PublicError("Gift cards aren't working right now. Please pay by card, or call the shop.");
+    }
+    throw new PublicError("We couldn't find that gift card. Check the number and try again.");
+  }
+  if (String(gc.state) !== "ACTIVE") throw new PublicError("That gift card isn't active. Please ask the shop.");
+  const balance = Math.round(Number(gc.balance_money?.amount ?? 0));
+  if (!(balance > 0)) throw new PublicError("That gift card has no balance left.");
+  if (balance < MIN_PAY) throw new PublicError(`That gift card has ${usdTxt(balance)} left. Online it needs at least ${usdTxt(MIN_PAY)} — it still works in the shop.`);
+  return { ok: true, env: env(), balance_cents: balance, last4: String(gc.gan ?? "").slice(-4) || null };
+}
+
+// Square said no to the gift card: tell the guest why (a balance that changed comes back with the new balance)
+function giftRefused(err: unknown, asked: number): unknown {
+  const st = Number((err as any)?.status), errs = sqErrs(err);
+  if (!(err instanceof PublicError) || !(st < 500 || errs.length)) return err;
+  if (errs.some((x) => x?.code === "INSUFFICIENT_FUNDS")) {
+    const left = Math.round(Number(errs.find((x) => x?.code === "GIFT_CARD_AVAILABLE_AMOUNT")?.detail));
+    if (Number.isFinite(left) && left >= 0 && left < asked) {
+      return giftError(`That gift card has ${usdTxt(left)} on it now, so the amounts changed. Please review them and pay again. Nothing was charged.`, { gift_balance_cents: left });
+    }
+    return giftError("That gift card doesn't have enough on it. Remove it and add it again to see its balance. Nothing was charged.", { gift_recheck: true });
+  }
+  return giftError(GIFT_NO + " Nothing was charged.", { gift_recheck: true });
+}
+const paidState = (p: any) => p?.status === "APPROVED" || p?.status === "COMPLETED";
+// let go of authorizations that won't be captured (best effort — Square lets them go itself after 30 minutes)
+async function voidPayments(ids: (string | null | undefined)[]) {
+  for (const id of ids) {
+    if (!id) continue;
+    try { await square(`/v2/payments/${encodeURIComponent(id)}/cancel`, { method: "POST", body: "{}" }); }
+    catch (err) { console.error("void", id, String((err as Error).message).slice(0, 200)); }
+  }
+}
+// Did the order's payments get captured? true / false, or null when Square can't be asked right now.
+async function orderCaptured(orderId: string): Promise<boolean | null> {
+  for (let i = 0; i < 2; i++) {
+    try {
+      const o = (await square(`/v2/orders/${encodeURIComponent(orderId)}`, { method: "GET" }))?.order;
+      if (!o) return null;
+      const live = ((o.tenders ?? []) as any[]).filter((t) => !["FAILED", "VOIDED"].includes(String(t?.card_details?.status ?? "")));
+      return live.length > 0 && live.every((t) => String(t?.card_details?.status ?? "") === "CAPTURED");
+    } catch { await new Promise((r) => setTimeout(r, 400)); }
+  }
+  return null;
+}
+
+// Pay with a gift card, and a card for whatever the gift card doesn't cover (GIFT CARDS at the top).
+// Throws with nothing charged and nothing left held — except `unconfirmed`, where Square has to be checked first.
+type GiftPaid = { primary: any; giftPay: any; cardPay: any | null; split: Split; last4: string | null; receipt_url: string | null };
+async function payWithGift(o: {
+  orderId: string | null; locationId: string; code: string; email: string; note: string;
+  total: number; tip?: number; gift: Gift; sourceId: string; verificationToken: string; extra?: Record<string, unknown>;
+}): Promise<GiftPaid> {
+  const tip = o.tip ?? 0;
+  const s = giftPlan(o.total, tip, o.gift.cents);
+  if (!s || s.gift !== o.gift.cents) {
+    throw giftError("The total changed, so the gift card amount did too. Please review it and pay again. Nothing was charged.", { gift_replan: true });
+  }
+  const split = s.card > 0;
+  if (split && !TOKEN_OK.test(o.sourceId)) {
+    throw giftError(`Your gift card covers ${usdTxt(s.gift)} of ${usdTxt(o.total + tip)}. Please add a card for the other ${usdTxt(s.card)}. Nothing was charged.`);
+  }
+  // capturing two payments together is PayOrder's job, and that needs the Square order
+  if (split && !o.orderId) {
+    throw giftError("We couldn't split this between a gift card and a card just now. Please pay by card, or call the shop. Nothing was charged.", { gift_recheck: true });
+  }
+  const key = async (tag: string, ...parts: (string | number)[]) => (tag + (await sha256hex([o.orderId ?? o.code, ...parts].join("|")))).slice(0, 45);
+  const common = { location_id: o.locationId, order_id: o.orderId || undefined, reference_id: o.code, buyer_email_address: o.email || undefined };
+  const hold = { autocomplete: false, delay_duration: "PT30M" }; // held, not charged
+
+  // 1. the gift card: exactly what the page showed
+  let g: any;
+  try {
+    g = (await square("/v2/payments", {
+      method: "POST",
+      body: JSON.stringify({
+        idempotency_key: await key("g", o.gift.token, s.gAmt, s.gTip, split ? 2 : 1),
+        source_id: o.gift.token,
+        amount_money: usd(s.gAmt),
+        ...(s.gTip > 0 ? { tip_money: usd(s.gTip) } : {}),
+        ...common,
+        note: `${o.note} · gift card`.slice(0, 500),
+        ...(split ? hold : { autocomplete: true }),
+      }),
+    }))?.payment ?? {};
+  } catch (err) { throw giftRefused(err, s.gift); }
+  if (!paidState(g)) throw giftError(GIFT_NO + " Nothing was charged.", { gift_recheck: true });
+  const last4 = String(g.card_details?.card?.last_4 ?? "") || null;
+  if (!split) return { primary: g, giftPay: g, cardPay: null, split: s, last4, receipt_url: g.receipt_url ?? null };
+
+  // 2. the card for the rest
+  let c: any = null;
+  try {
+    c = (await square("/v2/payments", {
+      method: "POST",
+      body: JSON.stringify({
+        idempotency_key: await key("c", o.sourceId, s.cAmt, s.cTip, g.id),
+        source_id: o.sourceId,
+        verification_token: o.verificationToken || undefined,
+        amount_money: usd(s.cAmt),
+        ...(s.cTip > 0 ? { tip_money: usd(s.cTip) } : {}),
+        ...common,
+        ...(o.extra ?? {}),
+        note: o.note,
+        ...hold,
+      }),
+    }))?.payment ?? {};
+    if (!paidState(c)) throw new PublicError("The card was not approved.");
+  } catch (err) {
+    await voidPayments([c?.id, g.id]);
+    throw err;
+  }
+  // 3. capture the two together
+  try {
+    await square(`/v2/orders/${encodeURIComponent(o.orderId!)}/pay`, {
+      method: "POST",
+      body: JSON.stringify({ idempotency_key: await key("k", g.id, c.id), payment_ids: [g.id, c.id] }),
+    });
+  } catch (err) {
+    // Square may have captured both with only its answer lost: look before letting anything go
+    const captured = await orderCaptured(o.orderId!);
+    if (captured === false) { await voidPayments([c.id, g.id]); throw err; }
+    if (captured === null) {
+      console.error("gift pay unconfirmed", o.code, o.orderId, String((err as Error).message).slice(0, 300));
+      throw giftError("We couldn't confirm your payment. Please don't pay again yet — call the shop and we'll check it for you.", { unconfirmed: true });
+    }
+  }
+  // No receipt link here: Square only makes one once a payment shows as captured, a few seconds after PayOrder.
+  return { primary: c, giftPay: g, cardPay: c, split: s, last4, receipt_url: null };
+}
+// how the payment reads on the confirmation and in the email
+function giftLabel(gp: GiftPaid, _wallet?: string | null) {
+  const g = "Gift card" + (gp.last4 ? " ····" + gp.last4 : "");
+  if (!gp.cardPay) return g;
+  const cd = gp.cardPay.card_details?.card;
+  const c = cd ? `${String(cd.card_brand || "Card").replace(/_/g, " ")} ····${cd.last_4}` : "Card";
+  return `${g} ${usdTxt(gp.split.gift)} + ${c} ${usdTxt(gp.split.card)}`;
+}
+
 // ---------- actions ----------
 async function config() {
   let reachable = false, reach_error: string | null = null;
@@ -386,17 +653,23 @@ async function config() {
     script_src: env() === "production" ? "https://web.squarecdn.com/v1/square.js" : "https://sandbox.web.squarecdn.com/v1/square.js",
     reachable, reach_error,
     pricing: pricingOut(R),
+    gift_cards: giftOn(),
   };
 }
 
 async function pay(req: Request, b: Record<string, unknown>) {
   await rateLimit(req);
   const sourceId = clean(b.source_id, 400);
-  if (!/^[A-Za-z0-9_\-:.]{8,400}$/.test(sourceId)) throw new PublicError("No card token — please re-enter the card.");
+  const gift = readGift(b); // a GREYS gift card pays some or all of it (GIFT CARDS at the top)
+  if (!(gift && !sourceId) && !TOKEN_OK.test(sourceId)) throw new PublicError("No card token — please re-enter the card.");
   const verificationToken = clean(b.verification_token, 4000);
   const shop = clean(b.location, 40) || "Memphis";
   const email = clean(b.email, 200);
   const name = (clean(b.first_name, 80) + " " + clean(b.last_name, 80)).trim();
+  // the add-ons they ticked, as keys (2026-11-14: chocolate fondue). Not sent at all (an older copy of a page):
+  // a held slot keeps the add-ons it was held with, a fresh booking takes none.
+  const addonKeys: string[] | null = Array.isArray(b.addons)
+    ? [...new Set((b.addons as unknown[]).map((k) => clean(k, 40)).filter(Boolean))].slice(0, 10) : null;
 
   // 1. the reservation (server decides price, validates party / time / tables).
   //    A link from an inquiry carries hold=<id>&hc=<code>: that slot is already held
@@ -437,9 +710,24 @@ async function pay(req: Request, b: Record<string, unknown>) {
     res = data;
   }
   if (!res || res.ok === false) throw new PublicError((res && res.error) || "That time is no longer available.");
-  const rid = String(res.id), code = String(res.code), price = Math.round(Number(res.total_cents) || 0);
+  const rid = String(res.id), code = String(res.code);
+  let price = Math.round(Number(res.total_cents) || 0);
   // a failed payment on a held slot keeps the hold; a fresh booking is cancelled
   const undo = async () => { if (fromHold) await admin.from("rb_reservations").update({ status: "pending" }).eq("id", rid).neq("payment_status", "paid"); else await cancelReservation(rid); };
+  // the add-ons, priced here (rb_experience_addons) and kept on the booking: total_cents = the package + add-ons
+  if (addonKeys) {
+    const { data: cur } = await admin.from("rb_reservations").select("experience_type_id, party_size, total_cents, addons_cents").eq("id", rid).single();
+    const pkg = Math.round(Number(cur?.total_cents) || 0) - Math.round(Number(cur?.addons_cents) || 0);
+    const { data: q, error: qe } = await admin.rpc("rb_experience_addons", { p_experience: cur?.experience_type_id, p_party: cur?.party_size, p_keys: addonKeys });
+    if (qe || !q || q.ok === false) {
+      await undo();
+      throw new PublicError((q && q.error) || "We couldn't add that add-on. Refresh the page and try again. Nothing was charged.");
+    }
+    const cents = Math.round(Number(q.cents) || 0);
+    const { error: ue } = await admin.from("rb_reservations").update({ addons: q.items, addons_cents: cents, total_cents: pkg + cents }).eq("id", rid);
+    if (ue) { await undo(); throw new Error(ue.message); }
+    price = pkg + cents;
+  }
   if (!(price > 0) || price > MAX_TOTAL_CENTS) { await undo(); throw new PublicError("That price doesn't look right — please call the shop."); }
 
   // the charge: price + 20% gratuity + sales tax, with the rates as Square has them right now
@@ -455,14 +743,27 @@ async function pay(req: Request, b: Record<string, unknown>) {
       : "This page needs a refresh: the total now shows the 20% gratuity and sales tax. Refresh it and try again. Nothing was charged.");
   }
   if (amount > MAX_TOTAL_CENTS) { await undo(); throw new PublicError("That price doesn't look right — please call the shop."); }
+  // a gift card: its share has to be the split the page showed, and a card has to be there for the rest —
+  // checked before any table is held
+  if (gift) {
+    const plan = giftPlan(amount, 0, gift.cents);
+    if (!plan || plan.gift !== gift.cents) {
+      await undo();
+      throw giftError("The total changed, so the gift card amount did too. Please review it and pay again. Nothing was charged.", { gift_replan: true });
+    }
+    if (plan.card > 0 && !TOKEN_OK.test(sourceId)) {
+      await undo();
+      throw giftError(`Your gift card covers ${usdTxt(plan.gift)} of ${usdTxt(amount)}. Please add a card for the other ${usdTxt(plan.card)}. Nothing was charged.`);
+    }
+  }
 
   // one key per card attempt: a declined card on a held slot can be retried with a new card
-  const attempt = rid + ":" + sourceId.slice(-16);
+  const attempt = rid + ":" + (sourceId || gift!.token).slice(-16);
 
   try {
     // 2. real tables in Wix (an at-home experience happens at their place: no tables)
     const { data: r } = await admin.from("rb_reservations")
-      .select("experience_type_id, starts_at, ends_at, party_size, location, guest_name, email, phone, option_label, event_address, rb_experience_types(name, at_home, info_url)").eq("id", rid).single();
+      .select("experience_type_id, starts_at, ends_at, party_size, location, guest_name, email, phone, option_label, event_address, addons, addons_cents, rb_experience_types(name, at_home, info_url, includes)").eq("id", rid).single();
     const atHome = !!(r as any)?.rb_experience_types?.at_home;
     if (!atHome) {
       const hold = await tableHolds("hold", {
@@ -480,8 +781,13 @@ async function pay(req: Request, b: Record<string, unknown>) {
     try { orderId = await createOrder(attempt.slice(0, 45) + ":o", code, P, R, r, location_id); }
     catch (e) { orderError = String((e as Error).message || e).slice(0, 500); console.error("order", rid, orderError); }
 
-    // 4. charge
-    const p = await square("/v2/payments", {
+    // 4. charge — with a gift card: the gift card first, then the card for the rest (GIFT CARDS at the top)
+    const payNote = [`${res.experience || "Experience"} · ${res.time || ""} · party of ${r?.party_size} · ${code}`, r?.option_label].filter(Boolean).join(" · ").slice(0, 500);
+    let gp: GiftPaid | null = null;
+    if (gift) {
+      gp = await payWithGift({ orderId, locationId: location_id, code, email, note: payNote, total: amount, gift, sourceId, verificationToken });
+    }
+    const p = gp ? { payment: gp.primary } : await square("/v2/payments", {
       method: "POST",
       body: JSON.stringify({
         idempotency_key: attempt.slice(0, 45),
@@ -492,7 +798,7 @@ async function pay(req: Request, b: Record<string, unknown>) {
         order_id: orderId || undefined,
         reference_id: code,
         buyer_email_address: email || undefined,
-        note: [`${res.experience || "Experience"} · ${res.time || ""} · party of ${r?.party_size} · ${code}`, r?.option_label].filter(Boolean).join(" · ").slice(0, 500),
+        note: payNote,
         autocomplete: true,
       }),
     });
@@ -506,7 +812,10 @@ async function pay(req: Request, b: Record<string, unknown>) {
       square_order_id: orderId, square_order_error: orderError,
     };
     const up = await admin.from("rb_reservations")
-      .update({ ...paidPatch, gratuity_cents: P.gratuity_cents, tax_cents: P.tax_cents, paid_cents: P.total_cents }).eq("id", rid);
+      .update({
+        ...paidPatch, gratuity_cents: P.gratuity_cents, tax_cents: P.tax_cents, paid_cents: P.total_cents,
+        ...(gp ? { gift_cents: gp.split.gift, gift_payment_id: gp.giftPay?.id ?? null, gift_last4: gp.last4 } : {}),
+      }).eq("id", rid);
     // the card is charged: the booking must end up paid even if the breakdown can't be stored
     if (up.error) { console.error("paid update", rid, up.error.message); await admin.from("rb_reservations").update(paidPatch).eq("id", rid); }
     if (fromHold) await admin.from("inquiries").update({ stage: "booked", hold_expires_at: null }).eq("reservation_id", rid);
@@ -514,7 +823,13 @@ async function pay(req: Request, b: Record<string, unknown>) {
       await admin.from("rb_reservations").update({ inquiry_id: lapsedInquiry }).eq("id", rid);
       await admin.from("inquiries").update({ stage: "booked", hold_expires_at: null, reservation_id: rid, reservation_code: code }).eq("id", lapsedInquiry);
     }
-    const card = pmt.card_details?.card ? `${pmt.card_details.card.card_brand} ····${pmt.card_details.card.last_4}` : null;
+    const card = gp ? giftLabel(gp) : pmt.card_details?.card ? `${pmt.card_details.card.card_brand} ····${pmt.card_details.card.last_4}` : null;
+    // what was booked: the package, then each add-on (2026-11-14)
+    const adds = (Array.isArray((r as any)?.addons) ? (r as any).addons : [])
+      .map((a: any) => ({ key: String(a?.key || ""), label: String(a?.label || "Add-on"), qty: Math.max(1, Math.floor(Number(a?.qty) || 1)),
+        price_cents: Math.round(Number(a?.price_cents) || 0), total_cents: Math.round(Number(a?.total_cents) || 0) }));
+    const addCents = Math.round(Number((r as any)?.addons_cents) || 0);
+    const pkgCents = P.price_cents - addCents;
 
     // 6. the guest's confirmation email. The booking is paid by now, so nothing here may throw
     //    into the catch below (that would release the tables of a paid booking).
@@ -527,9 +842,9 @@ async function pay(req: Request, b: Record<string, unknown>) {
           first: String(r?.guest_name || name || "").split(/\s+/)[0], experience: x.name || res.experience || "Experience",
           option: r?.option_label || null, startsAt: String(r?.starts_at), party: Number(r?.party_size) || 0,
           shop: String(r?.location || shop), atHome, address: r?.event_address || null, totalCents: amount, card, code,
-          notes: clean(b.notes, 1000) || null, receiptUrl: pmt.receipt_url ?? null, infoUrl: /^https:\/\//i.test(x.info_url || "") ? x.info_url : null,
+          notes: clean(b.notes, 1000) || null, receiptUrl: (gp ? gp.receipt_url : pmt.receipt_url) ?? null, infoUrl: /^https:\/\//i.test(x.info_url || "") ? x.info_url : null,
           test: env() !== "production",
-          priceCents: P.price_cents, gratuityCents: P.gratuity_cents, taxCents: P.tax_cents, gratuityPct: R.gratuity_pct,
+          priceCents: pkgCents, gratuityCents: P.gratuity_cents, taxCents: P.tax_cents, gratuityPct: R.gratuity_pct, addons: adds,
         });
         const sending = sendConfirmation(to, mail).catch((e) => { console.error("confirm mail", rid, e); return "failed"; });
         const rt = (globalThis as any).EdgeRuntime;
@@ -541,11 +856,17 @@ async function pay(req: Request, b: Record<string, unknown>) {
     return {
       ok: true, id: rid, code, experience: res.experience, time: res.time, total_cents: amount,
       price_cents: P.price_cents, gratuity_cents: P.gratuity_cents, tax_cents: P.tax_cents, pricing: pricingOut(R),
+      package_cents: pkgCents, addons: adds, addons_cents: addCents,
       party: r?.party_size, option_label: r?.option_label || null, at_home: atHome, card,
-      receipt_url: pmt.receipt_url ?? null, confirm_email,
+      receipt_url: (gp ? gp.receipt_url : pmt.receipt_url) ?? null, confirm_email,
+      ...(gp ? { gift_cents: gp.split.gift, card_cents: gp.split.card, gift_last4: gp.last4 } : {}),
     };
   } catch (e) {
-    await undo();
+    // A gift card + card payment Square may have captured without telling us: the booking and its tables are kept
+    // for a person to check, never quietly released.
+    if ((e as any)?.extra?.unconfirmed) {
+      await admin.from("rb_reservations").update({ square_order_error: "gift card + card payment unconfirmed — check this order's payments in Square before releasing the booking" }).eq("id", rid);
+    } else await undo();
     throw e;
   }
 }
@@ -564,14 +885,14 @@ async function staffEmail(req: Request) {
   return row ? email : null;
 }
 const esc = (s: string) => String(s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
-async function mailGuest(r: any, refundCents: number, reason: string) {
+async function mailGuest(r: any, refundCents: number, reason: string, refundedTo = "your card") {
   if (!r.email) return "no email";
   const exp = r.rb_experience_types?.name || "experience";
   const html = `<div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;color:#221E1B;line-height:1.55">
     <div style="font:700 22px Georgia,serif;letter-spacing:.04em;border-bottom:2px solid #E0A21C;padding-bottom:8px;margin-bottom:18px">GREYS <span style="font:400 12px Arial">Fine Cheeses · Charcuterie · Wine</span></div>
     <p>Hi ${esc(String(r.guest_name || "").split(" ")[0] || "there")},</p>
     <p>Your <b>${esc(exp)}</b> reservation for <b>${esc(fmtCT(r.starts_at))}</b> (party of ${r.party_size}, confirmation ${esc(r.code)}) has been cancelled.</p>
-    ${refundCents > 0 ? `<p>We've refunded <b>$${(refundCents / 100).toFixed(2)}</b> to your card. It usually shows up within 5–10 business days.</p>` : ""}
+    ${refundCents > 0 ? `<p>We've refunded <b>$${(refundCents / 100).toFixed(2)}</b> to ${esc(refundedTo)}. ${refundedTo === "your gift card" ? "It's back on the gift card now." : "It usually shows up within 5–10 business days."}</p>` : ""}
     ${reason ? `<p style="color:#6E6353">${esc(reason)}</p>` : ""}
     <p>Questions? Just reply to this email.</p></div>`;
   const res = await fetch(SUPABASE_URL + "/functions/v1/send-mail", {
@@ -590,12 +911,12 @@ async function cancelOrRefund(req: Request, b: Record<string, unknown>, action: 
   const who = await staffEmail(req);
   if (!who) throw Object.assign(new PublicError("Not authorized"), { status: 403 });
   const { data: r } = await admin.from("rb_reservations")
-    .select("id, code, status, payment_status, total_cents, paid_cents, refunded_cents, refund_ids, external_id, payment_env, guest_name, email, party_size, starts_at, inquiry_id, rb_experience_types(name)")
+    .select("id, code, status, payment_status, total_cents, paid_cents, refunded_cents, refund_ids, external_id, payment_env, guest_name, email, party_size, starts_at, inquiry_id, gift_cents, gift_payment_id, rb_experience_types(name)")
     .eq("id", clean(b.id, 64)).eq("kind", "experience").maybeSingle();
   if (!r) throw new PublicError("Booking not found.");
   const reason = clean(b.reason, 500);
   const keep = action === "refund" && b.cancel === false;
-  let refundCents = 0, refundId: string | null = null;
+  let refundCents = 0, refundIds: string[] = [], refundedTo = "your card";
   // what the card paid: the price + gratuity + tax since 2026-11-10 (paid_cents); the price alone before
   const charged = (r as any).paid_cents ?? r.total_cents ?? 0;
 
@@ -608,25 +929,49 @@ async function cancelOrRefund(req: Request, b: Record<string, unknown>, action: 
     refundCents = b.amount_cents == null || b.amount_cents === "" ? left : Math.round(Number(b.amount_cents));
     if (!(refundCents > 0) || refundCents > left) throw new PublicError(`Refund must be between $0.01 and $${(left / 100).toFixed(2)}.`);
     const e: Env = r.payment_env === "production" ? "production" : r.payment_env === "sandbox" ? "sandbox" : env();
-    const out = await square("/v2/refunds", {
-      method: "POST",
-      body: JSON.stringify({
-        idempotency_key: r.id + ":" + ((r.refund_ids || []).length + 1),
-        payment_id: paymentId,
-        amount_money: { amount: refundCents, currency: "USD" },
-        reason: (reason || "Experience cancelled").slice(0, 192),
-      }),
-    }, e);
-    const rf = out?.refund ?? {};
-    if (!rf.id || rf.status === "REJECTED" || rf.status === "FAILED") throw new PublicError("Square did not accept the refund" + (rf.status ? " (" + rf.status + ")" : "") + ".");
-    refundId = rf.id;
+    // A gift card may have paid some or all of it (GIFT CARDS at the top): money goes back to the card first, then
+    // to the gift card. No gift card = one refund to the card, exactly as before.
+    const giftPaid = Math.max(0, Math.min(charged, Math.round(Number((r as any).gift_cents) || 0)));
+    const giftId = giftPaid > 0 ? String((r as any).gift_payment_id || paymentId) : "";
+    const toCard = Math.min(refundCents, Math.max(0, charged - giftPaid - (r.refunded_cents || 0))), toGift = refundCents - toCard;
+    const parts = [{ id: paymentId, cents: toCard, tag: "", to: "your card" }, { id: giftId, cents: toGift, tag: "g", to: "your gift card" }].filter((x) => x.cents > 0);
+    const done: typeof parts = [];
+    let stopped: string | null = null;
+    for (const part of parts) {
+      try {
+        const out = await square("/v2/refunds", {
+          method: "POST",
+          body: JSON.stringify({
+            idempotency_key: r.id + ":" + ((r.refund_ids || []).length + 1 + done.length) + part.tag,
+            payment_id: part.id,
+            amount_money: { amount: part.cents, currency: "USD" },
+            reason: (reason || "Experience cancelled").slice(0, 192),
+          }),
+        }, e);
+        const rf = out?.refund ?? {};
+        if (!rf.id || rf.status === "REJECTED" || rf.status === "FAILED") throw new PublicError("Square did not accept the refund" + (rf.status ? " (" + rf.status + ")" : "") + ".");
+        done.push(part);
+        refundIds.push(rf.id);
+      } catch (err) {
+        if (!done.length) throw err; // nothing went back: nothing to record
+        stopped = String((err as Error).message || err).slice(0, 200);
+        break;
+      }
+    }
+    refundCents = done.reduce((n, x) => n + x.cents, 0);
+    refundedTo = done.map((x) => x.to).join(" and ").replace("your card and your gift card", "your card and gift card");
+    // the card part went back but the gift card part didn't: record what did, keep the booking, and say so
+    if (stopped) {
+      await admin.from("rb_reservations").update({ refunded_cents: (r.refunded_cents || 0) + refundCents, refund_ids: [...(r.refund_ids || []), ...refundIds] }).eq("id", r.id);
+      throw new PublicError(`Refunded $${(refundCents / 100).toFixed(2)} to the card, but the gift card part ($${(toGift / 100).toFixed(2)}) didn't go through: ${stopped} Nothing else was changed — refund the rest again.`);
+    }
   }
 
   const refundedTotal = (r.refunded_cents || 0) + refundCents;
   const patch: Record<string, unknown> = {};
   if (refundCents) {
     patch.refunded_cents = refundedTotal;
-    patch.refund_ids = [...(r.refund_ids || []), refundId];
+    patch.refund_ids = [...(r.refund_ids || []), ...refundIds];
     if (refundedTotal >= charged) patch.payment_status = "refunded";
   }
   if (!keep) { patch.status = "cancelled"; patch.cancelled_at = new Date().toISOString(); patch.cancel_reason = reason || null; patch.hold_expires_at = null; }
@@ -640,13 +985,13 @@ async function cancelOrRefund(req: Request, b: Record<string, unknown>, action: 
     await admin.from("inquiry_messages").insert({ inquiry_id: r.inquiry_id, direction: "note", body: line, sent_by: who });
     if (!keep) await admin.from("inquiries").update({ stage: "lost" }).eq("id", r.inquiry_id);
   }
-  const mail = b.notify === true && !keep ? await mailGuest(r, refundCents, reason) : null;
+  const mail = b.notify === true && !keep ? await mailGuest(r, refundCents, reason, refundedTo) : null;
   return { ok: true, refunded_cents: refundCents, refunded_total: refundedTotal, cancelled: !keep, email: mail };
 }
 
 async function status(b: Record<string, unknown>) {
   const { data } = await admin.from("rb_reservations")
-    .select("code, party_size, starts_at, total_cents, gratuity_cents, tax_cents, paid_cents, status, payment_status, option_label, event_address, rb_experience_types(name)")
+    .select("code, party_size, starts_at, total_cents, gratuity_cents, tax_cents, paid_cents, status, payment_status, option_label, event_address, addons, addons_cents, rb_experience_types(name)")
     .eq("code", clean(b.code, 20).toUpperCase()).eq("email", clean(b.email, 200).toLowerCase()).eq("kind", "experience").maybeSingle();
   return data ? { ok: true, reservation: data } : { ok: false, error: "Reservation not found" };
 }
@@ -659,12 +1004,13 @@ Deno.serve(async (req) => {
     try { body = await req.json(); } catch { /* empty */ }
     const action = new URL(req.url).searchParams.get("action") ?? String(body.action ?? "");
     if (action === "config") return json(req, await config());
+    if (action === "gift_balance") return json(req, await giftBalance(req, body));
     if (action === "pay") return json(req, await pay(req, body));
     if (action === "status") return json(req, await status(body));
     if (action === "cancel" || action === "refund") return json(req, await cancelOrRefund(req, body, action));
     return json(req, { ok: false, error: "Unknown action" }, 400);
   } catch (e) {
-    if (e instanceof PublicError) return json(req, { ok: false, error: e.message }, (e as any).status === 403 ? 403 : 402);
+    if (e instanceof PublicError) return json(req, { ok: false, error: e.message, ...((e as any).extra ?? {}) }, (e as any).status === 403 ? 403 : 402);
     console.error(`[${ref}]`, e);
     return json(req, { ok: false, error: `Something went wrong on our side and nothing was charged. Reference ${ref}.` }, 500);
   }
