@@ -1708,8 +1708,13 @@ async function giftBalance(req: Request, b: any) {
   try {
     gc = (await square("/v2/gift-cards/from-nonce", { method: "POST", body: JSON.stringify({ nonce }) }, e))?.gift_card ?? {};
   } catch (err) {
-    if (err instanceof SquareError && err.status < 500) throw new PublicError("We couldn't find that gift card. Check the number and try again.", 404);
-    throw err;
+    if (!(err instanceof SquareError) || err.status >= 500) throw err;
+    // 401 / 403 = our Square access, not their card: say so in the log, and don't blame the number
+    if (err.status === 401 || err.status === 403) {
+      console.error("gift balance: Square refused us", err.status, err.codes.join(","));
+      throw new PublicError("Gift cards aren't working right now. Please pay by card, or call the shop.", 503);
+    }
+    throw new PublicError("We couldn't find that gift card. Check the number and try again.", 404);
   }
   if (String(gc.state) !== "ACTIVE") throw new PublicError("That gift card isn't active. Please ask the shop.", 409);
   const balance = Math.round(Number(gc.balance_money?.amount ?? 0));
@@ -1828,13 +1833,9 @@ async function payWithGift(o: {
       throw new PublicError("We couldn't confirm your payment. Please don't order again yet — call the shop and we'll check it for you.", 502, { unconfirmed: true });
     }
   }
-  // a receipt link only exists once the payment is captured, and Square takes a moment to say so
-  let receipt: string | null = null;
-  for (let i = 0; i < 3 && !receipt; i++) {
-    if (i) await new Promise((r) => setTimeout(r, 500));
-    try { receipt = (await square(`/v2/payments/${encodeURIComponent(c.id)}`, { method: "GET" }, o.e))?.payment?.receipt_url ?? null; } catch { break; }
-  }
-  return { primary: c, giftPay: g, cardPay: c, split: s, last4, receipt_url: receipt };
+  // No receipt link here: Square only makes one once a payment shows as captured, a few seconds after PayOrder
+  // (tried in the sandbox) — the customer has our confirmation email, and the order in Square shows both tenders.
+  return { primary: c, giftPay: g, cardPay: c, split: s, last4, receipt_url: null };
 }
 // how the payment reads on the order, the confirmation and the email
 function giftLabel(gp: GiftPaid, wallet: string | null) {
