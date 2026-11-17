@@ -317,6 +317,35 @@ async function square(path: string, init: RequestInit = {}) {
   return data;
 }
 
+// A declined card (or any refusal before capture) used to leave the Square
+// order OPEN with a FAILED tender. Cancel it so it doesn't sit in Square as an
+// unpaid sale (2026-10-07). Square: UpdateOrder needs the current version and a
+// NEW idempotency key, and an order can't be canceled once a payment completed.
+async function cancelUnpaidOrder(orderId: string): Promise<string> {
+  try {
+    const got = await square(`/v2/orders/${orderId}`);
+    const order = (got?.order ?? {}) as Record<string, any>;
+    const state = String(order.state ?? "");
+    if (state !== "OPEN") return `skipped: ${state || "unknown"}`;
+    // Any tender that is not FAILED/VOIDED means money moved. Gift cards report
+    // under card_details too, and a tender with no status is treated as live.
+    for (const t of (order.tenders ?? []) as Record<string, any>[]) {
+      const st = String(t?.card_details?.status ?? "");
+      if (st !== "FAILED" && st !== "VOIDED") return `skipped: tender ${st || "unknown"}`;
+    }
+    await square(`/v2/orders/${orderId}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        idempotency_key: `cx_${orderId}_${order.version}`.slice(0, 192),
+        order: { location_id: order.location_id, version: order.version, state: "CANCELED" },
+      }),
+    });
+    return "canceled";
+  } catch (e) {
+    return `error: ${String(e instanceof Error ? e.message : e).slice(0, 120)}`;
+  }
+}
+
 const cents = (v: unknown) => Math.round(Number(v ?? 0));
 const money = (amount: number) => ({ amount: cents(amount), currency: CURRENCY });
 const clean = (v: unknown, max = 200) => String(v ?? "").trim().slice(0, max);
@@ -388,20 +417,62 @@ type Intent = {
   // never taxed or hit by the service fee.
   tipCents: number;
   tipPercent: number;
-  // Square catalog variation for this class date (square-class-items). When
-  // set, the ticket line references the real item so Square reports online and
-  // register sales together. Price stays the ticket price (fee is separate).
-  variationId: string | null;
+  // Square catalog variation for this date (square-class-items). Every ticket
+  // line references the real item, so Square reports online and register sales
+  // together. Price stays the ticket price (the fee is its own charge).
+  variationId: string;
   // add-on id -> Square CatalogModifier id on that item (upgrades as modifiers)
   modifierIds: Record<string, string>;
 };
 
-// Catalog-linked ticket lines are on for the staging site first; add the live
-// origin here (or set CLASS_CATALOG_ONLINE=all) once register tests pass.
-function catalogAllowed(req: Request) {
-  if ((Deno.env.get("CLASS_CATALOG_ONLINE") ?? "") === "all") return true;
-  return (req.headers.get("Origin") ?? "") === "https://ticket-rennet.onrender.com";
+// Catalog lines are no longer optional and no longer gated: every ticket sale
+// reaches Square as a real catalog item line, so the CLASS_CATALOG_ONLINE
+// secret is NOT read any more and the ad-hoc fallback line is gone. Leaving the
+// secret set does nothing. (2026-10-09)
+
+// square-class-items owns the Square catalog; nothing in here writes it. When
+// an event has no usable item yet, that function is asked to build one.
+const CLASS_ITEMS_FUNCTION = env() === "production" ? "square-class-items" : "square-class-items-sandbox";
+
+async function readLink(eventId: string): Promise<Record<string, any> | null> {
+  const { data } = await admin.from("class_square_links")
+    .select("square_variation_id,location_id,modifier_ids")
+    .eq("env", env()).eq("event_id", eventId).maybeSingle();
+  return (data as Record<string, any> | null) ?? null;
 }
+
+// Make (or repair) this event's catalog item right now, from the one function
+// that owns the catalog — no duplicated catalog-writing code in here. Same
+// service-role call pattern sendConfirmation uses. A catalog function that
+// hangs must not hang checkout: 25 seconds, then the booking is refused with
+// nothing charged.
+async function ensureLink(eventId: string): Promise<unknown> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 25000);
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/${CLASS_ITEMS_FUNCTION}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!}`,
+      },
+      body: JSON.stringify({ action: "ensure", eventId }),
+      signal: ctrl.signal,
+    });
+    const data = await res.json().catch(() => null);
+    return { status: res.status, body: data };
+  } catch (e) {
+    return { error: String(e instanceof Error ? e.message : e).slice(0, 200) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Mahjong-style events: events.price is per SEAT and seats are sold only as
+// whole tables of party_size, so one catalog line is one table. Everything else
+// is one line quantity per seat.
+const tableSeats = (ev: Record<string, any>) =>
+  String(ev?.kind) === "event_tabled" ? Math.max(1, Math.floor(Number(ev?.party_size ?? 1) || 1)) : 1;
 
 // Tip presets the page offers. Anything else must come in as a flat amount.
 const TIP_PERCENTS = [15, 18, 20];
@@ -543,19 +614,37 @@ async function buildIntent(body: Record<string, unknown>): Promise<Intent> {
   const discountCents = promoDiscountCents(promo, addOnCounts, subtotal);
   const { tipCents, tipPercent } = tipFor(body, subtotal - discountCents);
 
-  let variationId: string | null = null;
-  let modifierIds: Record<string, string> = {};
-  if (body.__catalog === true) {
-    try {
-      const { data: link } = await admin.from("class_square_links")
-        .select("square_variation_id,location_id,modifier_ids")
-        .eq("env", env()).eq("event_id", event.id).maybeSingle();
-      if (link?.square_variation_id && link.location_id === locationForEvent(event)) {
-        variationId = link.square_variation_id;
-        modifierIds = (link.modifier_ids ?? {}) as Record<string, string>;
-      }
-    } catch (_) { /* no link: ad-hoc line, exactly as before */ }
+  // THE CATALOG LINK. A sale is only ever a real Square catalog line, so the
+  // link has to be there, point at the location this event's money belongs to,
+  // and carry a modifier for every upgrade on this booking. If it doesn't,
+  // square-class-items is asked to build it — all of this happens before a seat
+  // is claimed, an order is opened or a card is charged. (2026-10-09)
+  const chosen = addOnCounts.map((x) => x.addOn.id);
+  const usable = (l: Record<string, any> | null) =>
+    !!l?.square_variation_id &&
+    l.location_id === locationForEvent(event) &&
+    chosen.every((id) => ((l.modifier_ids ?? {}) as Record<string, string>)[id]);
+  let link = await readLink(event.id);
+  let ensured: unknown = null;
+  if (!usable(link)) {
+    ensured = await ensureLink(event.id);
+    link = await readLink(event.id);
   }
+  if (!usable(link)) {
+    console.error("no usable catalog link", JSON.stringify({
+      event_id: event.id,
+      kind: event.kind,
+      location: event.location,
+      wanted_location: locationForEvent(event),
+      link,
+      ensure: ensured,
+    }).slice(0, 1500));
+    throw new PublicError(
+      "This event can't be booked online right now. Nothing was charged — please call the shop.",
+    );
+  }
+  const variationId = String(link!.square_variation_id);
+  const modifierIds = (link!.modifier_ids ?? {}) as Record<string, string>;
 
   return {
     variationId,
@@ -579,30 +668,49 @@ async function buildIntent(body: Record<string, unknown>): Promise<Intent> {
 
 // The Square order body. quote and pay send the identical structure, so the
 // figures shown to the buyer are the figures charged.
+//
+// Every line is a CATALOG line (2026-10-09): the variation from
+// class_square_links, upgrades as that item's own modifiers, so Square reports
+// an online sale exactly like a register one. buildIntent has already proved
+// the link is usable, so there is nothing to fall back to. The money is
+// unchanged — base_price_money still overrides the register's fee-bearing
+// catalog price with the bare ticket price, and the tax, the service fee, the
+// promo and the metadata are all as they were.
 function orderBody(intent: Intent, referenceId?: string) {
   const ev = intent.event;
-  const when = new Date(`${ev.date}T12:00:00`).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  const party = tableSeats(ev);
+  let line_items: Record<string, unknown>[];
 
-  // Catalog path: one ticket line per upgrade combo, upgrades as the item's
-  // modifiers, so Square reports online sales exactly like the register.
-  // Needs every chosen upgrade to have a modifier; otherwise the old shape.
-  const allMods = intent.addOnCounts.every((x) => intent.modifierIds?.[x.addOn.id]);
-  let catalogLines: Record<string, unknown>[] | null = null;
-  if (intent.variationId && allMods && intent.guests.length) {
+  if (party > 1) {
+    // Tabled event: one line of whole tables, priced per table. A table of 4
+    // at $31.25 a seat is 1 x $125.00 — the same money as 4 x $31.25.
+    if (intent.qty % party !== 0) {
+      // claim_ticket_seats refuses this first; this is the backstop.
+      throw new PublicError(
+        "Tables for this event are sold whole. Please reload the page and try again. Nothing was charged.",
+      );
+    }
+    line_items = [{
+      uid: "tickets",
+      catalog_object_id: intent.variationId,
+      quantity: String(intent.qty / party),
+      base_price_money: money(cents(ev.price) * party),
+      note: clean(ev.location, 40),
+    }];
+  } else {
+    // One ticket line per upgrade combo, upgrades as modifiers on that line.
     const combos = new Map<string, number>();
     for (const g of intent.guests) {
       const k = [...new Set((g.optIds ?? []).map(String))].sort().join("|");
       combos.set(k, (combos.get(k) ?? 0) + 1);
     }
     const priceOf = new Map(intent.addOnCounts.map((x) => [x.addOn.id, x.addOn.price]));
-    const lines = [...combos.entries()].map(([k, n], i) => ({
+    line_items = [...combos.entries()].map(([k, n], i) => ({
       uid: i === 0 ? "tickets" : `tickets_${i}`,
       catalog_object_id: intent.variationId,
       quantity: String(n),
+      // Online price is the bare ticket; the service fee is its own charge below.
+      // (The catalog price carries the fee for register sales.)
       base_price_money: money(ev.price),
       note: clean(ev.location, 40),
       modifiers: k ? k.split("|").map((id) => ({
@@ -611,30 +719,12 @@ function orderBody(intent: Intent, referenceId?: string) {
         quantity: "1",
       })) : undefined,
     }));
-    // Sanity: the modifier path must price exactly like the ad-hoc path.
-    const seats = lines.reduce((s, l) => s + Number(l.quantity), 0);
-    if (seats === intent.qty) catalogLines = lines;
-  }
-
-  const line_items: Record<string, unknown>[] = catalogLines ?? [{
-    uid: "tickets",
-    ...(intent.variationId
-      ? { catalog_object_id: intent.variationId }
-      : { name: `${clean(ev.title, 400)} · ${when}` }),
-    quantity: String(intent.qty),
-    // Online price is the bare ticket; the service fee is its own charge below.
-    // (The catalog price carries the fee for register sales.)
-    base_price_money: money(ev.price),
-    note: clean(ev.location, 40),
-  }];
-
-  for (const { addOn, count } of catalogLines ? [] : intent.addOnCounts) {
-    line_items.push({
-      uid: `ao_${addOn.id}`.slice(0, 60),
-      name: clean(addOn.name, 400),
-      quantity: String(count),
-      base_price_money: money(addOn.price),
-    });
+    // The seats on the lines must add up to the seats being sold. Only our own
+    // bug can break this, so it is an internal error — never a cheaper order.
+    const seats = line_items.reduce((s, l) => s + Number(l.quantity), 0);
+    if (seats !== intent.qty) {
+      throw new Error(`catalog lines carry ${seats} seats, qty is ${intent.qty} (event ${ev.id})`);
+    }
   }
 
   const order: Record<string, unknown> = {
@@ -743,6 +833,7 @@ async function config() {
       ? "https://web.squarecdn.com/v1/square.js"
       : "https://sandbox.web.squarecdn.com/v1/square.js",
     tax_rate: taxRate(),
+    card_fee_pct: feeOn() ? feePct() : 0, // CREDIT CARD FEE
     fee_rate: feeRate(),
     fee_label: feeLabel(),
     tax_label: taxLabel(),
@@ -761,7 +852,7 @@ async function quote(req: Request, body: Record<string, unknown>) {
     `q:${callerIp(req)}`, QUOTE_LIMIT, QUOTE_WINDOW_SECS,
     "Too many price checks from this connection. Please wait a minute and try again.",
   );
-  const intent = await buildIntent({ ...body, __catalog: catalogAllowed(req), __resume: false });
+  const intent = await buildIntent({ ...body, __resume: false });
   const { order: _sq, ...totals } = await calculate(intent);
   const left = await seatsLeft(intent.event.id, intent.event.capacity);
   return {
@@ -909,7 +1000,8 @@ function confirmationHtml(
         ${totals.tax_cents ? row(esc(taxLabel()), usd(totals.tax_cents)) : ""}
         ${totals.fee_cents ? row(esc(feeLabel()), usd(totals.fee_cents)) : ""}
         ${tip ? row("Tip" + (intent.tipPercent ? ` (${intent.tipPercent}%)` : ""), usd(tip)) : ""}
-        ${row("<b>Total</b>", "<b>" + usd(totals.total_cents + tip) + "</b>")}
+        ${(totals as any).card_fee_cents ? row("Credit card fee", usd((totals as any).card_fee_cents)) : ""}
+        ${row("<b>Total</b>", "<b>" + usd(totals.total_cents + tip + ((totals as any).card_fee_cents || 0)) + "</b>")}
         ${(card?.last_4 || giftCents > 0)
           ? `<tr><td colspan="2" style="padding:10px 0 2px;color:#777;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Payment</td></tr>` +
             (giftCents > 0 ? row("Gift card", usd(giftCents)) : "") +
@@ -1186,7 +1278,7 @@ async function pay(req: Request, body: Record<string, unknown>) {
     }
   }
 
-  const intent = await buildIntent({ ...body, __catalog: catalogAllowed(req), __resume: !!prior });
+  const intent = await buildIntent({ ...body, __resume: !!prior });
   await throttle(intent.buyer.email);
 
   // The ceiling. The client sends the total it actually displayed; if the
@@ -1302,7 +1394,7 @@ async function pay(req: Request, body: Record<string, unknown>) {
       .update({ payment_status: "failed" }).eq("id", regId);
   };
 
-  let sq: Record<string, any>;
+  let sq: Record<string, any> = {};
   let totals: Totals;
   let payment: Record<string, any>;
   // Split tender bookkeeping. Authorised-but-uncaptured payments are cancelled
@@ -1310,6 +1402,7 @@ async function pay(req: Request, body: Record<string, unknown>) {
   let giftPay: Record<string, any> | null = null;
   let cardPay: Record<string, any> | null = null;
   let giftCents = 0;
+  let cardFee = 0; // CREDIT CARD FEE
 
   // ---- everything in here happens BEFORE the card is charged ----
   try {
@@ -1354,22 +1447,13 @@ async function pay(req: Request, body: Record<string, unknown>) {
       giftCents = r.giftCents;
       payment = r.primary;
     } else {
-    const res = await square("/v2/payments", {
-      method: "POST",
-      body: JSON.stringify({
-        idempotency_key: pmt!.id, // same key on every retry of this attempt
-        source_id: sourceId,
-        verification_token: verificationToken || undefined,
-        order_id: sq.id,
-        location_id: locationForEvent(intent.event),
-        amount_money: money(due),
-        tip_money: intent.tipCents > 0 ? money(intent.tipCents) : undefined,
-        autocomplete: true,
-        reference_id: code,
-        buyer_email_address: intent.buyer.email,
-        note: `${clean(intent.event.title, 60)} · ${intent.qty} seat${intent.qty === 1 ? "" : "s"}`,
-      }),
+    const r = await chargeCard({
+      orderId: sq.id, locationId: locationForEvent(intent.event), key: pmt!.id, // same key on every retry of this attempt
+      sourceId, verificationToken, amount: due, tip: intent.tipCents, reference: code, email: intent.buyer.email,
+      note: `${clean(intent.event.title, 60)} · ${intent.qty} seat${intent.qty === 1 ? "" : "s"}`,
     });
+    cardFee = r.fee;
+    const res = { payment: r.pmt };
     payment = res?.payment ?? {};
     const paidStatus = String(payment?.status ?? "");
     if (paidStatus !== "COMPLETED" && paidStatus !== "APPROVED") {
@@ -1384,13 +1468,18 @@ async function pay(req: Request, body: Record<string, unknown>) {
         try { await square(`/v2/payments/${p.id}/cancel`, { method: "POST" }); } catch (_) {/* best effort */}
       }
     }
+    // Cancel the order we just created, so a decline doesn't leave an unpaid
+    // sale open in Square (2026-10-07). Skipped on a Square 5xx or a network
+    // error, where the charge may have landed after all.
+    const safeToCancel = (!(e instanceof SquareFail) || e.status < 500) && !(e instanceof TypeError);
+    const cx = safeToCancel && sq?.id ? await cancelUnpaidOrder(sq.id) : "";
     const msg = String(e instanceof Error ? e.message : e);
-    await fail(msg, e instanceof SquareFail ? e.data : undefined);
+    await fail(cx ? `${msg} [order ${cx}]` : msg, e instanceof SquareFail ? e.data : undefined);
     // The ledger keeps Square's raw code; the buyer gets the plain sentence.
     throw e instanceof SquareFail ? new PublicError(e.customer) : e;
   }
   // What the card actually carried: its share of the order plus the whole tip.
-  const cardCents = totals!.total_cents - giftCents + intent.tipCents;
+  const cardCents = totals!.total_cents - giftCents + intent.tipCents + cardFee;
 
   // ================= MONEY HAS MOVED =================
   // Nothing below may call fail(), throw, or refuse. Every write is retried and
@@ -1405,6 +1494,7 @@ async function pay(req: Request, body: Record<string, unknown>) {
       gift_payment_id: (giftPay as Record<string, any> | null)?.id ?? null,
       gift_cents: giftCents,
       card_cents: cardCents,
+      card_fee_cents: cardFee,
       tip_cents: intent.tipCents,
       card_brand: cardDetails.card_brand ?? null,
       card_last4: cardDetails.last_4 ?? null,
@@ -1442,7 +1532,7 @@ async function pay(req: Request, body: Record<string, unknown>) {
   // tries, then the failure is recorded on the ledger instead of thrown. A
   // customer who paid must never see an error because our mailer had a moment.
   problems.push((await persist("confirmation email", () =>
-    sendConfirmation(intent, totals!, code, regId, cardDetails, giftCents))) ?? "");
+    sendConfirmation(intent, { ...totals!, card_fee_cents: cardFee } as Totals, code, regId, cardDetails, giftCents))) ?? "");
 
   const residue = problems.filter(Boolean).join(" | ");
   if (residue) {
@@ -1467,7 +1557,8 @@ async function pay(req: Request, body: Record<string, unknown>) {
     gift_cents: giftCents,
     card_cents: cardCents,
     tip_cents: intent.tipCents,
-    grand_total_cents: totals!.total_cents + intent.tipCents,
+    grand_total_cents: totals!.total_cents + intent.tipCents + cardFee,
+    card_fee_cents: cardFee,
     square_env: env(),
   };
 }
@@ -1503,6 +1594,122 @@ async function status(body: Record<string, unknown>) {
   return { payment: safe };
 }
 
+// ---------- CREDIT CARD FEE (2026-11-17) ----------
+// Maverick: "we need to be charging the 3% credit card fees online, well everywhere". Same as square-online-order v20:
+// the card is HELD first so Square says what kind it is; a CREDIT card (not prepaid) gets FEE_PCT (3%) of the amount
+// (tip not included) added to the hold and a "Credit card fee (3%)" line (TOTAL_PHASE, not taxed) on the Square order,
+// then it's captured. Debit / prepaid / gift cards: no fee. If Square won't take the fee it's captured WITHOUT it.
+// Separate from the 4% "Ticketing service fee" above (every order, any tender): this one is only on credit cards.
+// Secrets: CARD_FEE=off, CARD_FEE_PCT (default 3, never over 3).
+const SQ = (path: string, init: RequestInit) => square(path, init);
+const $usd = (amount: number) => ({ amount, currency: "USD" });
+async function feeHash(s: string) {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+const FEE_UID = "ccfee";
+const feeOn = () => (Deno.env.get("CARD_FEE") ?? "on").trim().toLowerCase() !== "off";
+const feePct = () => Math.min(3, Math.max(0, Number(Deno.env.get("CARD_FEE_PCT") ?? "3") || 0));
+const feeFor = (amount: number) => Math.round(amount * feePct() / 100);
+const ccFeeLabel = () => `Credit card fee (${feePct()}%)`;
+const isCredit = (p: any) => {
+  const c = p?.card_details?.card ?? {};
+  return String(c.card_type ?? "") === "CREDIT" && String(c.prepaid_type ?? "") !== "PREPAID";
+};
+// the fee already on a Square order (0 when none)
+const feeOnOrder = (o: any) => ((o?.service_charges ?? []) as any[]).filter((s) => s?.uid === FEE_UID)
+  .reduce((n, s) => n + Number(s?.applied_money?.amount ?? s?.amount_money?.amount ?? 0), 0);
+
+// Charge a card for an order: hold → fee if it's a credit card → capture. Returns the captured payment and the fee.
+// Throws when the card is refused (nothing is left held).
+async function chargeCard(o: {
+  orderId: string | null; locationId: string; key: string; sourceId: string; verificationToken?: string;
+  amount: number; tip: number; reference: string; email: string; note: string; extra?: Record<string, unknown>;
+}): Promise<{ pmt: any; fee: number }> {
+  const created = await SQ("/v2/payments", {
+    method: "POST",
+    body: JSON.stringify({
+      idempotency_key: o.key, source_id: o.sourceId, verification_token: o.verificationToken || undefined,
+      amount_money: $usd(o.amount), ...(o.tip > 0 ? { tip_money: $usd(o.tip) } : {}),
+      location_id: o.locationId, order_id: o.orderId, reference_id: o.reference, buyer_email_address: o.email,
+      note: o.note, ...(o.extra ?? {}), autocomplete: false, delay_duration: "PT30M",
+    }),
+  });
+  let pmt = created?.payment ?? {};
+  if (pmt.status === "COMPLETED") { // a retry of a checkout that already went through
+    const ord = (await SQ(`/v2/orders/${encodeURIComponent(o.orderId)}`, { method: "GET" }).catch(() => null))?.order;
+    return { pmt, fee: feeOnOrder(ord) };
+  }
+  if (pmt.status !== "APPROVED") throw new Error("The card was not approved (" + pmt.status + ").");
+  const pid = encodeURIComponent(pmt.id);
+  let fee = 0;
+  if (feeOn() && isCredit(pmt) && feeFor(o.amount) > 0) {
+    const want = feeFor(o.amount);
+    let raised = Number(pmt.amount_money?.amount) === o.amount + want;
+    try {
+      if (!raised) {
+        const up = await SQ(`/v2/payments/${pid}`, { method: "PUT", body: JSON.stringify({
+          idempotency_key: ("f" + await feeHash(pmt.id + "|up|" + want)).slice(0, 45),
+          payment: { amount_money: $usd(o.amount + want), ...(o.tip > 0 ? { tip_money: $usd(o.tip) } : {}) },
+        }) });
+        pmt = up?.payment ?? pmt;
+        raised = Number(pmt.amount_money?.amount) === o.amount + want;
+      }
+      if (raised && o.orderId) {
+        const cur = (await SQ(`/v2/orders/${encodeURIComponent(o.orderId)}`, { method: "GET" }))?.order;
+        if (feeOnOrder(cur) !== want) {
+          await SQ(`/v2/orders/${encodeURIComponent(o.orderId)}`, { method: "PUT", body: JSON.stringify({
+            idempotency_key: ("g" + await feeHash(o.orderId + "|fee|" + want + "|" + cur?.version)).slice(0, 45),
+            order: { location_id: o.locationId, version: cur?.version, service_charges: [{
+              uid: FEE_UID, name: ccFeeLabel(), amount_money: $usd(want), calculation_phase: "TOTAL_PHASE", taxable: false,
+            }] },
+          }) });
+        }
+        fee = want;
+      } else if (raised) fee = want; // no Square order to put the line on: the fee is on the payment only
+    } catch (err) {
+      console.error("card fee", o.orderId, String((err as Error).message).slice(0, 200));
+      // couldn't add it everywhere: put the hold back to what the page showed and charge that
+      if (Number(pmt.amount_money?.amount) !== o.amount) {
+        const down = await SQ(`/v2/payments/${pid}`, { method: "PUT", body: JSON.stringify({
+          idempotency_key: ("h" + await feeHash(pmt.id + "|down")).slice(0, 45), payment: { amount_money: $usd(o.amount) },
+        }) }).catch(() => null);
+        if (down?.payment) pmt = down.payment;
+      }
+      fee = 0;
+    }
+  }
+  try {
+    if (o.orderId) await SQ(`/v2/orders/${encodeURIComponent(o.orderId)}/pay`, { method: "POST", body: JSON.stringify({
+      idempotency_key: ("k" + await feeHash(o.orderId + "|" + pmt.id + "|" + fee)).slice(0, 45), payment_ids: [pmt.id],
+    }) });
+    else await SQ(`/v2/payments/${pid}/complete`, { method: "POST", body: "{}" });
+  } catch (err) {
+    // the amounts didn't add up (or Square said no): take the fee back off and capture the order as shown
+    console.error("pay order", o.orderId, String((err as Error).message).slice(0, 200));
+    if (fee && o.orderId) {
+      const cur = (await SQ(`/v2/orders/${encodeURIComponent(o.orderId)}`, { method: "GET" }).catch(() => null))?.order;
+      if (cur && feeOnOrder(cur)) {
+        await SQ(`/v2/orders/${encodeURIComponent(o.orderId)}`, { method: "PUT", body: JSON.stringify({
+          idempotency_key: ("j" + await feeHash(o.orderId + "|nofee|" + cur.version)).slice(0, 45),
+          fields_to_clear: [`service_charges[${FEE_UID}]`], order: { location_id: o.locationId, version: cur.version },
+        }) }).catch(() => null);
+      }
+      await SQ(`/v2/payments/${pid}`, { method: "PUT", body: JSON.stringify({
+        idempotency_key: ("h" + await feeHash(pmt.id + "|down")).slice(0, 45), payment: { amount_money: $usd(o.amount) },
+      }) }).catch(() => null);
+      fee = 0;
+      try {
+        await SQ(`/v2/orders/${encodeURIComponent(o.orderId)}/pay`, { method: "POST", body: JSON.stringify({
+          idempotency_key: ("k" + await feeHash(o.orderId + "|" + pmt.id + "|0")).slice(0, 45), payment_ids: [pmt.id],
+        }) });
+      } catch (err2) { await SQ(`/v2/payments/${pid}/cancel`, { method: "POST", body: "{}" }).catch(() => null); throw err2; }
+    } else { await SQ(`/v2/payments/${pid}/cancel`, { method: "POST", body: "{}" }).catch(() => null); throw err; }
+  }
+  const done = (await SQ(`/v2/payments/${pid}`, { method: "GET" }).catch(() => null))?.payment;
+  return { pmt: done ?? { ...pmt, status: "COMPLETED" }, fee };
+}
+
 // ---------- admin ----------
 async function refund(body: Record<string, unknown>) {
   const id = clean(body.payment_id ?? body.id, 64);
@@ -1512,7 +1719,7 @@ async function refund(body: Record<string, unknown>) {
   if (row.status === "refunded") throw new PublicError("already fully refunded");
 
   // The tip rode on the card payment, so it is refundable along with the order.
-  const total = cents(row.total_cents) + cents(row.tip_cents ?? 0);
+  const total = cents(row.total_cents) + cents(row.tip_cents ?? 0) + cents(row.card_fee_cents ?? 0); // + the credit card fee (it rode on the card too)
   const already = cents(row.refunded_cents ?? 0); // NULL used to make this NaN
   const remaining = total - already;
   if (remaining <= 0) throw new PublicError("nothing left to refund");

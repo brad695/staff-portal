@@ -366,7 +366,7 @@ const cfWhen = (iso: string) => cfSp(new Date(iso).toLocaleString("en-US",
   { timeZone: "America/Chicago", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }));
 const cfDay = (iso: string) => cfSp(new Date(iso).toLocaleDateString("en-US", { timeZone: "America/Chicago", weekday: "long", month: "long", day: "numeric" }));
 const cfTime = (iso: string) => cfSp(new Date(iso).toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" }));
-type ConfirmInfo = {
+type ConfirmInfo = { cardFeeCents?: number;
   first: string; experience: string; option: string | null; startsAt: string; party: number; shop: string;
   atHome: boolean; address: string | null; totalCents: number; card: string | null; code: string;
   notes: string | null; receiptUrl: string | null; infoUrl: string | null; test: boolean;
@@ -400,7 +400,8 @@ function confirmationEmail(d: ConfirmInfo) {
       (d.priceCents != null && (d.gratuityCents || d.taxCents)
         ? `<br><span style="font:13px/1.5 Arial,sans-serif;color:${CF.MUTE}">${cfEsc(cfMoney(d.priceCents))}` +
           (d.addons || []).map((a) => ` + ${cfEsc(a.label.toLowerCase())} ${cfEsc(cfMoney(a.total_cents))}`).join("") +
-          ` + ${cfEsc(String(Number(d.gratuityPct || 20)))}% gratuity ${cfEsc(cfMoney(d.gratuityCents || 0))} + sales tax ${cfEsc(cfMoney(d.taxCents || 0))}</span>`
+          ` + ${cfEsc(String(Number(d.gratuityPct || 20)))}% gratuity ${cfEsc(cfMoney(d.gratuityCents || 0))} + sales tax ${cfEsc(cfMoney(d.taxCents || 0))}` +
+          (d.cardFeeCents ? ` + credit card fee ${cfEsc(cfMoney(d.cardFeeCents))}` : "") + `</span>`
         : "")) +
     row("Confirmation", `<b>${cfEsc(d.code)}</b>`) +
     (d.notes ? row("Your notes", cfEsc(d.notes)) : "") +
@@ -653,7 +654,7 @@ async function config() {
     script_src: env() === "production" ? "https://web.squarecdn.com/v1/square.js" : "https://sandbox.web.squarecdn.com/v1/square.js",
     reachable, reach_error,
     pricing: pricingOut(R),
-    gift_cards: giftOn(),
+    gift_cards: giftOn(), card_fee_pct: feeOn() ? feePct() : 0,
   };
 }
 
@@ -787,21 +788,11 @@ async function pay(req: Request, b: Record<string, unknown>) {
     if (gift) {
       gp = await payWithGift({ orderId, locationId: location_id, code, email, note: payNote, total: amount, gift, sourceId, verificationToken });
     }
-    const p = gp ? { payment: gp.primary } : await square("/v2/payments", {
-      method: "POST",
-      body: JSON.stringify({
-        idempotency_key: attempt.slice(0, 45),
-        source_id: sourceId,
-        verification_token: verificationToken || undefined,
-        amount_money: { amount, currency: "USD" },
-        location_id,
-        order_id: orderId || undefined,
-        reference_id: code,
-        buyer_email_address: email || undefined,
-        note: payNote,
-        autocomplete: true,
-      }),
-    });
+    let cardFee = 0; // CREDIT CARD FEE
+    const p = gp ? { payment: gp.primary } : await chargeCard({
+      orderId, locationId: location_id, key: attempt.slice(0, 45), sourceId, verificationToken,
+      amount, tip: 0, reference: code, email: email || "", note: payNote,
+    }).then((r) => { cardFee = r.fee; return { payment: r.pmt }; });
     const pmt = p?.payment ?? {};
     if (pmt.status !== "COMPLETED" && pmt.status !== "APPROVED") throw new PublicError("The card was not approved.");
 
@@ -813,7 +804,7 @@ async function pay(req: Request, b: Record<string, unknown>) {
     };
     const up = await admin.from("rb_reservations")
       .update({
-        ...paidPatch, gratuity_cents: P.gratuity_cents, tax_cents: P.tax_cents, paid_cents: P.total_cents,
+        ...paidPatch, gratuity_cents: P.gratuity_cents, tax_cents: P.tax_cents, paid_cents: P.total_cents + cardFee, card_fee_cents: cardFee,
         ...(gp ? { gift_cents: gp.split.gift, gift_payment_id: gp.giftPay?.id ?? null, gift_last4: gp.last4 } : {}),
       }).eq("id", rid);
     // the card is charged: the booking must end up paid even if the breakdown can't be stored
@@ -841,7 +832,7 @@ async function pay(req: Request, b: Record<string, unknown>) {
         const mail = confirmationEmail({
           first: String(r?.guest_name || name || "").split(/\s+/)[0], experience: x.name || res.experience || "Experience",
           option: r?.option_label || null, startsAt: String(r?.starts_at), party: Number(r?.party_size) || 0,
-          shop: String(r?.location || shop), atHome, address: r?.event_address || null, totalCents: amount, card, code,
+          shop: String(r?.location || shop), atHome, address: r?.event_address || null, totalCents: amount + cardFee, cardFeeCents: cardFee, card, code,
           notes: clean(b.notes, 1000) || null, receiptUrl: (gp ? gp.receipt_url : pmt.receipt_url) ?? null, infoUrl: /^https:\/\//i.test(x.info_url || "") ? x.info_url : null,
           test: env() !== "production",
           priceCents: pkgCents, gratuityCents: P.gratuity_cents, taxCents: P.tax_cents, gratuityPct: R.gratuity_pct, addons: adds,
@@ -854,7 +845,7 @@ async function pay(req: Request, b: Record<string, unknown>) {
     } catch (e) { console.error("confirm mail", rid, e); confirm_email = "failed"; }
 
     return {
-      ok: true, id: rid, code, experience: res.experience, time: res.time, total_cents: amount,
+      ok: true, id: rid, code, experience: res.experience, time: res.time, total_cents: amount + cardFee, card_fee_cents: cardFee,
       price_cents: P.price_cents, gratuity_cents: P.gratuity_cents, tax_cents: P.tax_cents, pricing: pricingOut(R),
       package_cents: pkgCents, addons: adds, addons_cents: addCents,
       party: r?.party_size, option_label: r?.option_label || null, at_home: atHome, card,
@@ -869,6 +860,121 @@ async function pay(req: Request, b: Record<string, unknown>) {
     } else await undo();
     throw e;
   }
+}
+
+// ---------- CREDIT CARD FEE (2026-11-17) ----------
+// Maverick: "we need to be charging the 3% credit card fees online, well everywhere". Same as square-online-order v20:
+// the card is HELD first so Square says what kind it is; a CREDIT card (not prepaid) gets FEE_PCT (3%) of the amount
+// (tip not included) added to the hold and a "Credit card fee (3%)" line (TOTAL_PHASE, not taxed) on the Square order,
+// then it's captured. Debit / prepaid / gift cards: no fee. If Square won't take the fee it's captured WITHOUT it.
+// Secrets: CARD_FEE=off, CARD_FEE_PCT (default 3, never over 3).
+const SQ = (path: string, init: RequestInit) => square(path, init);
+const $usd = (amount: number) => ({ amount, currency: "USD" });
+async function feeHash(s: string) {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+const FEE_UID = "ccfee";
+const feeOn = () => (Deno.env.get("CARD_FEE") ?? "on").trim().toLowerCase() !== "off";
+const feePct = () => Math.min(3, Math.max(0, Number(Deno.env.get("CARD_FEE_PCT") ?? "3") || 0));
+const feeFor = (amount: number) => Math.round(amount * feePct() / 100);
+const feeLabel = () => `Credit card fee (${feePct()}%)`;
+const isCredit = (p: any) => {
+  const c = p?.card_details?.card ?? {};
+  return String(c.card_type ?? "") === "CREDIT" && String(c.prepaid_type ?? "") !== "PREPAID";
+};
+// the fee already on a Square order (0 when none)
+const feeOnOrder = (o: any) => ((o?.service_charges ?? []) as any[]).filter((s) => s?.uid === FEE_UID)
+  .reduce((n, s) => n + Number(s?.applied_money?.amount ?? s?.amount_money?.amount ?? 0), 0);
+
+// Charge a card for an order: hold → fee if it's a credit card → capture. Returns the captured payment and the fee.
+// Throws when the card is refused (nothing is left held).
+async function chargeCard(o: {
+  orderId: string | null; locationId: string; key: string; sourceId: string; verificationToken?: string;
+  amount: number; tip: number; reference: string; email: string; note: string; extra?: Record<string, unknown>;
+}): Promise<{ pmt: any; fee: number }> {
+  const created = await SQ("/v2/payments", {
+    method: "POST",
+    body: JSON.stringify({
+      idempotency_key: o.key, source_id: o.sourceId, verification_token: o.verificationToken || undefined,
+      amount_money: $usd(o.amount), ...(o.tip > 0 ? { tip_money: $usd(o.tip) } : {}),
+      location_id: o.locationId, order_id: o.orderId, reference_id: o.reference, buyer_email_address: o.email,
+      note: o.note, ...(o.extra ?? {}), autocomplete: false, delay_duration: "PT30M",
+    }),
+  });
+  let pmt = created?.payment ?? {};
+  if (pmt.status === "COMPLETED") { // a retry of a checkout that already went through
+    const ord = (await SQ(`/v2/orders/${encodeURIComponent(o.orderId)}`, { method: "GET" }).catch(() => null))?.order;
+    return { pmt, fee: feeOnOrder(ord) };
+  }
+  if (pmt.status !== "APPROVED") throw new Error("The card was not approved (" + pmt.status + ").");
+  const pid = encodeURIComponent(pmt.id);
+  let fee = 0;
+  if (feeOn() && isCredit(pmt) && feeFor(o.amount) > 0) {
+    const want = feeFor(o.amount);
+    let raised = Number(pmt.amount_money?.amount) === o.amount + want;
+    try {
+      if (!raised) {
+        const up = await SQ(`/v2/payments/${pid}`, { method: "PUT", body: JSON.stringify({
+          idempotency_key: ("f" + await feeHash(pmt.id + "|up|" + want)).slice(0, 45),
+          payment: { amount_money: $usd(o.amount + want), ...(o.tip > 0 ? { tip_money: $usd(o.tip) } : {}) },
+        }) });
+        pmt = up?.payment ?? pmt;
+        raised = Number(pmt.amount_money?.amount) === o.amount + want;
+      }
+      if (raised && o.orderId) {
+        const cur = (await SQ(`/v2/orders/${encodeURIComponent(o.orderId)}`, { method: "GET" }))?.order;
+        if (feeOnOrder(cur) !== want) {
+          await SQ(`/v2/orders/${encodeURIComponent(o.orderId)}`, { method: "PUT", body: JSON.stringify({
+            idempotency_key: ("g" + await feeHash(o.orderId + "|fee|" + want + "|" + cur?.version)).slice(0, 45),
+            order: { location_id: o.locationId, version: cur?.version, service_charges: [{
+              uid: FEE_UID, name: feeLabel(), amount_money: $usd(want), calculation_phase: "TOTAL_PHASE", taxable: false,
+            }] },
+          }) });
+        }
+        fee = want;
+      } else if (raised) fee = want; // no Square order to put the line on: the fee is on the payment only
+    } catch (err) {
+      console.error("card fee", o.orderId, String((err as Error).message).slice(0, 200));
+      // couldn't add it everywhere: put the hold back to what the page showed and charge that
+      if (Number(pmt.amount_money?.amount) !== o.amount) {
+        const down = await SQ(`/v2/payments/${pid}`, { method: "PUT", body: JSON.stringify({
+          idempotency_key: ("h" + await feeHash(pmt.id + "|down")).slice(0, 45), payment: { amount_money: $usd(o.amount) },
+        }) }).catch(() => null);
+        if (down?.payment) pmt = down.payment;
+      }
+      fee = 0;
+    }
+  }
+  try {
+    if (o.orderId) await SQ(`/v2/orders/${encodeURIComponent(o.orderId)}/pay`, { method: "POST", body: JSON.stringify({
+      idempotency_key: ("k" + await feeHash(o.orderId + "|" + pmt.id + "|" + fee)).slice(0, 45), payment_ids: [pmt.id],
+    }) });
+    else await SQ(`/v2/payments/${pid}/complete`, { method: "POST", body: "{}" });
+  } catch (err) {
+    // the amounts didn't add up (or Square said no): take the fee back off and capture the order as shown
+    console.error("pay order", o.orderId, String((err as Error).message).slice(0, 200));
+    if (fee && o.orderId) {
+      const cur = (await SQ(`/v2/orders/${encodeURIComponent(o.orderId)}`, { method: "GET" }).catch(() => null))?.order;
+      if (cur && feeOnOrder(cur)) {
+        await SQ(`/v2/orders/${encodeURIComponent(o.orderId)}`, { method: "PUT", body: JSON.stringify({
+          idempotency_key: ("j" + await feeHash(o.orderId + "|nofee|" + cur.version)).slice(0, 45),
+          fields_to_clear: [`service_charges[${FEE_UID}]`], order: { location_id: o.locationId, version: cur.version },
+        }) }).catch(() => null);
+      }
+      await SQ(`/v2/payments/${pid}`, { method: "PUT", body: JSON.stringify({
+        idempotency_key: ("h" + await feeHash(pmt.id + "|down")).slice(0, 45), payment: { amount_money: $usd(o.amount) },
+      }) }).catch(() => null);
+      fee = 0;
+      try {
+        await SQ(`/v2/orders/${encodeURIComponent(o.orderId)}/pay`, { method: "POST", body: JSON.stringify({
+          idempotency_key: ("k" + await feeHash(o.orderId + "|" + pmt.id + "|0")).slice(0, 45), payment_ids: [pmt.id],
+        }) });
+      } catch (err2) { await SQ(`/v2/payments/${pid}/cancel`, { method: "POST", body: "{}" }).catch(() => null); throw err2; }
+    } else { await SQ(`/v2/payments/${pid}/cancel`, { method: "POST", body: "{}" }).catch(() => null); throw err; }
+  }
+  const done = (await SQ(`/v2/payments/${pid}`, { method: "GET" }).catch(() => null))?.payment;
+  return { pmt: done ?? { ...pmt, status: "COMPLETED" }, fee };
 }
 
 // ---------- staff: cancel / refund ----------
