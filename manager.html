@@ -736,7 +736,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     </div>
     <div class="section-card" id="shSetCard">
       <h2>⚙️ Shipping settings</h2>
-      <div class="hint">What the order site offers as <strong>Ship it</strong>: the items, the dates, the price and where boxes ship from. Saved changes reach the order site within about 10 seconds. Turning shipping off hides <strong>Ship it</strong>; orders already paid are not changed. Tax is charged only for ship-to states listed under <strong>Sales tax for</strong> (on the boxes and the shipping).</div>
+      <div class="hint">What the order site offers as <strong>Ship it</strong>: the items, the dates, the price and where boxes ship from. Saved changes reach the order site within about 10 seconds. Turning shipping off hides <strong>Ship it</strong>; orders already paid are not changed. Tax is charged only for ship-to states listed under <strong>Sales tax for</strong> (on the boxes and the shipping). <span id="shRatesHint">Shipping is priced by the ship-to ZIP: <strong>UPS Ground</strong> within the miles below, <strong>2nd Day Air</strong> farther.</span></div>
       <form class="sh-form" id="shForm" autocomplete="off" novalidate>
         <label class="sh-on"><input type="checkbox" id="shEnabled"><span>Offer <b>Ship it</b> on the order site</span></label>
         <div class="sh-grid">
@@ -745,11 +745,19 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
           <label>Ship day<input type="date" id="shShipOn"></label>
           <label>Arrives from<input type="date" id="shArrFrom"></label>
           <label>Arrives by<input type="date" id="shArrBy"></label>
-          <label>Shipping, first box<input type="text" inputmode="decimal" id="shFirst" placeholder="30.00"></label>
-          <label>Each extra box<input type="text" inputmode="decimal" id="shEach" placeholder="30.00"></label>
           <label>Most boxes to ship <span>(0 = no cap)</span><input type="number" min="0" step="1" id="shLimit" placeholder="0"></label>
           <label>Sales tax for <span>(state codes)</span><input type="text" id="shTax" placeholder="TN" maxlength="60"></label>
         </div>
+        <fieldset class="sh-items sh-rates"><legend>Shipping price, by the ship-to ZIP</legend>
+          <div class="sh-rate"><div class="sh-rl"><b>UPS Ground</b><span>near · 1–2 days</span></div>
+            <label>First box<input type="text" inputmode="decimal" id="shGFirst" placeholder="20.00"></label>
+            <label>Each extra box<input type="text" inputmode="decimal" id="shGEach" placeholder="same"></label></div>
+          <div class="sh-rate"><div class="sh-rl"><b>UPS 2nd Day Air</b><span>farther</span></div>
+            <label>First box<input type="text" inputmode="decimal" id="shAFirst" placeholder="40.00"></label>
+            <label>Each extra box<input type="text" inputmode="decimal" id="shAEach" placeholder="same"></label></div>
+          <label class="sh-mi">UPS Ground up to<input type="number" min="50" max="3000" step="25" id="shMiles" placeholder="600"><span>miles from the shop (as the crow flies; 600 ≈ UPS zones 2–4)</span></label>
+          <div class="sh-cover" id="shCover" role="status"></div>
+        </fieldset>
         <fieldset class="sh-items"><legend>Items that ship</legend><div id="shItems"><div class="rec-empty">Loading the menu…</div></div></fieldset>
         <div class="sh-save"><button type="submit" class="btn btn-gold" id="shSave">Save settings</button><span class="sh-setmsg" id="shSetMsg" role="status"></span></div>
       </form>
@@ -19658,6 +19666,24 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 .sh-save .btn{ min-height:44px; }
 .sh-setmsg{ font-size:.85rem; font-weight:700; color:#166534; }
 .sh-setmsg.bad{ color:#b91c1c; }
+/* near vs far prices (2026-11-14) */
+.sh-rates{ display:flex; flex-direction:column; gap:12px; min-width:0; min-inline-size:0; }
+.sh-rate{ display:grid; grid-template-columns:minmax(150px,1.2fr) minmax(0,1fr) minmax(0,1fr); gap:12px; align-items:end; }
+.sh-rate > *{ min-width:0; }
+.sh-rl{ display:flex; flex-direction:column; gap:2px; padding-bottom:10px; font-size:.92rem; color:#111827; }
+.sh-rl span{ font-size:.78rem; color:#6b7280; }
+.sh-rate label, .sh-mi{ display:flex; flex-direction:column; gap:4px; font-size:.78rem; font-weight:700; color:#374151; }
+.sh-rate input{ width:100%; }
+.sh-rate input, .sh-mi input{ box-sizing:border-box; min-height:44px; padding:0 10px; border:1px solid var(--line,#e5e7eb); border-radius:8px; background:#fff; color:#111827; font:inherit; font-size:16px; }
+.sh-mi{ flex-direction:row; flex-wrap:wrap; align-items:center; gap:8px; font-size:.86rem; }
+.sh-mi input{ width:96px; }
+.sh-mi span{ font-weight:500; color:#6b7280; font-size:.8rem; }
+.sh-cover{ font-size:.84rem; color:#374151; line-height:1.45; }
+.sh-cover b{ color:#111827; }
+.sh-cover.bad{ color:#b91c1c; }
+.sh-svc{ margin-left:6px; padding:1px 8px; border-radius:999px; font-size:.72rem; font-weight:800; background:#e0f2fe; color:#075985; white-space:nowrap; }
+.sh-svc.air{ background:#fef3c7; color:#92400e; }
+@media (max-width:640px){ .sh-rate{ grid-template-columns:minmax(0,1fr) minmax(0,1fr); } .sh-rl{ grid-column:1 / -1; padding-bottom:0; } }
 @media (max-width:640px){ .sh-side{ flex-basis:100%; } }
 </style>
 <script>
@@ -19670,8 +19696,14 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   var listEl = document.getElementById('shList'), barEl = document.getElementById('shBar'), errEl = document.getElementById('shErr');
   var envEl = document.getElementById('shEnv'), pill = document.getElementById('shTabPill');
   var form = document.getElementById('shForm'), itemsEl = document.getElementById('shItems'), setMsg = document.getElementById('shSetMsg'), saveBtn = document.getElementById('shSave');
-  var F = { enabled:'shEnabled', from:'shFrom', order_by:'shOrderBy', ship_on:'shShipOn', arrive_from:'shArrFrom', arrive_by:'shArrBy', first:'shFirst', each:'shEach', limit:'shLimit', tax:'shTax' };
+  var F = { enabled:'shEnabled', from:'shFrom', order_by:'shOrderBy', ship_on:'shShipOn', arrive_from:'shArrFrom', arrive_by:'shArrBy', limit:'shLimit', tax:'shTax',
+            gFirst:'shGFirst', gEach:'shGEach', aFirst:'shAFirst', aEach:'shAEach', miles:'shMiles' }; // near vs far (2026-11-14): Ground / 2nd Day Air by ZIP
   Object.keys(F).forEach(function(k){ F[k] = document.getElementById(F[k]); });
+  // TEST SWITCH (2026-11-13, Maverick: shipping on the test site to show the owner, live stays off): on the staging
+  // portal the on/off box is the TEST order site's own switch, order_shipping.test_enabled (read only by
+  // square-online-order-test; not set = follows enabled). It never changes the live site's `enabled`. The other
+  // settings (dates, prices, items) are still shared with the live site.
+  if (STAGE && F.enabled && F.enabled.nextElementSibling) F.enabled.nextElementSibling.innerHTML = 'Offer <b>Ship it</b> on the <b>test</b> order site <span style="font-weight:400;color:#6b7280">(staging only — dates, prices and items are shared with the live site)</span>';
   var st = { orders:null, env:'', cfg:null, fromLabel:'Memphis', filter:'todo', open:'', busy:{}, msg:{}, err:'', loading:false,
              row:null, menu:{}, menuErr:'', picked:[], showAll:false, saving:false };
   var CARRIERS = ['UPS', 'USPS', 'FedEx', 'Other'];
@@ -19732,6 +19764,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       + '<div class="sh-acts"><button type="button" class="sh-ghost" data-sh="refresh"' + (st.loading ? ' disabled' : '') + '>' + (st.loading ? 'Loading…' : 'Refresh') + '</button>'
       + '<button type="button" class="btn btn-gold" data-sh="print"' + (shown().length ? '' : ' disabled') + '>🖨 Print packing list</button></div>';
   }
+  // which label to buy (near vs far, 2026-11-14): orders from before it have no service
+  var SVC = { ground:'UPS Ground', air:'UPS 2nd Day Air' };
+  function svcTag(o){ return o.service && SVC[o.service] ? '<span class="sh-svc ' + o.service + '" title="Buy this label in Square">' + SVC[o.service] + '</span>' : ''; }
   function rowHTML(o){
     var done = shipped(o), busy = !!st.busy[o.id], m = st.msg[o.id];
     var addr = h(o.to.address1) + (o.to.address2 ? ', ' + h(o.to.address2) : '') + '<br>' + h(o.to.city) + ', ' + h(o.to.state) + ' ' + h(o.to.zip) + (o.to.phone ? ' · ' + h(phone(o.to.phone)) : '');
@@ -19754,7 +19789,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
         + '<button type="button" class="sh-ghost" data-sh="cancel" data-v="' + h(o.id) + '">Cancel</button></form>';
     }
     return '<div class="sh-row' + (o.refunded ? ' refund' : done ? ' done' : '') + '" data-id="' + h(o.id) + '">'
-      + '<div class="sh-main"><div class="sh-to"><b>' + h(o.to.name || '(no name)') + '</b><span class="sh-code">' + h(o.code) + '</span>'
+      + '<div class="sh-main"><div class="sh-to"><b>' + h(o.to.name || '(no name)') + '</b><span class="sh-code">' + h(o.code) + '</span>' + svcTag(o)
       + (o.ship_on && st.cfg && o.ship_on !== st.cfg.ship_on ? ' <span class="sh-code">ships ' + h(nice(o.ship_on)) + '</span>' : '') + '</div>'
       + '<div class="sh-addr">' + addr + '</div><div class="sh-what">' + items + '</div>'
       + (o.gift_note ? '<div class="sh-gift">🎁 “' + h(o.gift_note) + '”</div>' : '')
@@ -19822,7 +19857,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     var items = function(o){ return o.lines.map(function(l){ return l.qty + '× ' + h(l.name) + (l.option ? ' (' + h(l.option) + ')' : ''); }).join('<br>'); };
     var table = '<table class="list"><thead><tr><th>✓</th><th>Order</th><th>Ship to</th><th>Phone</th><th>Boxes</th><th>Gift note</th></tr></thead><tbody>'
       + rows.map(function(o){
-          return '<tr><td class="ck">☐</td><td><b>' + h(o.code) + '</b><br><small>' + h(o.buyer) + '</small></td><td>' + addr(o) + '</td><td>' + h(phone(o.to.phone)) + '</td>'
+          return '<tr><td class="ck">☐</td><td><b>' + h(o.code) + '</b><br><small>' + h(o.buyer) + '</small>' + (o.service && SVC[o.service] ? '<br><b><small>' + SVC[o.service] + '</small></b>' : '') + '</td><td>' + addr(o) + '</td><td>' + h(phone(o.to.phone)) + '</td>'
             + '<td class="n">' + o.boxes + '</td><td>' + (o.gift_note ? '“' + h(o.gift_note) + '”' : '<small>—</small>') + '</td></tr>';
         }).join('') + '</tbody></table>';
     var slips = rows.map(function(o){
@@ -19851,12 +19886,17 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 
   // ---------- settings ----------
   var cents = function(v){ var n = Number(String(v || '').replace(/[$,\s]/g, '')); return isFinite(n) && n >= 0 && n <= 500 ? Math.round(n * 100) : null; };
+  var price = function(v){ return String(v || '').trim() === '' ? null : cents(v); }; // a first-box price must be typed (0 = free)
   function fill(d){
     d = d || {};
-    F.enabled.checked = d.enabled === true;
+    F.enabled.checked = (STAGE && 'test_enabled' in d ? d.test_enabled : d.enabled) === true; // staging: the test site's switch (TEST SWITCH)
     F.from.value = d.from === 'nashville' ? 'nashville' : 'memphis';
     F.order_by.value = d.order_by || ''; F.ship_on.value = d.ship_on || ''; F.arrive_from.value = d.arrive_from || ''; F.arrive_by.value = d.arrive_by || '';
-    F.first.value = d.first_cents != null ? (d.first_cents / 100).toFixed(2) : ''; F.each.value = d.each_cents != null ? (d.each_cents / 100).toFixed(2) : '';
+    var r = d.rates && typeof d.rates === 'object' ? d.rates : {}, dol = function(c){ return c != null && isFinite(c) ? (c / 100).toFixed(2) : ''; };
+    var g = r.ground || { first_cents:d.first_cents, each_cents:d.each_cents }, a = r.air || {}; // no rates yet: Ground starts from the flat price
+    F.gFirst.value = dol(g.first_cents); F.gEach.value = g.each_cents != null && g.each_cents !== g.first_cents ? dol(g.each_cents) : '';
+    F.aFirst.value = dol(a.first_cents); F.aEach.value = a.each_cents != null && a.each_cents !== a.first_cents ? dol(a.each_cents) : '';
+    F.miles.value = r.ground_miles ? String(r.ground_miles) : '600';
     F.limit.value = d.limit ? String(d.limit) : '0';
     F.tax.value = (Array.isArray(d.tax_states) ? d.tax_states : ['TN']).join(', ');
     st.picked = Array.isArray(d.items) ? d.items.slice() : [];
@@ -19868,7 +19908,24 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       st.row = r.data || null; fill(st.row ? st.row.data : null);
       setMsg.className = 'sh-setmsg'; setMsg.textContent = st.row ? 'Last saved ' + when(st.row.updated_at) + (st.row.updated_by ? ' by ' + st.row.updated_by : '') : 'Not set up yet.';
     } catch (e) { setMsg.className = 'sh-setmsg bad'; setMsg.textContent = 'Couldn’t load the settings: ' + (e.message || e); }
-    loadMenu();
+    loadMenu(); cover();
+  }
+  // which states a Ground distance covers (the function's `zones`, same ZIP table it prices with)
+  var coverSeq = 0, coverT = 0;
+  function cover(){
+    clearTimeout(coverT);
+    coverT = setTimeout(async function(){
+      var el = document.getElementById('shCover'), my = ++coverSeq, mi = Math.round(Number(F.miles.value || 600));
+      if (!el) return;
+      if (!(mi >= 50 && mi <= 3000)) { el.className = 'sh-cover bad'; el.textContent = 'Miles: a number from 50 to 3000.'; return; }
+      try {
+        var z = await call('zones', { from:F.from.value, miles:mi });
+        if (my !== coverSeq) return;
+        el.className = 'sh-cover';
+        el.innerHTML = 'UPS Ground at ' + z.miles + ' miles from ' + h(F.from.options[F.from.selectedIndex].text) + ': all of <b>' + h(z.all.join(', ') || 'none') + '</b>'
+          + (z.part.length ? '; part of ' + h(z.part.map(function(p){ return p.state; }).join(', ')) : '') + '. Everywhere else in the lower 48 ships 2nd Day Air.';
+      } catch (err) { if (my === coverSeq) { el.className = 'sh-cover bad'; el.textContent = 'Couldn’t check the miles: ' + (err.message || err); } }
+    }, 250);
   }
   // the from-shop's items, from the order function's own menu (what the order site sells)
   async function loadMenu(){
@@ -19902,7 +19959,10 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     if (d.order_by && d.order_by > d.ship_on) return 'The last day to order has to be on or before the ship day.';
     if (d.arrive_from && d.arrive_from < d.ship_on) return '“Arrives from” can’t be before the ship day.';
     if (d.arrive_from && d.arrive_by && d.arrive_by < d.arrive_from) return '“Arrives by” can’t be before “Arrives from”.';
-    if (d.first_cents == null || d.each_cents == null) return 'Check the shipping prices (dollars, like 30.00).';
+    var rt = d.rates;
+    if (rt.ground.first_cents == null || rt.ground.each_cents == null) return 'Check the UPS Ground prices (dollars, like 20.00).';
+    if (rt.air.first_cents == null || rt.air.each_cents == null) return 'Check the 2nd Day Air prices (dollars, like 40.00).';
+    if (!(rt.ground_miles >= 50 && rt.ground_miles <= 3000)) return 'UPS Ground miles: a number from 50 to 3000.';
     if (d.enabled && !d.items.length) return 'Tick at least one item that ships, or turn shipping off.';
     if (!/^\d+$/.test(String(F.limit.value || '0').trim())) return 'Most boxes to ship is a whole number (0 = no cap).';
     if (d.bad_states.length) return 'Not a state code: ' + d.bad_states.join(', ');
@@ -19915,13 +19975,18 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     var d = {
       enabled: F.enabled.checked, from: F.from.value, items: st.picked.slice(),
       order_by: F.order_by.value || null, ship_on: F.ship_on.value || null, arrive_from: F.arrive_from.value || null, arrive_by: F.arrive_by.value || null,
-      first_cents: cents(F.first.value), each_cents: F.each.value.trim() ? cents(F.each.value) : cents(F.first.value),
+      rates: {
+        ground_miles: F.miles.value.trim() ? Math.round(Number(F.miles.value)) : 600,
+        ground: { first_cents: price(F.gFirst.value), each_cents: F.gEach.value.trim() ? cents(F.gEach.value) : price(F.gFirst.value) },
+        air: { first_cents: price(F.aFirst.value), each_cents: F.aEach.value.trim() ? cents(F.aEach.value) : price(F.aFirst.value) }
+      }, // first_cents / each_cents (the old flat price) are kept as they are
       limit: Math.max(0, parseInt(F.limit.value || '0', 10) || 0),
       tax_states: states.filter(function(s){ return /^[A-Z]{2}$/.test(s); }), bad_states: states.filter(function(s){ return !/^[A-Z]{2}$/.test(s); })
     };
     var why = problem(d);
     if (why) { setMsg.className = 'sh-setmsg bad'; setMsg.textContent = why; return; }
     delete d.bad_states;
+    if (STAGE) { d.test_enabled = d.enabled; delete d.enabled; } // staging saves the test site's switch; live's `enabled` is kept as it is
     var s = await session(), who = s && s.user && s.user.email ? s.user.email : 'manager';
     var data = Object.assign({}, st.row && st.row.data ? st.row.data : {}, d); // keeps keys this form doesn't know (note …)
     st.saving = true; saveBtn.disabled = true; setMsg.className = 'sh-setmsg'; setMsg.textContent = 'Saving…';
@@ -19952,8 +20017,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     if (t.getAttribute('data-sh') === 'item') {
       st.picked = st.picked.filter(function(id){ return id !== t.value; });
       if (t.checked) st.picked.push(t.value);
-    } else if (t === F.from) loadMenu();
+    } else if (t === F.from) { loadMenu(); cover(); }
   });
+  panel.addEventListener('input', function(e){ if (e.target === F.miles) cover(); });
   panel.addEventListener('submit', function(e){
     var f = e.target;
     if (f === form) return save(e);
