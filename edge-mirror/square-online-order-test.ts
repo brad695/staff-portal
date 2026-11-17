@@ -1349,7 +1349,7 @@ async function payShip(req: Request, b: any) {
     pmt = p?.payment ?? {};
     if (pmt.status !== "COMPLETED" && pmt.status !== "APPROVED") throw Object.assign(new SquareError("payment " + pmt.status), { codes: ["GENERIC_DECLINE"] });
   } catch (err) {
-    await fail((gift ? "gift card: " : "") + (wallet ? wallet + ": " : "") + String((err as Error).message));
+    await fail((gift ? "with a gift card — " : "") + (wallet ? wallet + ": " : "") + String((err as Error).message));
     if (err instanceof SquareError && (err.status < 500 || err.codes.length)) throw new PublicError(cardMessage(err) + " Nothing was charged.", 402);
     throw err;
   }
@@ -1406,7 +1406,8 @@ function shipOrderOf(o: any): ShipOrder | null {
   if (!o?.id || !f || (o.metadata?.fulfillment !== "ship" && o.source?.name !== "Greys online ordering")) return null;
   const sd = f.shipment_details ?? {}, r = sd.recipient ?? {}, a = r.address ?? {}, md = o.metadata ?? {};
   const tenders: any[] = Array.isArray(o.tenders) ? o.tenders : [];
-  const good = tenders.filter((t) => !["FAILED", "VOIDED"].includes(String(t?.card_details?.status ?? "")));
+  // AUTHORIZED = only held (a gift card + card payment in flight, v19): not paid until both are captured
+  const good = tenders.filter((t) => !["FAILED", "VOIDED", "AUTHORIZED"].includes(String(t?.card_details?.status ?? "")));
   const total = Number(o.total_money?.amount ?? 0), due = Number(o.net_amount_due_money?.amount);
   const paid = good.length > 0 || (Number.isFinite(due) && due <= 0 && total > 0 && o.state === "COMPLETED");
   const refundedCents = (Array.isArray(o.refunds) ? o.refunds : []).filter((x: any) => x?.status !== "REJECTED" && x?.status !== "FAILED")
@@ -1827,9 +1828,12 @@ async function payWithGift(o: {
       throw new PublicError("We couldn't confirm your payment. Please don't order again yet — call the shop and we'll check it for you.", 502, { unconfirmed: true });
     }
   }
-  // a receipt link only exists once the payment is captured
+  // a receipt link only exists once the payment is captured, and Square takes a moment to say so
   let receipt: string | null = null;
-  try { receipt = (await square(`/v2/payments/${encodeURIComponent(c.id)}`, { method: "GET" }, o.e))?.payment?.receipt_url ?? null; } catch { /* no link */ }
+  for (let i = 0; i < 3 && !receipt; i++) {
+    if (i) await new Promise((r) => setTimeout(r, 500));
+    try { receipt = (await square(`/v2/payments/${encodeURIComponent(c.id)}`, { method: "GET" }, o.e))?.payment?.receipt_url ?? null; } catch { break; }
+  }
   return { primary: c, giftPay: g, cardPay: c, split: s, last4, receipt_url: receipt };
 }
 // how the payment reads on the order, the confirmation and the email
@@ -1979,7 +1983,7 @@ async function pay(req: Request, b: any) {
     pmt = p?.payment ?? {};
     if (pmt.status !== "COMPLETED" && pmt.status !== "APPROVED") throw Object.assign(new SquareError("payment " + pmt.status), { codes: ["GENERIC_DECLINE"] });
   } catch (err) {
-    await fail((gift ? "gift card: " : "") + (wallet ? wallet + ": " : "") + String((err as Error).message));
+    await fail((gift ? "with a gift card — " : "") + (wallet ? wallet + ": " : "") + String((err as Error).message));
     if (err instanceof SquareError && (err.status < 500 || err.codes.length)) throw new PublicError(cardMessage(err) + " Nothing was charged.", 402);
     throw err;
   }
