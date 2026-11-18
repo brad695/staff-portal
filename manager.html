@@ -19637,6 +19637,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
 .sh-what{ font-size:.88rem; color:#111827; font-weight:600; }
 .sh-gift{ margin-top:2px; padding:8px 10px; border-radius:8px; background:#fdf6e3; color:#5b4410; font-size:.88rem; font-style:italic; }
 .sh-from{ font-size:.78rem; color:#6b7280; }
+.sh-gcard{ margin-left:8px; padding:3px 10px; border-radius:999px; border:1px solid #e0c98a; background:#fff; color:#5b4410; font:inherit; font-size:.76rem; font-style:normal; font-weight:700; cursor:pointer; }
+.sh-gcard:disabled{ opacity:.55; cursor:default; }
+.sh-bar .sh-msg{ flex-basis:100%; }
 .sh-side{ flex:0 1 250px; display:flex; flex-direction:column; align-items:flex-start; gap:6px; }
 .sh-st{ padding:2px 10px; border-radius:999px; font-size:.76rem; font-weight:800; background:#fee2e2; color:#991b1b; }
 .sh-st.done{ background:#dcfce7; color:#166534; }
@@ -19762,7 +19765,10 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
           return '<button type="button" data-sh="filter" data-v="' + x[0] + '" aria-pressed="' + (st.filter === x[0]) + '">' + x[1] + ' (' + x[2] + ')</button>';
         }).join('') + '</div>'
       + '<div class="sh-acts"><button type="button" class="sh-ghost" data-sh="refresh"' + (st.loading ? ' disabled' : '') + '>' + (st.loading ? 'Loading…' : 'Refresh') + '</button>'
-      + '<button type="button" class="btn btn-gold" data-sh="print"' + (shown().length ? '' : ' disabled') + '>🖨 Print packing list</button></div>';
+      + '<button type="button" class="btn btn-gold" data-sh="print"' + (shown().length ? '' : ' disabled') + '>🖨 Print packing list</button>'
+      + '<button type="button" class="sh-ghost" data-sh="gcards"' + (giftRows().length && !gc.busy ? '' : ' disabled') + ' title="Gift note cards, 6 to a sheet, with cut marks">'
+      + (gc.busy ? 'Building…' : '🎁 Gift note cards (' + giftRows().length + ')') + '</button></div>'
+      + (gc.msg ? '<div class="sh-msg' + (gc.msg.bad ? ' bad' : '') + '" role="status">' + h(gc.msg.text) + '</div>' : '');
   }
   // which label to buy (near vs far, 2026-11-14): orders from before it have no service
   var SVC = { ground:'UPS Ground', air:'UPS 2nd Day Air' };
@@ -19792,7 +19798,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       + '<div class="sh-main"><div class="sh-to"><b>' + h(o.to.name || '(no name)') + '</b><span class="sh-code">' + h(o.code) + '</span>' + svcTag(o)
       + (o.ship_on && st.cfg && o.ship_on !== st.cfg.ship_on ? ' <span class="sh-code">ships ' + h(nice(o.ship_on)) + '</span>' : '') + '</div>'
       + '<div class="sh-addr">' + addr + '</div><div class="sh-what">' + items + '</div>'
-      + (o.gift_note ? '<div class="sh-gift">🎁 “' + h(o.gift_note) + '”</div>' : '')
+      + (o.gift_note ? '<div class="sh-gift">🎁 “' + h(o.gift_note) + '”'
+          + (o.refunded ? '' : ' <button type="button" class="sh-gcard" data-sh="gcard" data-v="' + h(o.id) + '"' + (gc.busy ? ' disabled' : '') + '>Print card</button>') + '</div>' : '')
       + '<div class="sh-from">From ' + h(o.buyer || 'the buyer') + (o.email ? ' · ' + h(o.email) : '') + (o.buyer_phone ? ' · ' + h(phone(o.buyer_phone)) : '')
       + ' · ' + money(o.total_cents) + ' paid (' + money(o.shipping_cents) + ' shipping' + (o.tax_cents ? ', ' + money(o.tax_cents) + ' tax' : '') + ') · ordered ' + h(when(o.created_at)) + '</div></div>'
       + '<div class="sh-side">' + side + '</div>' + form
@@ -19882,6 +19889,122 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       + table + slips + '</body></html>');
     w.document.close(); w.focus();
     setTimeout(function(){ try{ w.print(); }catch(_){} }, 350);
+  }
+
+  // ---------- gift note cards (2026-11-17, Maverick: "when a customer asks for a note — make a printable pdf we can put
+  // in the package — a card we can add multiple to a sheet and print and cut like the cheese cards") ----------
+  // One 4 × 3 in card per order with a gift note, 6 to a Letter sheet with cut marks — the same sheet layout and PDF
+  // writer as Print Cards (studio/js/sheets.js, letter-6), in the brand fonts. Same order as the packing list.
+  // The card: GREYS · Fine Cheeses, "For <recipient>", the note (sized to fit), "— <buyer>".
+  var gc = { busy:false, msg:null, frame:null, url:'' };
+  function giftRows(){ return shown().filter(function(o){ return !o.refunded && String(o.gift_note || '').trim(); }); }
+  var GC_DPI = 300, GC_W = 4 * GC_DPI, GC_H = 3 * GC_DPI, GC_NAVY = '#06273a', GC_GOLD = '#E0A21C';
+  var GC_NOTE = function(px){ return 'italic 400 ' + px + 'px "Nunito Sans"'; };
+  function gcWrap(ctx, text, maxW){ // words onto lines; the customer's own line breaks kept; a word too long is split
+    var out = [];
+    String(text).replace(/\r/g, '').split('\n').forEach(function(par){
+      var line = '';
+      par.split(/\s+/).filter(Boolean).forEach(function(w){
+        while (ctx.measureText(w).width > maxW && w.length > 1) { // split an over-long word
+          var k = w.length; while (k > 1 && ctx.measureText(w.slice(0, k)).width > maxW) k--;
+          if (line) { out.push(line); line = ''; }
+          out.push(w.slice(0, k)); w = w.slice(k);
+        }
+        var t = line ? line + ' ' + w : w;
+        if (line && ctx.measureText(t).width > maxW) { out.push(line); line = w; } else line = t;
+      });
+      out.push(line);
+    });
+    while (out.length > 1 && !out[out.length - 1]) out.pop();
+    return out;
+  }
+  function gcSpaced(ctx, s, x, y, em){ // centered text with letter spacing (canvas letterSpacing isn't everywhere)
+    var sp = em, chars = s.split(''), w = chars.reduce(function(a, c){ return a + ctx.measureText(c).width; }, 0) + sp * (chars.length - 1), cx = x - w / 2;
+    ctx.textAlign = 'left';
+    chars.forEach(function(c){ ctx.fillText(c, cx, y); cx += ctx.measureText(c).width + sp; });
+    ctx.textAlign = 'center';
+  }
+  function gcDraw(o){
+    var cv = document.createElement('canvas'); cv.width = GC_W; cv.height = GC_H;
+    var ctx = cv.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, GC_W, GC_H);
+    ctx.strokeStyle = GC_GOLD; ctx.lineWidth = 6; ctx.strokeRect(48, 48, GC_W - 96, GC_H - 96);
+    ctx.lineWidth = 2; ctx.strokeRect(64, 64, GC_W - 128, GC_H - 128);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = GC_NAVY; ctx.font = '800 76px "League Spartan"'; gcSpaced(ctx, 'GREYS', GC_W / 2, 172, 14);
+    ctx.fillStyle = GC_GOLD; ctx.font = '800 30px "Barlow Condensed"'; gcSpaced(ctx, 'FINE CHEESES', GC_W / 2, 214, 7);
+    var top = 250;
+    var to = String((o.to && o.to.name) || '').trim();
+    if (to) { ctx.fillStyle = '#6b7280'; ctx.font = '700 30px "Nunito Sans"'; ctx.fillText('For ' + to, GC_W / 2, 282); top = 312; }
+    var from = String(o.buyer || '').trim(), bottom = from ? 752 : 806, maxW = GC_W - 2 * 150;
+    // the note: the biggest size (64 → 28 px) whose lines fit between the header and the signature
+    var px = 64, lines = [], lh = 0;
+    for (; px >= 28; px -= 2) {
+      ctx.font = GC_NOTE(px); lines = gcWrap(ctx, String(o.gift_note).trim(), maxW); lh = Math.round(px * 1.32);
+      if (lines.length * lh <= bottom - top) break;
+    }
+    if (px < 28) { px = 28; ctx.font = GC_NOTE(px); lh = Math.round(px * 1.32); lines = lines.slice(0, Math.floor((bottom - top) / lh)); }
+    ctx.fillStyle = GC_NAVY; ctx.font = GC_NOTE(px);
+    var y0 = top + (bottom - top - lines.length * lh) / 2 + px * 0.95;
+    lines.forEach(function(l, i){ ctx.fillText(l, GC_W / 2, y0 + i * lh); });
+    if (from) { ctx.fillStyle = GC_NAVY; ctx.font = '800 36px "Nunito Sans"'; ctx.fillText('— ' + from, GC_W / 2, 806); }
+    var bin = atob(cv.toDataURL('image/jpeg', 0.94).split(',')[1]), bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return { bytes:bytes, w:GC_W, h:GC_H };
+  }
+  async function gcFonts(rows){
+    var text = rows.map(function(o){ return o.gift_note + ' ' + o.buyer + ' For ' + (o.to && o.to.name); }).join(' ') + ' GREYS FINE CHEESES —';
+    await window.GS.Cards.loadFonts(text);
+    var faces = [GC_NOTE(40), '700 40px "Nunito Sans"', '800 40px "Nunito Sans"', '800 40px "League Spartan"', '800 40px "Barlow Condensed"'];
+    await Promise.all(faces.map(function(f){ return Promise.race([document.fonts.load(f, text).catch(function(){}), new Promise(function(r){ setTimeout(r, 10000); })]); }));
+    return faces.filter(function(f){ try { return !document.fonts.check(f, 'Aa'); } catch (_) { return true; } });
+  }
+  var GC_JOB = 'GREYS gift notes';
+  var GC_DIRECT = !!window.chrome && !/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  function gcPrintFrame(url){ // Chrome / Edge on a computer: print straight from a hidden frame (same as Print Cards)
+    if (gc.frame) gc.frame.remove();
+    var f = gc.frame = document.createElement('iframe'), done = false;
+    f.title = 'Gift note cards'; f.tabIndex = -1; f.setAttribute('aria-hidden', 'true');
+    f.style.cssText = 'position:fixed;right:0;bottom:0;width:2px;height:2px;border:0;opacity:0;pointer-events:none;';
+    f.onload = function(){ setTimeout(function(){
+      if (done || f !== gc.frame) return; done = true;
+      var was = document.title; document.title = GC_JOB;
+      try { f.contentWindow.print(); } catch (_) { window.open(url, '_blank'); }
+      setTimeout(function(){ if (document.title === GC_JOB) document.title = was; }, 2000);
+    }, 350); };
+    f.src = url; document.body.appendChild(f);
+  }
+  async function giftCards(id){
+    if (gc.busy) return;
+    var rows = id ? (st.orders || []).filter(function(o){ return o.id === id && String(o.gift_note || '').trim(); }) : giftRows();
+    if (!rows.length) return;
+    var direct = window.__giftCardsDirect != null ? window.__giftCardsDirect : GC_DIRECT, win = null;
+    if (!direct) { try { win = window.open('', '_blank'); if (win) win.document.write('<!doctype html><title>' + GC_JOB + '</title><p style="font:16px system-ui,sans-serif;padding:28px;color:#333">Building the gift note cards…</p>'); } catch (_) { win = null; } }
+    gc.busy = true; gc.msg = { text:'Building ' + rows.length + ' gift note card' + (rows.length === 1 ? '' : 's') + '…' }; draw();
+    try {
+      await loadStudioJs(['sheets']);
+      var missing = await gcFonts(rows);
+      if (missing.length) throw new Error('The card fonts didn’t load. Check the connection and try again.');
+      var S = window.GS.Sheets, P = S.plan('letter-6'), images = {};
+      rows.forEach(function(o){ images[o.id] = gcDraw(o); });
+      var pages = S.pages(rows.map(function(o){ return { id:o.id, n:1 }; }), P.per);
+      var blob = S.pdf({ layout:P.key, pages:pages, images:images, marks:true, title:GC_JOB });
+      if (gc.url) { var old = gc.url; setTimeout(function(){ URL.revokeObjectURL(old); }, 60000); }
+      var url = gc.url = URL.createObjectURL(blob);
+      window.__giftCardsLast = { blob:blob, cards:rows.length, sheets:pages.length };
+      var size = pages.length + ' sheet' + (pages.length === 1 ? '' : 's') + ', ' + rows.length + ' card' + (rows.length === 1 ? '' : 's');
+      if (direct) { gcPrintFrame(url); gc.msg = { text:size + ' sent to the print window — print at 100% (“Actual size”), then cut on the marks.' }; }
+      else if (win && !win.closed) { win.location.replace(url); gc.msg = { text:size + ' opened in a new tab — print at 100% (“Actual size”), then cut on the marks.' }; }
+      else {
+        var a = document.createElement('a'); a.href = url; a.download = 'GREYS-gift-notes-' + new Date().toISOString().slice(0, 10) + '.pdf';
+        document.body.appendChild(a); a.click(); a.remove();
+        gc.msg = { text:'Saved the PDF (' + size + '). Print it at 100% (“Actual size”).' };
+      }
+    } catch (e) {
+      if (win && !win.closed) try { win.close(); } catch (_) {}
+      gc.msg = { text:'Couldn’t make the gift cards: ' + ((e && e.message) || e), bad:true };
+    }
+    gc.busy = false; draw();
   }
 
   // ---------- settings ----------
@@ -20007,6 +20130,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     if (a === 'filter') { st.filter = v; draw(); }
     else if (a === 'refresh') load(true);
     else if (a === 'print') printList();
+    else if (a === 'gcards') giftCards();
+    else if (a === 'gcard') giftCards(v);
     else if (a === 'track') { st.open = v; st.msg[v] = null; draw(); }
     else if (a === 'cancel') { st.open = ''; draw(); }
     else if (a === 'email') emailTracking(v);
