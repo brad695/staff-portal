@@ -12,6 +12,8 @@
   // Paper, grid and card size in inches. Cards fill left to right, top to bottom; the grid sits in the middle of the page.
   const LAYOUTS = {
     'letter-6': { name: 'Letter paper · 6 to a sheet', paper: [8.5, 11], cols: 2, rows: 3, card: [4, 3], gap: [0, 0] },
+    // business-card size (the Studio's gift-card designs, 3.5 × 2 in) — the gift note cards on the Shipping tab
+    'letter-10': { name: 'Letter paper · 10 to a sheet', paper: [8.5, 11], cols: 2, rows: 5, card: [3.5, 2], gap: [0, 0] },
   };
   const DEFAULT = 'letter-6';
 

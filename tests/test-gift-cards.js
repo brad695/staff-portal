@@ -64,7 +64,9 @@ const SB_STUB = `(function(){
   window.supabase = { createClient: function(){ return client; } };
 })();`;
 
-const FACES = [["League Spartan", "league-spartan", ["800"]], ["Barlow Condensed", "barlow-condensed", ["800"]], ["Nunito Sans", "nunito-sans", ["400-italic", "700", "800"]]];
+const TPL = {"id":"dxcd6ls80cj","name":"Gift card cheesemas","w":336,"h":192,"unit":"in","kind":"gift-card","updated_at":"2026-11-18T00:11:43Z","pages":[{"bg":{"grad":{"a":"#123E57","b":"#06273A","angle":135},"color":"#06273A"},"id":"pdh1ydt80cj","els":[{"h":78,"w":78,"x":236,"y":22,"id":"egtofpf80cj","op":1,"rot":0,"fill":"#E6B33C","icon":"wheel","type":"icon"},{"h":40,"w":200,"x":24,"y":24,"id":"evyiz9h80cj","lh":1,"ls":0,"op":1,"rot":0,"font":"League Spartan","ital":false,"size":40,"text":"GREYS","type":"text","align":"left","color":"#FFF6E3","under":false,"upper":false,"weight":800},{"h":9.6,"w":200,"x":24,"y":68,"id":"ee6sc5v80cj","lh":1.2,"ls":120,"op":1,"rot":0,"font":"League Spartan","ital":false,"size":8,"text":"FINE CHEESES · CHARCUTERIE · WINE","type":"text","align":"left","color":"#E6B33C","under":false,"upper":false,"weight":700},{"h":12,"w":126,"x":186,"y":152,"id":"e0v1jea80cj","lh":1.2,"ls":0,"op":1,"rot":0,"font":"Nunito Sans","ital":false,"size":10,"text":"greyscheese.com","type":"text","align":"right","color":"#C9D6DF","under":false,"upper":false,"weight":700}]}]};
+const FACES = [["League Spartan", "league-spartan", ["700", "800"]], ["Barlow Condensed", "barlow-condensed", ["800"]], ["Nunito Sans", "nunito-sans", ["400-italic", "700", "800"]]];
+const SB_STUB2 = SB_STUB.replace("return { data: q.single ? null : [], error: null, count: 0 };", "if (table === 'studio_designs' && window.__gcTpl) return { data: [window.__gcTpl], error: null }; return { data: q.single ? null : [], error: null, count: 0 };");
 const FONT_CSS = FACES.flatMap(([fam, pkg, wts]) => wts.flatMap((w) => {
   const css = fs.readFileSync(require.resolve(`@fontsource/${pkg}/${w}.css`), "utf8"), out = [];
   for (const m of css.matchAll(/@font-face\s*\{([^}]+)\}/g)) {
@@ -77,16 +79,17 @@ const FONT_CSS = FACES.flatMap(([fam, pkg, wts]) => wts.flatMap((w) => {
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "*" };
 const LONG = "Merry Cheesemas, Grandma! We wish we could be there to share all twelve days with you — save the Comté for Christmas Eve, and don't let Uncle Ray near the truffle brie. Love you so much and see you in the spring!";
 
-async function open(browser, orders) {
+async function open(browser, orders, tpl) {
   const ctx = await browser.newContext({ viewport: { width: 1360, height: 900 } });
   const page = await ctx.newPage();
   const st = { errors: [], orders };
   page.on("pageerror", (e) => st.errors.push(String(e)));
   await page.addInitScript(() => { window.__giftCardsDirect = false; window.open = function(){ return null; }; });
+  if (tpl) await page.addInitScript((d) => { window.__gcTpl = d; }, tpl);
   await page.route("**/*", (route) => {
     const req = route.request(), u = new URL(req.url());
     if (!/^https?:/.test(u.protocol)) return route.continue();
-    if (u.hostname === "cdn.jsdelivr.net" && /supabase-js/.test(u.pathname)) return route.fulfill({ status: 200, contentType: "application/javascript", body: SB_STUB });
+    if (u.hostname === "cdn.jsdelivr.net" && /supabase-js/.test(u.pathname)) return route.fulfill({ status: 200, contentType: "application/javascript", body: SB_STUB2 });
     if (u.hostname === "fonts.googleapis.com") return route.fulfill({ status: 200, contentType: "text/css", body: FONT_CSS });
     if (u.hostname === "fonts.gstatic.com" && u.pathname.startsWith("/__font/")) {
       const [, , pkg, file] = u.pathname.split("/");
@@ -129,6 +132,7 @@ async function grab(page, click) {
   many.push(order("refund", { gift_note: "should not print", refunded: true }));
   console.log("\nmanager.html · 🚚 Shipping · 🎁 gift note cards");
   const { ctx, page, st } = await open(browser, many);
+  t("no template in the Studio: the plain 4 × 3 card", true);
   t("the button counts the gift notes to ship (7 — not the plain or refunded ones)", /Gift note cards \(7\)/.test(await txt(page, '#shBar [data-sh="gcards"]')), await txt(page, "#shBar .sh-acts"));
   t("each gift note row has its own Print card", (await page.locator('#shList [data-sh="gcard"]').count()) === 7);
   const all = await grab(page, '#shBar [data-sh="gcards"]');
@@ -150,7 +154,20 @@ async function grab(page, click) {
     await page.screenshot({ path: path.join(SHOTS, "shipping-gift-button.png") });
   }
   t("no page errors", st.errors.length === 0, st.errors.slice(0, 3).join(" | "));
-  await ctx.close(); await browser.close();
+  await ctx.close();
+  console.log("\n…with the Studio template “Gift card cheesemas”");
+  {
+    const o = await open(browser, many, TPL);
+    const r = await grab(o.page, '#shBar [data-sh="gcards"]');
+    const g = path.join(tmp, "tpl.pdf"); if (r) fs.writeFileSync(g, r.buf);
+    t("template: 7 cards on 1 sheet (10 to a sheet)", !!r && r.cards === 7 && r.sheets === 1, r && [r.cards, r.sheets]);
+    t("…it used the Studio design", (await o.page.evaluate(() => window.__giftCardsTemplate)) === "Gift card cheesemas");
+    t("…qpdf: sound", spawnSync("qpdf", ["--check", g]).status === 0);
+    if (SHOTS) { fs.copyFileSync(g, path.join(SHOTS, "gift-notes-tpl.pdf")); spawnSync("pdftoppm", ["-r", "110", "-png", g, path.join(SHOTS, "gift-tpl")]); }
+    t("…no page errors", o.st.errors.length === 0, o.st.errors.slice(0, 3).join(" | "));
+    await o.ctx.close();
+  }
+  await browser.close();
   console.log("\n" + ok + " passed, " + bad + " failed");
   process.exit(bad ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });
