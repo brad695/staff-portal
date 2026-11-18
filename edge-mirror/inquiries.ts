@@ -435,9 +435,80 @@ function stripQuoted(text: string) {
   return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-async function ingest(b: Record<string, unknown>) {
+async function checkSecret(b: Record<string, unknown>) {
   const { data: sec } = await admin.from("app_secrets").select("value").eq("name", "inquiry_ingest_secret").maybeSingle();
-  if (!sec?.value || clean(b.secret, 200) !== sec.value) return { ok: false, error: "bad secret", status: 403 };
+  return !!sec?.value && clean(b.secret, 200) === sec.value;
+}
+const addrOf = (s: string) => ((/<([^>]+)>/.exec(s)?.[1] || s).trim().toLowerCase());
+const OURS = /@greyscheese\.com$/i;
+// the addresses of leads still worth syncing (not lost, touched in the last year) — the Gmail script only sends mail to / from these
+async function leadAddrs() {
+  const since = new Date(Date.now() - 365 * 86400_000).toISOString();
+  const out = new Set<string>();
+  for (const t of ["catering_leads", "inquiries"]) {
+    const { data } = await admin.from(t).select("email").neq("stage", "lost").gte("created_at", since).limit(5000);
+    (data || []).forEach((r: any) => { const e = String(r.email || "").trim().toLowerCase(); if (e.includes("@") && !OURS.test(e)) out.add(e); });
+  }
+  return [...out];
+}
+// the newest lead (catering or experience inquiry) for an address
+async function leadByEmail(addr: string) {
+  if (!addr || OURS.test(addr)) return null;
+  const pick = async (t: string) => (await admin.from(t).select("id,code,stage,created_at,last_message_at").ilike("email", addr).neq("stage", "lost")
+    .order("created_at", { ascending: false }).limit(1)).data?.[0] || null;
+  const [c, i] = await Promise.all([pick("catering_leads"), pick("inquiries")]);
+  const at = (r: any) => r ? Date.parse(r.last_message_at || r.created_at) || 0 : -1;
+  if (!c && !i) return null;
+  return at(c) >= at(i) ? { kind: "cat", id: c.id } : { kind: "inq", id: i.id };
+}
+
+// 2026-11-18 (Maverick: "it was all supposed to be synced up whether they were replying in the chat or the customer leads
+// section or through the info@ email"): the info@ Gmail script also sends
+//   · mail staff send FROM info@ Gmail to a lead (direction "out") → an "out" row, like a reply from the console
+//   · customer mail with no [#CODE] in the subject → matched by the customer's address to their newest open lead
+// [#CODE] still wins when it's there. Every row lands in the lead's Greys Chat conversation through the usual mirror trigger.
+async function ingestAny(b: Record<string, unknown>) {
+  const out = clean(b.direction, 8) === "out";
+  const subject = clean(b.subject, 500);
+  const code = subject.match(/\[#([A-Z0-9]{6})\]/i)?.[1]?.toUpperCase() || "";
+  let target: { kind: string; id: string } | null = null;
+  if (code) {
+    const { data: i } = await admin.from("inquiries").select("id").eq("code", code).maybeSingle();
+    if (i) target = { kind: "inq", id: i.id };
+    else { const { data: c } = await admin.from("catering_leads").select("id").eq("code", code).maybeSingle(); if (c) target = { kind: "cat", id: c.id }; }
+    // a Greys Chat client conversation's code: a customer reply goes there as before
+    if (!target && !out) { const r: any = await ingestChat(code, b); if (r.added || r.skipped === "already have it") return r; }
+  }
+  if (!target) {
+    const addrs = out ? clean(b.to, 2000).split(/[,;]/).map(addrOf).filter((a) => a && !OURS.test(a)) : [addrOf(clean(b.from, 200))];
+    for (const a of addrs) { target = await leadByEmail(a); if (target) break; }
+  }
+  if (!target) return { ok: true, skipped: "no lead for this email" };
+  const tbl = target.kind === "cat" ? "catering_messages" : "inquiry_messages", key = target.kind === "cat" ? "lead_id" : "inquiry_id";
+  const parent = target.kind === "cat" ? "catering_leads" : "inquiries";
+  const gid = clean(b.message_id, 200);
+  if (gid) {
+    const { data: dup } = await admin.from(tbl).select("id").eq("gmail_id", gid).maybeSingle();
+    if (dup) return { ok: true, skipped: "already have it" };
+  }
+  const body = stripQuoted(clean(b.body, 20000)).slice(0, 8000) || "(empty email)";
+  const at = clean(b.date, 40), when = at && !isNaN(Date.parse(at)) ? new Date(at).toISOString() : new Date().toISOString();
+  const { error } = await admin.from(tbl).insert({ [key]: target.id, direction: out ? "out" : "in", body, gmail_id: gid || null, created_at: when,
+    sent_by: clean(b.from, 200) || (out ? "info@ Gmail" : "email"), ...(out ? { email_status: "sent" } : {}) });
+  if (error) throw new Error(error.message);
+  if (out) {
+    const { data: p } = await admin.from(parent).select("stage").eq("id", target.id).maybeSingle();
+    await admin.from(parent).update({ last_from: "staff", last_message_at: when, unread: false, ...(p?.stage === "new" ? { stage: "replied" } : {}) }).eq("id", target.id);
+  } else {
+    await admin.from(parent).update({ last_from: "customer", last_message_at: when, unread: true }).eq("id", target.id);
+  }
+  return { ok: true, added: true, to: target.kind, direction: out ? "out" : "in" };
+}
+
+async function ingest(b: Record<string, unknown>) {
+  if (!(await checkSecret(b))) return { ok: false, error: "bad secret", status: 403 };
+  // the new script says which way the mail went; an old one only ever sends customer replies with a code
+  if (b.direction) return await ingestAny(b);
   const subject = clean(b.subject, 500);
   const m = subject.match(/\[#([A-Z0-9]{6})\]/i);
   if (!m) return { ok: true, skipped: "no code" };
@@ -519,6 +590,7 @@ Deno.serve(async (req) => {
     const action = new URL(req.url).searchParams.get("action") ?? String(b.action ?? "");
     if (action === "ask") return json(await ask(req, b));
     if (action === "ingest") { const r: any = await ingest(b); return json(r, r.status || 200); }
+    if (action === "ingest_addrs") return (await checkSecret(b)) ? json({ ok: true, addrs: await leadAddrs() }) : json({ ok: false, error: "bad secret" }, 403);
     if (!(await isAdmin(req))) return json({ ok: false, error: "Not authorized" }, 403);
     if (action === "reply") return json(await reply(req, b));
     if (action === "log") return json(await logIn(b));

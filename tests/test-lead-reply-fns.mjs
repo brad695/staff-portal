@@ -37,7 +37,7 @@ function world() {
     const q = { table, filters: [], op: "select", row: null };
     const run = () => {
       const all = w.rows[table] || (w.rows[table] = []);
-      const hit = all.filter((r) => q.filters.every(([k, v, how]) => how === "ilike" ? String(r[k]).toLowerCase() === String(v).toLowerCase() : r[k] === v));
+      const hit = all.filter((r) => q.filters.every(([k, v, how]) => how === "ilike" ? String(r[k]).toLowerCase() === String(v).toLowerCase() : how === "neq" ? r[k] !== v : r[k] === v));
       if (q.op === "insert") {
         const err = w.insertError && w.insertError(table, q.row);
         w.ops.push({ table, op: "insert", row: q.row, error: err || null });
@@ -49,7 +49,8 @@ function world() {
       return { data: q.single ? (hit[0] || null) : hit, error: null };
     };
     const b = {
-      select: () => b, order: () => b, limit: () => b, in: () => b, not: () => b, neq: () => b, is: () => b,
+      select: () => b, order: () => b, limit: () => b, in: () => b, not: () => b, is: () => b, gte: () => b,
+      neq: (k, v) => { q.filters.push([k, v, "neq"]); return b; },
       eq: (k, v) => { q.filters.push([k, v]); return b; }, ilike: (k, v) => { q.filters.push([k, v, "ilike"]); return b; },
       insert: (row) => { q.op = "insert"; q.row = row; return b; }, update: (row) => { q.op = "update"; q.row = row; return b; },
       single: () => { q.single = true; return b; }, maybeSingle: () => { q.single = true; return b; },
@@ -218,6 +219,36 @@ console.log("\ninquiries.ts · the booking link");
   t("…and is clickable in the email", w2.mail[0].body.html.includes('<a href="https://tickets.greyscheese.com/experiences?book=abc" style='));
   const w3 = world(), fn3 = await load(now("inquiries.ts"), w3);
   eq("no booking link: replied", (await fn3("reply", { inquiry_id: INQ.id, html: "<div>We'd love to host you!</div>" })).data.stage, "replied");
+}
+
+console.log("\ninquiries.ts · info@ Gmail sync (2026-11-18)");
+{
+  const w = world();
+  w.rows.app_secrets = [{ name: "inquiry_ingest_secret", value: "s3cret" }];
+  w.rows.catering_leads[0].created_at = "2026-11-10T00:00:00Z";
+  const fn = await load(now("inquiries.ts"), w);
+  const ing = (b) => fn("ingest", { secret: "s3cret", ...b });
+  eq("bad secret is refused", (await fn("ingest", { secret: "x", direction: "in" })).status, 403);
+  eq("addresses list needs the secret", (await fn("ingest_addrs", { secret: "x" })).status, 403);
+  const ad = await fn("ingest_addrs", { secret: "s3cret" });
+  t("addresses list: the leads' emails", ad.data.ok && ad.data.addrs.includes("jane@example.com") && ad.data.addrs.includes("sam@example.com"), ad.data);
+  let r = await ing({ direction: "out", from: "GREYS Fine Cheeses <info@greyscheese.com>", to: "Jane Smith <jane@example.com>", subject: "Your party", body: "Hi Jane, here's the menu.\n\nOn Tue, Nov 17, 2026 Jane wrote:\n> hi", message_id: "g1", date: "2026-11-18T15:00:00Z" });
+  const o = w.ops.find((x) => x.table === "catering_messages" && x.op === "insert");
+  t("staff mail from info@ to a lead → an out row on that lead", r.data.added && o && o.row.direction === "out" && o.row.lead_id === LEAD.id && o.row.body === "Hi Jane, here's the menu." && o.row.email_status === "sent" && o.row.gmail_id === "g1", [r.data, o && o.row]);
+  t("…lead moves new → replied, not unread", w.rows.catering_leads[0].stage === "replied" && w.rows.catering_leads[0].unread === false && w.rows.catering_leads[0].last_from === "staff");
+  r = await ing({ direction: "out", from: "info@greyscheese.com", to: "Jane Smith <jane@example.com>", subject: "Your party", body: "x", message_id: "g1" });
+  eq("the same Gmail message twice is skipped", r.data.skipped, "already have it");
+  r = await ing({ direction: "in", from: "Sam Lee <sam@example.com>", to: "info@greyscheese.com", subject: "quick question", body: "Can we bring a cake?", message_id: "g2" });
+  const n = w.ops.filter((x) => x.table === "inquiry_messages" && x.op === "insert").pop();
+  t("customer mail with no code → their newest lead, as unread", r.data.added && n.row.direction === "in" && n.row.inquiry_id === INQ.id && w.rows.inquiries[0].unread === true, [r.data, n && n.row]);
+  r = await ing({ direction: "in", from: "stranger@example.com", subject: "hello", body: "x", message_id: "g3" });
+  eq("mail from someone who isn't a lead is skipped", r.data.skipped, "no lead for this email");
+  r = await ing({ direction: "out", from: "info@greyscheese.com", to: "kurt@greyscheese.com", subject: "fyi", body: "x", message_id: "g4" });
+  eq("staff-to-staff mail is skipped", r.data.skipped, "no lead for this email");
+  r = await ing({ direction: "in", from: "someone@else.com", subject: "Re: Your GREYS catering question [#AB12CD]", body: "yes please", message_id: "g5" });
+  t("a [#CODE] still wins over the address", r.data.added && w.ops.filter((x) => x.table === "catering_messages" && x.op === "insert").pop().row.body === "yes please");
+  r = await fn("ingest", { secret: "s3cret", from: "jane@example.com", subject: "Re: Your GREYS catering question [#AB12CD]", body: "old script", message_id: "g6" });
+  t("the old script's payload still works", r.data.added === true && r.data.catering === true, r.data);
 }
 
 console.log("\ncatering.ts · everything else still answers");
