@@ -18,6 +18,12 @@
 //   sync    {secret?} → refreshes every open invoice from Square (deposit_paid / paid / canceled)
 // ADMIN (staff JWT)
 //   reply · log · new_lead · save_quote · send_quote · send_invoice · create_invoice · cancel_invoice · contract_url · preview
+//   reply {lead_id, body}                       → the plain reply, as always
+//   reply {lead_id, html, attachments?, body?}  → 2026-11-17, the manager console's reply editor (Maverick: "when replying
+//            we need a full editor, add file, add link etc."): formatted text, links, pictures and files. All of it is
+//            ./rich-reply.ts — the HTML is sanitized there, files are checked against the lead-files bucket (only this
+//            lead's folder, cat/<lead id>/…), PDFs and images go as real attachments and every file is linked in the
+//            email. The row keeps body (plain copy), body_html and attachments (migration lead_reply_editor).
 //   preview {quote_id, kind, message} → the exact customer email (+ what Square will bill) without sending anything
 //   refund {quote_id, amount_cents?, reason?} → refunds money paid on the quote's Square invoice (default: all that's
 //            left), newest payment first; adds to catering_quotes.refunded_cents and logs a note. Real money.
@@ -49,6 +55,7 @@
 // verify_jwt = false (ask / view / sign are public).
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from "npm:pdf-lib@1.17.1";
+import { buildReply, mailAttachments, ReplyError, type LeadFile } from "./rich-reply.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -103,6 +110,28 @@ async function sendMail(to: string, subject: string, html: string, replyTo = REP
   });
   const d = await r.json().catch(() => ({}));
   return r.ok && d.ok ? "sent" : "failed: " + JSON.stringify(d).slice(0, 200);
+}
+// A staff reply with files (2026-11-17): send-mail fetches the ones marked "attached" from their public
+// Storage URL. If the send fails with them on board (a file isn't what its type says, the provider balks at
+// the size) it goes again without — every file is linked in the message anyway — and they're recorded as links.
+// With no files this posts exactly what sendMail posts.
+async function sendReplyMail(to: string, subject: string, html: string, files: LeadFile[]) {
+  const atts = mailAttachments(files);
+  const post = async (attachments: unknown[]) => {
+    const r = await fetch(SB_URL + "/functions/v1/send-mail", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICE },
+      body: JSON.stringify({ to, subject, html, from: FROM, replyTo: REPLY_TO, ...(attachments.length ? { attachments } : {}) }),
+    });
+    const d = await r.json().catch(() => ({}));
+    return { ok: r.ok && !!d.ok, d };
+  };
+  let res = await post(atts);
+  if (!res.ok && atts.length) {
+    console.error("reply attachments", JSON.stringify(res.d).slice(0, 300));
+    files.forEach((f) => { f.sent = "link"; });
+    res = await post([]);
+  }
+  return res.ok ? "sent" : "failed: " + JSON.stringify(res.d).slice(0, 200);
 }
 // Brand email chrome (Maverick 2026-10-12): cream canvas, white card, navy header band with the
 // GREYS wordmark + gold rule, gold CTA with navy text, shop footer. All inline styles for mail clients.
@@ -648,16 +677,28 @@ async function sync(onlyId?: string) {
 
 // ---------- admin actions ----------
 async function reply(who: string, b: Record<string, unknown>) {
-  const id = clean(b.lead_id, 64), body = clean(b.body, 8000);
-  if (!body) throw new PublicError("Type a message first.");
+  const id = clean(b.lead_id, 64);
+  if (!clean(b.body, 8000) && !clean(b.html, 20) && !(Array.isArray(b.attachments) && b.attachments.length)) throw new PublicError("Type a message first.");
   const { data: lead } = await admin.from("catering_leads").select("*").eq("id", id).single();
   if (!lead) throw new PublicError("Lead not found.");
-  const status = await sendMail(lead.email, "Re: " + subjectFor(lead), shell(`<p>${para(body)}</p>`));
-  await admin.from("catering_messages").insert({ lead_id: id, direction: "out", body, sent_by: who, email_status: status });
+  // plain text, or the reply editor's formatted message + files — see ./rich-reply.ts
+  const r = await buildReply(admin, SB_URL, `cat/${lead.id}/`, b);
+  const status = await sendReplyMail(lead.email, "Re: " + subjectFor(lead), shell(r.inner), r.files);
+  const row: Record<string, unknown> = { lead_id: id, direction: "out", body: r.body, sent_by: who, email_status: status };
+  if (r.html) row.body_html = r.html;
+  if (r.files.length) row.attachments = r.files;
+  let { error } = await admin.from("catering_messages").insert(row);
+  if (error && (row.body_html || row.attachments)) {
+    // the formatted copy couldn't be kept — the plain one (it lists the files) still is
+    console.error("reply row", error.message);
+    ({ error } = await admin.from("catering_messages").insert({ lead_id: id, direction: "out", body: r.body, sent_by: who, email_status: status }));
+  }
+  if (error) console.error("reply row", error.message);
   const stage = lead.stage === "new" ? "replied" : lead.stage;
   await admin.from("catering_leads").update({ stage, last_from: "staff", last_message_at: new Date().toISOString(), unread: false }).eq("id", id);
   if (status !== "sent") throw new PublicError("Saved, but the email didn't send (" + status + ").");
-  return { ok: true, stage };
+  if (error) throw new PublicError("The email went out, but it couldn't be saved to the conversation — add a note so there's a record.");
+  return { ok: true, stage, rich: true, files: r.files.map((f) => ({ name: f.name, sent: f.sent })) };
 }
 async function logIn(b: Record<string, unknown>) {
   const id = clean(b.lead_id, 64), body = clean(b.body, 8000);
@@ -928,7 +969,7 @@ Deno.serve(async (req) => {
     if (action === "contract_url") return json(await contractUrl(b));
     return json({ ok: false, error: "Unknown action" }, 400);
   } catch (e) {
-    if (e instanceof PublicError) return json({ ok: false, error: e.message }, 400);
+    if (e instanceof PublicError || e instanceof ReplyError) return json({ ok: false, error: e.message }, 400);
     console.error(`[${ref}]`, e);
     return json({ ok: false, error: `Something went wrong (ref ${ref}).` }, 500);
   }

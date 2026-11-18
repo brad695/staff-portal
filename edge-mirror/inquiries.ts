@@ -27,7 +27,12 @@
 //                   ride along — priced onto a held booking (rb_experience_addons), on the message and
 //                   in details.addons for a request (the portal's booking link carries them).
 //   reply (admin)   staff reply from the manager console → emailed to the customer;
-//                   sending a booking link (…?book=…) restarts the 48 h hold
+//                   sending a booking link (…?book=…) restarts the 48 h hold.
+//                   {inquiry_id, body} is the plain reply, as always. {inquiry_id, html, attachments?} is the
+//                   console's reply editor (2026-11-17): formatted text, links, pictures and files — sanitized
+//                   and checked in ./rich-reply.ts (shared with the catering fn; files live in the lead-files
+//                   bucket under inq/<inquiry id>/…). The row keeps body (plain copy — the booking-link check
+//                   reads it), body_html and attachments (migration lead_reply_editor).
 //   log   (admin)   paste a reply the customer sent by email into the conversation
 //   ingest (secret) Google Apps Script running in brad@greyscheese.com's Gmail posts each
 //                   customer reply whose subject carries [#CODE]; it lands in that thread
@@ -39,6 +44,7 @@
 // inbound email is wired straight into the portal. Mail goes through send-mail.
 // verify_jwt = false: `ask` is public (rate-limited); the rest check the admin JWT.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { buildReply, mailAttachments, ReplyError, type LeadFile } from "./rich-reply.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -105,6 +111,28 @@ async function sendMail(to: string, subject: string, html: string, replyTo = REP
   });
   const d = await r.json().catch(() => ({}));
   return r.ok && d.ok ? "sent" : "failed: " + JSON.stringify(d).slice(0, 200);
+}
+// A staff reply with files (2026-11-17, same as the catering fn): send-mail fetches the ones marked
+// "attached" from their public Storage URL. If the send fails with them on board it goes again without —
+// every file is linked in the message anyway — and they're recorded as links. With no files this posts
+// exactly what sendMail posts.
+async function sendReplyMail(to: string, subject: string, html: string, files: LeadFile[]) {
+  const atts = mailAttachments(files);
+  const post = async (attachments: unknown[]) => {
+    const r = await fetch(SB_URL + "/functions/v1/send-mail", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICE },
+      body: JSON.stringify({ to, subject, html, from: FROM, replyTo: REPLY_TO, ...(attachments.length ? { attachments } : {}) }),
+    });
+    const d = await r.json().catch(() => ({}));
+    return { ok: r.ok && !!d.ok, d };
+  };
+  let res = await post(atts);
+  if (!res.ok && atts.length) {
+    console.error("reply attachments", JSON.stringify(res.d).slice(0, 300));
+    files.forEach((f) => { f.sent = "link"; });
+    res = await post([]);
+  }
+  return res.ok ? "sent" : "failed: " + JSON.stringify(res.d).slice(0, 200);
 }
 // Brand email chrome (Maverick 2026-10-12, same as the catering fn): cream canvas, white card,
 // navy header band with the GREYS wordmark + gold rule, gold CTA with navy text, shop footer.
@@ -357,13 +385,25 @@ async function ask(req: Request, b: Record<string, unknown>) {
 }
 
 async function reply(req: Request, b: Record<string, unknown>) {
-  const id = clean(b.inquiry_id, 64), body = clean(b.body, 8000);
-  if (!body) throw new PublicError("Type a message first.");
+  const id = clean(b.inquiry_id, 64);
+  if (!clean(b.body, 8000) && !clean(b.html, 20) && !(Array.isArray(b.attachments) && b.attachments.length)) throw new PublicError("Type a message first.");
   const { data: inq } = await admin.from("inquiries").select("*").eq("id", id).single();
   if (!inq) throw new PublicError("Conversation not found.");
-  const status = await sendMail(inq.email, "Re: " + subjectFor(inq), shell(`<p>${para(body)}</p>`));
+  // plain text, or the reply editor's formatted message + files — see ./rich-reply.ts
+  const r = await buildReply(admin, SB_URL, `inq/${inq.id}/`, b);
+  const body = r.body; // the plain copy: a link's address is written out in it, so the check below still sees it
+  const status = await sendReplyMail(inq.email, "Re: " + subjectFor(inq), shell(r.inner), r.files);
   const by = await whoIs(req);
-  await admin.from("inquiry_messages").insert({ inquiry_id: id, direction: "out", body, sent_by: by, email_status: status });
+  const row: Record<string, unknown> = { inquiry_id: id, direction: "out", body, sent_by: by, email_status: status };
+  if (r.html) row.body_html = r.html;
+  if (r.files.length) row.attachments = r.files;
+  let { error: rowErr } = await admin.from("inquiry_messages").insert(row);
+  if (rowErr && (row.body_html || row.attachments)) {
+    // the formatted copy couldn't be kept — the plain one (it lists the files) still is
+    console.error("reply row", rowErr.message);
+    ({ error: rowErr } = await admin.from("inquiry_messages").insert({ inquiry_id: id, direction: "out", body, sent_by: by, email_status: status }));
+  }
+  if (rowErr) console.error("reply row", rowErr.message);
   // a booking link: experiences.html?book=… today, experiences.greyscheese.com/?book=… later
   const hasLink = /[?&]book=/.test(body);
   if (hasLink && inq.reservation_id) {
@@ -375,7 +415,8 @@ async function reply(req: Request, b: Record<string, unknown>) {
   const stage = hasLink ? "link_sent" : (inq.stage === "new" ? "replied" : inq.stage);
   await admin.from("inquiries").update({ stage, last_from: "staff", last_message_at: new Date().toISOString(), unread: false }).eq("id", id);
   if (status !== "sent") throw new PublicError("Saved, but the email didn't send (" + status + ").");
-  return { ok: true, stage };
+  if (rowErr) throw new PublicError("The email went out, but it couldn't be saved to the conversation — add a note so there's a record.");
+  return { ok: true, stage, rich: true, files: r.files.map((f) => ({ name: f.name, sent: f.sent })) };
 }
 
 // Keep only what the customer wrote: drop quoted history ("On … wrote:", "> …",
@@ -483,7 +524,7 @@ Deno.serve(async (req) => {
     if (action === "log") return json(await logIn(b));
     return json({ ok: false, error: "Unknown action" }, 400);
   } catch (e) {
-    if (e instanceof PublicError) return json({ ok: false, error: e.message }, 400);
+    if (e instanceof PublicError || e instanceof ReplyError) return json({ ok: false, error: e.message }, 400);
     console.error(`[${ref}]`, e);
     return json({ ok: false, error: `Something went wrong (ref ${ref}).` }, 500);
   }

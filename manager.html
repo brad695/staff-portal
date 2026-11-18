@@ -817,7 +817,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       <div class="cat-sec"><h4>Reply</h4>
         <div class="rf full">
           <select id="inqQuick" class="loc-sel" style="margin-bottom:6px;" onchange="inqQuickPick(this)"><option value="">Quick replies…</option></select>
-          <textarea id="inqBody" rows="5" placeholder="Write your reply…"></textarea></div>
+          <div id="inqBody" data-ph="Write your reply…"></div></div>
         <div class="cat-sec-actions">
           <button class="btn btn-ghost btn-sm" onclick="inqInsertLink()">🔗 Booking link</button>
           <button class="btn btn-ghost btn-sm" onclick="inqLog(false)">📥 Log their reply</button>
@@ -973,7 +973,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
         <div class="cat-sec"><h4>Reply</h4>
           <div class="rf full">
             <select id="catQuick" class="loc-sel" style="margin-bottom:6px;" onchange="catQuickPick(this)"><option value="">Quick replies…</option></select>
-            <textarea id="catBody" rows="5" placeholder="Write your reply…"></textarea></div>
+            <div id="catBody" data-ph="Write your reply…"></div></div>
           <div class="cat-sec-actions">
             <button class="btn btn-ghost btn-sm" onclick="catLog(false)">📥 Log their reply</button>
             <button class="btn btn-ghost btn-sm" onclick="catLog(true)">📝 Add note</button>
@@ -2160,7 +2160,8 @@ async function inqOpen(id){
   document.getElementById('inqStage').value = r.stage;
   const icl = document.getElementById('inqChatLink'); if(icl) icl.href = '/chat#lead=' + encodeURIComponent(r.code);
   document.getElementById('inqHideCal').checked = !!r.hide_on_calendar;
-  document.getElementById('inqBody').value = '';
+  // another inquiry: an empty reply box whose files go to its folder (reopening the same one keeps the draft)
+  if(inqEd().prefix !== 'inq/' + r.id + '/') inqEd().reset('inq/' + r.id + '/');
   document.getElementById('inqMsg').textContent = '';
   const q = document.getElementById('inqQuick');
   q.innerHTML = '<option value="">Quick replies…</option>' + INQ_QUICK.map((x,i)=>'<option value="'+i+'">'+esc(x[0])+'</option>').join('');
@@ -2178,7 +2179,7 @@ async function inqThread(){
     const warn = mine && m.email_status && m.email_status!=='sent' ? ' <span class="pill pill-bad">email failed</span>' : '';
     return '<div style="display:flex;justify-content:'+(mine?'flex-end':'flex-start')+';margin:6px 0;"><div style="max-width:82%;background:'+bg+';border-radius:12px;padding:9px 12px;">'
       +'<div style="font-size:.72rem;color:#64748b;margin-bottom:3px;">'+who+' · '+esc(inqWhen(m.created_at))+warn+'</div>'
-      +'<div style="white-space:pre-wrap;font-size:.9rem;">'+esc(m.body)+'</div></div></div>';
+      +rrMsgBody(m)+'</div></div>';
   }).join('') || '<div class="rec-empty">No messages.</div>';
   el.scrollTop = el.scrollHeight;
 }
@@ -2211,37 +2212,60 @@ function inqLink(){
   if(r.email) p.set('email', r.email); if(r.phone) p.set('phone', r.phone);
   return INQ_SITE + '?' + p.toString();
 }
+/* The Reply boxes are editors (2026-11-17, the RICH-REPLY block further down): formatting, links, pictures, files.
+   inqEd() / catEd() → the editor on #inqBody / #catBody: appendText / appendHtml (add to what is typed), payload()
+   (what to post), reset(folder) (new conversation), getText() (plain text, for notes). */
+function inqEd(){ return RichReply.of('inqBody'); }
+function catEd(){ return RichReply.of('catBody'); }
+// before a send: wait for uploads, don't send past a file that failed, don't send nothing. Returns the payload or null.
+function rrReady(ed, msg){
+  if(ed.busy()){ msg.textContent = 'Hang on — a file is still uploading.'; return null; }
+  if(ed.failed()){ msg.textContent = 'One file didn\'t upload — take it off (✕) or add it again, then send.'; return null; }
+  const p = ed.payload();
+  if(p.empty){ msg.textContent = 'Write a reply first.'; return null; }
+  return p;
+}
+// "✓ Sent to …" + how the files went. An email function that predates the editor sends just the text — say so.
+function rrSentMsg(email, p, d){
+  if(!p.plain && !(d && d.rich)) return '⚠ Sent to '+email+' as plain text — the formatting and files did not go (the email function needs its update).';
+  const files = (d && d.files) || [], links = files.filter(f=>f.sent==='link').length, att = files.length - links;
+  const how = [att ? att+(att===1?' file attached':' files attached') : '', links ? links+(links===1?' file as a link':' files as links') : ''].filter(Boolean).join(', ');
+  return '✓ Sent to '+email+(how ? ' — '+how : '');
+}
 function inqInsertLink(){
-  const t = document.getElementById('inqBody');
   if(!INQ_CUR.experience_type_id){ document.getElementById('inqMsg').textContent = 'They didn\'t pick an experience — the link opens the Experiences page.'; }
-  t.value = (t.value ? t.value.replace(/\s*$/,'') + '\n\n' : '') + inqLink();
-  t.focus();
+  // a real link — the address itself is long and full of their details
+  inqEd().appendHtml('<a href="'+esc(inqLink())+'">Book and pay here</a>');
+  inqEd().focus();
 }
 function inqQuickPick(sel){
   const x = INQ_QUICK[Number(sel.value)]; sel.value=''; if(!x) return;
-  const t = document.getElementById('inqBody');
-  const first = ((INQ_CUR && INQ_CUR.name)||'').split(' ')[0];
-  const txt = (first ? 'Hi '+first+',\n\n' : '') + x[1].replace('{link}', inqLink());
-  t.value = t.value ? t.value + '\n\n' + x[1].replace('{link}', inqLink()) : txt;
+  const ed = inqEd(), first = ((INQ_CUR && INQ_CUR.name)||'').split(' ')[0];
+  const body = x[1].replace('{link}', inqLink());
+  ed.appendText(ed.isEmpty() && first ? 'Hi '+first+',\n\n'+body : body);
+  ed.focus();
 }
 async function inqSend(){
-  const body = document.getElementById('inqBody').value.trim();
-  const msg = document.getElementById('inqMsg');
-  if(!body){ msg.textContent = 'Write a reply first.'; return; }
+  const ed = inqEd(), msg = document.getElementById('inqMsg');
+  const p = rrReady(ed, msg); if(!p) return;
   const btn = document.getElementById('inqSend'); btn.disabled = true; msg.textContent = 'Sending…';
-  const r = await inqApi('reply', { inquiry_id: INQ_CUR.id, body });
+  const id = INQ_CUR.id, email = INQ_CUR.email;
+  // lines of text and nothing else go exactly as the old box sent them
+  const r = await inqApi('reply', p.plain ? { inquiry_id: id, body: p.body } : { inquiry_id: id, body: p.body, html: p.html, attachments: p.attachments });
   btn.disabled = false;
-  msg.textContent = r.ok ? '✓ Sent to '+INQ_CUR.email : '❌ '+(r.data.error||'Could not send');
-  if(r.ok){ document.getElementById('inqBody').value=''; if(r.data.stage){ INQ_CUR.stage=r.data.stage; document.getElementById('inqStage').value=r.data.stage; } }
+  if(r.ok && ed.prefix === 'inq/' + id + '/') ed.reset();  // sent — even if they closed it meanwhile, so it isn't sitting there to send twice
+  if(!INQ_CUR || INQ_CUR.id !== id){ inqLoad(); return; }  // they closed it or moved on while it sent
+  msg.textContent = r.ok ? rrSentMsg(email, p, r.data) : '❌ '+(r.data.error||'Could not send');
+  if(r.ok && r.data.stage){ INQ_CUR.stage=r.data.stage; document.getElementById('inqStage').value=r.data.stage; }
   await inqThread(); inqLoad();
 }
 async function inqLog(note){
-  const body = document.getElementById('inqBody').value.trim();
+  const ed = inqEd(), body = ed.getText();
   const msg = document.getElementById('inqMsg');
   if(!body){ msg.textContent = note ? 'Type the note in the box first.' : 'Paste their email reply into the box first.'; return; }
   const r = await inqApi('log', { inquiry_id: INQ_CUR.id, body, note });
-  msg.textContent = r.ok ? (note?'✓ Note added':'✓ Reply logged') : '❌ '+(r.data.error||'Could not save');
-  if(r.ok) document.getElementById('inqBody').value='';
+  msg.textContent = r.ok ? (note?'✓ Note added':'✓ Reply logged')+(ed.hasFiles() ? ' — the files are still here for your reply (notes are text only)' : '') : '❌ '+(r.data.error||'Could not save');
+  if(r.ok) ed.clearText();
   await inqThread(); inqLoad();
 }
 async function inqSetHideCal(v){
@@ -2372,7 +2396,8 @@ async function catOpen(id){
   catHead();
   document.getElementById('catStage').innerHTML = Object.entries(CAT_STAGES).map(([k,l])=>'<option value="'+k+'">'+l+'</option>').join('');
   document.getElementById('catStage').value = CAT_CUR.stage;
-  document.getElementById('catBody').value = '';
+  // another lead: an empty reply box whose files go to its folder (reopening the same one keeps the draft)
+  if(catEd().prefix !== 'cat/' + CAT_CUR.id + '/') catEd().reset('cat/' + CAT_CUR.id + '/');
   document.getElementById('catMsg').textContent = '';
   document.getElementById('catQuick').innerHTML = '<option value="">Quick replies…</option>' + CAT_QUICK.map((x,i)=>'<option value="'+i+'">'+esc(x[0])+'</option>').join('');
   document.getElementById('catModal').style.display = 'flex';
@@ -2406,35 +2431,39 @@ async function catThread(){
     const warn = mine && m.email_status && m.email_status!=='sent' ? ' <span class="pill pill-bad">email failed</span>' : '';
     return '<div style="display:flex;justify-content:'+(mine?'flex-end':'flex-start')+';margin:6px 0;"><div style="max-width:82%;background:'+bg+';border-radius:12px;padding:9px 12px;">'
       +'<div style="font-size:.72rem;color:#64748b;margin-bottom:3px;">'+who+' · '+esc(inqWhen(m.created_at))+warn+'</div>'
-      +'<div style="white-space:pre-wrap;font-size:.9rem;">'+esc(m.body)+'</div></div></div>';
+      +rrMsgBody(m)+'</div></div>';
   }).join('') || '<div class="rec-empty">No messages.</div>';
   el.scrollTop = el.scrollHeight;
 }
 function catClose(){ document.getElementById('catModal').style.display='none'; CAT_CUR=null; CAT_Q=null; }
 function catQuickPick(sel){
   const x = CAT_QUICK[Number(sel.value)]; sel.value=''; if(!x) return;
-  const t = document.getElementById('catBody');
-  const first = ((CAT_CUR && CAT_CUR.name)||'').split(' ')[0];
-  t.value = t.value ? t.value + '\n\n' + x[1] : (first ? 'Hi '+first+',\n\n' : '') + x[1];
+  const ed = catEd(), first = ((CAT_CUR && CAT_CUR.name)||'').split(' ')[0];
+  ed.appendText(ed.isEmpty() && first ? 'Hi '+first+',\n\n'+x[1] : x[1]);
+  ed.focus();
 }
+// The reply editor (RICH-REPLY): formatted text, links, pictures and files → catering fn `reply` { body, html, attachments }.
 async function catSend(){
-  const body = document.getElementById('catBody').value.trim();
-  const msg = document.getElementById('catMsg');
-  if(!body){ msg.textContent = 'Write a reply first.'; return; }
+  const ed = catEd(), msg = document.getElementById('catMsg');
+  const p = rrReady(ed, msg); if(!p) return;
   const btn = document.getElementById('catSend'); btn.disabled = true; msg.textContent = 'Sending…';
-  const r = await catApi('reply', { lead_id: CAT_CUR.id, body });
+  const id = CAT_CUR.id, email = CAT_CUR.email;
+  // lines of text and nothing else go exactly as the old box sent them
+  const r = await catApi('reply', p.plain ? { lead_id: id, body: p.body } : { lead_id: id, body: p.body, html: p.html, attachments: p.attachments });
   btn.disabled = false;
-  msg.textContent = r.ok ? '✓ Sent to '+CAT_CUR.email : '❌ '+(r.data.error||'Could not send');
-  if(r.ok){ document.getElementById('catBody').value=''; if(r.data.stage){ CAT_CUR.stage=r.data.stage; document.getElementById('catStage').value=r.data.stage; } }
+  if(r.ok && ed.prefix === 'cat/' + id + '/') ed.reset();  // sent — even if they closed it meanwhile, so it isn't sitting there to send twice
+  if(!CAT_CUR || CAT_CUR.id !== id){ catLoad(); return; }  // they closed it or moved on while it sent
+  msg.textContent = r.ok ? rrSentMsg(email, p, r.data) : '❌ '+(r.data.error||'Could not send');
+  if(r.ok && r.data.stage){ CAT_CUR.stage=r.data.stage; document.getElementById('catStage').value=r.data.stage; }
   await catThread(); catLoad();
 }
 async function catLog(note){
-  const body = document.getElementById('catBody').value.trim();
+  const ed = catEd(), body = ed.getText();
   const msg = document.getElementById('catMsg');
   if(!body){ msg.textContent = note ? 'Type the note in the box first.' : 'Paste their reply into the box first.'; return; }
   const r = await catApi('log', { lead_id: CAT_CUR.id, body, note });
-  msg.textContent = r.ok ? (note?'✓ Note added':'✓ Reply logged') : '❌ '+(r.data.error||'Could not save');
-  if(r.ok) document.getElementById('catBody').value='';
+  msg.textContent = r.ok ? (note?'✓ Note added':'✓ Reply logged')+(ed.hasFiles() ? ' — the files are still here for your reply (notes are text only)' : '') : '❌ '+(r.data.error||'Could not save');
+  if(r.ok) ed.clearText();
   await catThread(); catLoad();
 }
 async function catSetStage(v){
@@ -17835,6 +17864,514 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
 </script>
+<!-- RICH-REPLY (2026-11-17, Maverick: "catering leads section- when replying we need a full editor, add file, add link etc.")
+     The Reply box in a lead (#catBody) and in an experience / private-event inquiry (#inqBody) is an editor now:
+     undo / redo · text size · bold, italic, underline, strike · text color · bullets, numbers, quote · left / center /
+     right · 🔗 link (Ctrl+K; click a link to change or remove it) · 🖼 picture in the message (click it for S / M / L) ·
+     📎 files · clear formatting. Paste keeps bold / lists / links / tables and drops the rest; a pasted screenshot becomes
+     a picture; files can be dropped on the box.
+     window.RichReply: of(id) → the editor on that box (made on first use). The box keeps a textarea-like .value
+     (plain text) and .focus() so older code that reads or sets it still works — but new code should use
+     appendText() / appendHtml(), which keep what is already typed.
+     Files and pictures upload straight to the public `lead-files` bucket under the open conversation's own folder
+     (cat/<lead id>/<random>/<file> · inq/<inquiry id>/<random>/<file>; only signed-in managers can upload).
+     Opening another conversation empties the box; closing and reopening the same one keeps what was typed and attached.
+     Sending: catSend / inqSend post { body, html, attachments:[{path,name}] } to the catering / inquiries fn, where
+     edge-mirror/rich-reply.ts sanitizes the HTML again and checks every file — nothing here is trusted there.
+     A reply with no formatting and no files is posted as { body } alone, exactly like the old box.
+     The thread: rrMsgBody(m) draws body_html (cleaned here once more) + a chip per file; plain rows draw as before.
+     PDFs, pictures, text, CSV and calendar files ride as real attachments (3 files, 12 MB together); anything else
+     — Word, Excel, something big — goes as a download link. Every file is also linked in the email.
+     Migration lead_reply_editor (body_html + attachments on catering_messages / inquiry_messages, the bucket). -->
+<style id="rich-reply-css">
+  .rr{ border:1px solid #d8dce2; border-radius:8px; background:#fff; position:relative; }
+  .rr.focus{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .rr.drop{ border-color:var(--accent); border-style:dashed; background:#f8fafc; }
+  .rr-bar{ display:flex; flex-wrap:wrap; align-items:center; gap:1px; padding:5px 6px; border-bottom:1px solid var(--line); background:#f7f8fa; border-radius:8px 8px 0 0; }
+  .rr-bar button{ all:unset; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; gap:5px; min-width:28px; height:30px; padding:0 6px; border-radius:6px;
+    font:600 .84rem/1 inherit; font-family:inherit; color:#3f4854; cursor:pointer; white-space:nowrap; }
+  .rr-bar button:hover{ background:#e9edf1; color:var(--ink); }
+  .rr-bar button:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  .rr-bar button.on{ background:var(--accent-soft); color:var(--accent); }
+  .rr-bar button svg{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+  .rr-bar button .lbl{ font-size:.76rem; font-weight:700; }
+  .rr-bar .rr-sep{ width:1px; height:18px; background:#d8dce2; margin:0 3px; flex:none; }
+  .rf .rr-bar select.rr-size, .rr-bar select.rr-size{ height:30px; width:auto; padding:0 20px 0 6px; border:1px solid transparent; border-radius:6px; background-color:transparent; font:600 .78rem/1 inherit; font-family:inherit; color:#3f4854; cursor:pointer; min-height:0; box-shadow:none; }
+  .rr-bar select.rr-size:hover{ background-color:#e9edf1; }
+  .rr-bar .rr-a{ font-weight:800; border-bottom:3px solid currentColor; line-height:1; padding-bottom:1px; }
+  .rr-area{ min-height:132px; max-height:46vh; overflow-y:auto; padding:11px 12px; font-size:.92rem; line-height:1.55; outline:none; overflow-wrap:anywhere; resize:vertical; }
+  .rr-area:empty::before{ content:attr(data-ph); color:#9aa3ae; pointer-events:none; }
+  .rr-area a, .rr-view a{ color:#06273a; text-decoration:underline; }
+  .rr-area ul, .rr-area ol, .rr-view ul, .rr-view ol{ margin:6px 0; padding-left:24px; }
+  .rr-area blockquote, .rr-view blockquote{ margin:8px 0; padding:2px 0 2px 12px; border-left:3px solid #e6b33c; color:#5a6472; }
+  .rr-area img, .rr-view img{ max-width:100%; height:auto; border-radius:6px; vertical-align:middle; }
+  .rr-area img{ cursor:pointer; }
+  .rr-area img.sel{ outline:2px solid var(--accent); outline-offset:2px; }
+  .rr-area table, .rr-view table{ border-collapse:collapse; margin:8px 0; }
+  .rr-area td, .rr-area th, .rr-view td, .rr-view th{ border:1px solid #d8dce2; padding:4px 8px; vertical-align:top; text-align:left; }
+  .rr-area h2, .rr-view h2{ font-size:1.25rem; margin:10px 0 6px; } .rr-area h3, .rr-view h3{ font-size:1.08rem; margin:8px 0 4px; }
+  .rr-area p, .rr-view p{ margin:0 0 10px; } .rr-area hr, .rr-view hr{ border:0; border-top:1px solid #d8dce2; margin:12px 0; }
+  .rr-area pre, .rr-view pre{ white-space:pre-wrap; font:12px/1.5 Consolas,Menlo,monospace; background:#f3f5f7; padding:8px 10px; border-radius:6px; }
+  .rr-view{ font-size:.9rem; line-height:1.5; overflow-wrap:anywhere; }
+  .rr-pop{ position:absolute; z-index:5; left:8px; right:8px; max-width:440px; background:#fff; border:1px solid #c9cfd7; border-radius:10px; box-shadow:0 8px 24px rgba(18,26,38,.16); padding:10px 12px; }
+  .rr-pop[hidden]{ display:none; }
+  .rr-pop label{ display:block; font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.3px; color:var(--sub); margin:0 0 3px; }
+  .rf .rr-pop input, .rr-pop input{ width:100%; box-sizing:border-box; padding:8px 10px; border:1px solid #d8dce2; border-radius:7px; font:inherit; font-size:.9rem; margin-bottom:8px; }
+  .rr-pop .row{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .rr-pop .err{ color:#b3261e; font-size:.78rem; font-weight:600; flex:1 1 100%; }
+  .rr-sw{ display:flex; gap:6px; flex-wrap:wrap; }
+  .rr-sw button{ all:unset; width:26px; height:26px; border-radius:50%; cursor:pointer; box-shadow:inset 0 0 0 1px rgba(0,0,0,.14); }
+  .rr-sw button:hover, .rr-sw button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .rr-files{ display:flex; flex-wrap:wrap; gap:6px; padding:0 10px; }
+  .rr-files:not(:empty){ padding:8px 10px 2px; border-top:1px dashed var(--line); }
+  .rr-chip{ display:inline-flex; align-items:center; gap:6px; max-width:100%; background:#f3f5f7; border:1px solid var(--line); border-radius:999px; padding:4px 6px 4px 10px; font-size:.78rem; color:#3f4854; }
+  .rr-chip b{ font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:240px; }
+  .rr-chip i{ font-style:normal; color:var(--sub); white-space:nowrap; }
+  .rr-chip.up{ opacity:.75; } .rr-chip.err{ background:#fdf1ef; border-color:#f3ccc6; color:#b3261e; } .rr-chip.err i{ color:#b3261e; }
+  .rr-chip button{ all:unset; cursor:pointer; width:20px; height:20px; border-radius:50%; text-align:center; line-height:20px; font-size:.8rem; color:#5a6472; }
+  .rr-chip button:hover{ background:#dfe3e8; color:var(--ink); }
+  .rr-note{ font-size:.74rem; color:var(--sub); padding:0 12px; }
+  .rr-note:not(:empty){ padding:5px 12px 8px; }
+  .rr-note.err{ color:#b3261e; font-weight:600; }
+  .rr-atts{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  a.rr-att{ display:inline-flex; align-items:center; gap:6px; max-width:100%; background:#fff; border:1px solid #c9d1da; border-radius:8px; padding:5px 10px; font-size:.78rem; font-weight:600; color:#06273a; text-decoration:none; }
+  a.rr-att:hover{ border-color:#06273a; }
+  a.rr-att b{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:260px; }
+  a.rr-att span{ font-weight:400; color:var(--sub); white-space:nowrap; }
+  @media (max-width:640px){
+    .rr-bar button{ min-width:34px; height:34px; } .rr-bar .rr-sep{ display:none; } .rr-bar button .lbl{ display:none; }
+    .rr-area{ font-size:16px; min-height:120px; } /* 16px stops iOS auto-zoom */
+    .rf .rr-pop input, .rr-pop input{ font-size:16px; }
+  }
+</style>
+<script>
+(function(){
+  'use strict';
+  const BUCKET = 'lead-files';
+  const PUB = SB_URL + '/storage/v1/object/public/' + BUCKET + '/';
+  const MAX_FILE = 25 * 1024 * 1024, MAX_FILES = 10, BODY_W = 536;
+  // what the email can carry as a real attachment (send-mail's list) — the rest goes as a link. Same rule as rich-reply.ts.
+  const ATTACH = { 'application/pdf':1, 'image/jpeg':1, 'image/png':1, 'image/gif':1, 'image/webp':1, 'text/plain':1, 'text/csv':1, 'text/calendar':1 };
+  const ATTACH_FILES = 3, ATTACH_BYTES = 12 * 1024 * 1024;
+  // what the bucket takes, by extension (a browser doesn't always know the type)
+  const TYPES = { pdf:'application/pdf', jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif', webp:'image/webp', heic:'image/heic', heif:'image/heif',
+    txt:'text/plain', csv:'text/csv', ics:'text/calendar', doc:'application/msword', docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls:'application/vnd.ms-excel', xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ppt:'application/vnd.ms-powerpoint', pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation', zip:'application/zip' };
+  const TYPE_OK = {}; Object.keys(TYPES).forEach(k => { TYPE_OK[TYPES[k]] = k; }); TYPE_OK['application/x-zip-compressed'] = 'zip';
+  const INLINE_IMG = { 'image/jpeg':1, 'image/png':1, 'image/gif':1, 'image/webp':1 };
+  const COLORS = [['#221e1b','Default'],['#06273a','Navy'],['#b7791f','Gold'],['#b91c1c','Red'],['#15803d','Green'],['#1d4ed8','Blue'],['#7c3aed','Purple'],['#64748b','Gray']];
+  const h = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const fmtSize = n => n >= 1048576 ? (n / 1048576).toFixed(n >= 10485760 ? 0 : 1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  const ico = d => '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + '</svg>';
+  const I = {
+    undo: ico('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
+    redo: ico('<path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>'),
+    ul: ico('<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'),
+    ol: ico('<path d="M10 6h11M10 12h11M10 18h11M4 6h1v4M4 10h2M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/>'),
+    quote: ico('<path d="M17 6H3M21 12H8M21 18H8M3 12v6"/>'),
+    left: ico('<path d="M21 6H3M15 12H3M17 18H3"/>'), center: ico('<path d="M21 6H3M17 12H7M19 18H5"/>'), right: ico('<path d="M21 6H3M21 12H9M21 18H7"/>'),
+    link: ico('<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'),
+    image: ico('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>'),
+    clip: ico('<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>'),
+    clear: ico('<path d="M4 7V4h16v3M5 20h6M13 4 8 20M15 15l5 5M20 15l-5 5"/>')
+  };
+
+  /* ---------- cleaning: paste, what gets sent, what the thread shows ---------- */
+  const OK = {}; 'B STRONG I EM U S STRIKE DEL SUB SUP P DIV BR HR UL OL LI BLOCKQUOTE H1 H2 H3 H4 H5 H6 A SPAN FONT IMG TABLE THEAD TBODY TFOOT TR TD TH PRE CODE CENTER'.split(' ').forEach(t => { OK[t] = 1; });
+  const DROP = {}; 'SCRIPT STYLE HEAD TITLE IFRAME OBJECT EMBED SVG MATH NOSCRIPT TEMPLATE TEXTAREA SELECT CANVAS AUDIO VIDEO META LINK BASE XML INPUT BUTTON'.split(' ').forEach(t => { DROP[t] = 1; });
+  const RENAME = { STRONG:'b', EM:'i', STRIKE:'s', DEL:'s', H1:'h2', H4:'h3', H5:'h3', H6:'h3', FONT:'span', CENTER:'div' };
+  const STYLED = { p:1, div:1, li:1, h2:1, h3:1, td:1, th:1, span:1, blockquote:1 };
+  const COLOR_RE = /^(?:#[0-9a-f]{3}|#[0-9a-f]{6}|rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\))$/;
+  const FONT_PX = [0, 11, 13, 0, 18, 22, 28, 34];
+  function href(v){
+    let s = String(v || '').trim();
+    if(/^www\.[^\s.]+\.\S/i.test(s)) s = 'https://' + s;
+    return /^https?:\/\/[^\s"'<>\\^`{|}]+$/i.test(s) || /^mailto:[^\s"'<>\\^`{|}]+@[^\s"'<>\\^`{|}]+$/i.test(s) || /^tel:\+?[\d\s().-]{5,24}$/i.test(s) ? s : '';
+  }
+  // Chrome writes the box's own look into text it moves or merges (style="font-size: 0.92rem; color: rgb(…)"):
+  // a size that isn't in px and the box's own text color (opt.base) are that, not something the writer picked.
+  function styleOf(el, tag, opt){
+    const out = [], st = el.style, paste = opt.paste;
+    if(!paste){
+      const c = String(st.color || '').toLowerCase().replace(/\s+/g, '');
+      if(COLOR_RE.test(c) && c !== opt.base) out.push('color:' + c);
+      const m = /^(\d{1,3}(?:\.\d+)?)px$/.exec(st.fontSize || ''), px = m ? Math.round(Number(m[1])) : 0;
+      if(px >= 9 && px <= 40 && px !== 16) out.push('font-size:' + px + 'px');
+    }
+    if(tag === 'span'){ // on anything else these come from the page's own look, not from the writer
+      if(/^(bold|bolder|[6-9]00)$/.test(st.fontWeight)) out.push('font-weight:bold');
+      if(st.fontStyle === 'italic') out.push('font-style:italic');
+      const td = (st.textDecorationLine || st.textDecoration || '').match(/\b(underline|line-through)\b/g);
+      if(td) out.push('text-decoration:' + td.filter((x, i) => td.indexOf(x) === i).join(' '));
+    }
+    const ta = String(st.textAlign || el.getAttribute('align') || '').toLowerCase();
+    if(tag !== 'span' && /^(center|right|justify)$/.test(ta)) out.push('text-align:' + ta);
+    return out.join(';');
+  }
+  // opt.paste: keep the structure, drop colors / sizes and every picture that isn't ours
+  // opt.view:  links open in a new tab
+  function walk(src, dst, opt, depth, inA){
+    if(depth > 40) return;
+    src.childNodes.forEach(n => {
+      if(n.nodeType === 3){ dst.appendChild(document.createTextNode(n.nodeValue)); return; }
+      if(n.nodeType !== 1) return;
+      const T = n.tagName.toUpperCase();
+      if(DROP[T] || (T.indexOf(':') > 0 && T !== 'O:P')) return;             // Word's v: / w: bits go whole
+      const skip = () => walk(n, dst, opt, depth + 1, inA);                   // keep what is inside, not the tag
+      if(!OK[T]) return skip();
+      // Google Docs wraps a whole paste in <b style="font-weight:normal">
+      if((T === 'B' || T === 'STRONG') && /^(normal|[1-4]00)$/.test((n.style && n.style.fontWeight) || '')) return skip();
+      const tag = RENAME[T] || T.toLowerCase();
+      if(tag === 'br' || tag === 'hr'){ dst.appendChild(document.createElement(tag)); return; }
+      if(tag === 'img'){
+        const s = n.getAttribute('src') || '';
+        if(s.indexOf(PUB) !== 0 || /\.\./.test(s) || !/^[\w\-.~:/%+,@=()]+$/.test(s)) return;
+        const img = document.createElement('img'); img.setAttribute('src', s);
+        img.setAttribute('alt', String(n.getAttribute('alt') || '').slice(0, 150));
+        const w = Math.round(Number(n.getAttribute('width')) || 0); if(w >= 16) img.setAttribute('width', Math.min(w, BODY_W));
+        dst.appendChild(img); return;
+      }
+      if(tag === 'a'){
+        const u = href(n.getAttribute('href'));
+        if(!u || inA) return skip();
+        const a = document.createElement('a'); a.setAttribute('href', u);
+        if(opt.view){ a.setAttribute('target', '_blank'); a.setAttribute('rel', 'noopener'); }
+        walk(n, a, opt, depth + 1, true); if(a.childNodes.length) dst.appendChild(a); return;
+      }
+      let style = STYLED[tag] ? styleOf(n, tag, opt) : '';
+      if(T === 'FONT' && !opt.paste){
+        const c = String(n.getAttribute('color') || '').toLowerCase();
+        if(COLOR_RE.test(c) && style.indexOf('color:') < 0) style = (style ? style + ';' : '') + 'color:' + c;
+        const px = FONT_PX[Number(n.getAttribute('size'))] || 0;
+        if(px && style.indexOf('font-size:') < 0) style = (style ? style + ';' : '') + 'font-size:' + px + 'px';
+      }
+      if(T === 'CENTER' && style.indexOf('text-align:') < 0) style = (style ? style + ';' : '') + 'text-align:center';
+      if(tag === 'span' && !style) return skip();
+      const el = document.createElement(tag);
+      if(style) el.setAttribute('style', style);
+      if(tag === 'td' || tag === 'th') ['colspan','rowspan'].forEach(k => { const v = Math.round(Number(n.getAttribute(k)) || 0); if(v >= 2 && v <= 20) el.setAttribute(k, v); });
+      walk(n, el, opt, depth + 1, inA);
+      dst.appendChild(el);
+    });
+  }
+  function clean(html, opt){
+    const tpl = document.createElement('template');
+    tpl.innerHTML = String(html == null ? '' : html); // inert: nothing in it runs or loads
+    const out = document.createElement('div');
+    walk(tpl.content, out, opt || {}, 0, false);
+    return out.innerHTML;
+  }
+  const isBlank = html => !/<img\b/i.test(html) && !html.replace(/<[^>]+>/g, '').replace(/&nbsp;|\s/g, '');
+  // only lines of text → it can go as a plain reply, exactly like the old box
+  const isPlain = html => /^(?:[^<]|<\/?(?:div|br|p)>)*$/i.test(html);
+
+  /* ---------- files ---------- */
+  function typeOf(file){
+    const t = String(file.type || '').toLowerCase();
+    if(TYPE_OK[t]) return t;
+    const ext = (String(file.name || '').split('.').pop() || '').toLowerCase();
+    return !t || t === 'application/octet-stream' ? (TYPES[ext] || '') : '';
+  }
+  function safeName(name, type){
+    const ext = TYPE_OK[type] || 'bin';
+    let base = String(name || '').replace(/\.[^.]*$/, '');
+    try{ base = base.normalize('NFKD'); }catch(_){}
+    base = base.replace(/[^A-Za-z0-9._ -]+/g, '').trim().replace(/\s+/g, '-').replace(/^[._-]+/, '').slice(0, 90) || 'file';
+    const given = (String(name || '').split('.').pop() || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return base + '.' + (TYPES[given] === type ? given : ext);
+  }
+  const rand = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16))).replace(/-/g, '').toLowerCase();
+  async function upload(file, prefix){
+    const type = typeOf(file);
+    if(!type) throw new Error('“' + file.name + '” can’t be sent from here — use a PDF, a picture, or a Word / Excel / PowerPoint file.');
+    if(file.size > MAX_FILE) throw new Error('“' + file.name + '” is over 25 MB — too big to send. Share a link to it instead.');
+    if(!file.size) throw new Error('“' + file.name + '” is empty.');
+    if(!prefix) throw new Error('Open a conversation first.');
+    const path = prefix + rand() + '/' + safeName(file.name, type);
+    const { error } = await sb.storage.from(BUCKET).upload(path, file, { contentType: type, upsert: false, cacheControl: '31536000' });
+    if(error) throw new Error('“' + file.name + '” didn’t upload: ' + (error.message || 'try again'));
+    return { path, url: PUB + path, name: String(file.name || 'file').slice(0, 150), size: file.size, type };
+  }
+  // which files will ride as real attachments — the same walk the server does
+  function plan(files){
+    let n = 0, total = 0;
+    files.forEach(f => { f.sent = 'link'; if(f.state === 'ok' && ATTACH[f.type] && n < ATTACH_FILES && total + f.size <= ATTACH_BYTES){ f.sent = 'attached'; n++; total += f.size; } });
+  }
+  function chips(files){
+    files = (Array.isArray(files) ? files : []).filter(f => f && /^https:\/\//.test(String(f.url || '')));
+    if(!files.length) return '';
+    return '<div class="rr-atts">' + files.map(f => '<a class="rr-att" href="' + h(f.url) + '" target="_blank" rel="noopener" title="' + h(f.sent === 'attached' ? 'Went as an attachment' : 'Went as a download link') + '">📎 <b>'
+      + h(f.name || 'file') + '</b><span>' + (Number(f.size) ? fmtSize(Number(f.size)) + ' · ' : '') + (f.sent === 'attached' ? 'attached' : 'link') + '</span></a>').join('') + '</div>';
+  }
+
+  /* ---------- the editor ---------- */
+  const EDS = {};
+  function mount(host){
+    if(host.rr) return host.rr;
+    const ph = host.getAttribute('data-ph') || 'Write your reply…';
+    host.classList.add('rr');
+    const btn = (attr, val, title, inner) => '<button type="button" ' + attr + '="' + val + '" title="' + h(title) + '" aria-label="' + h(title) + '">' + inner + '</button>';
+    host.innerHTML =
+      '<div class="rr-bar" role="toolbar" aria-label="Formatting">'
+      + btn('data-cmd','undo','Undo (Ctrl+Z)',I.undo) + btn('data-cmd','redo','Redo (Ctrl+Y)',I.redo) + '<span class="rr-sep"></span>'
+      + '<select class="rr-size" title="Text size" aria-label="Text size"><option value="3">Normal</option><option value="2">Small</option><option value="5">Large</option><option value="6">Huge</option></select>'
+      + btn('data-cmd','bold','Bold (Ctrl+B)','<b>B</b>') + btn('data-cmd','italic','Italic (Ctrl+I)','<i style="font-family:Georgia,serif">I</i>')
+      + btn('data-cmd','underline','Underline (Ctrl+U)','<u>U</u>') + btn('data-cmd','strikeThrough','Strikethrough','<s>S</s>')
+      + btn('data-act','color','Text color','<span class="rr-a">A</span>') + '<span class="rr-sep"></span>'
+      + btn('data-cmd','insertUnorderedList','Bulleted list',I.ul) + btn('data-cmd','insertOrderedList','Numbered list',I.ol) + btn('data-act','quote','Quote',I.quote)
+      + btn('data-cmd','justifyLeft','Align left',I.left) + btn('data-cmd','justifyCenter','Center',I.center) + btn('data-cmd','justifyRight','Align right',I.right) + '<span class="rr-sep"></span>'
+      + btn('data-act','link','Add a link (Ctrl+K)',I.link + '<span class="lbl">Link</span>') + btn('data-act','image','Put a picture in the message',I.image + '<span class="lbl">Picture</span>')
+      + btn('data-act','file','Attach files',I.clip + '<span class="lbl">Attach file</span>') + '<span class="rr-sep"></span>'
+      + btn('data-cmd','removeFormat','Clear formatting',I.clear)
+      + '</div><div class="rr-pop" hidden></div>'
+      + '<div class="rr-area" contenteditable="true" role="textbox" aria-multiline="true" aria-label="' + h(ph) + '" data-ph="' + h(ph) + '"></div>'
+      + '<div class="rr-files"></div><div class="rr-note" aria-live="polite"></div>'
+      + '<input type="file" class="rr-in-file" multiple hidden><input type="file" class="rr-in-img" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden>';
+    const $ = s => host.querySelector(s);
+    const bar = $('.rr-bar'), area = $('.rr-area'), pop = $('.rr-pop'), filesEl = $('.rr-files'), note = $('.rr-note'), inFile = $('.rr-in-file'), inImg = $('.rr-in-img'), sizeSel = $('.rr-size');
+    const ed = { host, area, files: [], prefix: '', pending: 0 };
+    let saved = null, noteTimer = 0;
+
+    const inArea = n => !!n && (n === area || area.contains(n));
+    function keep(){ const s = getSelection(); if(s && s.rangeCount && inArea(s.anchorNode)) saved = s.getRangeAt(0).cloneRange(); }
+    function toEnd(){ const r = document.createRange(); r.selectNodeContents(area); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); saved = r.cloneRange(); }
+    function back(){ // put the caret back where it was before a toolbar control took the focus
+      area.focus({ preventScroll: true });
+      const s = getSelection();
+      if(saved && inArea(saved.startContainer)){ s.removeAllRanges(); s.addRange(saved); }
+      else if(!s.rangeCount || !inArea(s.anchorNode)) toEnd();
+    }
+    function exec(cmd, val){ back(); try{ document.execCommand('styleWithCSS', false, false); }catch(_){} const ok = document.execCommand(cmd, false, val == null ? null : val); keep(); tidy(); state(); return ok; }
+    function tidy(){ if(area.innerHTML === '<br>' || area.innerHTML === '<div><br></div>') area.innerHTML = ''; } // so the placeholder comes back
+    function say(msg, err){ clearTimeout(noteTimer); note.textContent = msg || ''; note.classList.toggle('err', !!err); if(msg && !err) noteTimer = setTimeout(hint, 6000); }
+    function hint(){
+      note.classList.remove('err');
+      const okFiles = ed.files.filter(f => f.state === 'ok');
+      note.textContent = !okFiles.length ? '' : okFiles.some(f => f.sent === 'link')
+        ? 'PDFs and pictures go as real attachments (3 files, 12 MB together). The rest go as a download link in the email.'
+        : 'Attached to the email — and linked in it too.';
+    }
+    function state(){
+      const s = getSelection(), on = s && s.rangeCount && inArea(s.anchorNode);
+      bar.querySelectorAll('button[data-cmd]').forEach(b => {
+        const c = b.dataset.cmd; let v = false;
+        if(on && /^(bold|italic|underline|strikeThrough|insertUnorderedList|insertOrderedList|justifyCenter|justifyRight)$/.test(c)){ try{ v = document.queryCommandState(c); }catch(_){} }
+        b.classList.toggle('on', !!v);
+      });
+      const q = bar.querySelector('[data-act="quote"]'); if(q) q.classList.toggle('on', !!(on && up(s.anchorNode, 'BLOCKQUOTE')));
+      const l = bar.querySelector('[data-act="link"]'); if(l) l.classList.toggle('on', !!(on && up(s.anchorNode, 'A')));
+      sizeSel.value = on ? sizeAt(s.anchorNode) : '3';
+    }
+    // the size the caret is in: the nearest <font size> / px size around it (Chrome's own answer calls this box's normal text "small")
+    function sizeAt(n){
+      for(; n && n !== area; n = n.parentNode){
+        if(n.nodeType !== 1) continue;
+        const f = n.tagName === 'FONT' ? Number(n.getAttribute('size')) : 0;
+        const m = f ? null : /^(\d+(?:\.\d+)?)px$/.exec((n.style && n.style.fontSize) || ''), px = m ? Math.round(Number(m[1])) : 0;
+        if(f || px) return f ? (f <= 2 ? '2' : f >= 6 ? '6' : f >= 4 ? '5' : '3') : (px <= 13 ? '2' : px >= 26 ? '6' : px >= 18 ? '5' : '3');
+      }
+      return '3';
+    }
+    function up(n, tag){ while(n && n !== area){ if(n.nodeType === 1 && n.tagName === tag) return n; n = n.parentNode; } return null; }
+    function closePop(){ pop.hidden = true; pop.innerHTML = ''; area.querySelectorAll('img.sel').forEach(i => i.classList.remove('sel')); }
+    function openPop(html){ closePop(); pop.innerHTML = html; pop.hidden = false; pop.style.top = (bar.offsetHeight + 4) + 'px'; }
+
+    /* link */
+    function linkPop(){
+      keep();
+      const s = getSelection();
+      const a = saved ? up(saved.commonAncestorContainer, 'A') || (saved.startContainer.nodeType === 1 && saved.startContainer.childNodes[saved.startOffset] && saved.startContainer.childNodes[saved.startOffset].tagName === 'A' ? saved.startContainer.childNodes[saved.startOffset] : null) : null;
+      const text = a ? a.textContent : (saved && inArea(saved.startContainer) ? String(saved) : '');
+      openPop('<label for="rrLt">Words to show</label><input id="rrLt" class="rr-lt" value="' + h(text) + '" placeholder="e.g. our catering menu">'
+        + '<label for="rrLu">Link</label><input id="rrLu" class="rr-lu" value="' + h(a ? a.getAttribute('href') : '') + '" placeholder="https://…" inputmode="url" autocapitalize="off" spellcheck="false">'
+        + '<div class="row"><span class="err"></span><button type="button" class="btn btn-gold btn-sm rr-ok">' + (a ? 'Save link' : 'Add link') + '</button>'
+        + (a ? '<button type="button" class="btn btn-ghost btn-sm rr-rm">Remove link</button>' : '') + '<button type="button" class="btn btn-ghost btn-sm rr-x">Cancel</button></div>');
+      const lt = pop.querySelector('.rr-lt'), lu = pop.querySelector('.rr-lu'), err = pop.querySelector('.err');
+      const go = () => {
+        let u = lu.value.trim();
+        if(u && !/^[a-z][a-z0-9+.-]*:/i.test(u)) u = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u) ? 'mailto:' + u : /^\+?[\d\s().-]{7,}$/.test(u) ? 'tel:' + u.replace(/[^\d+]/g, '') : 'https://' + u;
+        const ok = href(u);
+        if(!ok){ err.textContent = u ? 'That doesn’t look like a link — it should start with https://' : 'Paste or type the link.'; lu.focus(); return; }
+        const words = lt.value.trim() || ok.replace(/^mailto:|^tel:/, '');
+        closePop();
+        const after = (node, space) => { const r = document.createRange(); r.setStartAfter(node); r.collapse(true); saved = r; back(); if(space) exec('insertText', ' '); };
+        if(a && area.contains(a)){ a.setAttribute('href', ok); if(a.textContent !== words) a.textContent = words; after(a); }
+        else {
+          back();
+          const s0 = getSelection(), picked = s0.rangeCount ? String(s0.getRangeAt(0)) : '';
+          if(picked !== words){ // nothing picked, or the words were changed: type the words (they take the look of the text around them), then link them
+            exec('insertText', words);
+            const r = getSelection().getRangeAt(0), n = r.startContainer, end = r.startOffset;
+            if(n.nodeType !== 3 || n.nodeValue.slice(Math.max(0, end - words.length), end) !== words){ state(); return; }
+            const lr = document.createRange(); lr.setStart(n, end - words.length); lr.setEnd(n, end);
+            const s1 = getSelection(); s1.removeAllRanges(); s1.addRange(lr); saved = lr.cloneRange();
+          }
+          exec('createLink', ok);
+          const s2 = getSelection(), made = up(s2.anchorNode, 'A') || up(s2.focusNode, 'A') || (s2.rangeCount && s2.getRangeAt(0).commonAncestorContainer.querySelector ? s2.getRangeAt(0).commonAncestorContainer.querySelector('a[href="' + ok.replace(/["\\]/g, '\\$&') + '"]') : null);
+          if(made && area.contains(made)) after(made, !picked); // typing carries on after the link, not inside it
+        }
+        state();
+      };
+      pop.querySelector('.rr-ok').onclick = go;
+      pop.querySelector('.rr-x').onclick = () => { closePop(); back(); };
+      const rm = pop.querySelector('.rr-rm');
+      if(rm) rm.onclick = () => { closePop(); if(area.contains(a)){ const r = document.createRange(); r.selectNodeContents(a); saved = r; } exec('unlink'); };
+      [lt, lu].forEach(i => i.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); go(); } else if(e.key === 'Escape'){ e.preventDefault(); closePop(); back(); } }));
+      (text && !a ? lu : (a ? lu : lt)).focus();
+      if(a) lu.select();
+    }
+    /* color */
+    function colorPop(){
+      keep();
+      openPop('<label>Text color</label><div class="rr-sw">' + COLORS.map(c => '<button type="button" data-c="' + c[0] + '" title="' + c[1] + '" aria-label="' + c[1] + '" style="background:' + c[0] + '"></button>').join('') + '</div>');
+      pop.querySelectorAll('[data-c]').forEach(b => { b.onmousedown = e => e.preventDefault(); b.onclick = () => { const c = b.dataset.c; closePop(); exec('foreColor', c); }; });
+    }
+    /* a picture in the message: click it for a size */
+    function imgPop(img){
+      openPop('<label>Picture size</label><div class="row">' + [['Small', 200], ['Medium', 360], ['Large', BODY_W]].map(s => '<button type="button" class="btn btn-ghost btn-sm" data-w="' + s[1] + '">' + s[0] + '</button>').join('')
+        + '<button type="button" class="btn btn-ghost btn-sm" data-w="0" style="color:#b3261e">Remove picture</button><button type="button" class="btn btn-ghost btn-sm rr-x">Done</button></div>');
+      img.classList.add('sel');
+      pop.querySelectorAll('[data-w]').forEach(b => { b.onclick = () => { const w = Number(b.dataset.w); if(!w){ img.remove(); closePop(); tidy(); } else img.setAttribute('width', w); }; });
+      pop.querySelector('.rr-x').onclick = closePop;
+    }
+    const natural = file => new Promise(res => { const u = URL.createObjectURL(file), i = new Image(); i.onload = () => { URL.revokeObjectURL(u); res(i.naturalWidth || 0); }; i.onerror = () => { URL.revokeObjectURL(u); res(0); }; i.src = u; });
+    async function addImages(list){
+      for(const file of list){
+        if(!INLINE_IMG[typeOf(file)]){ say('“' + file.name + '” isn’t a picture that shows in an email (use JPG, PNG, GIF or WebP) — attach it as a file instead.', true); continue; }
+        ed.pending++; say('Uploading the picture…');
+        try{
+          const [f, w] = await Promise.all([upload(file, ed.prefix), natural(file)]);
+          exec('insertHTML', '<img src="' + h(f.url) + '" alt="' + h(f.name.replace(/\.[^.]*$/, '')) + '" width="' + Math.min(w || 360, BODY_W) + '">');
+          say('');
+        }catch(e){ say(e.message || String(e), true); }
+        finally{ ed.pending--; }
+      }
+    }
+    /* files */
+    function drawFiles(){
+      plan(ed.files);
+      filesEl.innerHTML = ed.files.map(f => '<span class="rr-chip' + (f.state === 'up' ? ' up' : f.state === 'err' ? ' err' : '') + '" data-id="' + f.id + '" title="' + h(f.state === 'err' ? f.err : f.name) + '">📎 <b>' + h(f.name) + '</b><i>'
+        + (f.state === 'up' ? 'uploading…' : f.state === 'err' ? 'didn’t upload' : fmtSize(f.size) + ' · ' + (f.sent === 'attached' ? 'attached' : 'as a link'))
+        + '</i><button type="button" title="Remove" aria-label="Remove ' + h(f.name) + '">✕</button></span>').join('');
+      if(!note.classList.contains('err')) hint();
+    }
+    async function addFiles(list){
+      for(const file of list){
+        if(ed.files.length >= MAX_FILES){ say('That’s the most one message can carry — ' + MAX_FILES + ' files.', true); break; }
+        const f = { id: rand().slice(0, 10), name: String(file.name || 'file').slice(0, 150), size: file.size, type: typeOf(file), state: 'up' };
+        ed.files.push(f); drawFiles();
+        const prefix = ed.prefix;
+        upload(file, prefix).then(u => { if(ed.prefix !== prefix) return; Object.assign(f, u, { state: 'ok' }); drawFiles(); })
+          .catch(e => { if(ed.prefix !== prefix) return; f.state = 'err'; f.err = e.message || String(e); drawFiles(); say(f.err, true); });
+      }
+    }
+    filesEl.addEventListener('click', e => { const b = e.target.closest('button'); if(!b) return; const id = b.parentNode.dataset.id; ed.files = ed.files.filter(f => f.id !== id); note.classList.remove('err'); drawFiles(); });
+    inFile.addEventListener('change', () => { const l = Array.from(inFile.files || []); inFile.value = ''; if(l.length) addFiles(l); });
+    inImg.addEventListener('change', () => { const l = Array.from(inImg.files || []); inImg.value = ''; if(l.length) addImages(l); });
+
+    /* toolbar */
+    ['mousedown','pointerdown'].forEach(ev => bar.addEventListener(ev, e => { if(e.target.closest('button')) e.preventDefault(); })); // the caret stays in the message
+    bar.addEventListener('click', e => {
+      const b = e.target.closest('button'); if(!b) return;
+      const cmd = b.dataset.cmd, act = b.dataset.act;
+      if(cmd){ closePop(); exec(cmd); return; }
+      if(act === 'quote'){ closePop(); back(); exec(up(getSelection().anchorNode, 'BLOCKQUOTE') ? 'outdent' : 'formatBlock', up(getSelection().anchorNode, 'BLOCKQUOTE') ? null : 'blockquote'); }
+      else if(act === 'link'){ pop.hidden || !pop.querySelector('.rr-lu') ? linkPop() : (closePop(), back()); }
+      else if(act === 'color'){ pop.hidden || !pop.querySelector('.rr-sw') ? colorPop() : (closePop(), back()); }
+      else if(act === 'image'){ closePop(); keep(); inImg.click(); }
+      else if(act === 'file'){ closePop(); inFile.click(); }
+    });
+    sizeSel.addEventListener('mousedown', keep);
+    sizeSel.addEventListener('change', () => exec('fontSize', sizeSel.value));
+
+    /* the message box */
+    area.addEventListener('focus', () => host.classList.add('focus'));
+    area.addEventListener('blur', () => { host.classList.remove('focus'); });
+    ['keyup','mouseup','input'].forEach(ev => area.addEventListener(ev, () => { keep(); state(); if(ev === 'input') tidy(); }));
+    area.addEventListener('keydown', e => {
+      if((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'k'){ e.preventDefault(); linkPop(); }
+      else if(e.key === 'Escape' && !pop.hidden){ e.preventDefault(); closePop(); }
+    });
+    area.addEventListener('click', e => {
+      const t = e.target;
+      if(t.tagName === 'IMG'){ imgPop(t); return; }
+      if(!pop.hidden && !pop.querySelector('.rr-lu')) closePop();
+      const a = up(t, 'A'); if(a){ e.preventDefault(); const r = document.createRange(); r.selectNodeContents(a); const s = getSelection(); s.removeAllRanges(); s.addRange(r); linkPop(); }
+    });
+    area.addEventListener('paste', e => {
+      const cd = e.clipboardData; if(!cd) return;
+      const pics = Array.from(cd.files || []).filter(f => /^image\//.test(f.type));
+      const raw = cd.getData('text/html'), cleaned = raw ? clean(raw, { paste: true }) : '';
+      if(cleaned && !isBlank(cleaned)){ e.preventDefault(); exec('insertHTML', cleaned); }      // text from a page, Word, a sheet: structure kept, their look dropped
+      else if(pics.length){ e.preventDefault(); keep(); addImages(pics); }                        // a screenshot or a copied picture
+      // plain text: the browser's own paste is right
+    });
+    area.addEventListener('dragstart', e => { if(e.target.tagName === 'IMG') e.preventDefault(); });
+    host.addEventListener('dragover', e => { if(e.dataTransfer && Array.from(e.dataTransfer.types || []).indexOf('Files') >= 0){ e.preventDefault(); host.classList.add('drop'); } });
+    host.addEventListener('dragleave', e => { if(!host.contains(e.relatedTarget)) host.classList.remove('drop'); });
+    host.addEventListener('drop', e => { host.classList.remove('drop'); const l = e.dataTransfer ? Array.from(e.dataTransfer.files || []) : []; if(l.length){ e.preventDefault(); addFiles(l); } });
+    document.addEventListener('selectionchange', () => { const s = getSelection(); if(s && s.rangeCount && inArea(s.anchorNode)){ saved = s.getRangeAt(0).cloneRange(); } });
+
+    /* what the rest of the page uses */
+    const lines = text => String(text == null ? '' : text).replace(/\r/g, '').split('\n').map(l => l ? '<div>' + h(l).replace(/ {2}/g, ' &nbsp;') + '</div>' : '<div><br></div>').join('');
+    const baseColor = () => { try{ return String(getComputedStyle(area).color || '').replace(/\s+/g, ''); }catch(_){ return ''; } };
+    ed.getHtml = () => { const c = clean(area.innerHTML, { base: baseColor() }); return isBlank(c) ? '' : c; };
+    ed.getText = () => String(area.innerText || '').replace(/ /g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    ed.isEmpty = () => !ed.getHtml();
+    ed.setText = text => { closePop(); area.innerHTML = String(text == null ? '' : text).trim() ? lines(String(text).replace(/\s+$/, '')) : ''; saved = null; state(); };
+    ed.setHtml = html => { closePop(); area.innerHTML = clean(html, {}); tidy(); saved = null; state(); };
+    // add to the end, a blank line after what is already there — nothing typed is lost
+    ed.appendHtml = html => {
+      closePop(); const c = clean(html, {}); if(isBlank(c)) return;
+      if(ed.isEmpty()) area.innerHTML = c; else area.insertAdjacentHTML('beforeend', '<div><br></div>' + c);
+      toEnd(); area.scrollTop = area.scrollHeight; state();
+    };
+    ed.appendText = text => { if(String(text == null ? '' : text).trim()) ed.appendHtml(lines(String(text).replace(/\s+$/, ''))); };
+    ed.clearText = () => { closePop(); area.innerHTML = ''; saved = null; state(); };
+    ed.focus = () => { back(); };
+    ed.busy = () => ed.pending > 0 || ed.files.some(f => f.state === 'up');
+    ed.failed = () => ed.files.some(f => f.state === 'err');
+    ed.hasFiles = () => ed.files.length > 0;
+    // { empty, plain, body, html, attachments } — plain = lines of text only and no files: post { body } like the old box
+    ed.payload = () => {
+      const html = ed.getHtml(), files = ed.files.filter(f => f.state === 'ok');
+      const plain = !files.length && isPlain(html);
+      return { empty: !html && !files.length, plain, body: ed.getText(), html: plain ? '' : html, attachments: files.map(f => ({ path: f.path, name: f.name })), formatted: !plain };
+    };
+    // a new conversation: empty box, no files, uploads go to its folder
+    ed.reset = prefix => { closePop(); ed.files = []; ed.pending = 0; if(prefix !== undefined) ed.prefix = prefix || ''; area.innerHTML = ''; saved = null; clearTimeout(noteTimer); note.textContent = ''; note.classList.remove('err'); drawFiles(); state(); };
+    ed.say = say;
+
+    // Picking text with the mouse and letting go on the dim area outside the card is not "close": the click lands on
+    // the backdrop (the nearest thing both ends share) and the draft would be gone. Close only when the press started there too.
+    const modal = host.closest('.rec-modal');
+    if(modal && !modal.rrGuard){
+      modal.rrGuard = true; let pressedOutside = false;
+      modal.addEventListener('mousedown', e => { pressedOutside = e.target === modal; }, true);
+      modal.addEventListener('click', e => { if(e.target === modal && !pressedOutside) e.stopImmediatePropagation(); }, true);
+    }
+    try{ Object.defineProperty(host, 'value', { configurable: true, get: () => ed.getText(), set: v => ed.setText(v) }); }catch(_){}
+    host.focus = () => ed.focus();
+    try{ document.execCommand('defaultParagraphSeparator', false, 'div'); }catch(_){}
+    host.rr = ed;
+    return ed;
+  }
+  function of(id){ const host = typeof id === 'string' ? document.getElementById(id) : id; if(!host) return null; return EDS[host.id] = mount(host); }
+
+  // one message in the thread: the formatted copy + its files, or the plain text as before
+  function msgBody(m){
+    const files = Array.isArray(m.attachments) ? m.attachments : [];
+    if(m.body_html) return '<div class="rr-view">' + clean(m.body_html, { view: true }) + '</div>' + chips(files);
+    let text = String(m.body == null ? '' : m.body);
+    if(files.length) text = text.split('\n').filter(l => !/^📎 .* — https:\/\/\S+$/.test(l)).join('\n').trim(); // the chips say it
+    return '<div style="white-space:pre-wrap;font-size:.9rem;">' + h(text) + '</div>' + chips(files);
+  }
+  window.RichReply = { of, mount, clean, chips, msgBody, fmtSize, isPlain, isBlank, PUB };
+  window.rrMsgBody = msgBody;
+})();
+</script>
+
 <!-- CAT-TEMPLATES (2026-10-07): HoneyBook templates inside Catering Leads.
      Data: catering_templates (admin-only RLS: email / package / contract) + site_content 'catering_template_vars'
      (scheduling link + shop address/phone per store). Reply box: email templates. Proposal: 📦 packages (+ a live
@@ -18065,10 +18602,10 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     if(val === 'manage') return ctplOpen('email');
     const t = byId(val.slice(2)); if(!t) return;
     const ta = $('catBody'), body = fill(t.body);
-    ta.value = ta.value.trim() ? ta.value.replace(/\s+$/,'') + '\n\n' + body : body;
-    autoGrow(ta); ta.focus();
+    if(ta.rr){ ta.rr.appendText(body); ta.rr.focus(); }   // the reply editor: added after what is already typed
+    else { ta.value = ta.value.trim() ? ta.value.replace(/\s+$/,'') + '\n\n' + body : body; autoGrow(ta); ta.focus(); }
     const notes = [];
-    if((t.attachments || []).length) notes.push('📎 In HoneyBook this email attached ' + t.attachments.join(', ') + ' — nothing is attached here.');
+    if((t.attachments || []).length) notes.push('📎 In HoneyBook this email attached ' + t.attachments.join(', ') + ' — add it here with 📎 Attach file.');
     if(/\[[a-z ]+\]/.test(body)) notes.push('Fill in the [bracketed] parts before sending.');
     $('catMsg').textContent = notes.join(' ');
   }
