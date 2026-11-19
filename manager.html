@@ -584,6 +584,49 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
 .tf-item .btn[disabled]{ opacity:.55; cursor:default; }
 </style>
 <script>/* STAGING-ICON: on a staging host the browser tab shows the sheep (favicon-sheep.ico); the live site keeps its own icon */(function(){if(location.hostname.indexOf("staging")<0)return;var l=document.querySelectorAll('link[rel~="icon"]');if(!l.length){var n=document.createElement("link");n.rel="icon";document.head.appendChild(n);l=[n];}for(var i=0;i<l.length;i++){l[i].href="/favicon-sheep.ico";l[i].removeAttribute("type");l[i].removeAttribute("sizes");}})();</script>
+<style id="sg-fit">
+/* SCHEDULE FIT — the weekly grid fits the screen, no sideways scroll (2026-11-18) */
+#panel-scheduling .sg-wrap{ overflow:visible; }
+#panel-scheduling table.sg-grid{ min-width:0 !important; width:100%; table-layout:fixed; font-size:0.8rem; }
+#panel-scheduling table.sg-grid th{ padding:7px 4px; text-align:center; white-space:normal; line-height:1.25; }
+#panel-scheduling table.sg-grid th span{ display:block; font-weight:600; opacity:.75; }
+#panel-scheduling table.sg-grid th.sg-today{ background:#e3edf2; color:#06273a; }
+#panel-scheduling table.sg-grid th.sg-nm, #panel-scheduling table.sg-grid td.sg-nm{ width:15%; text-align:left; }
+#panel-scheduling table.sg-grid td{ padding:4px 3px; vertical-align:top; overflow:hidden; }
+#panel-scheduling table.sg-grid td.sg-nm{ padding:6px 6px; overflow-wrap:anywhere; }
+#panel-scheduling td.sg-nm b{ display:block; font-weight:700; line-height:1.2; }
+#panel-scheduling td.sg-nm span{ display:block; font-size:0.68rem; color:var(--sub); font-weight:500; }
+#panel-scheduling td.sg-cell{ cursor:pointer; min-height:40px; height:44px; }
+#panel-scheduling .sg-chip{ border-radius:3px; padding:1px 3px; margin:2px 0; font-size:0.6rem; font-weight:700; text-align:center; line-height:1.25; overflow-wrap:anywhere; }
+#panel-scheduling .sg-off{ background:#f6dad4; color:var(--wax); text-transform:uppercase; font-weight:800; }
+#panel-scheduling .sg-off span{ text-transform:none; }
+#panel-scheduling .sg-pref{ background:#e7f6ee; color:#0a7a52; border:1px dashed #9fd8bc; }
+#panel-scheduling .sg-unav{ background:#ececec; color:#777; text-transform:uppercase; }
+#panel-scheduling .sg-shift{ border-radius:4px; padding:3px 4px; margin:2px 0; font-weight:700; cursor:grab; line-height:1.25; text-align:center; overflow-wrap:anywhere; }
+#panel-scheduling .sg-shift span{ display:block; }
+#panel-scheduling .sg-t{ font-size:0.72rem; }
+#panel-scheduling .sg-k{ text-transform:uppercase; font-size:0.6rem; letter-spacing:0.3px; }
+#panel-scheduling .sg-r{ font-size:0.62rem; font-weight:600; opacity:.85; }
+#panel-scheduling .sg-shift.sg-off{ background:#f6dad4; color:#9f2d20; }
+#panel-scheduling .sg-oncall{ background:#fdebc4; color:#92400e; }
+#panel-scheduling .sg-offsite{ background:#dbeafe; color:#1d4ed8; }
+#panel-scheduling .sg-shift:not(.sg-off):not(.sg-oncall):not(.sg-offsite){ background:#d1fae5; color:#065f46; }
+/* phone: one day at a time */
+#panel-scheduling .sg-days{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin:0 0 10px; }
+#panel-scheduling .sg-dbtn{ border:1px solid var(--line); background:#fff; border-radius:10px; padding:6px 0; font:inherit; color:#3f4854; cursor:pointer; }
+#panel-scheduling .sg-dbtn b{ display:block; font-size:0.68rem; text-transform:uppercase; letter-spacing:.3px; }
+#panel-scheduling .sg-dbtn span{ display:block; font-size:1rem; font-weight:700; }
+#panel-scheduling .sg-dbtn.today{ border-color:#06273a; }
+#panel-scheduling .sg-dbtn.on{ background:#06273a; color:#fff; border-color:#06273a; }
+#panel-scheduling table.sg-1day th.sg-nm, #panel-scheduling table.sg-1day td.sg-nm{ width:38%; }
+#panel-scheduling table.sg-1day{ font-size:0.9rem; }
+#panel-scheduling table.sg-1day td{ padding:6px; }
+#panel-scheduling table.sg-1day .sg-shift{ text-align:left; padding:6px 8px; }
+#panel-scheduling table.sg-1day .sg-t{ font-size:0.86rem; }
+#panel-scheduling table.sg-1day .sg-chip{ text-align:left; font-size:0.7rem; padding:3px 6px; }
+#panel-scheduling table.sg-1day td.sg-cell{ height:52px; }
+#panel-scheduling .toolbar{ flex-wrap:wrap; }
+</style>
 </head>
 <body>
 
@@ -3808,52 +3851,70 @@ function sgPubState(loc){
     : {label:'Unpublished changes', cls:'pill-dirty'};
 }
 
+/* SCHEDULE FIT — no sideways scrolling. Wide screens get the 7-day grid squeezed to the screen
+   width; phones (grid narrower than 640px) get a day picker and one day at a time. */
+let sgDay = null;            // selected weekday in phone view (0 = Monday)
+let _sgNarrow = null;
+function sgIsNarrow(){
+  const el = document.getElementById('sgAll');
+  const w = (el && el.clientWidth) || window.innerWidth;
+  return w < 640;
+}
+function sgPickDay(i){ sgDay=i; sgRender(); }
+window.addEventListener('resize', ()=>{
+  clearTimeout(window._sgRz);
+  window._sgRz = setTimeout(()=>{ const n=sgIsNarrow(); if(n!==_sgNarrow && document.getElementById('sgAll')) sgRender(); }, 150);
+});
+/* one grid cell (time off, availability, shifts) for one employee on one day */
+function sgCell(loc, emp, d, wd){
+  const g = SG[loc], di=sgIso(d), bits=[]; let hrs=0;
+  const ow=sgOffWhen(loc,emp.name,di);
+  if(ow) bits.push('<div class="sg-chip sg-off">Off'+(ow==='day'?'':' <span>'+ow+'</span>')+'</div>');
+  sgAv(loc,emp.id,wd).forEach(a=>{
+    bits.push(a.kind==='preferred'
+      ? '<div class="sg-chip sg-pref" title="Prefers to work'+(a.note?': '+esc(a.note):'')+'">'+sgAvLabel(a)+'</div>'
+      : '<div class="sg-chip sg-unav" title="Unavailable'+(a.note?': '+esc(a.note):'')+'">'+sgAvLabel(a)+'</div>');
+  });
+  g.shifts.filter(s=>s.employee_id===emp.id && s.date===di).forEach(s=>{
+    const kind = sgKind(s);
+    const noTimes = String(s.start_time).slice(0,5)==='00:00' && String(s.end_time).slice(0,5)==='00:00';
+    // offsite is worked time, but only counts hours when times were entered
+    if(kind==='shift' || (kind==='offsite' && !noTimes)) hrs+=sgHours(s);
+    const t = noTimes ? '' : '<span class="sg-t">'+sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time)+'</span>';
+    const label = kind==='off' ? '<span class="sg-k">Off</span>'
+                : kind==='oncall' ? '<span class="sg-k">On call</span>'+t
+                : kind==='offsite' ? '<span class="sg-k">Offsite</span>'+t
+                : '<span class="sg-t">'+sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time)+'</span>';
+    bits.push('<div class="sg-shift sg-'+kind+'" draggable="true" ondragstart="sgDrag(event,\''+loc+'\','+s.id+')" onclick="event.stopPropagation();openShift(\''+loc+'\','+emp.id+',\''+di+'\','+s.id+')" title="Drag to copy · click to edit">'
+      +label+(kind!=='off' && s.role?'<span class="sg-r">'+esc(s.role)+'</span>':'')+'</div>');
+  });
+  return { hrs, html:'<td class="sg-cell" onclick="openShift(\''+loc+'\','+emp.id+',\''+di+'\')" ondragover="sgOver(event)" ondrop="sgDrop(event,\''+loc+'\','+emp.id+',\''+di+'\')" title="Tap to add a shift">'+bits.join('')+'</td>' };
+}
 function sgRender(){
   const days=[]; for(let i=0;i<7;i++) days.push(sgAdd(sgWeek,i));
   const todayIso = sgIso(new Date());
-  const head = '<th style="min-width:150px;">Employee</th>'+days.map(d=>{
-    const hl = sgIso(d)===todayIso ? ' style="background:var(--wax);"' : '';
-    return '<th'+hl+'>'+d.toLocaleDateString('en-US',{weekday:'short'})+' '+d.toLocaleDateString('en-US',{month:'numeric',day:'numeric'})+'</th>';
-  }).join('');
+  const narrow = _sgNarrow = sgIsNarrow();
+  if(sgDay===null){ const ti=days.findIndex(d=>sgIso(d)===todayIso); sgDay = ti>=0?ti:0; }
+  const dayStrip = !narrow ? '' : '<div class="sg-days">'+days.map((d,i)=>
+    '<button class="sg-dbtn'+(i===sgDay?' on':'')+(sgIso(d)===todayIso?' today':'')+'" onclick="sgPickDay('+i+')">'
+      +'<b>'+d.toLocaleDateString('en-US',{weekday:'short'})+'</b><span>'+d.getDate()+'</span></button>').join('')+'</div>';
+  const head = narrow
+    ? '<th class="sg-nm">Employee</th><th>'+days[sgDay].toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})+'</th>'
+    : '<th class="sg-nm">Employee</th>'+days.map(d=>'<th'+(sgIso(d)===todayIso?' class="sg-today"':'')+'>'
+        +d.toLocaleDateString('en-US',{weekday:'short'})+'<span>'+d.toLocaleDateString('en-US',{month:'numeric',day:'numeric'})+'</span></th>').join('');
+  const cols = narrow ? 2 : 8;
   document.getElementById('sgAll').innerHTML = LOC_KEYS.map(loc=>{
     const g = SG[loc];
     let rows;
     if(!g.emps.length){
-      rows = '<tr><td class="empty-row" colspan="8">No active employees for '+LOC_LABELS[loc]+' yet — add them below.</td></tr>';
+      rows = '<tr><td class="empty-row" colspan="'+cols+'">No active employees for '+LOC_LABELS[loc]+' yet — add them below.</td></tr>';
     } else {
       rows = g.emps.map(emp=>{
-        let hrs=0;
-        const cells = days.map((d,wd)=>{
-          const di=sgIso(d);
-          const bits=[];
-          const ow=sgOffWhen(loc,emp.name,di);
-          if(ow) bits.push('<div style="background:#f6dad4;color:var(--wax);border-radius:2px;padding:2px 6px;margin:2px 0;font-size:0.62rem;font-weight:800;text-transform:uppercase;text-align:center;">Off'+(ow==='day'?'':' <span style="text-transform:none;">'+ow+'</span>')+'</div>');
-          sgAv(loc,emp.id,wd).forEach(a=>{
-            bits.push(a.kind==='preferred'
-              ? '<div style="background:#e7f6ee;color:#0a7a52;border:1px dashed #9fd8bc;border-radius:2px;padding:1px 5px;margin:2px 0;font-size:0.6rem;font-weight:700;text-align:center;" title="Prefers to work'+(a.note?': '+esc(a.note):'')+'">'+sgAvLabel(a)+'</div>'
-              : '<div style="background:#ececec;color:#777777;border-radius:2px;padding:1px 5px;margin:2px 0;font-size:0.6rem;font-weight:700;text-transform:uppercase;text-align:center;" title="Unavailable'+(a.note?': '+esc(a.note):'')+'">'+sgAvLabel(a)+'</div>');
-          });
-          g.shifts.filter(s=>s.employee_id===emp.id && s.date===di).forEach(s=>{
-            const kind = sgKind(s);
-            const noTimes = String(s.start_time).slice(0,5)==='00:00' && String(s.end_time).slice(0,5)==='00:00';
-            // offsite is worked time, but only counts hours when times were entered
-            if(kind==='shift' || (kind==='offsite' && !noTimes)) hrs+=sgHours(s);
-            const style = kind==='off' ? 'background:#f6dad4;color:#9f2d20;'
-                        : kind==='oncall' ? 'background:#fdebc4;color:#92400e;'
-                        : kind==='offsite' ? 'background:#dbeafe;color:#1d4ed8;'
-                        : 'background:#d1fae5;color:#065f46;';
-            const label = kind==='off' ? '<span style="text-transform:uppercase;font-size:0.68rem;letter-spacing:0.4px;">Off</span>'
-                        : kind==='oncall' ? '<span style="text-transform:uppercase;font-size:0.68rem;letter-spacing:0.4px;">On call</span>'+(noTimes?'':'<span style="display:block;font-weight:600;font-size:0.68rem;">'+sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time)+'</span>')
-                        : kind==='offsite' ? '<span style="text-transform:uppercase;font-size:0.68rem;letter-spacing:0.4px;">Offsite</span>'+(noTimes?'':'<span style="display:block;font-weight:600;font-size:0.68rem;">'+sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time)+'</span>')
-                        : sgFmtT(s.start_time)+'–'+sgFmtT(s.end_time);
-            bits.push('<div draggable="true" ondragstart="sgDrag(event,\''+loc+'\','+s.id+')" onclick="event.stopPropagation();openShift(\''+loc+'\','+emp.id+',\''+di+'\','+s.id+')" style="'+style+'border-radius:2px;padding:3px 6px;margin:2px 0;font-size:0.74rem;font-weight:700;cursor:grab;line-height:1.3;" title="Drag to copy · click to edit">'
-              +label
-              +(kind!=='off' && s.role?'<span style="display:block;font-weight:600;font-size:0.64rem;opacity:0.85;">'+esc(s.role)+'</span>':'')+'</div>');
-          });
-          return '<td onclick="openShift(\''+loc+'\','+emp.id+',\''+di+'\')" ondragover="sgOver(event)" ondrop="sgDrop(event,\''+loc+'\','+emp.id+',\''+di+'\')" style="cursor:pointer;min-width:104px;" title="Click to add a shift">'+bits.join('')+'</td>';
-        }).join('');
-        return '<tr><td style="font-weight:700;white-space:nowrap;">'+esc(emp.name)
-          +'<span style="display:block;font-weight:500;font-size:0.7rem;color:var(--sub);">'+esc(emp.role||'')+(hrs?' · '+(Math.round(hrs*10)/10)+' hrs':'')+'</span></td>'+cells+'</tr>';
+        const all = days.map((d,wd)=>sgCell(loc,emp,d,wd));
+        const hrs = all.reduce((t,c)=>t+c.hrs,0);
+        const cells = narrow ? all[sgDay].html : all.map(c=>c.html).join('');
+        return '<tr><td class="sg-nm"><b>'+esc(emp.name)+'</b>'
+          +'<span>'+esc(emp.role||'')+(hrs?(emp.role?' · ':'')+(Math.round(hrs*10)/10)+' hrs':'')+'</span></td>'+cells+'</tr>';
       }).join('');
     }
     const pub = sgPubState(loc);
@@ -3865,7 +3926,7 @@ function sgRender(){
         +'<button class="btn btn-ghost btn-sm" onclick="sgCopyPrev(\''+loc+'\')">⧉ Copy previous week</button>'
         +'<span class="save-msg" id="sgMsg-'+loc+'"></span>'
       +'</div>'
-      +'<div class="bulk-wrap"><table class="bulk" style="min-width:980px;"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table></div>'
+      +dayStrip+'<div class="bulk-wrap sg-wrap"><table class="bulk sg-grid'+(narrow?' sg-1day':'')+'"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table></div>'
     +'</div>';
   }).join('');
 }
