@@ -20821,7 +20821,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
      CARDS: studio_designs rows of kind cheese-card / wine-card (GREYS Studio; managers only). The list loads names
        only; thumbnails are fetched for the rows on screen and for the cards on the print list.
      PRINT LIST: [{ id, n }] in the order added, kept in localStorage (greys_cardprint_v1) so a reload keeps it.
-     SHEETS: studio/js/sheets.js (GS.Sheets) lays the list out 6 to a letter sheet, each card 4 × 3 in, with cut
+     SHEETS: studio/js/sheets.js (GS.Sheets) lays the list out 8 to a letter sheet, each card 3.5 × 2.5 in, with cut
        marks. The preview is drawn from that same layout with the thumbnails, so what shows is what prints.
      PRINT / DOWNLOAD PDF: the cards' designs are fetched fresh, drawn at 300 dpi with the Studio's own renderer and
        brand fonts (loadStudioJs, shared with Cheese Entry) and written into one PDF at true size. Print opens the
@@ -21102,14 +21102,14 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     askThumbs(st.list.map((x) => x.id));
   }
   function drawBar(){
-    const S = lib(), per = S ? S.plan().per : 6, n = total(), sheets = Math.ceil(n / per), spare = sheets * per - n, off = !n || !!st.busy;
+    const S = lib(), per = S ? S.plan().per : 8, n = total(), sheets = Math.ceil(n / per), spare = sheets * per - n, off = !n || !!st.busy;
     $('pcBar').innerHTML = '<div class="pc-sum">' +
       (n ? '<b>' + plural(sheets, 'sheet') + '</b> · ' + plural(n, 'card') + '<small>' + (spare ? 'Room for ' + spare + ' more on the last sheet.' : sheets === 1 ? 'The sheet is full.' : 'Every sheet is full.') + '</small>'
          : '<b>No cards yet</b><small>Add cheeses from the list and the sheets build themselves.</small>') + '</div>' +
       '<div class="pc-acts"><label class="pc-opt"><input type="checkbox" id="pcMarks"' + (st.marks ? ' checked' : '') + '> Cut marks</label>' +
       '<button type="button" class="btn btn-ghost" data-pc="pdf"' + (off ? ' disabled' : '') + '>Download PDF</button>' +
       '<button type="button" class="btn btn-gold" data-pc="print"' + (off ? ' disabled' : '') + '>🖨 Print</button></div>' +
-      '<div class="pc-tip">Letter paper · 6 cards to a sheet · each card 4 × 3 in. Print at <b>100%</b> (“Actual size”, not “Fit to page”) on card stock' +
+      '<div class="pc-tip">Letter paper · 8 cards to a sheet · each card 3.5 × 2.5 in. Print at <b>100%</b> (“Actual size”, not “Fit to page”) on card stock' +
       (st.marks ? ', then cut from mark to mark.' : '.') + '</div>';
   }
   function sheet(S, P, ids, i, n){

@@ -21,8 +21,8 @@
     { k: 'menu', label: 'Menu', w: 408, h: 1056, unit: 'in', g: 'Print' },
     { k: 'card', label: 'Card', w: 480, h: 672, unit: 'in', g: 'Print' },
     { k: 'table-tent', label: 'Table tent', w: 384, h: 576, unit: 'in', g: 'Print' },
-    { k: 'cheese-card', label: 'Cheese card', w: 384, h: 288, unit: 'in', g: 'Shop' },
-    { k: 'wine-card', label: 'Wine card', w: 384, h: 288, unit: 'in', g: 'Shop' },
+    { k: 'cheese-card', label: 'Cheese card', w: 336, h: 240, unit: 'in', g: 'Shop' },
+    { k: 'wine-card', label: 'Wine card', w: 336, h: 240, unit: 'in', g: 'Shop' },
     { k: 'price-tag', label: 'Price tag', w: 288, h: 192, unit: 'in', g: 'Shop' },
     { k: 'gift-card', label: 'Gift card', w: 336, h: 192, unit: 'in', g: 'Shop' },
     { k: 'sign', label: 'Shop sign', w: 1056, h: 816, unit: 'in', g: 'Shop' },
@@ -30,6 +30,25 @@
   GS.sizeText = (w, h, unit) => unit === 'in' ? `${GS.round(w / 96, 2)} × ${GS.round(h / 96, 2)} in` : `${Math.round(w)} × ${Math.round(h)} px`;
   GS.sizeLabel = (d) => GS.sizeText(d.w, d.h, d.unit);
   GS.sizeByKey = (k) => GS.SIZES.find((s) => s.k === k);
+
+
+  // Counter cards (cheese + wine) print at 3.5 × 2.5 in (2026-11-19; were 4 × 3). They are laid out on the old
+  // 384 × 288 grid (studio/js/cards.js fits text against it), then scaled by 240/288 and spread to the 336 px
+  // width: full-width pieces stretch, right-hand pieces (badge, GREYS) move right, text that reached the right
+  // margin gets the extra width. Works on a template or on a saved card's page (keeps staff edits).
+  GS.COUNTER = { w: 336, h: 240, w0: 384, h0: 288 };
+  GS.shrinkCounter = (d) => {
+    const C = GS.COUNTER, s = C.h / C.h0, extra = C.w - C.w0 * s;
+    (d.pages || []).forEach((p) => (p.els || []).forEach((e) => {
+      const x0 = e.x || 0, w0 = e.w || 0;
+      ['x', 'y', 'w', 'h', 'size', 'sw', 'r'].forEach((k) => { if (typeof e[k] === 'number') e[k] = Math.round(e[k] * s * 100) / 100; });
+      if (e.stroke && typeof e.stroke.w === 'number') e.stroke.w = Math.round(e.stroke.w * s * 100) / 100;
+      if (x0 >= C.w0 / 2) e.x += extra;
+      else if (x0 + w0 > C.w0 - 90) e.w += extra;
+    }));
+    d.w = C.w; d.h = C.h;
+    return d;
+  };
 
   // ---------- Element factories ----------
   const base = (o) => Object.assign({ id: GS.uid('e'), x: 0, y: 0, w: 100, h: 100, rot: 0, op: 1 }, o);
@@ -189,7 +208,7 @@
     },
     {
       id: 'cheese-card', name: 'Cheese counter card', size: 'cheese-card', tags: 'shelf talker sign print',
-      make: () => ({ w: 384, h: 288, pages: [page('#FFFFFF', [
+      base: () => ({ w: 384, h: 288, pages: [page('#FFFFFF', [
         B(0, 0, 384, 96, NAVY),
         T('Comté', 22, 16, 270, 46, { font: BC, weight: 800, color: CREAM, lh: 1.05 }),
         T('AGED 18 MONTHS', 22, 66, 270, 12.5, { font: LS, weight: 700, color: GOLD, ls: 200 }),
@@ -202,10 +221,11 @@
         T('$00.00 / lb', 22, 230, 220, 30, { font: BC, weight: 800, color: NAVY }),
         T('GREYS', 262, 244, 100, 17, { font: LS, weight: 800, color: NAVY, align: 'right', ls: 80 }),
       ])] }),
+      make() { return GS.shrinkCounter(this.base()); },
     },
     {
       id: 'wine-card', name: 'Wine counter card', size: 'wine-card', tags: 'wine bottle shelf talker sign print',
-      make: () => ({ w: 384, h: 288, pages: [page('#FFFFFF', [
+      base: () => ({ w: 384, h: 288, pages: [page('#FFFFFF', [
         B(0, 0, 384, 96, NAVY),
         T('Côte de Brouilly', 22, 16, 270, 46, { font: BC, weight: 800, color: CREAM, lh: 1.05 }),
         T('Cru Beaujolais', 22, 66, 270, 12.5, { font: LS, weight: 700, color: GOLD, upper: true, ls: 200 }),
@@ -218,6 +238,7 @@
         T('$00.00', 22, 230, 220, 30, { font: BC, weight: 800, color: NAVY }),
         T('GREYS', 262, 244, 100, 17, { font: LS, weight: 800, color: NAVY, align: 'right', ls: 80 }),
       ])] }),
+      make() { return GS.shrinkCounter(this.base()); },
     },
     {
       id: 'catering-menu', name: 'Catering menu', size: 'flyer', tags: 'menu catering print',

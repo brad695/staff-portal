@@ -43,7 +43,8 @@
   function build(c, kind) {
     kind = kind || 'cheese';
     const K = KINDS[kind];
-    const d = GS.fromTemplate(GS.TEMPLATES.find((t) => t.id === K.tpl));
+    const tpl = GS.TEMPLATES.find((t) => t.id === K.tpl);
+    const d = GS.fromTemplate({ id: tpl.id, name: tpl.name, size: tpl.size, make: tpl.base }); // laid out at 4 × 3, shrunk below
     const els = d.pages[0].els;
     const T = (txt) => els.find((e) => e.type === 'text' && e.text === txt);
     const title = T(K.title), sub = T(K.sub), line = T(K.line);
@@ -102,12 +103,13 @@
       els.length = 0; els.push(...keep);
     }
 
+    const diag0 = { title: [title.size, lines(title, title.w).lines.length], sub: sub.size, line: line.size, desc: [desc.size, lines(desc, desc.w).lines.length, Math.round(desc.y + desc.h)], price: price.size, warn };
+    GS.shrinkCounter(d); // 3.5 × 2.5 in
     els.forEach((e) => R.syncText(e));
     if (c.design_id) d.id = c.design_id;
     d.name = c.name || [c.title, c.sub].filter(Boolean).join(' — ') || d.name;
     d.kind = K.tpl;
-    const diag = { title: [title.size, lines(title, title.w).lines.length], sub: sub.size, line: line.size, desc: [desc.size, lines(desc, desc.w).lines.length, Math.round(desc.y + desc.h)], price: price.size, warn };
-    return { d, diag };
+    return { d, diag: diag0 };
   }
 
   // load the badge pictures before drawing; a card must never be saved with an empty frame
