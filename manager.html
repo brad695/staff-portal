@@ -417,6 +417,10 @@
     @media(min-width:821px){
       .sect.more{ display:none; }
     }
+.sg-mv{float:right;display:inline-flex;flex-direction:column;gap:1px;margin-left:4px;}
+.sg-mv button{border:0;background:#eee;border-radius:3px;font-size:9px;line-height:1;padding:2px 4px;cursor:pointer;color:#444;}
+.sg-mv button:hover{background:#ddd;} .sg-mv button:disabled{opacity:.25;cursor:default;}
+@media print{.sg-mv{display:none;}}
 </style>
 <style id="theme-v3">
 /* ═══════════════════════════════════════════════════════════════════
@@ -3810,7 +3814,7 @@ async function sgLoad(){
     sgWeek.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+sgAdd(sgWeek,6).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   try{
     const [emps, shifts, toff, avail, pubs] = await Promise.all([
-      sb.from('portal_employees').select('*').eq('active',true).order('name'),
+      sb.from('portal_employees').select('*').eq('active',true).order('sched_order',{ascending:true,nullsFirst:false}).order('name'),
       sb.from('portal_shifts').select('*').gte('date',from).lte('date',to).order('start_time'),
       sb.from('portal_time_off').select('*').eq('status','approved').lte('start_date',to),
       sb.from('portal_availability').select('*'),
@@ -3913,7 +3917,11 @@ function sgRender(){
         const all = days.map((d,wd)=>sgCell(loc,emp,d,wd));
         const hrs = all.reduce((t,c)=>t+c.hrs,0);
         const cells = narrow ? all[sgDay].html : all.map(c=>c.html).join('');
-        return '<tr><td class="sg-nm"><b>'+esc(emp.name)+'</b>'
+        const ix = g.emps.indexOf(emp), last = g.emps.length-1;
+        const mv = '<span class="sg-mv">'
+          +'<button title="Move up" '+(ix===0?'disabled ':'')+'onclick="event.stopPropagation();sgReorder(\''+loc+'\','+emp.id+',-1)">▲</button>'
+          +'<button title="Move down" '+(ix===last?'disabled ':'')+'onclick="event.stopPropagation();sgReorder(\''+loc+'\','+emp.id+',1)">▼</button></span>';
+        return '<tr><td class="sg-nm">'+mv+'<b>'+esc(emp.name)+'</b>'
           +'<span>'+esc(emp.role||'')+(hrs?(emp.role?' · ':'')+(Math.round(hrs*10)/10)+' hrs':'')+'</span></td>'+cells+'</tr>';
       }).join('');
     }
@@ -3929,6 +3937,18 @@ function sgRender(){
       +dayStrip+'<div class="bulk-wrap sg-wrap"><table class="bulk sg-grid'+(narrow?' sg-1day':'')+'"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table></div>'
     +'</div>';
   }).join('');
+}
+
+/* move an employee up/down the schedule; saves sched_order for everyone at that location */
+async function sgReorder(loc, empId, dir){
+  const list = SG[loc].emps, i = list.findIndex(e=>e.id===empId), j = i+dir;
+  if(i<0 || j<0 || j>=list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  sgRender();
+  const ups = list.map((e,k)=>{ e.sched_order=k+1; return sb.from('portal_employees').update({sched_order:k+1}).eq('id',e.id); });
+  const res = await Promise.all(ups);
+  const el = document.getElementById('sgMsg-'+loc);
+  if(res.some(r=>r.error)){ if(el) el.textContent='⚠️ Order not saved'; }
 }
 
 function printGrid(loc){
