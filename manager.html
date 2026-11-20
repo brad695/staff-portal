@@ -3929,6 +3929,7 @@ function sgRender(){
     return '<div class="section-card">'
       +'<h2>📍 '+LOC_LABELS[loc]+(pub?' <span class="pill '+pub.cls+'" style="vertical-align:3px;margin-left:6px;">'+pub.label+'</span>':'')+'</h2>'
       +'<div class="toolbar" style="margin-top:10px;">'
+        +'<button class="btn btn-navy btn-sm" onclick="sgSave(\''+loc+'\')">💾 Save'+(SG_DIRTY[loc]?' •':'')+'</button>'
         +'<button class="btn btn-gold btn-sm" onclick="publishWeek(\''+loc+'\')">📣 Publish &amp; notify</button>'
         +'<button class="btn btn-navy btn-sm" onclick="printGrid(\''+loc+'\')">🖨 Print</button>'
         +'<button class="btn btn-ghost btn-sm" onclick="sgCopyPrev(\''+loc+'\')">⧉ Copy previous week</button>'
@@ -3939,16 +3940,26 @@ function sgRender(){
   }).join('');
 }
 
-/* move an employee up/down the schedule; saves sched_order for everyone at that location */
-async function sgReorder(loc, empId, dir){
+/* move an employee up/down the schedule (local until 💾 Save) */
+const SG_DIRTY = {};
+function sgReorder(loc, empId, dir){
   const list = SG[loc].emps, i = list.findIndex(e=>e.id===empId), j = i+dir;
   if(i<0 || j<0 || j>=list.length) return;
   [list[i], list[j]] = [list[j], list[i]];
+  SG_DIRTY[loc] = true;
   sgRender();
-  const ups = list.map((e,k)=>{ e.sched_order=k+1; return sb.from('portal_employees').update({sched_order:k+1}).eq('id',e.id); });
-  const res = await Promise.all(ups);
+  const el = document.getElementById('sgMsg-'+loc); if(el) el.textContent='Order changed — click 💾 Save';
+}
+/* SAVE, DON'T PUBLISH — stores the row order; shifts already save as you edit them. No notifications. */
+async function sgSave(loc){
   const el = document.getElementById('sgMsg-'+loc);
-  if(res.some(r=>r.error)){ if(el) el.textContent='⚠️ Order not saved'; }
+  if(el) el.textContent='Saving…';
+  const ids = SG[loc].emps.map(e=>e.id);
+  const { error } = await sb.rpc('portal_employee_set_order', { p_ids: ids });
+  if(error){ if(el) el.textContent='❌ Not saved: '+error.message; return; }
+  SG_DIRTY[loc] = false;
+  await sgLoad();
+  const el2 = document.getElementById('sgMsg-'+loc); if(el2) el2.textContent='✓ Saved (not published)';
 }
 
 function printGrid(loc){
@@ -4150,6 +4161,7 @@ async function sgDrop(ev, loc, empId, date){
 
 /* ── publish & notify ── */
 async function publishWeek(loc){
+  if(SG_DIRTY[loc]){ const r=await sb.rpc('portal_employee_set_order',{p_ids:SG[loc].emps.map(e=>e.id)}); if(!r.error) SG_DIRTY[loc]=false; }
   if(!confirm('Publish the '+LOC_LABELS[loc]+' schedule for this week?\n\nEveryone whose week changed gets an email and/or text with their shifts (whatever contact info they have on file).')) return;
   const el = document.getElementById('sgMsg-'+loc);
   el.className='save-msg'; el.textContent='Publishing…';
