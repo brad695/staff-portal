@@ -21139,6 +21139,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       (n ? '<b>' + plural(sheets, 'sheet') + '</b> · ' + plural(n, 'card') + '<small>' + (spare ? 'Room for ' + spare + ' more on the last sheet.' : sheets === 1 ? 'The sheet is full.' : 'Every sheet is full.') + '</small>'
          : '<b>No cards yet</b><small>Add cheeses from the list and the sheets build themselves.</small>') + '</div>' +
       '<div class="pc-acts"><label class="pc-opt"><input type="checkbox" id="pcMarks"' + (st.marks ? ' checked' : '') + '> Cut marks</label>' +
+      '<button type="button" class="btn btn-ghost" data-pc="cricut"' + (off ? ' disabled' : '') + ' title="Every card as its own picture, zipped — for Cricut Print Then Cut">✂ Cricut files (.zip)</button>' +
       '<button type="button" class="btn btn-ghost" data-pc="pdf"' + (off ? ' disabled' : '') + '>Download PDF</button>' +
       '<button type="button" class="btn btn-gold" data-pc="print"' + (off ? ' disabled' : '') + '>🖨 Print</button></div>' +
       '<div class="pc-tip">Letter paper · 8 cards to a sheet · each card 3.5 × 2.5 in. Print at <b>100%</b> (“Actual size”, not “Fit to page”) on card stock' +
@@ -21191,7 +21192,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   /* ---------- the PDF ---------- */
   // a pause that lets the page repaint the progress line between cards (a timer would crawl in a background tab)
   const breathe = () => new Promise((r) => { const c = new MessageChannel(); c.port1.onmessage = () => { c.port1.close(); r(); }; c.port2.postMessage(0); });
-  async function build(){
+  async function build(what){
     const say = (t) => { st.busy = t; drawMsg(); };
     const want = st.list.map((x) => ({ id: x.id, n: x.n }));
     say('Getting the cards…');
@@ -21223,12 +21224,44 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     }
     const list = want.filter((x) => got[x.id]), gone = want.filter((x) => !got[x.id]).map((x) => x.id);
     if (!list.length) throw new Error('Those cards aren’t in GREYS Studio any more. Add them again.');
+    if (what === 'cricut') {
+      say('Zipping the cards…');
+      const used = {}, files = list.map((x) => {
+        let base = String((got[x.id].name || 'card')).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'card';
+        if (used[base]) base += '-' + (++used[base]); else used[base] = 1;
+        return { name: base + (x.n > 1 ? '-x' + x.n : '') + '.jpg', bytes: jpgs.get(x.id).img.bytes };
+      });
+      return { blob: zipStore(files), sheets: 0, files: files.length, cards: list.reduce((a, x) => a + x.n, 0), gone };
+    }
     say('Building the sheets…');
     const images = {};
     list.forEach((x) => { images[x.id] = jpgs.get(x.id).img; });
     const pages = S.pages(list, P.per);
     const blob = S.pdf({ layout: P.key, pages, images, marks: st.marks, title: JOB });
     return { blob, sheets: pages.length, cards: list.reduce((a, x) => a + x.n, 0), gone };
+  }
+  // a plain (stored, no compression) .zip — the card JPEGs are already compressed
+  function zipStore(files){
+    const T = zipStore.t || (zipStore.t = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })());
+    const crc = (b) => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = T[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+    const enc = new TextEncoder(), parts = [], cen = [];
+    let off = 0;
+    const d = new Date(), dt = ((d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1)), dd = (((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate());
+    files.forEach((f) => {
+      const nm = enc.encode(f.name), c = crc(f.bytes), n = f.bytes.length;
+      const lh = new DataView(new ArrayBuffer(30));
+      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(10, dt, true); lh.setUint16(12, dd, true);
+      lh.setUint32(14, c, true); lh.setUint32(18, n, true); lh.setUint32(22, n, true); lh.setUint16(26, nm.length, true);
+      parts.push(lh.buffer, nm, f.bytes);
+      const ch = new DataView(new ArrayBuffer(46));
+      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(12, dt, true); ch.setUint16(14, dd, true);
+      ch.setUint32(16, c, true); ch.setUint32(20, n, true); ch.setUint32(24, n, true); ch.setUint16(28, nm.length, true); ch.setUint32(42, off, true);
+      cen.push(ch.buffer, nm);
+      off += 30 + nm.length + n;
+    });
+    const size = cen.reduce((a, b) => a + b.byteLength, 0), e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, size, true); e.setUint32(16, off, true);
+    return new Blob(parts.concat(cen, [e.buffer]), { type: 'application/zip' });
   }
   function fileName(){
     const d = new Date(), z = (v) => String(v).padStart(2, '0');
@@ -21274,11 +21307,12 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     st.note = null; st.undo = null; st.busy = 'Getting the cards…';
     drawBar(); drawMsg();
     try {
-      const r = await build(), url = URL.createObjectURL(r.blob), name = fileName(), size = plural(r.sheets, 'sheet');
+      const r = await build(what), url = URL.createObjectURL(r.blob), name = fileName(), size = plural(r.sheets, 'sheet');
       if (lastUrl) { const old = lastUrl; setTimeout(() => URL.revokeObjectURL(old), 60000); }
       lastUrl = url;
       let text;
-      if (what === 'pdf') { download(url, name); text = 'Saved ' + name + ' (' + size + '). Print it at 100% (“Actual size”).'; }
+      if (what === 'cricut') { const zn = name.replace(/\.pdf$/, '-cricut.zip'); download(url, zn); text = 'Saved ' + zn + ' (' + plural(r.files, 'card') + ', 3.5 × 2.5 in at 300 dpi). In Cricut Design Space: Upload ▸ pick all the files ▸ Print Then Cut ▸ set each to 3.5 in wide.'; }
+      else if (what === 'pdf') { download(url, name); text = 'Saved ' + name + ' (' + size + '). Print it at 100% (“Actual size”).'; }
       else if (direct()) { printFrame(url); text = size + ' sent to the print window — keep the scale at 100%. Nothing opened? Use Download PDF.'; }
       else if (win && !win.closed) { win.location.replace(url); text = 'The sheets opened in a new tab — print from there at 100% (“Actual size”).'; }
       else { download(url, name); text = 'Saved ' + name + ' (' + size + '). Open it and print at 100% (“Actual size”).'; }
@@ -21300,7 +21334,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     const b = e.target.closest('[data-pc]');
     if (!b || b.disabled) return;
     const a = b.getAttribute('data-pc'), v = b.getAttribute('data-v');
-    if (a === 'pdf' || a === 'print') { run(a); return; }
+    if (a === 'pdf' || a === 'print' || a === 'cricut') { run(a); return; }
     if (a === 'add') setQty(v, qty(v) + 1);
     else if (a === 'sub') setQty(v, qty(v) - 1);
     else if (a === 'remove') setQty(v, 0);
