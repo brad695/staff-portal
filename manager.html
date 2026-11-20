@@ -21229,8 +21229,9 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       const used = {}, files = list.map((x) => {
         let base = String((got[x.id].name || 'card')).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'card';
         if (used[base]) base += '-' + (++used[base]); else used[base] = 1;
-        return { name: base + (x.n > 1 ? '-x' + x.n : '') + '.jpg', bytes: jpgs.get(x.id).img.bytes };
+        return { name: base + (x.n > 1 ? '-x' + x.n : '') + '.png', img: jpgs.get(x.id).img };
       });
+      for (let i = 0; i < files.length; i++) { say('Rounding corners ' + (i + 1) + ' of ' + files.length + '…'); await breathe(); files[i].bytes = await roundPng(files[i].img); }
       return { blob: zipStore(files), sheets: 0, files: files.length, cards: list.reduce((a, x) => a + x.n, 0), gone };
     }
     say('Building the sheets…');
@@ -21239,6 +21240,19 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     const pages = S.pages(list, P.per);
     const blob = S.pdf({ layout: P.key, pages, images, marks: st.marks, title: JOB });
     return { blob, sheets: pages.length, cards: list.reduce((a, x) => a + x.n, 0), gone };
+  }
+  // card JPEG -> PNG with clear rounded corners (⅛ in at 300 dpi), so Cricut Print Then Cut cuts the round
+  async function roundPng(img){
+    const url = URL.createObjectURL(new Blob([img.bytes], { type: 'image/jpeg' })), im = new Image();
+    await new Promise((res, rej) => { im.onload = res; im.onerror = rej; im.src = url; });
+    URL.revokeObjectURL(url);
+    const cv = document.createElement('canvas'); cv.width = img.w; cv.height = img.h;
+    const ctx = cv.getContext('2d'), r = Math.round(DPI / 8);
+    ctx.beginPath(); ctx.roundRect(0, 0, img.w, img.h, r); ctx.clip();
+    ctx.drawImage(im, 0, 0, img.w, img.h);
+    const bin = atob(cv.toDataURL('image/png').split(',')[1]), out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
   }
   // a plain (stored, no compression) .zip — the card JPEGs are already compressed
   function zipStore(files){
@@ -21311,7 +21325,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
       if (lastUrl) { const old = lastUrl; setTimeout(() => URL.revokeObjectURL(old), 60000); }
       lastUrl = url;
       let text;
-      if (what === 'cricut') { const zn = name.replace(/\.pdf$/, '-cricut.zip'); download(url, zn); text = 'Saved ' + zn + ' (' + plural(r.files, 'card') + ', 3.5 × 2.5 in at 300 dpi). In Cricut Design Space: Upload ▸ pick all the files ▸ Print Then Cut ▸ set each to 3.5 in wide.'; }
+      if (what === 'cricut') { const zn = name.replace(/\.pdf$/, '-cricut.zip'); download(url, zn); text = 'Saved ' + zn + ' (' + plural(r.files, 'card') + ', 3.5 × 2.5 in, rounded corners, 300 dpi). In Cricut Design Space: Upload ▸ pick all the files ▸ Print Then Cut ▸ set each to 3.5 in wide.'; }
       else if (what === 'pdf') { download(url, name); text = 'Saved ' + name + ' (' + size + '). Print it at 100% (“Actual size”).'; }
       else if (direct()) { printFrame(url); text = size + ' sent to the print window — keep the scale at 100%. Nothing opened? Use Download PDF.'; }
       else if (win && !win.closed) { win.location.replace(url); text = 'The sheets opened in a new tab — print from there at 100% (“Actual size”).'; }
