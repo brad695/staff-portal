@@ -554,6 +554,18 @@ body{display:flex;flex-direction:column}
 .nbar-x:hover{background:rgba(0,0,0,.1)}
 .pf-note{margin:0 0 10px;color:var(--muted)}
 .pf-row{display:flex;gap:8px;flex-wrap:wrap}
+/* 2026-11-21: per-channel notification switches in Preferences (off = chat_members.muted; chat-notify already skips muted members unless @mentioned) */
+.pf-chs{border:1px solid var(--line);border-radius:8px;max-height:260px;overflow-y:auto}
+.pf-ch{position:relative;display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line-soft);font-weight:400;margin:0;cursor:pointer}
+.pf-ch:last-child{border-bottom:0}
+.pf-ch .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.pf-ch.off .nm{color:var(--muted);font-weight:400}
+.pf-sw{position:relative;flex:none;width:36px;height:20px;border-radius:10px;background:var(--line);transition:background .15s}
+.pf-sw::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .15s}
+.pf-ch input{position:absolute;opacity:0;pointer-events:none}
+.pf-ch input:checked+.pf-sw{background:#1d9bd1}
+.pf-ch input:checked+.pf-sw::after{transform:translateX(16px)}
+.pf-ch input:focus-visible+.pf-sw{box-shadow:0 0 0 2px rgba(29,155,209,.5)}
 /* bookmarks: ⋯ on hover (always on touch) for edit / remove; members: Remove on hover */
 .bm-w{position:relative;display:inline-flex;align-items:center;flex:none;border-radius:6px}
 .bm-w:hover{background:var(--soft)}
@@ -1722,16 +1734,23 @@ function setStatus(){const pre=[['🗓️','In a meeting'],['🚚','Delivering']
   $('#stS',back).onclick=()=>busy($('#stS',back),async()=>{const t=$('#stT',back).value.trim();await api('profile',{status_e:t?e:'',status_t:t});users[ME].status=t?{e,t}:null;back.remove();renderAll();toast('Status updated');});
   $('#stX',back).onclick=()=>busy($('#stX',back),async()=>{await api('profile',{status_e:'',status_t:''});users[ME].status=null;back.remove();renderAll();});}
 function notifPref(){
-  const what='direct messages, @mentions, replies in your threads and client messages while you\'re away from chat';
+  const what='direct messages, @mentions, replies in your threads, client messages and booking alerts while you\'re away from chat';
   if(isIOS&&!standalone())return '<p class="pf-note">To get notifications on an iPhone or iPad, add Greys Chat to your Home Screen: tap <b>Share</b>, then <b>Add to Home Screen</b>. Open Greys Chat from your Home Screen and turn them on here.</p>';
   if(!pushOK())return '<p class="pf-note">This browser can\'t show notifications.</p>';
   if(S.swFail)return '<p class="pf-note">Notifications aren\'t available on this site yet.</p>';
   if(Notification.permission==='denied')return '<p class="pf-note">Notifications are blocked for this site. Allow them in your browser\'s site settings, then come back here.</p>';
   if(S.pushOn)return `<p class="pf-note">On for this device. You'll get a notification for ${what}.</p><div class="pf-row"><button class="btn sm" data-ptest>Send a test</button><button class="btn sm" data-poff>Turn off for this device</button></div>`;
   return `<p class="pf-note">Get a notification on this device for ${what}.</p><button class="btn sm primary" data-pon>Turn on notifications</button>`;}
+function chanPref(){
+  const chs=Object.values(convos).filter(c=>c.type==='channel'&&c.joined&&!c.archived).sort((a,b)=>a.name.localeCompare(b.name));
+  if(!chs.length)return '<p class="pf-note">You haven\'t joined any channels yet.</p>';
+  return `<p class="pf-note">Turn off a channel you don't need alerts from. You'll still hear when someone @mentions you there, and direct messages still notify.</p><div class="pf-chs">${chs.map(c=>`<label class="pf-ch ${c.muted?'off':''}"><span class="ico">${ic(c.private?'lock':'hash',14,2)}</span><span class="nm">${esc(c.name)}</span><input type="checkbox" data-chn="${c.id}" ${c.muted?'':'checked'} aria-label="Notifications from #${esc(c.name)}"><span class="pf-sw"></span></label>`).join('')}</div>`;}
 function prefs(){const t=store.get('theme','system');
-  const back=modal('Preferences',`<label>Color mode</label><div class="seg-ctl">${[['light','Light'],['dark','Dark'],['system','Sync with OS']].map(([k,l])=>`<button class="${t===k?'on':''}" data-th="${k}">${l}</button>`).join('')}</div><label>Notifications</label><div id="pfN">${notifPref()}</div><label>Your title</label><input id="pfT" class="fld" value="${esc(users[ME].title)}" placeholder="e.g. Cheesemonger · Memphis">`,`<button class="btn primary" id="pfS">Done</button>`);
+  const back=modal('Preferences',`<label>Color mode</label><div class="seg-ctl">${[['light','Light'],['dark','Dark'],['system','Sync with OS']].map(([k,l])=>`<button class="${t===k?'on':''}" data-th="${k}">${l}</button>`).join('')}</div><label>Notifications</label><div id="pfN">${notifPref()}</div><label>Channel notifications</label><div id="pfC">${chanPref()}</div><label>Your title</label><input id="pfT" class="fld" value="${esc(users[ME].title)}" placeholder="e.g. Cheesemonger · Memphis">`,`<button class="btn primary" id="pfS">Done</button>`);
   const redo=()=>{const n=$('#pfN',back);if(n)n.innerHTML=notifPref();};
+  back.addEventListener('change',e=>{const x=e.target.closest('[data-chn]');if(!x)return;const c=convos[x.dataset.chn];if(!c)return;
+    const was=c.muted,row=x.closest('.pf-ch');c.muted=!x.checked;row.classList.toggle('off',c.muted);renderSide();
+    api('prefs',{convo:c.id,muted:c.muted}).then(()=>toast((c.muted?'Notifications off for #':'Notifications on for #')+c.name)).catch(er=>{c.muted=was;x.checked=!was;row.classList.toggle('off',was);renderSide();toast(er.message);});});
   back.addEventListener('click',e=>{const b=e.target.closest('[data-th]');if(b){applyTheme(b.dataset.th);$$('[data-th]',back).forEach(x=>x.classList.toggle('on',x===b));}
     const on=e.target.closest('[data-pon]');if(on)busy(on,async()=>{const r=await pushOn();redo();toast(r.sent?'Notifications are on. We sent a test to this device.':'Notifications are on for this device.');});
     const tst=e.target.closest('[data-ptest]');if(tst)busy(tst,async()=>{const sub=await pushSub();const r=await api('push_test',{endpoint:sub?sub.endpoint:''});toast(r.sent?'Test sent. Check your notifications.':'Couldn\'t reach this device. Turn notifications off and on again.');});
