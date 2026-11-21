@@ -683,6 +683,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     <div class="tab" onclick="tkTab(this,'bulk')">Bulk Add Classes</div>
     <div class="tab" onclick="tkTab(this,'customers')">Customers</div>
     <div class="tab" onclick="tkTab(this,'promos')">Promo Codes</div>
+    <div class="tab" onclick="tkTab(this,'classcheeses')">🧀 Class Cheeses</div>
     <div class="tab-head">Cheese Case</div>
     <div class="tab" onclick="mtab('plu')">🧀 New Case Entry</div>
     <div class="tab" onclick="mtab('jamlabels')">🏷️ Jam Labels</div>
@@ -6060,6 +6061,7 @@ function App() {
               {view.name === "experiences" && <AdminExperiences go={go} />}
               {view.name === "expbookings" && <ExperienceBookings x={null} />}
               {view.name === "confirm" && <AdminConfirmEmail go={go} />}
+              {view.name === "classcheeses" && <AdminClassCheeses events={events} />}
               {view.name === "bulk" && (
                 <AdminBulk
                   go={go}
@@ -9770,7 +9772,7 @@ function ClassCheeses({ eventId }) {
         </div>
       ))}
       <div className="cc-giftrow">
-        <input className="cc-input" placeholder="Search Cheese Case or type a name…" value={q}
+        <input className="cc-input" placeholder="Search Cheese Case — or type any cheese and press Add" value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); matches[0] && nm(matches[0]).toLowerCase() === q.trim().toLowerCase() ? add(nm(matches[0]), matches[0].id) : add(q); } }} />
         <button className="cc-mini" onClick={() => add(q)} disabled={!q.trim()}>Add</button>
@@ -9782,7 +9784,44 @@ function ClassCheeses({ eventId }) {
           ))}
         </div>
       )}
+      {q.trim() && !matches.some((c) => nm(c).toLowerCase() === q.trim().toLowerCase()) && (
+        <div onClick={() => add(q)} style={{ padding: "8px 10px", cursor: "pointer", border: "1px dashed #B97F0E", borderRadius: 8, marginTop: 4, color: "#7C1F15" }}>
+          ＋ Add “{q.trim()}” (not on the list)
+        </div>
+      )}
       {msg && <p className="cc-hint" style={{ color: "#A52B1E" }}>{msg}</p>}
+    </div>
+  );
+}
+
+// 🧀 Class Cheeses tab — every class (past and archived included), newest first, with its cheese list.
+function AdminClassCheeses({ events }) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(null);
+  const [counts, setCounts] = useState({});
+  const [past, setPast] = useState([]);
+  useEffect(() => {
+    db.from("events").select("id,title,date,location,kind").or("kind.eq.class,kind.is.null").order("date", { ascending: false }).limit(1000)
+      .then(({ data }) => setPast(data || []));
+    db.from("class_cheeses").select("event_id").then(({ data }) => {
+      const c = {}; (data || []).forEach((r) => (c[r.event_id] = (c[r.event_id] || 0) + 1)); setCounts(c);
+    });
+  }, [open]);
+  const list = past.filter((e) => !q || (e.title || "").toLowerCase().includes(q.toLowerCase()) || (e.date || "").includes(q));
+  return (
+    <div style={{ maxWidth: 760 }}>
+      <h2 style={{ margin: "0 0 4px" }}>Class Cheeses</h2>
+      <p className="cc-hint">Pick a class and list the cheeses served. Customers see them at tickets.greyscheese.com/past-classes.</p>
+      <input className="cc-input" placeholder="Search class or date (2026-11)…" value={q} onChange={(e) => setQ(e.target.value)} />
+      {list.map((e) => (
+        <div key={e.id} style={{ border: "1px solid #e5e5e5", borderRadius: 10, margin: "8px 0", background: "#fff" }}>
+          <div onClick={() => setOpen(open === e.id ? null : e.id)} style={{ padding: "12px 14px", cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 10 }}>
+            <span><b>{e.title}</b><br /><span className="cc-hint" style={{ margin: 0 }}>{e.date} · {e.location}</span></span>
+            <span className="cc-hint" style={{ margin: 0, whiteSpace: "nowrap" }}>{counts[e.id] ? counts[e.id] + " cheeses" : "none yet"}</span>
+          </div>
+          {open === e.id && <div style={{ padding: "0 14px 14px" }}><ClassCheeses eventId={e.id} /></div>}
+        </div>
+      ))}
     </div>
   );
 }
