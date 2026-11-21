@@ -9723,6 +9723,70 @@ function AdminConfirmEmail({ go }) {
   );
 }
 
+// Cheeses served at a class (2026-11-21) — saved straight to class_cheeses so customers can
+// look them up later on tickets.greyscheese.com/past-classes. Pick from Cheese Case, or type any name.
+function ClassCheeses({ eventId }) {
+  const [rows, setRows] = useState([]);
+  const [all, setAll] = useState([]);
+  const [q, setQ] = useState("");
+  const [msg, setMsg] = useState("");
+  const load = async () => {
+    const { data } = await db.from("class_cheeses").select("*").eq("event_id", eventId).order("sort");
+    setRows(data || []);
+  };
+  useEffect(() => {
+    load();
+    db.from("cheese_items").select("id,name,marketing_name").order("name").limit(2000)
+      .then(({ data }) => setAll(data || []));
+  }, [eventId]);
+  const nm = (c) => c.marketing_name || c.name || "";
+  const matches = q.trim().length < 2 ? [] :
+    all.filter((c) => nm(c).toLowerCase().includes(q.trim().toLowerCase())).slice(0, 8);
+  const add = async (name, cheeseId) => {
+    if (!name.trim()) return;
+    const sort = rows.length ? Math.max(...rows.map((r) => r.sort)) + 1 : 0;
+    const { error } = await db.from("class_cheeses").insert({ event_id: eventId, cheese_item_id: cheeseId || null, name: name.trim(), sort });
+    if (error) { setMsg(error.message); return; }
+    setQ(""); setMsg(""); load();
+  };
+  const remove = async (id) => { await db.from("class_cheeses").delete().eq("id", id); load(); };
+  const move = async (i, d) => {
+    const j = i + d; if (j < 0 || j >= rows.length) return;
+    const a = rows[i], b = rows[j];
+    await db.from("class_cheeses").update({ sort: b.sort }).eq("id", a.id);
+    await db.from("class_cheeses").update({ sort: a.sort === b.sort ? a.sort + d : a.sort }).eq("id", b.id);
+    load();
+  };
+  return (
+    <div>
+      <label className="cc-label">Cheeses served</label>
+      <p className="cc-hint">Customers can look these up later on the Past Classes page. Saves as you go.</p>
+      {rows.map((r, i) => (
+        <div key={r.id} className="cc-giftrow" style={{ alignItems: "center" }}>
+          <span style={{ flex: 1 }}>{i + 1}. {r.name}</span>
+          <button className="cc-mini" onClick={() => move(i, -1)}>↑</button>
+          <button className="cc-mini" onClick={() => move(i, 1)}>↓</button>
+          <button className="cc-mini danger" onClick={() => remove(r.id)}>Remove</button>
+        </div>
+      ))}
+      <div className="cc-giftrow">
+        <input className="cc-input" placeholder="Search Cheese Case or type a name…" value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); matches[0] && nm(matches[0]).toLowerCase() === q.trim().toLowerCase() ? add(nm(matches[0]), matches[0].id) : add(q); } }} />
+        <button className="cc-mini" onClick={() => add(q)} disabled={!q.trim()}>Add</button>
+      </div>
+      {matches.length > 0 && (
+        <div style={{ border: "1px solid #e5e5e5", borderRadius: 8, marginTop: 4 }}>
+          {matches.map((c) => (
+            <div key={c.id} onClick={() => add(nm(c), c.id)} style={{ padding: "8px 10px", cursor: "pointer", borderBottom: "1px solid #f0f0f0" }}>{nm(c)}</div>
+          ))}
+        </div>
+      )}
+      {msg && <p className="cc-hint" style={{ color: "#A52B1E" }}>{msg}</p>}
+    </div>
+  );
+}
+
 function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
   // Events differ from classes: a table option (party size > 1) and an optional
   // group/table dropdown. Editing an existing record uses its stored kind.
@@ -10159,6 +10223,7 @@ function AdminEdit({ ev, kind, sold = 0, onCancel, onSave }) {
         </>
       )}
 
+      {isClass && ev?.id && <ClassCheeses eventId={ev.id} />}
       <label className="cc-label">{isClass ? "Class image" : "Event image"}</label>
       {imageUrl ? (
         <div className="cc-classimg">
