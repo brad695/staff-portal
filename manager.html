@@ -2401,6 +2401,8 @@ function catRender(){
   const catToday = new Date().toLocaleDateString('en-CA');
   const catPast = x => { const d = String((x.inq ? x.r.preferred_date : x.r.event_date) || '').slice(0,10); return !!d && d < catToday; };
   const isOpen = x => !!x.r.unread || (x.stage!=='lost' && !catPast(x));
+  // ARCHIVE (2026-11-21): once the event date has passed the lead moves to 📦 Archived — out of Open, the stage chips and All.
+  const isArch = x => !x.r.unread && x.stage!=='lost' && catPast(x);
   const kc = { all:0, catering:0, event:0, experience:0, table:0, donation:0, question:0 };
   all.filter(isOpen).forEach(x=>{ kc.all++; kc[x.kind]++; });
   const kd = document.getElementById('catKinds');
@@ -2409,11 +2411,11 @@ function catRender(){
   const tools = document.getElementById('catTools');
   if(tools && !tools.querySelector('button')) tools.innerHTML = '<button class="btn btn-ghost btn-sm" onclick="catLoad();inqLoad()">↻ Refresh</button><button class="btn btn-gold btn-sm" onclick="catNew()">＋ New lead</button>';
   const mine = all.filter(x=> CAT_KIND==='all' || x.kind===CAT_KIND);
-  const counts = { open:0 }; Object.keys(CAT_STAGES).forEach(k=>counts[k]=0);
-  mine.forEach(x=>{ counts[x.stage]=(counts[x.stage]||0)+1; if(isOpen(x)) counts.open++; });
-  document.getElementById('catChips').innerHTML = '<span class="lbl">Stage</span>' + [['open','Open'],['sep'],...Object.entries(CAT_STAGES),['sep'],['all','All']].map(([k,l])=>
+  const counts = { open:0, archived:0 }; Object.keys(CAT_STAGES).forEach(k=>counts[k]=0);
+  mine.forEach(x=>{ if(isArch(x)){ counts.archived++; return; } counts[x.stage]=(counts[x.stage]||0)+1; if(isOpen(x)) counts.open++; });
+  document.getElementById('catChips').innerHTML = '<span class="lbl">Stage</span>' + [['open','Open'],['sep'],...Object.entries(CAT_STAGES),['sep'],['archived','📦 Archived'],['all','All']].map(([k,l])=>
     k==='sep' ? '<span class="sep"></span>' : '<button class="chip'+(CAT_FILTER===k?' on':'')+'" onclick="CAT_FILTER=\''+k+'\';catRender()">'+l+(k==='all'?'':'<b>'+(counts[k]||0)+'</b>')+'</button>').join('');
-  const rows = mine.filter(x=> CAT_FILTER==='all' ? true : CAT_FILTER==='open' ? isOpen(x) : x.stage===CAT_FILTER);
+  const rows = mine.filter(x=> CAT_FILTER==='archived' ? isArch(x) : isArch(x) ? false : CAT_FILTER==='all' ? true : CAT_FILTER==='open' ? isOpen(x) : x.stage===CAT_FILTER);
   const el = document.getElementById('catList');
   if(!rows.length){ el.innerHTML = '<div class="rec-empty">Nothing here.</div>'; return; }
   // CAT-CARDS (2026-10-14): one card per lead, colored tab on the left end = its kind (CAT_KINDS). No type badge,
