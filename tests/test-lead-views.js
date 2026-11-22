@@ -216,7 +216,7 @@ const shown = (page, sel) => page.evaluate((s) => { const e = document.querySele
     t("the type row is on top, the colored stage row under it, then the list", await page.evaluate(() => { const a = document.getElementById("catKinds"), b = document.getElementById("catChips"), c = document.getElementById("catList"); return a.getBoundingClientRect().bottom <= b.getBoundingClientRect().top + 1 && b.getBoundingClientRect().bottom <= c.getBoundingClientRect().top + 1 && a.nextElementSibling === b && b.nextElementSibling === c; }));
     let sb = await stg();
     sb.push(sb.shift());   // All is first on the page; checks below read Open as [0] and All as [10]
-    t("eleven stage buttons: All first, then Open and the nine stages", sb.map((x) => x.text).join() === "Open,New,Replied,Quoting,Proposal sent,Signed,Invoiced,Deposit paid,Paid,Lost,All" && (await page.textContent("#catChips .chip")) === "All" && await page.evaluate(() => !document.querySelector("#catChips .lbl, #catChips .sep")), sb.map((x) => x.text));
+    t("eleven stage buttons: All first, then Open and the nine stages", sb.map((x) => x.text).join() === "Open,New,Replied,Quoting,Proposal sent,Signed,Invoiced,Deposit paid,Paid,Closed,All" && (await page.textContent("#catChips .chip")) === "All" && await page.evaluate(() => !document.querySelector("#catChips .lbl, #catChips .sep")), sb.map((x) => x.text));
     let tp = await typ();
     t("the stage buttons are the big ones now, the type pills the small ones", sb.every((x) => x.radius === 10 && x.padT >= 7) && tp.every((x) => x.radius > 100) && sb[0].fs > tp[0].fs, [sb[0], tp[0]]);
     t("each stage button is in its own color, the same as its chip in the table", new Set(sb.map((x) => x.bg)).size === 11 && await page.evaluate(() => ["new", "replied", "quoted", "contract_sent"].every((k) => { const chip = document.querySelector("#catList .cv-chip.st-" + k), btn = document.querySelector("#catChips .chip.st-" + k); return chip && getComputedStyle(chip).backgroundColor === getComputedStyle(btn).backgroundColor && getComputedStyle(chip).color === getComputedStyle(btn).color; })), sb.map((x) => x.bg));
@@ -361,7 +361,7 @@ const shown = (page, sel) => page.evaluate((s) => { const e = document.querySele
     await page.click('.cv-seg button[data-v="table"]');
     t("back on the table the stage picked earlier is still on", (await names(page)).length === 2 && (await page.textContent("#catChips .chip.on")) === "Quoting2");
     await page.click('.cv-seg button[data-v="board"]');
-    t("Board draws a column per stage, in pipeline order", JSON.stringify(await page.$$eval("#catList .cv-col", (c) => c.map((x) => x.querySelector(".cv-chip").textContent))) === JSON.stringify(["New", "Replied", "Quoting", "Proposal sent", "Signed", "Invoiced", "Deposit paid", "Paid", "Lost"]));
+    t("Board draws a column per stage, in pipeline order", JSON.stringify(await page.$$eval("#catList .cv-col", (c) => c.map((x) => x.querySelector(".cv-chip").textContent))) === JSON.stringify(["New", "Replied", "Quoting", "Proposal sent", "Signed", "Invoiced", "Deposit paid", "Paid", "Closed"]));
     t("on the board the chips are just Open | All", JSON.stringify(await chips(page)) === JSON.stringify(["All", "Open10"]) && (await page.textContent("#catChips .chip.on")) === "Open10");
     const col = (name) => page.evaluate((nm) => { const c = [...document.querySelectorAll("#catList .cv-col")].find((x) => x.querySelector(".cv-chip").textContent === nm); return { empty: c.classList.contains("empty"), cards: [...c.querySelectorAll(".cv-card .cv-nm b")].map((b) => b.textContent), n: (c.querySelector(".cv-n") || {}).textContent, total: (c.querySelector(".cv-total") || {}).textContent }; }, name);
     let c = await col("New");
@@ -370,12 +370,12 @@ const shown = (page, sel) => page.evaluate((s) => { const e = document.querySele
     t("a column adds up its proposals", c.n === "2" && c.total === "$13,658.17", c);
     c = await col("Proposal sent");
     t("a 'Link sent' inquiry sits under Proposal sent and says so on its card", c.cards.includes("Kelly Nguyen") && await page.evaluate(() => [...document.querySelectorAll(".cv-card")].find((x) => /Kelly Nguyen/.test(x.textContent)).querySelector(".cv-cardfoot .cv-sub").textContent === "Link sent"), c);
-    t("stages with nobody in them fold to a slim column", (await col("Signed")).empty && (await col("Invoiced")).empty && (await col("Lost")).empty && await page.evaluate(() => document.querySelector(".cv-col.empty").getBoundingClientRect().width < 60));
+    t("stages with nobody in them fold to a slim column", (await col("Signed")).empty && (await col("Invoiced")).empty && (await col("Closed")).empty && await page.evaluate(() => document.querySelector(".cv-col.empty").getBoundingClientRect().width < 60));
     t("a card shows the date, guests, shop and amount", await page.evaluate(() => { const k = [...document.querySelectorAll(".cv-card")].find((x) => /Omar Reyes/.test(x.textContent)); return /Acme Realty/.test(k.textContent) && k.querySelector(".cv-ev").textContent === "Holiday party" && k.querySelectorAll(".cv-facts span").length === 3 && k.querySelector(".cv-val").textContent === "$2,480.00" && k.querySelector(".cv-kind").textContent === "Private event"; }));
     t("the board's column heading is not styled as the page header", await page.evaluate(() => !document.querySelector("#catList header, #catList footer")));
     await shot(page, "views-board");
     await page.click('#catChips .chip:has-text("All")');
-    t("All adds the lost and past leads to their columns", (await col("Lost")).cards.includes("Will Turner") && (await col("Paid")).cards.includes("Grace Kim"));
+    t("All adds the lost and past leads to their columns", (await col("Closed")).cards.includes("Will Turner") && (await col("Paid")).cards.includes("Grace Kim"));
     await page.click('#catChips .chip:has-text("Open")');
     await page.click('#catList .cv-card:has-text("Omar Reyes")');
     await page.waitForFunction(() => document.getElementById("catModal").style.display === "flex");
