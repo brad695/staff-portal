@@ -1133,11 +1133,13 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     /* ROW SWAP (2026-11-22, Maverick: "switch the button designs, give bottom row the big prominent colored buttons,
        move top row to bottom and give them checkmarks inside the button"). This replaces the KIND BUTTONS look of
        earlier the same day (kinds were the big colored buttons, stages the small pills).
-       STAGE row (#catChips) is on top: big buttons, each in its stage's color — the same colors as the stage chips in
-       the table — tinted when idle, solid when picked. Open and All are not stages: Open is navy, All is outlined.
-       TYPE row (#catKinds) sits under it: small pills with a checkbox inside. Tick one or more kinds to narrow the
-       list (CAT_KSEL); All inquiries clears the ticks. The checkbox carries the kind's color. */
-    #panel-catering .cat-stages{ gap:6px; padding:0; margin:16px 0 0; }
+       TYPE row (#catKinds) is on top: small pills with a checkbox inside. Tick one or more kinds to narrow the list
+       (CAT_KSEL); All inquiries clears the ticks. The checkbox carries the kind's color.
+       STAGE row (#catChips) sits under it, right above the list: big buttons, each in its stage's color — the same
+       colors as the stage chips in the table — tinted when idle, solid when picked. Open and All are not stages:
+       Open is navy, All is outlined.
+       (First pushed with the stage row on top; he then said "swap positions though, colored on bottom".) */
+    #panel-catering .cat-stages{ gap:6px; padding:0 0 14px; margin:10px 0 0; }
     #panel-catering .cat-stages .chip{ display:inline-flex; align-items:center; gap:8px; margin:0; padding:8px 9px 8px 12px; border:1px solid color-mix(in srgb, var(--t,#3d4654) 26%, #fff); border-radius:10px;
       background:var(--b,#eceef1); color:var(--t,#3d4654); font-size:.84rem; font-weight:700; line-height:1.3; }
     #panel-catering .cat-stages .chip.st-open{ --b:#dde7ee; --t:#06273a; }
@@ -1147,7 +1149,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     #panel-catering .cat-stages .chip:focus-visible, #panel-catering .cat-kinds .ctab:focus-visible{ outline:2px solid #3a8bb3; outline-offset:2px; }
     #panel-catering .cat-stages .chip b{ margin:0; opacity:1; min-width:24px; padding:1px 7px; border-radius:999px; background:#fff; color:var(--t,#3d4654); font-size:.68rem; font-weight:800; line-height:1.5; text-align:center; }
     #panel-catering .cat-stages .chip.on b{ background:rgba(255,255,255,.24); color:#fff; }
-    #panel-catering .cat-kinds{ gap:6px; flex-wrap:wrap; align-items:center; overflow:visible; border-bottom:0; margin:0; padding:12px 0 14px; }
+    #panel-catering .cat-kinds{ gap:6px; flex-wrap:wrap; align-items:center; overflow:visible; border-bottom:0; margin:14px 0 0; padding:0; }
     #panel-catering .cat-kinds .lbl{ font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--sub); margin-right:4px; }
     #panel-catering .cat-kinds .ctab{ --kc:#3d4654; margin:0; padding:5px 11px 5px 6px; gap:7px; border:1px solid var(--line); border-radius:999px; background:#fff; color:var(--sub); font-size:.76rem; font-weight:700; line-height:1.3; }
     #panel-catering .cat-kinds .ctab:hover{ background:#fff; border-color:color-mix(in srgb, var(--kc) 45%, #fff); color:var(--ink); }
@@ -1181,7 +1183,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       .cv-calsum{ margin-left:0; }
       .cv-undated .cv-item{ flex:1 1 100%; font-size:.88rem; padding:7px 10px 8px; }
       .cv-seg button{ padding:6px 9px 6px 7px; }
-      #panel-catering .cat-stages{ flex-wrap:nowrap; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; }
+      #panel-catering .cat-stages{ flex-wrap:nowrap; overflow-x:auto; padding-bottom:12px; scrollbar-width:none; }
       #panel-catering .cat-stages::-webkit-scrollbar{ display:none; }
       #panel-catering .cat-stages .chip{ flex:none; padding:8px 9px 8px 12px; font-size:.82rem; }
       #panel-catering .cat-kinds .ctab{ padding:6px 11px 6px 7px; font-size:.78rem; }
@@ -1211,8 +1213,8 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
         <div class="cv-bar"><div class="cv-left" id="catViewBar"></div><div class="cat-tools" id="catTools"></div></div>
         <div class="cat-howbox" id="catHow" hidden><strong>Every inquiry lands here</strong> — catering, private events and experiences from the inquiry form, plus any you add by hand. Memphis and Nashville tables booked on the form go straight into Reservations. Experiences open their own conversation with the held time and booking link; catering and private events get the proposal and invoice. Reply here and it's emailed from info@greyscheese.com; their replies come back in automatically (Gmail sync). Build the <strong>Proposal</strong>, send it, and the customer signs online — that <strong>creates a Square invoice</strong> (deposit now, balance before the event) with the signed agreement attached. No proposal needed? <strong>🧾 Save &amp; send invoice</strong> skips the signature and emails the Square invoice right away. Payment status refreshes from Square every 15 minutes.</div>
       </div>
-      <div class="cat-stages" id="catChips"></div>
       <div class="cat-kinds" id="catKinds"></div>
+      <div class="cat-stages" id="catChips"></div>
       <div class="rec-list" id="catList"><div class="rec-empty">Loading…</div></div>
     </div>
   </div>
