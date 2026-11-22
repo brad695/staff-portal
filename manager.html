@@ -1173,6 +1173,19 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     .cv-tbl.cv-dragging td.c-moving{ background:#f1f6f9; }
     #cvDrop{ position:fixed; z-index:990; width:3px; margin-left:-2px; border-radius:2px; background:#06273a; pointer-events:none; }
     #cvGhost{ position:fixed; z-index:991; pointer-events:none; padding:5px 10px; border-radius:8px; background:#06273a; color:#fff; font-size:.78rem; font-weight:600; line-height:1.3; white-space:nowrap; box-shadow:0 6px 16px rgba(18,26,38,.28); transform:translate(12px, 14px); }
+    #catWho{ display:inline-flex; }
+    .cv-who{ display:inline-flex; align-items:center; gap:7px; height:34px; padding:0 4px 0 10px; border:1px solid var(--line); border-radius:9px; background:#fff; font-size:.82rem; color:#3f4854; white-space:nowrap; }
+    .cv-who b{ font-weight:700; color:var(--ink); }
+    .cv-who button{ appearance:none; border:0; background:none; font:inherit; font-size:.78rem; font-weight:600; color:var(--cv-sub); padding:5px 8px; border-radius:6px; cursor:pointer; }
+    .cv-who button:hover{ background:var(--cv-soft); color:var(--ink); }
+    .cv-who-b{ cursor:pointer; padding:0 12px 0 10px; font:inherit; font-size:.82rem; font-weight:600; }
+    .cv-who-b:hover{ border-color:#c5ccd6; color:var(--ink); }
+    .cv-who-f input{ width:130px; border:0; outline:0; font:inherit; font-size:.84rem; background:none; color:var(--ink); }
+    .cv-who-f button[type=submit]{ background:#06273a; color:#fff; }
+    .cv-who-f button[type=submit]:hover{ background:#0b3a55; color:#fff; }
+    .cv-who-f:focus-within{ border-color:#3a8bb3; box-shadow:0 0 0 3px rgba(58,139,179,.15); }
+    .cv-who .msg{ font-size:.76rem; color:#b45309; padding-right:6px; }
+    .cv-who .msg:empty{ display:none; }
     .cv-reset{ appearance:none; border:0; background:none; padding:6px 4px; font:inherit; font-size:.8rem; font-weight:600; color:var(--cv-sub); cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
     .cv-reset:hover{ color:var(--cv-navy); }
     .cv-reset[hidden]{ display:none; }
@@ -2621,7 +2634,7 @@ function catAll(){
 }
 // CAT-VIEWS (2026-11-22): the list draws as a table or a board — see <style id="cat-views">.
 const CV_VIEWS = ['table', 'board', 'calendar'];
-let CAT_VIEW = (function(){ try{ const v = localStorage.getItem('cat_view'); return CV_VIEWS.indexOf(v) >= 0 ? v : 'table'; }catch(_){ return 'table'; } })();
+let CAT_VIEW = (function(){ try{ const v = localStorage.getItem('cat_view'); return CV_VIEWS.indexOf(v) >= 0 ? v : 'board'; }catch(_){ return 'board'; } })();   // Board is the default (2026-11-22)
 let CAT_MONTH = '';
 if(CAT_VIEW === 'calendar') CAT_FILTER = 'all';   // calendar opens on All (2026-11-22, "make calendar default to the all view")
 // STAGE TICKS (2026-11-22, "checkmarks on bottom row as well"): CAT_FILTER is 'all', 'open', or a list of ticked stages.
@@ -2785,9 +2798,10 @@ function catSorted(recs){
   return recs.slice().sort((a,b)=>{ const x = val(a), y = val(b); if(none(x) || none(y)) return none(x) - none(y); return (x < y ? -1 : x > y ? 1 : 0) * d; });   // blanks always last
 }
 function catSortBy(k){ CAT_SORT = CAT_SORT.k === k ? { k, d:-CAT_SORT.d } : { k, d: /^(last|value|paid|guests)$/.test(k) ? -1 : 1 }; catRender(); }
-function catSetView(v){ CAT_VIEW = CV_VIEWS.indexOf(v) >= 0 ? v : 'table'; if(CAT_VIEW === 'calendar') CAT_FILTER = 'all'; try{ localStorage.setItem('cat_view', CAT_VIEW); }catch(_){} catRender(); }
+function catSetView(v){ CAT_VIEW = CV_VIEWS.indexOf(v) >= 0 ? v : 'board'; if(CAT_VIEW === 'calendar') CAT_FILTER = 'all'; try{ localStorage.setItem('cat_view', CAT_VIEW); }catch(_){} catRender(); }
 function catViewBar(){
   const bar = document.getElementById('catViewBar'); if(!bar) return;
+  catWhoKick();
   if(!bar.firstChild) bar.innerHTML = '<div class="cv-seg" role="group" aria-label="View">'
     + '<button type="button" data-v="table" onclick="catSetView(\'table\')">'+cvIc('table')+'Table</button>'
     + '<button type="button" data-v="board" onclick="catSetView(\'board\')">'+cvIc('board')+'Board</button>'
@@ -2795,6 +2809,9 @@ function catViewBar(){
     + '<label class="cv-find">'+cvIc('search')+'<input type="search" id="catFind" placeholder="Search leads" aria-label="Search leads" autocomplete="off" oninput="CAT_FIND=this.value;catRender()"></label>'
     + '<button type="button" class="cv-reset" id="catColsReset" onclick="catColsReset()" title="Put the columns back in their original order" hidden>Reset columns</button>';
   const rs = document.getElementById('catColsReset'); if(rs) rs.hidden = !(CAT_VIEW === 'table' && cvColsCustom());
+  let who = document.getElementById('catWho');
+  if(!who){ who = document.createElement('span'); who.id = 'catWho'; bar.appendChild(who); }
+  const wh = catWhoHtml(); if(who.__h !== wh){ const keep = CAT_WHO_EDIT && who.__h && who.__h.indexOf('catWhoId') >= 0 && document.activeElement && document.activeElement.id === 'catWhoId'; /* don't wipe the ID box while someone is typing in it */ if(!keep){ who.innerHTML = wh; who.__h = wh; } }
   cvDragInit(document.getElementById('catList'));
   bar.querySelectorAll('.cv-seg button').forEach(b=>{ const on = b.dataset.v === CAT_VIEW; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
 }
@@ -2852,6 +2869,78 @@ function catBoardHtml(recs){
       + (total ? '<span class="cv-total">'+catMoney(total)+'</span>' : '') + '</div>' + list.map(a=>card(a, l)).join('') + '</section>';
   }).join('') + '</div>';
 }
+// ---- YOUR SETTINGS (2026-11-22, "keep all settings per user" → "tie it into the login for scheduling, the four digit number") ----
+// The console signs in on one shared manager account, so a person says who they are with the employee ID they use on
+// the schedule page (portal_employees.login_id; same localStorage key greys_emp_id as schedule.html, so a device that
+// already signed in there is known here). Their view, column order, sort, stage ticks and type ticks are saved in
+// portal_user_prefs (login_id lowercased, key 'catering_leads') and follow them to any computer or phone.
+// Before anyone has entered an ID the settings stay on this device (localStorage) as before.
+let CAT_ME = null, CAT_PREFS_READY = false, CAT_PREFS_LAST = '', CAT_PREFS_T = 0, CAT_WHO_EDIT = false;
+const CAT_PREFS_KEY = 'catering_leads';
+const cvIdPat = v => String(v).replace(/([\\%_])/g, '\\$1');   // literal match for ilike
+function catPrefsNow(){ return { view:CAT_VIEW, cols:CAT_COLS, sort:CAT_SORT, filter:CAT_FILTER, kinds:CAT_KSEL }; }
+function catPrefsApply(v){
+  v = v || {};
+  CAT_VIEW = CV_VIEWS.indexOf(v.view) >= 0 ? v.view : 'board';
+  const cols = (Array.isArray(v.cols) ? v.cols : []).filter((k,i,a)=>CV_DEFAULT.indexOf(k) >= 0 && a.indexOf(k) === i);
+  CAT_COLS = cols.concat(CV_DEFAULT.filter(k=>cols.indexOf(k) < 0));
+  CAT_SORT = v.sort && CV_COLS.some(c=>c.k === v.sort.k) && (v.sort.d === 1 || v.sort.d === -1) ? { k:v.sort.k, d:v.sort.d } : { k:'last', d:-1 };
+  CAT_FILTER = v.filter === 'all' || v.filter === 'open' ? v.filter
+    : Array.isArray(v.filter) && v.filter.filter(k=>CAT_STAGES[k]).length ? v.filter.filter(k=>CAT_STAGES[k]) : (CAT_VIEW === 'calendar' ? 'all' : 'open');
+  CAT_KSEL = (Array.isArray(v.kinds) ? v.kinds : []).filter(k=>CAT_KINDS[k]);
+}
+// called at the end of every catRender: saves (after a short pause) only when something actually changed
+function catPrefsSave(){
+  if(!CAT_ME || !CAT_PREFS_READY) return;
+  const val = catPrefsNow(), j = JSON.stringify(val);
+  if(j === CAT_PREFS_LAST) return;
+  clearTimeout(CAT_PREFS_T);
+  CAT_PREFS_T = setTimeout(async ()=>{
+    const { error } = await sb.from('portal_user_prefs').upsert({ login_id:CAT_ME.login_id, key:CAT_PREFS_KEY, value:val, updated_at:new Date().toISOString() });
+    if(!error) CAT_PREFS_LAST = j;
+  }, 700);
+}
+async function catWhoLoad(id){
+  id = String(id || '').trim();
+  if(!id) return false;
+  const { data, error } = await sb.from('portal_employees').select('name,login_id').ilike('login_id', cvIdPat(id)).eq('active', true);
+  if(error || !data || !data.length) return false;
+  CAT_ME = { login_id:id.toLowerCase(), name:data[0].name || id };
+  CAT_PREFS_READY = false;
+  const r = await sb.from('portal_user_prefs').select('value').eq('login_id', CAT_ME.login_id).eq('key', CAT_PREFS_KEY).maybeSingle();
+  if(!r || r.error) return true;   // couldn't read them: keep what's on screen and don't save over what's stored
+  catPrefsApply(r.data ? r.data.value : null);   // nobody saved yet = the defaults (Board, Open, newest first)
+  CAT_PREFS_LAST = JSON.stringify(catPrefsNow());   // nothing to save until something changes
+  CAT_PREFS_READY = true;
+  return true;
+}
+async function catWhoSubmit(ev){
+  if(ev) ev.preventDefault();
+  const inp = document.getElementById('catWhoId'), msg = document.getElementById('catWhoMsg'), v = inp ? inp.value.trim() : '';
+  if(!v){ if(msg) msg.textContent = 'Enter your employee ID'; return false; }
+  if(msg) msg.textContent = 'Checking…';
+  if(await catWhoLoad(v)){ try{ localStorage.setItem('greys_emp_id', v); }catch(_){} CAT_WHO_EDIT = false; catRender(); }
+  else if(msg) msg.textContent = 'No employee with that ID';
+  return false;
+}
+function catWhoEdit(on){ CAT_WHO_EDIT = !!on; catRender(); if(on){ const i = document.getElementById('catWhoId'); if(i) i.focus(); } }
+function catWhoOut(){ CAT_ME = null; CAT_PREFS_READY = false; CAT_WHO_EDIT = false; try{ localStorage.removeItem('greys_emp_id'); }catch(_){} catRender(); }
+function catWhoHtml(){
+  if(CAT_WHO_EDIT) return '<form class="cv-who cv-who-f" onsubmit="return catWhoSubmit(event)">'+cvIc('user')
+    + '<input id="catWhoId" inputmode="numeric" autocomplete="off" placeholder="Your employee ID" aria-label="Your employee ID">'
+    + '<button type="submit">Save</button><button type="button" class="x" onclick="catWhoEdit(false)" aria-label="Cancel">✕</button><span id="catWhoMsg" class="msg" aria-live="polite"></span></form>';
+  if(CAT_ME) return '<span class="cv-who">'+cvIc('user')+'<b>'+esc(CAT_ME.name)+'</b><button type="button" onclick="catWhoOut()" title="Not you? Your settings stay saved.">Not you?</button></span>';
+  return '<button type="button" class="cv-who cv-who-b" onclick="catWhoEdit(true)" title="Enter the employee ID you use on the schedule so your settings follow you">'+cvIc('user')+'Use my settings</button>';
+}
+// on page load: a device that already signed in (here or on the schedule page) gets that person's settings —
+// read once the console is signed in (the settings table is managers-only), from the first catRender after that.
+let CAT_WHO_PENDING = (function(){ try{ return localStorage.getItem('greys_emp_id') || ''; }catch(_){ return ''; } })();
+function catWhoKick(){
+  if(!CAT_WHO_PENDING || typeof SESSION === 'undefined' || !SESSION) return;
+  const id = CAT_WHO_PENDING; CAT_WHO_PENDING = '';
+  catWhoLoad(id).then(ok=>{ if(ok) catRender(); });
+}
+
 // ---- Calendar view: the month by event date ----
 function cvMonth(){ return /^\d{4}-\d{2}$/.test(CAT_MONTH) ? CAT_MONTH : new Date().toLocaleDateString('en-CA').slice(0,7); }
 // n = -1 / +1 a month back / on, 0 = back to this month, 'YYYY-MM' = straight to that month
@@ -2944,6 +3033,7 @@ function catRender(){
   const keep = el.querySelector('.cv-scroll, .cv-cols'), sx = keep ? keep.scrollLeft : 0, sy = keep ? keep.scrollTop : 0;   // a re-draw (sort, refresh) keeps your place
   el.innerHTML = board ? catBoardHtml(recs) : CAT_VIEW === 'calendar' ? catCalendarHtml(recs) : catTableHtml(recs);
   const now = el.querySelector('.cv-scroll, .cv-cols'); if(now && keep){ now.scrollLeft = sx; now.scrollTop = sy; }
+  catPrefsSave();
 }
 // 📦 Archive / ↩ Unarchive one lead (catering_leads.archived / inquiries.archived)
 async function leadArchive(kind){
