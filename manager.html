@@ -1046,15 +1046,15 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     .cv-dot{ position:absolute; top:-4px; right:-4px; width:10px; height:10px; border-radius:50%; background:#d97706; border:2px solid #fff; }
     .cv-chip{ display:inline-flex; align-items:center; gap:6px; max-width:100%; padding:2px 8px 2px 7px; border-radius:6px; font-size:.76rem; font-weight:600; line-height:1.5; white-space:nowrap; background:var(--b,#eceef1); color:var(--t,#4b5563); }
     .cv-chip i{ flex:none; width:6px; height:6px; border-radius:50%; background:var(--d,#9aa3af); }
-    .cv-chip.st-new, .cv-sd.st-new{ --b:#fdf0d2; --t:#7a4a00; --d:#d98a00; }
-    .cv-chip.st-replied, .cv-sd.st-replied{ --b:#e1edfb; --t:#1b4a86; --d:#3b82c4; }
-    .cv-chip.st-quoted, .cv-sd.st-quoted{ --b:#ebe6fb; --t:#4a3596; --d:#7c5cd6; }
-    .cv-chip.st-contract_sent, .cv-sd.st-contract_sent{ --b:#fbe6f1; --t:#8a2560; --d:#cf4f95; }
-    .cv-chip.st-signed, .cv-sd.st-signed{ --b:#dcf3f0; --t:#0f5c56; --d:#1a9e93; }
-    .cv-chip.st-invoiced, .cv-sd.st-invoiced{ --b:#fde9dd; --t:#8a3a12; --d:#e0703a; }
-    .cv-chip.st-deposit_paid, .cv-sd.st-deposit_paid{ --b:#e8f5d6; --t:#3f6212; --d:#7cb518; }
-    .cv-chip.st-paid, .cv-sd.st-paid{ --b:#d5f2e0; --t:#0b5d33; --d:#1f9d57; }
-    .cv-chip.st-lost, .cv-sd.st-lost{ --b:#eceef1; --t:#4b5563; --d:#9aa3af; }
+    .cv-chip.st-new, .cv-sd.st-new, .cv-stg.st-new{ --b:#fdf0d2; --t:#7a4a00; --d:#d98a00; }
+    .cv-chip.st-replied, .cv-sd.st-replied, .cv-stg.st-replied{ --b:#e1edfb; --t:#1b4a86; --d:#3b82c4; }
+    .cv-chip.st-quoted, .cv-sd.st-quoted, .cv-stg.st-quoted{ --b:#ebe6fb; --t:#4a3596; --d:#7c5cd6; }
+    .cv-chip.st-contract_sent, .cv-sd.st-contract_sent, .cv-stg.st-contract_sent{ --b:#fbe6f1; --t:#8a2560; --d:#cf4f95; }
+    .cv-chip.st-signed, .cv-sd.st-signed, .cv-stg.st-signed{ --b:#dcf3f0; --t:#0f5c56; --d:#1a9e93; }
+    .cv-chip.st-invoiced, .cv-sd.st-invoiced, .cv-stg.st-invoiced{ --b:#fde9dd; --t:#8a3a12; --d:#e0703a; }
+    .cv-chip.st-deposit_paid, .cv-sd.st-deposit_paid, .cv-stg.st-deposit_paid{ --b:#e8f5d6; --t:#3f6212; --d:#7cb518; }
+    .cv-chip.st-paid, .cv-sd.st-paid, .cv-stg.st-paid{ --b:#d5f2e0; --t:#0b5d33; --d:#1f9d57; }
+    .cv-chip.st-lost, .cv-sd.st-lost, .cv-stg.st-lost{ --b:#eceef1; --t:#4b5563; --d:#9aa3af; }
     .cv-kind{ display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis; vertical-align:middle; padding:2px 8px; border-radius:6px; font-size:.76rem; font-weight:600; line-height:1.5; white-space:nowrap; background:color-mix(in srgb, var(--kc,#06273a) 9%, #fff); color:var(--kc,#06273a); }
     .cv-nil{ color:#b3bac3; }
     .cv-rel{ margin-left:8px; font-size:.74rem; color:var(--cv-sub); }
@@ -1130,17 +1130,34 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     .cv-agitems{ display:flex; flex-direction:column; gap:6px; min-width:0; }
     .cv-agempty{ padding:22px 8px; text-align:center; color:var(--cv-sub); font-size:.86rem; }
 
-    /* KIND BUTTONS (2026-11-22, Maverick: "change the look of the tabs, color code them, the whole thing like a button"):
-       each kind tab is a button in its own color (CAT_KINDS, the same color as its avatar and Type chip) — tinted when
-       idle, solid when picked. "All inquiries" has no kind, so it is the neutral one. */
-    #panel-catering .cat-kinds{ gap:8px; flex-wrap:wrap; overflow:visible; border-bottom:0; margin:16px 0 0; }
-    #panel-catering .cat-kinds .ctab{ --kc:#3d4654; margin:0; padding:8px 10px 8px 14px; gap:9px; border:1px solid color-mix(in srgb, var(--kc) 30%, #fff); border-radius:10px;
-      background:color-mix(in srgb, var(--kc) 13%, #fff); color:var(--kc); font-size:.84rem; font-weight:700; line-height:1.3; }
-    #panel-catering .cat-kinds .ctab:hover{ background:color-mix(in srgb, var(--kc) 21%, #fff); border-color:color-mix(in srgb, var(--kc) 48%, #fff); color:var(--kc); }
-    #panel-catering .cat-kinds .ctab.on{ background:var(--kc); border-color:var(--kc); color:#fff; box-shadow:0 1px 2px rgba(18,26,38,.2); }
-    #panel-catering .cat-kinds .ctab:focus-visible{ outline:2px solid #3a8bb3; outline-offset:2px; }
-    #panel-catering .cat-kinds .ctab .cnt{ background:#fff; color:var(--kc); min-width:24px; padding:1px 7px; }
-    #panel-catering .cat-kinds .ctab.on .cnt{ background:rgba(255,255,255,.24); color:#fff; }
+    /* ROW SWAP (2026-11-22, Maverick: "switch the button designs, give bottom row the big prominent colored buttons,
+       move top row to bottom and give them checkmarks inside the button"). This replaces the KIND BUTTONS look of
+       earlier the same day (kinds were the big colored buttons, stages the small pills).
+       STAGE row (#catChips) is on top: big buttons, each in its stage's color — the same colors as the stage chips in
+       the table — tinted when idle, solid when picked. Open and All are not stages: Open is navy, All is outlined.
+       TYPE row (#catKinds) sits under it: small pills with a checkbox inside. Tick one or more kinds to narrow the
+       list (CAT_KSEL); All inquiries clears the ticks. The checkbox carries the kind's color. */
+    #panel-catering .cat-stages{ gap:6px; padding:0; margin:16px 0 0; }
+    #panel-catering .cat-stages .chip{ display:inline-flex; align-items:center; gap:8px; margin:0; padding:8px 9px 8px 12px; border:1px solid color-mix(in srgb, var(--t,#3d4654) 26%, #fff); border-radius:10px;
+      background:var(--b,#eceef1); color:var(--t,#3d4654); font-size:.84rem; font-weight:700; line-height:1.3; }
+    #panel-catering .cat-stages .chip.st-open{ --b:#dde7ee; --t:#06273a; }
+    #panel-catering .cat-stages .chip.st-all{ --b:#fff; --t:#3d4654; }   /* next to Lost (gray), so All is the outlined one */
+    #panel-catering .cat-stages .chip:hover{ border-color:color-mix(in srgb, var(--t,#3d4654) 60%, #fff); background:color-mix(in srgb, var(--t,#3d4654) 9%, var(--b,#eceef1)); }
+    #panel-catering .cat-stages .chip.on{ background:var(--t,#3d4654); border-color:var(--t,#3d4654); color:#fff; box-shadow:0 1px 2px rgba(18,26,38,.2); }
+    #panel-catering .cat-stages .chip:focus-visible, #panel-catering .cat-kinds .ctab:focus-visible{ outline:2px solid #3a8bb3; outline-offset:2px; }
+    #panel-catering .cat-stages .chip b{ margin:0; opacity:1; min-width:24px; padding:1px 7px; border-radius:999px; background:#fff; color:var(--t,#3d4654); font-size:.68rem; font-weight:800; line-height:1.5; text-align:center; }
+    #panel-catering .cat-stages .chip.on b{ background:rgba(255,255,255,.24); color:#fff; }
+    #panel-catering .cat-kinds{ gap:6px; flex-wrap:wrap; align-items:center; overflow:visible; border-bottom:0; margin:0; padding:12px 0 14px; }
+    #panel-catering .cat-kinds .lbl{ font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--sub); margin-right:4px; }
+    #panel-catering .cat-kinds .ctab{ --kc:#3d4654; margin:0; padding:5px 11px 5px 6px; gap:7px; border:1px solid var(--line); border-radius:999px; background:#fff; color:var(--sub); font-size:.76rem; font-weight:700; line-height:1.3; }
+    #panel-catering .cat-kinds .ctab:hover{ background:#fff; border-color:color-mix(in srgb, var(--kc) 45%, #fff); color:var(--ink); }
+    #panel-catering .cat-kinds .ctab.on{ background:color-mix(in srgb, var(--kc) 8%, #fff); border-color:color-mix(in srgb, var(--kc) 55%, #fff); color:var(--ink); }
+    #panel-catering .cat-kinds .ctab .cv-ck{ flex:none; width:17px; height:17px; display:grid; place-items:center; border:1.5px solid color-mix(in srgb, var(--kc) 55%, #fff); border-radius:5px; background:#fff; }
+    #panel-catering .cat-kinds .ctab .cv-ck .cv-ic{ width:11px; height:11px; stroke:#fff; stroke-width:2.4; opacity:0; }
+    #panel-catering .cat-kinds .ctab.on .cv-ck{ background:var(--kc); border-color:var(--kc); }
+    #panel-catering .cat-kinds .ctab.on .cv-ck .cv-ic{ opacity:1; }
+    #panel-catering .cat-kinds .ctab .cnt{ min-width:0; padding:0; background:none; color:inherit; opacity:.6; font-size:.76rem; font-weight:800; line-height:1.3; }
+    #panel-catering .cat-kinds .ctab.on .cnt{ background:none; color:inherit; opacity:.75; }
 
     /* MOVE COLUMNS: drag a column heading sideways to move it (Lead stays first). .cv-moving = the one being dragged,
        #cvDrop = the line where it will land, #cvGhost = the label that follows the pointer. */
@@ -1164,8 +1181,10 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       .cv-calsum{ margin-left:0; }
       .cv-undated .cv-item{ flex:1 1 100%; font-size:.88rem; padding:7px 10px 8px; }
       .cv-seg button{ padding:6px 9px 6px 7px; }
-      #panel-catering .cat-kinds{ flex-wrap:nowrap; overflow-x:auto; padding-bottom:2px; }
-      #panel-catering .cat-kinds .ctab{ padding:8px 9px 8px 12px; font-size:.82rem; }
+      #panel-catering .cat-stages{ flex-wrap:nowrap; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; }
+      #panel-catering .cat-stages::-webkit-scrollbar{ display:none; }
+      #panel-catering .cat-stages .chip{ flex:none; padding:8px 9px 8px 12px; font-size:.82rem; }
+      #panel-catering .cat-kinds .ctab{ padding:6px 11px 6px 7px; font-size:.78rem; }
       .cv-reset{ display:none; }
       #panel-catering .cv-bar .cat-tools{ margin-left:0; }
       .cv-find{ flex:1 1 150px; }
@@ -1192,8 +1211,8 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
         <div class="cv-bar"><div class="cv-left" id="catViewBar"></div><div class="cat-tools" id="catTools"></div></div>
         <div class="cat-howbox" id="catHow" hidden><strong>Every inquiry lands here</strong> — catering, private events and experiences from the inquiry form, plus any you add by hand. Memphis and Nashville tables booked on the form go straight into Reservations. Experiences open their own conversation with the held time and booking link; catering and private events get the proposal and invoice. Reply here and it's emailed from info@greyscheese.com; their replies come back in automatically (Gmail sync). Build the <strong>Proposal</strong>, send it, and the customer signs online — that <strong>creates a Square invoice</strong> (deposit now, balance before the event) with the signed agreement attached. No proposal needed? <strong>🧾 Save &amp; send invoice</strong> skips the signature and emails the Square invoice right away. Payment status refreshes from Square every 15 minutes.</div>
       </div>
-      <div class="cat-kinds" id="catKinds"></div>
       <div class="cat-stages" id="catChips"></div>
+      <div class="cat-kinds" id="catKinds"></div>
       <div class="rec-list" id="catList"><div class="rec-empty">Loading…</div></div>
     </div>
   </div>
@@ -2540,7 +2559,13 @@ const CAT_QSTAT = { draft:'Draft', sent:'Sent — waiting for signature', signed
 const catQStat = q => q.invoice_only && q.status==='signed' ? 'Invoice pending'
   : q.status==='invoiced' && !(q.deposit_pct>0 && q.deposit_pct<100) ? 'Invoiced — payment due' : (CAT_QSTAT[q.status]||q.status);
 const CAT_FUL = { pickup:'Pick-up', delivery:'Delivery', onsite:'On-site service' };
-let CAT_KIND = 'all'; // all | catering | event | experience | table | donation | question
+let CAT_KSEL = [];   // the kinds ticked in the Type row (catering | event | experience | table | donation | question); none ticked = every kind
+// tick / untick a kind; 'all' (All inquiries) clears the ticks. Ticking every kind is the same as none, so it resets.
+function catKindToggle(k){
+  if(k === 'all' || !CAT_KINDS[k]) CAT_KSEL = [];
+  else { const i = CAT_KSEL.indexOf(k); if(i >= 0) CAT_KSEL.splice(i, 1); else CAT_KSEL.push(k); if(CAT_KSEL.length >= Object.keys(CAT_KINDS).length) CAT_KSEL = []; }
+  catRender();
+}
 let CAT_ROWS = [], CAT_FILTER = 'open', CAT_CUR = null, CAT_Q = null, CAT_QUOTES = [], CAT_ITEMS = [], CAT_MENU = null, CAT_TEMPLATE = '';
 const CAT_QUICK = [
   ['Thanks — on it', "Thanks so much for thinking of us! I'm pulling some ideas together and will send a proposal shortly."],
@@ -2610,6 +2635,7 @@ const CV_ICONS = {
   mail:'<rect x="2" y="3.5" width="12" height="9" rx="1.5"/><path d="M2.5 4.5L8 8.8l5.5-4.3"/>',
   phone:'<path d="M5.2 2.5H3.8a1.3 1.3 0 0 0-1.3 1.4c.4 4.8 4.2 8.6 9 9a1.3 1.3 0 0 0 1.4-1.3v-1.4L10.3 9l-1.4 1.4a6 6 0 0 1-3.3-3.3L7 5.7z"/>',
   sort:'<path d="M4 6.5l4 4 4-4"/>',
+  tick:'<path d="M3.4 8.5l3 3 6.2-6.8"/>',
   left:'<path d="M10 3.5L5.5 8l4.5 4.5"/>',
   right:'<path d="M6 3.5L10.5 8 6 12.5"/>'
 };
@@ -2881,19 +2907,20 @@ function catRender(){
   const kc = { all:0, catering:0, event:0, experience:0, table:0, donation:0, question:0 };
   all.filter(isOpen).forEach(x=>{ kc.all++; kc[x.kind]++; });
   const kd = document.getElementById('catKinds');
-  if(kd) kd.innerHTML = [['all','All inquiries'],['catering','Catering'],['event','Private events'],['experience','Experiences'],['table','Table requests'],['donation','Donations'],['question','Questions']].map(([k,l])=>
-    '<button type="button" class="ctab'+(CAT_KIND===k?' on':'')+'" aria-pressed="'+(CAT_KIND===k)+'"'+(CAT_KINDS[k]?' style="--kc:'+CAT_KINDS[k][1]+'"':'')+' onclick="CAT_KIND=\''+k+'\';catRender()">'+l+'<span class="cnt">'+kc[k]+'</span></button>').join('');
+  const kOn = k => k === 'all' ? !CAT_KSEL.length : CAT_KSEL.indexOf(k) >= 0;
+  if(kd) kd.innerHTML = '<span class="lbl">Type</span>' + [['all','All inquiries'],['catering','Catering'],['event','Private events'],['experience','Experiences'],['table','Table requests'],['donation','Donations'],['question','Questions']].map(([k,l])=>
+    '<button type="button" class="ctab'+(kOn(k)?' on':'')+'" role="checkbox" aria-checked="'+kOn(k)+'"'+(CAT_KINDS[k]?' style="--kc:'+CAT_KINDS[k][1]+'"':'')+' onclick="catKindToggle(\''+k+'\')"><span class="cv-ck">'+cvIc('tick')+'</span><span class="kl">'+l+'</span><span class="cnt">'+kc[k]+'</span></button>').join('');
   const tools = document.getElementById('catTools');
   if(tools && !tools.querySelector('button')) tools.innerHTML = '<button class="btn btn-ghost btn-sm" onclick="catLoad();inqLoad()">↻ Refresh</button><button class="btn btn-gold btn-sm" onclick="catNew()">＋ New lead</button>';
   catViewBar();
-  const mine = all.filter(x=> CAT_KIND==='all' || x.kind===CAT_KIND);
+  const mine = all.filter(x=> !CAT_KSEL.length || CAT_KSEL.indexOf(x.kind) >= 0);
   const counts = { open:0, archived:0 }; Object.keys(CAT_STAGES).forEach(k=>counts[k]=0);
   mine.forEach(x=>{ if(isArch(x)){ counts.archived++; return; } counts[x.stage]=(counts[x.stage]||0)+1; if(isOpen(x)) counts.open++; });
-  // the board already has a column per stage, so there it is just Open | Archived | All
+  // the board already has a column per stage, so there it is just Open | All (a stage picked in the table comes back when you switch back)
   const board = CAT_VIEW === 'board', filter = board && !['all','archived'].includes(CAT_FILTER) ? 'open' : CAT_FILTER;
-  const chips = board ? [['open','Open'],['archived','📦 Archived'],['all','All']] : [['open','Open'],['sep'],...Object.entries(CAT_STAGES),['sep'],['archived','📦 Archived'],['all','All']];
-  document.getElementById('catChips').innerHTML = '<span class="lbl">'+(board?'Show':'Stage')+'</span>' + chips.map(([k,l])=>
-    k==='sep' ? '<span class="sep"></span>' : '<button class="chip'+(filter===k?' on':'')+'" onclick="CAT_FILTER=\''+k+'\';catRender()">'+l+(k==='all'?'':'<b>'+(counts[k]||0)+'</b>')+'</button>').join('');
+  const chips = board ? [['open','Open'],['archived','📦 Archived'],['all','All']] : [['open','Open'],...Object.entries(CAT_STAGES),['archived','📦 Archived'],['all','All']];
+  document.getElementById('catChips').innerHTML = chips.map(([k,l])=>
+    '<button type="button" class="chip cv-stg st-'+k+(filter===k?' on':'')+'" aria-pressed="'+(filter===k)+'" onclick="CAT_FILTER=\''+k+'\';catRender()">'+l+(k==='all'?'':'<b>'+(counts[k]||0)+'</b>')+'</button>').join('');
   const rows = mine.filter(x=> filter==='archived' ? isArch(x) : isArch(x) ? false : filter==='all' ? true : filter==='open' ? isOpen(x) : x.stage===filter);
   const el = document.getElementById('catList');
   if(!rows.length){ el.className = 'rec-list'; el.innerHTML = '<div class="rec-empty">'+(find ? 'No leads match “'+esc(CAT_FIND.trim())+'”.' : 'Nothing here.')+'</div>'; return; }
@@ -14252,7 +14279,7 @@ const mbMoney=c=>'$'+(Math.round(Number(c)||0)/100).toFixed(2).replace(/\.00$/,'
 const mbDay=iso=>iso?new Date(String(iso).length>10?iso:iso+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
 const mbWhen=iso=>iso?new Date(iso).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}):'';
 const mbMonth=m=>m?new Date(String(m).slice(0,10)+'T12:00:00').toLocaleDateString('en-US',{month:'long'}):'';
-const MB_FILTERS=[['current','Current'],['monthly','Monthly'],['comp','Prepaid & comp'],['paused','Paused & skipping'],['ending','Ending & ended'],['attention','Needs attention'],['all','All']];
+const MB_FILTERS=[['current','Current'],['monthly','Monthly'],['comp','Prepaid & comp'],['paused','Paused & skipping'],['ending','Ending & ended'],['attention','Needs attention'],['archived','📦 Archived'],['all','All']];
 function mbMatch(m,f){
   if(f==='current')return m.live;
   if(f==='monthly')return m.live&&m.billing==='square';

@@ -6,6 +6,9 @@
  * button" — table columns move by dragging a heading (order remembered), and each kind tab is a button in its own color.
  * Then "also do a calendar view" — a third view: the month by event date, leads with no date in a strip underneath,
  * a list of days on a phone.
+ * Later: "switch the button designs, give bottom row the big prominent colored buttons, move top row to bottom and give
+ * them checkmarks inside the button" — the stage row is on top as big buttons in each stage's color; the type row is
+ * under it as small pills with a tick box (tick one or more kinds; All inquiries clears them).
  * The page is served under the staging host; Supabase and the CDNs are stood in — nothing goes to the network.
  * Run: NODE_PATH=$(npm root -g) node tests/test-lead-views.js     (SHOTS=dir for screenshots, PW_CHROME=path, MANAGER=file)
  */
@@ -203,21 +206,53 @@ const shown = (page, sel) => page.evaluate((s) => { const e = document.querySele
     await ctx.close();
   }
 
-  console.log("\nmanager.html · 💼 Catering Leads → kind tabs as color-coded buttons");
+  console.log("\nmanager.html · 💼 Catering Leads → stage buttons on top, type checkmarks under them");
   {
     const { ctx, page, st } = await open(browser);
-    const tabs = () => page.$$eval("#catKinds .ctab", (bs) => bs.map((b) => { const c = getComputedStyle(b); return { text: b.childNodes[0].textContent, on: b.classList.contains("on"), pressed: b.getAttribute("aria-pressed"), kc: b.style.getPropertyValue("--kc"), bg: c.backgroundColor, color: c.color, radius: parseFloat(c.borderTopLeftRadius), borderB: c.borderBottomWidth, borderT: c.borderTopWidth }; }));
     const rgb = (hex) => "rgb(" + [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(", ") + ")";
-    let tb = await tabs();
-    t("seven buttons, each carrying its kind's color", tb.length === 7 && JSON.stringify(tb.map((x) => x.kc)) === JSON.stringify(["", "#06273a", "#7c3aed", "#b45309", "#0f766e", "#be185d", "#2563eb"]), tb.map((x) => x.kc));
-    t("the picked one is filled solid with white text and says it is pressed", tb[0].on && tb[0].pressed === "true" && tb[0].color === "rgb(255, 255, 255)" && tb[0].bg === "rgb(61, 70, 84)" && tb.slice(1).every((x) => x.pressed === "false"), tb[0]);
-    t("the others are tinted in their own color with colored text", tb.slice(1).every((x) => x.color === rgb(x.kc) && x.bg !== "rgba(0, 0, 0, 0)" && x.bg !== rgb(x.kc)) && new Set(tb.map((x) => x.bg)).size === 7, tb.map((x) => x.bg));
-    t("a whole button, not an underlined tab", tb.every((x) => x.radius >= 8 && x.borderB === x.borderT) && await page.evaluate(() => getComputedStyle(document.getElementById("catKinds")).borderBottomWidth === "0px" && !document.querySelector("#catKinds .kdot")));
+    const stg = () => page.$$eval("#catChips .chip", (bs) => bs.map((b) => { const c = getComputedStyle(b); return { text: b.childNodes[0].textContent, k: (b.className.match(/st-(\w+)/) || [])[1], on: b.classList.contains("on"), pressed: b.getAttribute("aria-pressed"), bg: c.backgroundColor, color: c.color, radius: parseFloat(c.borderTopLeftRadius), fs: parseFloat(c.fontSize), padT: parseFloat(c.paddingTop), n: (b.querySelector("b") || {}).textContent }; }));
+    const typ = () => page.$$eval("#catKinds .ctab", (bs) => bs.map((b) => { const c = getComputedStyle(b), k = b.querySelector(".cv-ck"), kc = getComputedStyle(k); return { text: b.querySelector(".kl").textContent, on: b.classList.contains("on"), role: b.getAttribute("role"), checked: b.getAttribute("aria-checked"), kcVar: b.style.getPropertyValue("--kc"), radius: parseFloat(c.borderTopLeftRadius), fs: parseFloat(c.fontSize), box: kc.backgroundColor, boxW: k.getBoundingClientRect().width, tick: getComputedStyle(k.querySelector("svg")).opacity, n: b.querySelector(".cnt").textContent }; }));
+    t("the stage row is on top, the type row under it, then the list", await page.evaluate(() => { const a = document.getElementById("catChips"), b = document.getElementById("catKinds"), c = document.getElementById("catList"); return a.getBoundingClientRect().bottom <= b.getBoundingClientRect().top + 1 && b.getBoundingClientRect().bottom <= c.getBoundingClientRect().top + 1 && a.nextElementSibling === b && b.nextElementSibling === c; }));
+    let sb = await stg();
+    t("eleven stage buttons: Open, the nine stages, All", sb.map((x) => x.text).join() === "Open,New,Replied,Quoting,Proposal sent,Signed,Invoiced,Deposit paid,Paid,Lost,All" && await page.evaluate(() => !document.querySelector("#catChips .lbl, #catChips .sep")), sb.map((x) => x.text));
+    let tp = await typ();
+    t("the stage buttons are the big ones now, the type pills the small ones", sb.every((x) => x.radius === 10 && x.padT >= 8) && tp.every((x) => x.radius > 100) && sb[0].fs > tp[0].fs, [sb[0], tp[0]]);
+    t("each stage button is in its own color, the same as its chip in the table", new Set(sb.map((x) => x.bg)).size === 11 && await page.evaluate(() => ["new", "replied", "quoted", "contract_sent"].every((k) => { const chip = document.querySelector("#catList .cv-chip.st-" + k), btn = document.querySelector("#catChips .chip.st-" + k); return chip && getComputedStyle(chip).backgroundColor === getComputedStyle(btn).backgroundColor && getComputedStyle(chip).color === getComputedStyle(btn).color; })), sb.map((x) => x.bg));
+    t("the picked one (Open) is solid navy with white text and says it is pressed", sb[0].on && sb[0].pressed === "true" && sb[0].bg === rgb("#06273a") && sb[0].color === "rgb(255, 255, 255)" && sb.slice(1).every((x) => !x.on && x.pressed === "false" && x.color !== "rgb(255, 255, 255)"), sb[0]);
+    t("the count sits inside each button; All has none", sb[0].n === "10" && sb[1].n === "2" && sb[10].n === undefined, sb.map((x) => x.n));
+    await page.click('#catChips .chip:has-text("Quoting")');
+    sb = await stg();
+    t("picking Quoting fills it with the Quoting color and lets go of Open", sb[3].on && sb[3].bg === rgb("#4a3596") && sb[3].color === "rgb(255, 255, 255)" && !sb[0].on && sb[0].bg !== rgb("#06273a") && (await names(page)).length === 2, sb[3]);
+    await page.click('#catChips .chip:has-text("Open")');
+
+    console.log("\n  type row: tick boxes");
+    t("a Type label, then seven pills that are checkboxes", (await page.textContent("#catKinds .lbl")) === "Type" && tp.map((x) => x.text).join() === "All inquiries,Catering,Private events,Experiences,Table requests,Donations,Questions" && tp.every((x) => x.role === "checkbox" && x.boxW >= 15));
+    t("each box carries its kind's color", JSON.stringify(tp.map((x) => x.kcVar)) === JSON.stringify(["", "#06273a", "#7c3aed", "#b45309", "#0f766e", "#be185d", "#2563eb"]));
+    t("to begin with only All inquiries is ticked", tp[0].on && tp[0].checked === "true" && tp[0].tick === "1" && tp[0].box === "rgb(61, 70, 84)" && tp.slice(1).every((x) => !x.on && x.checked === "false" && x.tick === "0" && x.box === "rgb(255, 255, 255)"), tp.map((x) => x.checked + x.tick));
+    await page.click('#catKinds .ctab:has-text("Catering")');
+    tp = await typ();
+    t("ticking Catering shows only catering and unticks All inquiries", tp[1].on && tp[1].checked === "true" && tp[1].tick === "1" && tp[1].box === rgb("#06273a") && !tp[0].on && tp[0].tick === "0" && (await names(page)).length === 5 && (await page.$$eval("#catList tbody td.c-kind", (c) => c.every((x) => x.textContent === "Catering"))), await names(page));
     await page.click('#catKinds .ctab:has-text("Experiences")');
-    tb = await tabs();
-    t("picking Experiences fills it with the experience color", tb[3].on && tb[3].bg === rgb("#b45309") && tb[3].color === "rgb(255, 255, 255)" && !tb[0].on && (await names(page)).length === 3, tb[3]);
-    t("the count sits inside the button", (await page.textContent("#catKinds .ctab.on .cnt")) === "3");
-    await shot(page, "views-kind-buttons");
+    tp = await typ();
+    t("ticking Experiences as well shows both kinds", tp[1].on && tp[3].on && tp[3].box === rgb("#b45309") && tp.filter((x) => x.on).length === 2 && (await names(page)).length === 8 && JSON.stringify([...new Set(await page.$$eval("#catList tbody td.c-kind", (c) => c.map((x) => x.textContent)))].sort()) === JSON.stringify(["Catering", "Experience"]), await names(page));
+    t("the stage counts follow what is ticked", (await chips(page))[0] === "Open8");
+    await shot(page, "views-rows-swapped");
+    await page.click('#catKinds .ctab:has-text("Catering")');
+    t("unticking Catering leaves just the experiences", (await names(page)).length === 3 && (await typ()).filter((x) => x.on).map((x) => x.text).join() === "Experiences");
+    await page.click('#catKinds .ctab:has-text("Experiences")');
+    t("unticking the last one goes back to All inquiries", (await typ())[0].on && (await names(page)).length === 10);
+    await page.click('#catKinds .ctab:has-text("Private events")');
+    await page.click('#catKinds .ctab:has-text("All inquiries")');
+    tp = await typ();
+    t("All inquiries clears the ticks", tp[0].on && tp.filter((x) => x.on).length === 1 && (await names(page)).length === 10);
+    for (const l of ["Catering", "Private events", "Experiences", "Table requests", "Donations", "Questions"]) await page.click('#catKinds .ctab:has-text("' + l + '")');
+    tp = await typ();
+    t("ticking every kind is the same as All inquiries", tp[0].on && tp.filter((x) => x.on).length === 1 && (await names(page)).length === 10, tp.map((x) => x.on));
+    await page.focus('#catKinds .ctab:has-text("Private events")');
+    await page.keyboard.press("Space");
+    t("Space ticks a box from the keyboard", (await typ())[2].checked === "true" && JSON.stringify((await names(page)).sort()) === JSON.stringify(["Lucia Romano", "Omar Reyes"]));
+    await page.click('.cv-seg button[data-v="board"]');
+    t("on the board the big row is just Open | All and the ticks still apply", JSON.stringify(await chips(page)) === JSON.stringify(["Open2", "All"]) && (await page.$$eval("#catList .cv-card .cv-nm b", (b) => b.map((x) => x.textContent).sort())).join() === "Lucia Romano,Omar Reyes");
     t("no errors on the page", st.errors.length === 0, st.errors);
     await ctx.close();
   }
@@ -455,6 +490,7 @@ const shown = (page, sel) => page.evaluate((s) => { const e = document.querySele
     t("no column headings or totals row — each lead is two lines", !(await shown(page, "#catList thead")) && !(await shown(page, "#catList tfoot")) && (await shown(page, "#catList tbody td.c-sum")) && !(await shown(page, "#catList tbody td.c-email")));
     t("line two reads occasion, date, guests, shop, amount", (await cellOf(page, "Omar Reyes", "c-sum")).replace(/[A-Z][a-z]{2}, [A-Z][a-z]{2} \d+(, \d{4})?/, "DATE") === "Holiday party, DATE, 40 guests, Nashville, $2,480.00", await cellOf(page, "Omar Reyes", "c-sum"));
     t("nothing runs off the side of the screen", await page.evaluate(() => { const w = document.documentElement.clientWidth; return [...document.querySelectorAll("#catList tbody tr, #catList td.c-stage .cv-chip, #catViewBar, #catTools")].every((e) => { const r = e.getBoundingClientRect(); return r.width === 0 || (r.left >= 0 && r.right <= w + 1); }) && document.documentElement.scrollWidth <= w + 1; }));
+    t("the big stage buttons scroll sideways in their own row; the type pills wrap", await page.evaluate(() => { const s = document.getElementById("catChips"), k = document.getElementById("catKinds"), w = document.documentElement.clientWidth; return s.scrollWidth > s.clientWidth + 20 && getComputedStyle(s).flexWrap === "nowrap" && [...k.querySelectorAll(".ctab")].every((b) => { const r = b.getBoundingClientRect(); return r.left >= 0 && r.right <= w; }) && k.getBoundingClientRect().height > 60; }));
     await shot(page, "views-table-phone");
     await page.tap('#catList tbody tr:has-text("Omar Reyes")');
     await page.waitForFunction(() => document.getElementById("catModal").style.display === "flex");
