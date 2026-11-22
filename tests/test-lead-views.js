@@ -48,13 +48,14 @@ function fresh() {
     { id: id(), code: "E00001", name: "Sam Lee", email: "sam@example.com", phone: "6155550100", stage: "new", unread: false, experience_name: "Raclette", preferred_date: day(11), preferred_time: "18:00", party_size: 6, location: "Memphis", last_message_at: ago(20), created_at: ago(20), details: {} },
     { id: id(), code: "E00002", name: "Kelly Nguyen", email: "kelly@example.com", phone: "", stage: "link_sent", unread: false, experience_name: "Greysing Table", preferred_date: day(16), preferred_time: "19:00", party_size: 8, location: "Nashville", last_message_at: ago(44), created_at: ago(60), details: {} },
   ];
-  return { catering_leads: L, catering_messages: [], catering_quotes: quotes, inquiries: I, inquiry_messages: [], catering_templates: [], site_content: [] };
+  const E = [{ id: 1, name: "Brad", login_id: "1234", active: true, location: "memphis" }, { id: 2, name: "Alex", login_id: "5678", active: true, location: "nashville" }, { id: 3, name: "Gone", login_id: "9999", active: false, location: "memphis" }];
+  return { catering_leads: L, catering_messages: [], catering_quotes: quotes, inquiries: I, inquiry_messages: [], catering_templates: [], site_content: [], portal_employees: E, portal_user_prefs: [] };
 }
 
 // supabase-js stand-in: the tables are answered by this test (https://stub.local/db)
 const SB_STUB = `(function(){
   function ask(what, payload){ return fetch('https://stub.local/' + what, { method: 'POST', body: JSON.stringify(payload) }).then(function(r){ return r.json(); }); }
-  var REAL = { catering_leads:1, catering_messages:1, catering_quotes:1, inquiries:1, inquiry_messages:1, catering_templates:1, site_content:1 };
+  var REAL = { catering_leads:1, catering_messages:1, catering_quotes:1, inquiries:1, inquiry_messages:1, catering_templates:1, site_content:1, portal_employees:1, portal_user_prefs:1 };
   function builder(table){
     var q = { table: table, ops: [] };
     var b = new Proxy({}, { get: function(_, k){
@@ -80,7 +81,8 @@ async function open(browser, opts) {
   opts = opts || {};
   const ctx = await browser.newContext({ viewport: opts.viewport || { width: 1440, height: 900 }, hasTouch: !!opts.touch });
   const page = await ctx.newPage();
-  const st = { errors: [], updates: [], rows: fresh() };
+  const st = { errors: [], updates: [], upserts: [], rows: fresh() };
+  if (opts.prefs) st.rows.portal_user_prefs = opts.prefs;
   page.on("pageerror", (e) => st.errors.push(String(e)));
   page.on("dialog", (d) => { st.errors.push("dialog: " + d.message()); d.dismiss(); });
   await page.route("**/*", async (route) => {
@@ -91,7 +93,10 @@ async function open(browser, opts) {
     if (u.hostname === "cdn.jsdelivr.net" && /supabase-js/.test(u.pathname)) return route.fulfill({ status: 200, contentType: "application/javascript", body: SB_STUB });
     if (u.hostname === "stub.local" && u.pathname === "/db") {
       const q = JSON.parse(req.postData()), all = st.rows[q.table] || [];
-      const eqs = q.ops.filter((o) => o[0] === "eq"), hit = all.filter((r) => eqs.every((e) => r[e[1]] === e[2]));
+      const ups = q.ops.find((o) => o[0] === "upsert");
+      if (ups) { const row = ups[1]; st.upserts.push(JSON.parse(JSON.stringify(row))); const i = all.findIndex((r) => r.login_id === row.login_id && r.key === row.key); if (i >= 0) all[i] = row; else all.push(row); return json({ data: [row], error: null }); }
+      const il = q.ops.filter((o) => o[0] === "ilike");
+      const eqs = q.ops.filter((o) => o[0] === "eq"), hit = all.filter((r) => eqs.every((e) => r[e[1]] === e[2]) && il.every((e) => String(r[e[1]]).toLowerCase() === String(e[2]).replace(/\\(.)/g, "$1").toLowerCase()));
       const upd = q.ops.find((o) => o[0] === "update");
       if (upd) { st.updates.push({ table: q.table, set: upd[1], ids: hit.map((r) => r.id) }); hit.forEach((r) => Object.assign(r, upd[1])); return json({ data: hit, error: null }); }
       const rows = hit.map((r) => Object.assign({}, r));
@@ -106,7 +111,9 @@ async function open(browser, opts) {
     if (/\.(png|svg|ico|jpg|webp|woff2?)$/.test(u.pathname)) return route.fulfill({ status: 404, body: "" });
     return json({});
   });
-  if (opts.view) await page.addInitScript((v) => { try { localStorage.setItem("cat_view", v); } catch (_) {} }, opts.view);
+  const view = opts.view === undefined ? "table" : opts.view;   // most checks start on the table; null = a fresh device
+  if (view) await page.addInitScript((v) => { try { localStorage.setItem("cat_view", v); } catch (_) {} }, view);
+  if (opts.emp) await page.addInitScript((v) => { try { localStorage.setItem("greys_emp_id", v); } catch (_) {} }, opts.emp);
   if (opts.cols) await page.addInitScript((v) => { try { localStorage.setItem("cat_cols", v); } catch (_) {} }, opts.cols);
   await page.goto(HOST + "/manager.html");
   await page.waitForFunction(() => !document.getElementById("consoleView").classList.contains("hide"), null, { timeout: 15000 });
@@ -496,6 +503,58 @@ const shown = (page, sel) => page.evaluate((s) => { const e = document.querySele
     t("a tap opens the lead", (await page.textContent("#catTitle")) === "Omar Reyes — Acme Realty");
     await page.evaluate(() => { catClose(); catMonthStep(9); });
     t("an empty month reads 'Nothing this month.'", (await page.textContent("#catList .cv-agenda")) === "Nothing this month.");
+    t("no errors on the page", st.errors.length === 0, st.errors);
+    await ctx.close();
+  }
+
+  console.log("\nmanager.html · 💼 Catering Leads → Board by default, settings per person (employee ID)");
+  {
+    const { ctx, page, st } = await open(browser, { view: null });
+    t("a fresh device opens on the Board", (await page.getAttribute("#catList", "class")) === "rec-list cv-board" && (await page.getAttribute('.cv-seg button[data-v="board"]', "aria-pressed")) === "true");
+    t("before anyone says who they are, it offers 'Use my settings'", (await page.textContent("#catWho")) === "Use my settings");
+    await page.click("#catWho .cv-who-b");
+    t("it asks for the employee ID", await page.evaluate(() => document.activeElement && document.activeElement.id === "catWhoId"));
+    await page.fill("#catWhoId", "4321");
+    await page.click('#catWho button[type="submit"]');
+    await page.waitForFunction(() => /No employee/.test(document.getElementById("catWhoMsg").textContent));
+    t("an unknown ID says so", (await page.textContent("#catWhoMsg")) === "No employee with that ID");
+    await page.fill("#catWhoId", "9999");
+    await page.press("#catWhoId", "Enter");
+    await page.waitForFunction(() => /No employee/.test(document.getElementById("catWhoMsg").textContent));
+    t("an inactive employee's ID doesn't work", (await page.evaluate(() => CAT_ME)) === null);
+    await page.click('.cv-seg button[data-v="table"]');   // changed on this device before signing in
+    await page.click("#catWho button.x"); await page.click("#catWho .cv-who-b");
+    await page.fill("#catWhoId", "1234");
+    await page.press("#catWhoId", "Enter");
+    await page.waitForFunction(() => /Brad/.test(document.getElementById("catWho").textContent));
+    t("the schedule ID signs you in by name", (await page.textContent("#catWho b")) === "Brad" && (await page.evaluate(() => localStorage.getItem("greys_emp_id"))) === "1234");
+    t("first time with nothing saved: your defaults — Board, Open", (await page.getAttribute("#catList", "class")) === "rec-list cv-board" && (await page.textContent("#catChips .chip.on")) === "Open10");
+    await page.waitForTimeout(900);
+    t("just signing in saves nothing", st.upserts.length === 0, st.upserts);
+    await page.click('.cv-seg button[data-v="table"]');
+    await page.evaluate(() => catMoveCol("phone", "stage"));
+    await page.click('#catKinds .ctab:has-text("Experiences")');
+    await page.click('#catChips .chip:has-text("Proposal sent")');
+    await page.click("#catList th.c-guests .cv-th");
+    await page.waitForTimeout(1000);
+    const saved = st.upserts[st.upserts.length - 1];
+    t("your changes are saved to your ID (after a moment, not on every click)", !!saved && saved.login_id === "1234" && saved.key === "catering_leads" && st.upserts.length <= 2 && saved.value.view === "table" && saved.value.cols[0] === "phone" && JSON.stringify(saved.value.kinds) === '["experience"]' && JSON.stringify(saved.value.filter) === '["contract_sent"]' && saved.value.sort.k === "guests", st.upserts);
+    await page.click("#catWho button");
+    t("'Not you?' forgets the ID on this device", (await page.textContent("#catWho")) === "Use my settings" && (await page.evaluate(() => localStorage.getItem("greys_emp_id"))) === null);
+    const n = st.upserts.length;
+    await page.click('.cv-seg button[data-v="calendar"]'); await page.waitForTimeout(900);
+    t("after that, changes are not saved to Brad", st.upserts.length === n);
+    t("no errors on the page", st.errors.length === 0, st.errors);
+    await ctx.close();
+  }
+  {
+    const prefs = [{ login_id: "1234", key: "catering_leads", value: { view: "calendar", cols: ["shop", "bogus"], sort: { k: "value", d: -1 }, filter: "all", kinds: ["catering", "nope"] } }];
+    const { ctx, page, st } = await open(browser, { view: "board", emp: "1234", prefs });
+    await page.waitForFunction(() => /Brad/.test(document.getElementById("catWho").textContent));
+    t("on another device the same ID brings back your settings", (await page.getAttribute("#catList", "class")) === "rec-list cv-calendar" && (await page.textContent("#catChips .chip.on")) === "All" && (await page.$$eval("#catKinds .ctab.on .kl", (x) => x.map((y) => y.textContent))).join() === "Catering");
+    await page.click('.cv-seg button[data-v="table"]');
+    t("…the column order and sort too (junk in them ignored)", (await page.$$eval("#catList .cv-tbl thead th", (h) => h.map((x) => x.textContent.trim()).slice(0, 3))).join() === "Lead,Shop,Stage" && (await page.getAttribute("#catList th.c-value", "aria-sort")) === "descending");
+    t("a device signed in on the schedule page (same greys_emp_id) is already known here", (await page.textContent("#catWho b")) === "Brad");
     t("no errors on the page", st.errors.length === 0, st.errors);
     await ctx.close();
   }
