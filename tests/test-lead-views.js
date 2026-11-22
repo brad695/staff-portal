@@ -4,6 +4,8 @@
  * with a search box. Opening a lead, the kind tabs and the stage chips work as before.
  * Same day: "make the columns rearrangeable, and change the look of the tabs, color code them, the whole thing like a
  * button" — table columns move by dragging a heading (order remembered), and each kind tab is a button in its own color.
+ * Then "also do a calendar view" — a third view: the month by event date, leads with no date in a strip underneath,
+ * a list of days on a phone.
  * The page is served under the staging host; Supabase and the CDNs are stood in — nothing goes to the network.
  * Run: NODE_PATH=$(npm root -g) node tests/test-lead-views.js     (SHOTS=dir for screenshots, PW_CHROME=path, MANAGER=file)
  */
@@ -343,6 +345,107 @@ const shown = (page, sel) => page.evaluate((s) => { const e = document.querySele
   {
     const { ctx, page, st } = await open(browser, { view: "board" });
     t("the page opens on the board when that was the last view", (await page.getAttribute("#catList", "class")) === "rec-list cv-board" && (await page.getAttribute('.cv-seg button[data-v="board"]', "aria-pressed")) === "true" && st.errors.length === 0, st.errors);
+    await ctx.close();
+  }
+
+  console.log("\nmanager.html · 💼 Catering Leads → Calendar");
+  const ym = (d) => d.slice(0, 7);
+  const monthName = (m) => new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const money = (c) => "$" + (c / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // the open leads that have a date: [date, guests, proposal cents]
+  const OPEN_DATED = [[day(20), 20, 0], [day(28), 40, 248000], [day(9), 60, 131250], [day(41), 120, 685000], [day(6), 24, 410000], [day(3), 6, 42000], [day(18), 250, 1234567], [day(11), 6, 0], [day(16), 8, 0]];
+  const sumFor = (m) => { const x = OPEN_DATED.filter((r) => ym(r[0]) === m), g = x.reduce((n, r) => n + r[1], 0), v = x.reduce((n, r) => n + r[2], 0); return x.length ? x.length + (x.length === 1 ? " event" : " events") + (g ? g.toLocaleString("en-US") + " guests" : "") + (v ? money(v) : "") : null; };
+  {
+    const { ctx, page, st } = await open(browser);
+    const today = day(0);
+    const title = () => page.textContent("#catList .cv-month");
+    const show = (m) => page.evaluate((mm) => catMonthStep(mm), m);
+    const inDay = (d, box) => page.$$eval("#catList " + (box || ".cv-calgrid") + ' [data-d="' + d + '"] .cv-item .nm span', (x) => x.map((y) => y.textContent));
+    await page.click('.cv-seg button[data-v="calendar"]');
+    t("Calendar is the third view, and it is remembered", (await page.getAttribute("#catList", "class")) === "rec-list cv-calendar" && (await page.getAttribute('.cv-seg button[data-v="calendar"]', "aria-pressed")) === "true" && (await page.$$eval(".cv-seg button", (b) => b.map((x) => x.textContent).join())) === "Table,Board,Calendar" && (await page.evaluate(() => localStorage.getItem("cat_view"))) === "calendar");
+    t("it opens on this month", (await title()) === monthName(ym(today)));
+    t("whole weeks, Sunday first, with today marked", await page.evaluate((td) => { const d = [...document.querySelectorAll("#catList .cv-calgrid .cv-day")], dow = [...document.querySelectorAll("#catList .cv-dow")].map((x) => x.textContent).join(); const marked = document.querySelectorAll("#catList .cv-calgrid .cv-day.today");
+      return dow === "Sun,Mon,Tue,Wed,Thu,Fri,Sat" && d.length % 7 === 0 && d.length >= 28 && new Date(d[0].dataset.d + "T12:00:00").getDay() === 0 && marked.length === 1 && marked[0].dataset.d === td && d.every((x, i) => i === 0 || x.dataset.d > d[i - 1].dataset.d); }, today));
+    t("this month's total sits beside the month name", (await page.textContent("#catList .cv-calsum")).replace(/Go to .*/, "") === (sumFor(ym(today)) || "Nothing this month"), [await page.textContent("#catList .cv-calsum"), sumFor(ym(today))]);
+    t("the stage chips are the full set, as on the table", (await chips(page)).length === 11 && !(await shown(page, "#catColsReset")));
+    await show(ym(day(28)));
+    t("a lead sits on its event date", (await inDay(day(28))).includes("Omar Reyes") && (await title()) === monthName(ym(day(28))), await inDay(day(28)));
+    t("its tile carries the kind color, a stage dot, guests and the amount", await page.evaluate(() => { const k = [...document.querySelectorAll("#catList .cv-calgrid .cv-item")].find((x) => /Omar Reyes/.test(x.textContent)); return k.style.getPropertyValue("--kc") === "#7c3aed" && k.querySelector(".cv-sd").classList.contains("st-replied") && [...k.querySelectorAll(".meta span")].map((x) => x.textContent).join("|") === "40 guests|$2,480.00" && /Acme Realty/.test(k.title) && /Holiday party/.test(k.title); }));
+    t("the month total follows the month shown", (await page.textContent("#catList .cv-calsum")) === sumFor(ym(day(28))), [await page.textContent("#catList .cv-calsum"), sumFor(ym(day(28)))]);
+    await show(ym(day(20)));
+    t("the time shows when the lead has one", await page.evaluate(() => [...document.querySelectorAll("#catList .cv-calgrid .cv-item")].find((x) => /Jane Smith/.test(x.textContent)).querySelector(".meta span").textContent === "6 PM"));
+    await show(ym(day(16)));
+    t("experience inquiries are on it too, under their own date", (await inDay(day(16))).includes("Kelly Nguyen") && await page.evaluate(() => [...document.querySelectorAll("#catList .cv-calgrid .cv-item")].find((x) => /Kelly Nguyen/.test(x.textContent)).querySelector(".meta").textContent === "7 PM8 guests"));
+    t("a lead with no date waits in the strip underneath", (await page.textContent("#catList .cv-undated .lbl")) === "No date yet (1)" && (await page.$$eval("#catList .cv-undated .cv-item .nm span", (x) => x.map((y) => y.textContent))).join() === "Ana Flores");
+    t("names are written as text here as well", await page.evaluate(() => !window.__xss && !document.querySelector("#catList img, #catList script")));
+    await shot(page, "views-calendar");
+
+    console.log("\n  moving between months");
+    await show("");
+    await page.click('#catList .cv-navb[aria-label="Next month"]');
+    const next = (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + 1); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); })();
+    const prev = (() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); })();
+    t("› goes to next month", (await title()) === monthName(next));
+    await page.click('#catList .cv-navb[aria-label="Previous month"]');
+    await page.click('#catList .cv-navb[aria-label="Previous month"]');
+    t("‹ goes back", (await title()) === monthName(prev));
+    await page.click("#catList .cv-todayb");
+    t("Today comes back to this month", (await title()) === monthName(ym(today)) && (await page.$$("#catList .cv-day.today")).length === 1);
+    await page.evaluate(() => catMonthStep(9));
+    const lastMonth = OPEN_DATED.map((r) => ym(r[0])).sort().pop();
+    t("an empty month says so and offers the nearest month that has something", /^Nothing this month/.test(await page.textContent("#catList .cv-calsum")) && (await page.textContent("#catList .cv-jump")) === "Go to " + monthName(lastMonth) && (await page.$$("#catList .cv-calgrid .cv-item")).length === 0, await page.textContent("#catList .cv-calsum"));
+    await page.click("#catList .cv-jump");
+    t("…and goes there", (await title()) === monthName(lastMonth) && (await inDay(day(41))).includes("Marcus Lee"));
+
+    console.log("\n  filters and opening a lead");
+    await show(ym(day(-4)));
+    t("Open leaves a past, paid job off the calendar", !(await inDay(day(-4))).includes("Grace Kim"));
+    await page.click('#catChips .chip:has-text("All")');
+    t("All shows it", (await inDay(day(-4))).includes("Grace Kim"));
+    await show(ym(day(60)));
+    t("a lost lead is struck through", await page.evaluate(() => { const k = [...document.querySelectorAll("#catList .cv-calgrid .cv-item")].find((x) => /Will Turner/.test(x.textContent)); return !!k && k.classList.contains("lost") && getComputedStyle(k.querySelector(".nm span")).textDecorationLine === "line-through"; }));
+    await page.click('#catChips .chip:has-text("Open")');
+    await show(ym(day(28)));
+    await page.click('#catKinds .ctab:has-text("Private events")');
+    t("a kind button narrows the calendar", (await page.$$eval("#catList .cv-calgrid .cv-item .nm span", (x) => x.map((y) => y.textContent))).every((n) => ["Omar Reyes", "Lucia Romano"].includes(n)) && (await inDay(day(28))).join() === "Omar Reyes");
+    await page.click('#catKinds .ctab:has-text("All inquiries")');
+    await page.fill("#catFind", "omar");
+    t("so does the search box", (await page.$$eval("#catList .cv-calgrid .cv-item .nm span", (x) => x.map((y) => y.textContent))).join() === "Omar Reyes" && !(await page.$("#catList .cv-undated")));
+    await page.fill("#catFind", "");
+    await page.click('#catList .cv-calgrid .cv-item:has-text("Omar Reyes")');
+    await page.waitForFunction(() => document.getElementById("catModal").style.display === "flex");
+    t("a click on a tile opens the lead", (await page.textContent("#catTitle")) === "Omar Reyes — Acme Realty");
+    await page.evaluate(() => catClose());
+    t("the calendar stays on the month you were looking at", (await title()) === monthName(ym(day(28))));
+    await show(ym(day(11)));
+    await page.focus('#catList .cv-calgrid .cv-item:has-text("Sam Lee")');
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => document.getElementById("inqModal").style.display === "flex");
+    t("Enter on a tile opens it (an inquiry opens its own window)", /Sam Lee/.test(await page.textContent("#inqTitle")));
+    await page.evaluate(() => { document.getElementById("inqModal").style.display = "none"; });
+    t("looking at the calendar wrote nothing", st.updates.length === 0, st.updates);
+    t("no errors on the page", st.errors.length === 0, st.errors);
+    await ctx.close();
+  }
+  {
+    const { ctx, page, st } = await open(browser, { view: "calendar" });
+    t("the page opens on the calendar when that was the last view", (await page.getAttribute("#catList", "class")) === "rec-list cv-calendar" && st.errors.length === 0, st.errors);
+    await ctx.close();
+  }
+  {
+    const { ctx, page, st } = await open(browser, { viewport: { width: 390, height: 844 }, touch: true, view: "calendar" });
+    await page.evaluate((m) => catMonthStep(m), ym(day(28)));
+    t("on a phone the month is a list of days, not a grid", !(await shown(page, "#catList .cv-calgrid")) && (await shown(page, "#catList .cv-agenda")));
+    t("only days with something on them, in date order", await page.evaluate((m) => { const d = [...document.querySelectorAll("#catList .cv-agenda .cv-agday")]; return d.length > 0 && d.every((x, i) => x.dataset.d.slice(0, 7) === m && x.querySelector(".cv-item") && (i === 0 || x.dataset.d > d[i - 1].dataset.d)); }, ym(day(28))));
+    t("the lead is under its day", (await page.$$eval('#catList .cv-agenda [data-d="' + day(28) + '"] .cv-item .nm span', (x) => x.map((y) => y.textContent))).includes("Omar Reyes"));
+    t("nothing runs off the side of the screen", await page.evaluate(() => { const w = document.documentElement.clientWidth; return document.documentElement.scrollWidth <= w + 1 && [...document.querySelectorAll("#catList .cv-agenda .cv-item, #catList .cv-calhead, .cv-seg")].every((e) => { const r = e.getBoundingClientRect(); return r.left >= 0 && r.right <= w + 1; }); }));
+    await shot(page, "views-calendar-phone");
+    await page.tap('#catList .cv-agenda .cv-item:has-text("Omar Reyes")');
+    await page.waitForFunction(() => document.getElementById("catModal").style.display === "flex");
+    t("a tap opens the lead", (await page.textContent("#catTitle")) === "Omar Reyes — Acme Realty");
+    await page.evaluate(() => { catClose(); catMonthStep(9); });
+    t("an empty month reads 'Nothing this month.'", (await page.textContent("#catList .cv-agenda")) === "Nothing this month.");
+    t("no errors on the page", st.errors.length === 0, st.errors);
     await ctx.close();
   }
 
