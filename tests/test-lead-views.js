@@ -166,7 +166,7 @@ const shown = (page, sel) => page.evaluate((s) => { const e = document.querySele
     console.log("\n  search, tabs and stage chips");
     await page.fill("#catFind", "acme");
     t("search finds a lead by company", JSON.stringify(await names(page)) === JSON.stringify(["Omar Reyes"]));
-    t("the tab and stage counts follow the search", (await page.textContent("#catKinds .ctab.on .cnt")) === "1" && (await chips(page))[0] === "Open1");
+    t("the tab and stage counts follow the search", (await page.textContent("#catKinds .ctab.on .cnt")) === "1" && (await chips(page))[1] === "Open1");
     t("typing keeps the cursor in the box", await page.evaluate(() => document.activeElement === document.getElementById("catFind")));
     await page.fill("#catFind", "KELLY@EXAMPLE");
     t("search matches email, any case, and experience inquiries too", JSON.stringify(await names(page)) === JSON.stringify(["Kelly Nguyen"]));
@@ -215,14 +215,15 @@ const shown = (page, sel) => page.evaluate((s) => { const e = document.querySele
     const typ = () => page.$$eval("#catKinds .ctab", (bs) => bs.map((b) => { const c = getComputedStyle(b), k = b.querySelector(".cv-ck"), kc = getComputedStyle(k); return { text: b.querySelector(".kl").textContent, on: b.classList.contains("on"), role: b.getAttribute("role"), checked: b.getAttribute("aria-checked"), kcVar: b.style.getPropertyValue("--kc"), radius: parseFloat(c.borderTopLeftRadius), fs: parseFloat(c.fontSize), box: kc.backgroundColor, boxW: k.getBoundingClientRect().width, tick: getComputedStyle(k.querySelector("svg")).opacity, n: b.querySelector(".cnt").textContent }; }));
     t("the type row is on top, the colored stage row under it, then the list", await page.evaluate(() => { const a = document.getElementById("catKinds"), b = document.getElementById("catChips"), c = document.getElementById("catList"); return a.getBoundingClientRect().bottom <= b.getBoundingClientRect().top + 1 && b.getBoundingClientRect().bottom <= c.getBoundingClientRect().top + 1 && a.nextElementSibling === b && b.nextElementSibling === c; }));
     let sb = await stg();
-    t("eleven stage buttons: Open, the nine stages, All", sb.map((x) => x.text).join() === "Open,New,Replied,Quoting,Proposal sent,Signed,Invoiced,Deposit paid,Paid,Lost,All" && await page.evaluate(() => !document.querySelector("#catChips .lbl, #catChips .sep")), sb.map((x) => x.text));
+    sb.push(sb.shift());   // All is first on the page; checks below read Open as [0] and All as [10]
+    t("eleven stage buttons: All first, then Open and the nine stages", sb.map((x) => x.text).join() === "Open,New,Replied,Quoting,Proposal sent,Signed,Invoiced,Deposit paid,Paid,Lost,All" && (await page.textContent("#catChips .chip")) === "All" && await page.evaluate(() => !document.querySelector("#catChips .lbl, #catChips .sep")), sb.map((x) => x.text));
     let tp = await typ();
     t("the stage buttons are the big ones now, the type pills the small ones", sb.every((x) => x.radius === 10 && x.padT >= 8) && tp.every((x) => x.radius > 100) && sb[0].fs > tp[0].fs, [sb[0], tp[0]]);
     t("each stage button is in its own color, the same as its chip in the table", new Set(sb.map((x) => x.bg)).size === 11 && await page.evaluate(() => ["new", "replied", "quoted", "contract_sent"].every((k) => { const chip = document.querySelector("#catList .cv-chip.st-" + k), btn = document.querySelector("#catChips .chip.st-" + k); return chip && getComputedStyle(chip).backgroundColor === getComputedStyle(btn).backgroundColor && getComputedStyle(chip).color === getComputedStyle(btn).color; })), sb.map((x) => x.bg));
     t("the picked one (Open) is solid navy with white text and says it is pressed", sb[0].on && sb[0].pressed === "true" && sb[0].bg === rgb("#06273a") && sb[0].color === "rgb(255, 255, 255)" && sb.slice(1).every((x) => !x.on && x.pressed === "false" && x.color !== "rgb(255, 255, 255)"), sb[0]);
     t("the count sits inside each button; All has none", sb[0].n === "10" && sb[1].n === "2" && sb[10].n === undefined, sb.map((x) => x.n));
     await page.click('#catChips .chip:has-text("Quoting")');
-    sb = await stg();
+    sb = await stg(); sb.push(sb.shift());
     t("picking Quoting fills it with the Quoting color and lets go of Open", sb[3].on && sb[3].bg === rgb("#4a3596") && sb[3].color === "rgb(255, 255, 255)" && !sb[0].on && sb[0].bg !== rgb("#06273a") && (await names(page)).length === 2, sb[3]);
     await page.click('#catChips .chip:has-text("Open")');
 
@@ -236,7 +237,7 @@ const shown = (page, sel) => page.evaluate((s) => { const e = document.querySele
     await page.click('#catKinds .ctab:has-text("Experiences")');
     tp = await typ();
     t("ticking Experiences as well shows both kinds", tp[1].on && tp[3].on && tp[3].box === rgb("#b45309") && tp.filter((x) => x.on).length === 2 && (await names(page)).length === 8 && JSON.stringify([...new Set(await page.$$eval("#catList tbody td.c-kind", (c) => c.map((x) => x.textContent)))].sort()) === JSON.stringify(["Catering", "Experience"]), await names(page));
-    t("the stage counts follow what is ticked", (await chips(page))[0] === "Open8");
+    t("the stage counts follow what is ticked", (await chips(page))[1] === "Open8");
     await shot(page, "views-rows-swapped");
     await page.click('#catKinds .ctab:has-text("Catering")');
     t("unticking Catering leaves just the experiences", (await names(page)).length === 3 && (await typ()).filter((x) => x.on).map((x) => x.text).join() === "Experiences");
@@ -253,7 +254,7 @@ const shown = (page, sel) => page.evaluate((s) => { const e = document.querySele
     await page.keyboard.press("Space");
     t("Space ticks a box from the keyboard", (await typ())[2].checked === "true" && JSON.stringify((await names(page)).sort()) === JSON.stringify(["Lucia Romano", "Omar Reyes"]));
     await page.click('.cv-seg button[data-v="board"]');
-    t("on the board the big row is just Open | All and the ticks still apply", JSON.stringify(await chips(page)) === JSON.stringify(["Open2", "All"]) && (await page.$$eval("#catList .cv-card .cv-nm b", (b) => b.map((x) => x.textContent).sort())).join() === "Lucia Romano,Omar Reyes");
+    t("on the board the big row is just Open | All and the ticks still apply", JSON.stringify(await chips(page)) === JSON.stringify(["All", "Open2"]) && (await page.$$eval("#catList .cv-card .cv-nm b", (b) => b.map((x) => x.textContent).sort())).join() === "Lucia Romano,Omar Reyes");
     t("no errors on the page", st.errors.length === 0, st.errors);
     await ctx.close();
   }
@@ -349,7 +350,7 @@ const shown = (page, sel) => page.evaluate((s) => { const e = document.querySele
     t("back on the table the stage picked earlier is still on", (await names(page)).length === 2 && (await page.textContent("#catChips .chip.on")) === "Quoting2");
     await page.click('.cv-seg button[data-v="board"]');
     t("Board draws a column per stage, in pipeline order", JSON.stringify(await page.$$eval("#catList .cv-col", (c) => c.map((x) => x.querySelector(".cv-chip").textContent))) === JSON.stringify(["New", "Replied", "Quoting", "Proposal sent", "Signed", "Invoiced", "Deposit paid", "Paid", "Lost"]));
-    t("on the board the chips are just Open | All", JSON.stringify(await chips(page)) === JSON.stringify(["Open10", "All"]) && (await page.textContent("#catChips .chip.on")) === "Open10");
+    t("on the board the chips are just Open | All", JSON.stringify(await chips(page)) === JSON.stringify(["All", "Open10"]) && (await page.textContent("#catChips .chip.on")) === "Open10");
     const col = (name) => page.evaluate((nm) => { const c = [...document.querySelectorAll("#catList .cv-col")].find((x) => x.querySelector(".cv-chip").textContent === nm); return { empty: c.classList.contains("empty"), cards: [...c.querySelectorAll(".cv-card .cv-nm b")].map((b) => b.textContent), n: (c.querySelector(".cv-n") || {}).textContent, total: (c.querySelector(".cv-total") || {}).textContent }; }, name);
     let c = await col("New");
     t("New holds the new catering lead and the new inquiry", JSON.stringify(c.cards) === JSON.stringify(["Jane Smith", "Sam Lee"]) && c.n === "2" && !c.total, c);
@@ -399,6 +400,8 @@ const shown = (page, sel) => page.evaluate((s) => { const e = document.querySele
     const inDay = (d, box) => page.$$eval("#catList " + (box || ".cv-calgrid") + ' [data-d="' + d + '"] .cv-item .nm span', (x) => x.map((y) => y.textContent));
     await page.click('.cv-seg button[data-v="calendar"]');
     t("Calendar is the third view, and it is remembered", (await page.getAttribute("#catList", "class")) === "rec-list cv-calendar" && (await page.getAttribute('.cv-seg button[data-v="calendar"]', "aria-pressed")) === "true" && (await page.$$eval(".cv-seg button", (b) => b.map((x) => x.textContent).join())) === "Table,Board,Calendar" && (await page.evaluate(() => localStorage.getItem("cat_view"))) === "calendar");
+    t("the calendar starts on All, so past and lost jobs are on it", (await page.textContent("#catChips .chip.on")) === "All" && (await page.evaluate(() => CAT_FILTER)) === "all");
+    await page.click('#catChips .chip:has-text("Open")');
     t("it opens on this month", (await title()) === monthName(ym(today)));
     t("whole weeks, Sunday first, with today marked", await page.evaluate((td) => { const d = [...document.querySelectorAll("#catList .cv-calgrid .cv-day")], dow = [...document.querySelectorAll("#catList .cv-dow")].map((x) => x.textContent).join(); const marked = document.querySelectorAll("#catList .cv-calgrid .cv-day.today");
       return dow === "Sun,Mon,Tue,Wed,Thu,Fri,Sat" && d.length % 7 === 0 && d.length >= 28 && new Date(d[0].dataset.d + "T12:00:00").getDay() === 0 && marked.length === 1 && marked[0].dataset.d === td && d.every((x, i) => i === 0 || x.dataset.d > d[i - 1].dataset.d); }, today));
@@ -465,7 +468,7 @@ const shown = (page, sel) => page.evaluate((s) => { const e = document.querySele
   }
   {
     const { ctx, page, st } = await open(browser, { view: "calendar" });
-    t("the page opens on the calendar when that was the last view", (await page.getAttribute("#catList", "class")) === "rec-list cv-calendar" && st.errors.length === 0, st.errors);
+    t("the page opens on the calendar when that was the last view, on All", (await page.getAttribute("#catList", "class")) === "rec-list cv-calendar" && (await page.textContent("#catChips .chip.on")) === "All" && st.errors.length === 0, st.errors);
     await ctx.close();
   }
   {
