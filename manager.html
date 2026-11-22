@@ -852,7 +852,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       <div class="cat-mhead" style="padding-bottom:0;">
         <div style="flex:1;min-width:0;"><h3 id="inqTitle"></h3><div id="inqMeta" class="hint"></div></div>
         <div class="cat-mhead-r"><a class="btn btn-ghost btn-sm" id="inqChatLink" href="/chat" target="_blank" rel="noopener" title="This inquiry's conversation in Greys Chat — texts, emails and notes stay in step with this one">💬 Chat</a><span class="cat-stagelbl">Stage</span><select id="inqStage" class="loc-sel" onchange="inqSetStage(this.value)">
-          <option value="new">New</option><option value="replied">Replied</option><option value="link_sent">Booking link sent</option><option value="booked">Booked</option><option value="lost">Lost</option>
+          <option value="new">New</option><option value="replied">Replied</option><option value="link_sent">Booking link sent</option><option value="booked">Booked</option><option value="lost">Closed</option>
         </select>
         <button class="btn btn-ghost btn-sm" onclick="inqClose()">✕</button></div>
       </div>
@@ -1130,7 +1130,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     #panel-catering .cat-stages .chip{ display:inline-flex; align-items:center; gap:6px; margin:0; padding:7px 7px 7px 9px; border:1px solid color-mix(in srgb, var(--t,#3d4654) 26%, #fff); border-radius:10px;
       background:var(--b,#eceef1); color:var(--t,#3d4654); font-size:.8rem; font-weight:700; line-height:1.3; }
     #panel-catering .cat-stages .chip.st-open{ --b:#dde7ee; --t:#06273a; }
-    #panel-catering .cat-stages .chip.st-all{ --b:#fff; --t:#3d4654; }   /* next to Lost (gray), so All is the outlined one */
+    #panel-catering .cat-stages .chip.st-all{ --b:#fff; --t:#3d4654; }   /* next to Closed (gray), so All is the outlined one */
     #panel-catering .cat-stages .chip:hover{ border-color:color-mix(in srgb, var(--t,#3d4654) 60%, #fff); background:color-mix(in srgb, var(--t,#3d4654) 9%, var(--b,#eceef1)); }
     #panel-catering .cat-stages .chip.on{ background:var(--t,#3d4654); border-color:var(--t,#3d4654); color:#fff; box-shadow:0 1px 2px rgba(18,26,38,.2); }
     #panel-catering .cat-stages .chip:focus-visible, #panel-catering .cat-kinds .ctab:focus-visible{ outline:2px solid #3a8bb3; outline-offset:2px; }
@@ -2391,7 +2391,7 @@ function loadAll(){ loadKind('items'); loadKind('events'); loadKind('schedules')
    the customer via send-mail. Customer replies land in brad@greyscheese.com until
    inbound email is wired in — "Log their reply" pastes them into the thread. */
 const INQ_URL = SB_URL + '/functions/v1/inquiries';
-const INQ_STAGES = { new:'New', replied:'Replied', link_sent:'Link sent', booked:'Booked', lost:'Lost' };
+const INQ_STAGES = { new:'New', replied:'Replied', link_sent:'Link sent', booked:'Booked', lost:'Closed' };   // 'lost' shows as Closed (2026-11-22, "change lost to closed")
 const INQ_SITE = 'https://tickets.greyscheese.com/experiences';
 let INQ_ROWS = [], INQ_FILTER = 'open', INQ_CUR = null;
 const INQ_QUICK = [
@@ -2591,7 +2591,7 @@ async function inqSetStage(v){
    payment status every 15 min; "↻ Payment status" does it on demand. */
 const CAT_URL = SB_URL + '/functions/v1/catering';
 const CAT_SITE = 'https://tickets.greyscheese.com/catering';
-const CAT_STAGES = { new:'New', replied:'Replied', quoted:'Quoting', contract_sent:'Proposal sent', signed:'Signed', invoiced:'Invoiced', deposit_paid:'Deposit paid', paid:'Paid', lost:'Lost' };
+const CAT_STAGES = { new:'New', replied:'Replied', quoted:'Quoting', contract_sent:'Proposal sent', signed:'Signed', invoiced:'Invoiced', deposit_paid:'Deposit paid', paid:'Paid', lost:'Closed' };   // 'lost' shows as Closed (2026-11-22)
 const CAT_QSTAT = { draft:'Draft', sent:'Sent — waiting for signature', signed:'Signed — invoice pending', invoiced:'Invoiced — deposit due', deposit_paid:'Deposit paid', paid:'Paid in full', canceled:'Canceled' };
 const catQStat = q => q.invoice_only && q.status==='signed' ? 'Invoice pending'
   : q.status==='invoiced' && !(q.deposit_pct>0 && q.deposit_pct<100) ? 'Invoiced — payment due' : (CAT_QSTAT[q.status]||q.status);
