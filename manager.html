@@ -999,7 +999,7 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     .cv-find input{ flex:1; min-width:0; border:0; outline:0; background:none; font:inherit; font-size:.84rem; color:var(--ink); padding:0; }
     .cv-find input::placeholder{ color:#8a939e; }
 
-    #catList.cv-table, #catList.cv-board{ display:block; }
+    #catList.cv-table, #catList.cv-board, #catList.cv-calendar{ display:block; }
     #catList.cv-table{ border:1px solid var(--cv-line); border-radius:10px; background:#fff; overflow:hidden; }
     #catList .cv-scroll{ overflow:auto; max-height:max(380px, calc(100vh - 372px)); scrollbar-width:thin; }
     .cv-tbl{ border-collapse:separate; border-spacing:0; table-layout:fixed; width:100%; font-size:.82rem; line-height:1.3; color:var(--ink); font-variant-numeric:tabular-nums; }
@@ -1033,15 +1033,15 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     .cv-dot{ position:absolute; top:-4px; right:-4px; width:10px; height:10px; border-radius:50%; background:#d97706; border:2px solid #fff; }
     .cv-chip{ display:inline-flex; align-items:center; gap:6px; max-width:100%; padding:2px 8px 2px 7px; border-radius:6px; font-size:.76rem; font-weight:600; line-height:1.5; white-space:nowrap; background:var(--b,#eceef1); color:var(--t,#4b5563); }
     .cv-chip i{ flex:none; width:6px; height:6px; border-radius:50%; background:var(--d,#9aa3af); }
-    .cv-chip.st-new{ --b:#fdf0d2; --t:#7a4a00; --d:#d98a00; }
-    .cv-chip.st-replied{ --b:#e1edfb; --t:#1b4a86; --d:#3b82c4; }
-    .cv-chip.st-quoted{ --b:#ebe6fb; --t:#4a3596; --d:#7c5cd6; }
-    .cv-chip.st-contract_sent{ --b:#fbe6f1; --t:#8a2560; --d:#cf4f95; }
-    .cv-chip.st-signed{ --b:#dcf3f0; --t:#0f5c56; --d:#1a9e93; }
-    .cv-chip.st-invoiced{ --b:#fde9dd; --t:#8a3a12; --d:#e0703a; }
-    .cv-chip.st-deposit_paid{ --b:#e8f5d6; --t:#3f6212; --d:#7cb518; }
-    .cv-chip.st-paid{ --b:#d5f2e0; --t:#0b5d33; --d:#1f9d57; }
-    .cv-chip.st-lost{ --b:#eceef1; --t:#4b5563; --d:#9aa3af; }
+    .cv-chip.st-new, .cv-sd.st-new{ --b:#fdf0d2; --t:#7a4a00; --d:#d98a00; }
+    .cv-chip.st-replied, .cv-sd.st-replied{ --b:#e1edfb; --t:#1b4a86; --d:#3b82c4; }
+    .cv-chip.st-quoted, .cv-sd.st-quoted{ --b:#ebe6fb; --t:#4a3596; --d:#7c5cd6; }
+    .cv-chip.st-contract_sent, .cv-sd.st-contract_sent{ --b:#fbe6f1; --t:#8a2560; --d:#cf4f95; }
+    .cv-chip.st-signed, .cv-sd.st-signed{ --b:#dcf3f0; --t:#0f5c56; --d:#1a9e93; }
+    .cv-chip.st-invoiced, .cv-sd.st-invoiced{ --b:#fde9dd; --t:#8a3a12; --d:#e0703a; }
+    .cv-chip.st-deposit_paid, .cv-sd.st-deposit_paid{ --b:#e8f5d6; --t:#3f6212; --d:#7cb518; }
+    .cv-chip.st-paid, .cv-sd.st-paid{ --b:#d5f2e0; --t:#0b5d33; --d:#1f9d57; }
+    .cv-chip.st-lost, .cv-sd.st-lost{ --b:#eceef1; --t:#4b5563; --d:#9aa3af; }
     .cv-kind{ display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis; vertical-align:middle; padding:2px 8px; border-radius:6px; font-size:.76rem; font-weight:600; line-height:1.5; white-space:nowrap; background:color-mix(in srgb, var(--kc,#06273a) 9%, #fff); color:var(--kc,#06273a); }
     .cv-nil{ color:#b3bac3; }
     .cv-rel{ margin-left:8px; font-size:.74rem; color:var(--cv-sub); }
@@ -1072,6 +1072,51 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     .cv-cardfoot .cv-val{ margin-left:auto; font-weight:600; font-variant-numeric:tabular-nums; }
     .cv-cardfoot .cv-sub{ font-size:.74rem; color:var(--cv-sub); }
 
+    /* CALENDAR (2026-11-22, Maverick: "we have the table view a board view and then also do a calendar view"):
+       a month of leads by event date — one tile per lead in its day, in its kind's color with a stage dot. Leads with
+       no date sit in a strip underneath. On a phone the month is a list of days instead of a grid. */
+    #catList.cv-calendar{ border:0; border-radius:0; background:none; box-shadow:none; overflow:visible; }
+    .cv-calhead{ display:flex; align-items:center; gap:10px 16px; flex-wrap:wrap; margin-bottom:10px; }
+    .cv-calnav{ display:flex; align-items:center; gap:6px; }
+    .cv-month{ margin:0; min-width:10.5em; text-align:center; font-size:1.02rem; font-weight:700; color:var(--ink); }
+    .cv-navb, .cv-todayb, .cv-jump{ appearance:none; height:32px; border:1px solid var(--line); border-radius:8px; background:#fff; color:#3f4854; font:inherit; font-size:.8rem; font-weight:600; cursor:pointer; }
+    .cv-navb{ width:32px; display:grid; place-items:center; padding:0; }
+    .cv-todayb, .cv-jump{ padding:0 12px; }
+    .cv-todayb{ margin-left:4px; }
+    .cv-navb:hover, .cv-todayb:hover, .cv-jump:hover{ background:var(--cv-soft); border-color:#c5ccd6; color:var(--ink); }
+    .cv-navb:focus-visible, .cv-todayb:focus-visible, .cv-jump:focus-visible, .cv-item:focus-visible{ outline:2px solid #3a8bb3; outline-offset:1px; }
+    .cv-calsum{ margin-left:auto; display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:.82rem; color:var(--cv-sub); font-variant-numeric:tabular-nums; }
+    .cv-calsum b{ color:var(--ink); font-weight:600; }
+    .cv-calgrid{ display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); border:1px solid var(--cv-line); border-radius:10px; overflow:hidden; background:#fff; }
+    .cv-dow{ padding:8px 9px; font-size:.74rem; font-weight:600; color:var(--cv-sub); background:#fafbfc; border-bottom:1px solid var(--cv-line); border-right:1px solid var(--cv-line); }
+    .cv-day{ min-width:0; min-height:98px; padding:5px 5px 7px; display:flex; flex-direction:column; gap:4px; border-right:1px solid var(--cv-line); border-bottom:1px solid var(--cv-line); }
+    .cv-dow:nth-child(7n), .cv-day:nth-child(7n){ border-right:0; }
+    .cv-day.last{ border-bottom:0; }
+    .cv-day.out{ background:#fafbfc; }
+    .cv-dnum{ align-self:flex-start; min-width:24px; height:24px; padding:0 6px; display:grid; place-items:center; border-radius:999px; font-size:.76rem; font-weight:600; color:#3f4854; font-variant-numeric:tabular-nums; }
+    .cv-day.past .cv-dnum{ color:#8a939e; }
+    .cv-day.out .cv-dnum{ color:#aab1ba; }
+    .cv-day.today .cv-dnum{ background:var(--cv-navy); color:#fff; }
+    .cv-item{ display:block; min-width:0; padding:4px 7px 5px 7px; border-left:3px solid var(--kc,#06273a); border-radius:6px; background:color-mix(in srgb, var(--kc,#06273a) 9%, #fff); font-size:.76rem; line-height:1.3; cursor:pointer; }
+    .cv-item:hover{ background:color-mix(in srgb, var(--kc,#06273a) 18%, #fff); }
+    .cv-item .nm{ display:flex; align-items:center; gap:5px; min-width:0; font-weight:600; color:var(--ink); }
+    .cv-item .nm span{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .cv-item.unread .nm{ font-weight:800; }
+    .cv-item.lost .nm span{ text-decoration:line-through; color:var(--cv-sub); }
+    .cv-item .meta{ display:flex; gap:8px; margin-top:1px; color:#56606d; font-size:.72rem; white-space:nowrap; overflow:hidden; font-variant-numeric:tabular-nums; }
+    .cv-sd{ flex:none; width:7px; height:7px; border-radius:50%; background:var(--d,#9aa3af); }
+    .cv-undated{ margin-top:12px; padding:10px 12px; border:1px dashed #cfd5dc; border-radius:10px; display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; }
+    .cv-undated .lbl{ font-size:.8rem; font-weight:600; color:var(--cv-sub); margin-right:4px; }
+    .cv-undated .cv-item{ flex:0 1 190px; }
+    .cv-agenda{ display:none; }
+    .cv-agday{ display:grid; grid-template-columns:52px minmax(0, 1fr); gap:10px; padding:10px 0; border-bottom:1px solid var(--cv-line); }
+    .cv-agday:last-child{ border-bottom:0; }
+    .cv-agdate{ text-align:center; color:var(--cv-sub); font-size:.74rem; font-weight:600; line-height:1.2; }
+    .cv-agdate b{ display:block; font-size:1.25rem; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; }
+    .cv-agday.today .cv-agdate b{ color:#fff; background:var(--cv-navy); border-radius:999px; width:34px; height:34px; line-height:34px; margin:2px auto 0; font-size:1.05rem; }
+    .cv-agitems{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+    .cv-agempty{ padding:22px 8px; text-align:center; color:var(--cv-sub); font-size:.86rem; }
+
     /* KIND BUTTONS (2026-11-22, Maverick: "change the look of the tabs, color code them, the whole thing like a button"):
        each kind tab is a button in its own color (CAT_KINDS, the same color as its avatar and Type chip) — tinted when
        idle, solid when picked. "All inquiries" has no kind, so it is the neutral one. */
@@ -1097,6 +1142,15 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     .cv-reset[hidden]{ display:none; }
 
     @media (max-width:640px){
+      .cv-calgrid{ display:none; }
+      .cv-agenda{ display:block; border:1px solid var(--cv-line); border-radius:10px; background:#fff; padding:0 10px; }
+      .cv-agenda .cv-item{ padding:7px 10px 8px; font-size:.88rem; }
+      .cv-agenda .cv-item .meta{ font-size:.78rem; flex-wrap:wrap; white-space:normal; gap:2px 10px; }
+      .cv-month{ min-width:0; flex:1; }
+      .cv-calnav{ flex:1 1 100%; }
+      .cv-calsum{ margin-left:0; }
+      .cv-undated .cv-item{ flex:1 1 100%; font-size:.88rem; padding:7px 10px 8px; }
+      .cv-seg button{ padding:6px 9px 6px 7px; }
       #panel-catering .cat-kinds{ flex-wrap:nowrap; overflow-x:auto; padding-bottom:2px; }
       #panel-catering .cat-kinds .ctab{ padding:8px 9px 8px 12px; font-size:.82rem; }
       .cv-reset{ display:none; }
@@ -2566,7 +2620,9 @@ function catAll(){
   return a.concat(b).sort((x,y)=>String(y.r.last_message_at||'').localeCompare(String(x.r.last_message_at||'')));
 }
 // CAT-VIEWS (2026-11-22): the list draws as a table or a board — see <style id="cat-views">.
-let CAT_VIEW = (function(){ try{ return localStorage.getItem('cat_view')==='board' ? 'board' : 'table'; }catch(_){ return 'table'; } })();
+const CV_VIEWS = ['table', 'board', 'calendar'];
+let CAT_VIEW = (function(){ try{ const v = localStorage.getItem('cat_view'); return CV_VIEWS.indexOf(v) >= 0 ? v : 'table'; }catch(_){ return 'table'; } })();
+let CAT_MONTH = '';   // the month the calendar shows, 'YYYY-MM' ('' = this month)
 let CAT_SORT = { k:'last', d:-1 }, CAT_FIND = '';
 const CV_ICONS = {
   table:'<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6.2h12M2 9.8h12M6.2 6.2v7.3"/>',
@@ -2584,7 +2640,9 @@ const CV_ICONS = {
   clock:'<circle cx="8" cy="8" r="5.5"/><path d="M8 4.8V8l2.2 1.4"/>',
   mail:'<rect x="2" y="3.5" width="12" height="9" rx="1.5"/><path d="M2.5 4.5L8 8.8l5.5-4.3"/>',
   phone:'<path d="M5.2 2.5H3.8a1.3 1.3 0 0 0-1.3 1.4c.4 4.8 4.2 8.6 9 9a1.3 1.3 0 0 0 1.4-1.3v-1.4L10.3 9l-1.4 1.4a6 6 0 0 1-3.3-3.3L7 5.7z"/>',
-  sort:'<path d="M4 6.5l4 4 4-4"/>'
+  sort:'<path d="M4 6.5l4 4 4-4"/>',
+  left:'<path d="M10 3.5L5.5 8l4.5 4.5"/>',
+  right:'<path d="M6 3.5L10.5 8 6 12.5"/>'
 };
 const cvIc = (n, cls) => '<svg class="cv-ic'+(cls?' '+cls:'')+'" viewBox="0 0 16 16" aria-hidden="true">'+(CV_ICONS[n]||'')+'</svg>';
 // Lead, Stage, then what a caterer reads next: when, how many, how much. Contact details sit at the far right (the table scrolls sideways).
@@ -2701,7 +2759,8 @@ function cvInitials(name){ const w = String(name||'').trim().split(/\s+/).filter
 // one flat record per lead — catering leads and experience inquiries read the same in both views
 function catRec(x){
   const r = x.r, K = CAT_KINDS[x.kind] || CAT_KINDS.catering;
-  const base = { kind:x.kind, kc:K[1], kl:K[0], stage:x.stage, name:r.name||'', shop:r.location||'', last:r.last_message_at||'', email:r.email||'', phone:r.phone||'', unread:!!r.unread };
+  const base = { kind:x.kind, kc:K[1], kl:K[0], stage:x.stage, name:r.name||'', shop:r.location||'', last:r.last_message_at||'', email:r.email||'', phone:r.phone||'', unread:!!r.unread,
+    time:/^\d{1,2}:\d{2}/.test(String((x.inq ? r.preferred_time : r.event_time) || '')) ? String(x.inq ? r.preferred_time : r.event_time).slice(0,5).padStart(5,'0') : '' };
   if(x.inq) return Object.assign(base, { open:"inqOpen('"+r.id+"')", company:'', label:INQ_STAGES[r.stage]||r.stage, event:r.experience_name||'Not sure yet',
     date:String(r.preferred_date||'').slice(0,10), guests:Number(r.party_size)||null, value:null, paid:null });
   const q = (r.catering_quotes||[]).filter(z=>z.status!=='canceled').sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)))[0];
@@ -2717,12 +2776,13 @@ function catSorted(recs){
   return recs.slice().sort((a,b)=>{ const x = val(a), y = val(b); if(none(x) || none(y)) return none(x) - none(y); return (x < y ? -1 : x > y ? 1 : 0) * d; });   // blanks always last
 }
 function catSortBy(k){ CAT_SORT = CAT_SORT.k === k ? { k, d:-CAT_SORT.d } : { k, d: /^(last|value|paid|guests)$/.test(k) ? -1 : 1 }; catRender(); }
-function catSetView(v){ CAT_VIEW = v === 'board' ? 'board' : 'table'; try{ localStorage.setItem('cat_view', CAT_VIEW); }catch(_){} catRender(); }
+function catSetView(v){ CAT_VIEW = CV_VIEWS.indexOf(v) >= 0 ? v : 'table'; try{ localStorage.setItem('cat_view', CAT_VIEW); }catch(_){} catRender(); }
 function catViewBar(){
   const bar = document.getElementById('catViewBar'); if(!bar) return;
   if(!bar.firstChild) bar.innerHTML = '<div class="cv-seg" role="group" aria-label="View">'
     + '<button type="button" data-v="table" onclick="catSetView(\'table\')">'+cvIc('table')+'Table</button>'
-    + '<button type="button" data-v="board" onclick="catSetView(\'board\')">'+cvIc('board')+'Board</button></div>'
+    + '<button type="button" data-v="board" onclick="catSetView(\'board\')">'+cvIc('board')+'Board</button>'
+    + '<button type="button" data-v="calendar" onclick="catSetView(\'calendar\')">'+cvIc('cal')+'Calendar</button></div>'
     + '<label class="cv-find">'+cvIc('search')+'<input type="search" id="catFind" placeholder="Search leads" aria-label="Search leads" autocomplete="off" oninput="CAT_FIND=this.value;catRender()"></label>'
     + '<button type="button" class="cv-reset" id="catColsReset" onclick="catColsReset()" title="Put the columns back in their original order" hidden>Reset columns</button>';
   const rs = document.getElementById('catColsReset'); if(rs) rs.hidden = !(CAT_VIEW === 'table' && cvColsCustom());
@@ -2783,6 +2843,58 @@ function catBoardHtml(recs){
       + (total ? '<span class="cv-total">'+catMoney(total)+'</span>' : '') + '</div>' + list.map(a=>card(a, l)).join('') + '</section>';
   }).join('') + '</div>';
 }
+// ---- Calendar view: the month by event date ----
+function cvMonth(){ return /^\d{4}-\d{2}$/.test(CAT_MONTH) ? CAT_MONTH : new Date().toLocaleDateString('en-CA').slice(0,7); }
+// n = -1 / +1 a month back / on, 0 = back to this month, 'YYYY-MM' = straight to that month
+function catMonthStep(n){
+  if(typeof n === 'string') CAT_MONTH = n;
+  else if(!n) CAT_MONTH = '';
+  else { const p = cvMonth().split('-').map(Number), d = new Date(p[0], p[1] - 1 + n, 1); CAT_MONTH = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+  catRender();
+}
+function cvTime(t){ if(!t) return ''; const p = t.split(':').map(Number); return ((p[0] % 12) || 12) + (p[1] ? ':' + String(p[1]).padStart(2, '0') : '') + (p[0] >= 12 ? ' PM' : ' AM'); }
+function catCalendarHtml(recs){
+  const ym = cvMonth(), Y = Number(ym.slice(0,4)), M = Number(ym.slice(5,7)), today = new Date().toLocaleDateString('en-CA');
+  const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const first = new Date(Y, M - 1, 1), days = new Date(Y, M, 0).getDate(), weeks = Math.ceil((first.getDay() + days) / 7);
+  const by = {}, undated = [];
+  recs.forEach(a=>{ if(a.date) (by[a.date] = by[a.date] || []).push(a); else undated.push(a); });
+  const order = (a,b) => (a.time || '99').localeCompare(b.time || '99') || a.name.localeCompare(b.name);   // by time, no time last
+  Object.keys(by).forEach(k=>by[k].sort(order)); undated.sort((a,b)=>String(b.last).localeCompare(String(a.last)));
+  const item = a => {
+    const facts = [a.time ? cvTime(a.time) : '', a.guests ? a.guests.toLocaleString('en-US') + (a.guests === 1 ? ' guest' : ' guests') : '', a.value != null ? catMoney(a.value) : ''].filter(Boolean);
+    const tip = [a.name + (a.company ? ' (' + a.company + ')' : ''), a.label, a.kl + (a.event ? ': ' + a.event : ''), a.date ? cvDate(a.date) + (a.time ? ', ' + cvTime(a.time) : '') : 'No date yet', a.shop].filter(Boolean).concat(facts.slice(a.time ? 1 : 0)).join('\n');
+    return '<div class="cv-item'+(a.unread?' unread':'')+(a.stage==='lost'?' lost':'')+'" style="--kc:'+a.kc+'" tabindex="0" role="button" title="'+esc(tip)+'" onclick="'+a.open+'" onkeydown="'+cvKey+'">'
+      + '<div class="nm"><i class="cv-sd st-'+a.stage+'"></i><span>'+esc(a.name)+'</span></div>'
+      + (facts.length ? '<div class="meta">'+facts.map(f=>'<span>'+esc(f)+'</span>').join('')+'</div>' : '') + '</div>';
+  };
+  // the grid runs whole weeks, Sunday first, so it starts and ends in the months either side
+  let cells = '';
+  for(let i = 0; i < weeks * 7; i++){
+    const d = new Date(Y, M - 1, 1 - first.getDay() + i), k = iso(d), out = d.getMonth() !== M - 1;
+    cells += '<div class="cv-day'+(out?' out':'')+(k < today?' past':'')+(k === today?' today':'')+(i >= (weeks - 1) * 7?' last':'')+'" data-d="'+k+'">'
+      + '<span class="cv-dnum">'+(d.getDate() === 1 ? d.toLocaleDateString('en-US', { month:'short' }) + ' ' : '')+d.getDate()+'</span>'+(by[k] || []).map(item).join('')+'</div>';
+  }
+  const inMonth = Object.keys(by).filter(k=>k.slice(0,7) === ym).sort();
+  const mine = inMonth.reduce((all,k)=>all.concat(by[k]), []), guests = mine.reduce((n,a)=>n + (a.guests || 0), 0), value = mine.reduce((n,a)=>n + (a.value || 0), 0);
+  // nothing this month: offer the nearest month that has something (the next one, else the last one before)
+  const months = [...new Set(Object.keys(by).map(k=>k.slice(0,7)))].sort(), jump = mine.length ? '' : (months.find(m=>m > ym) || months.filter(m=>m < ym).pop() || '');
+  const monthName = m => new Date(Number(m.slice(0,4)), Number(m.slice(5,7)) - 1, 1).toLocaleDateString('en-US', { month:'long', year:'numeric' });
+  const sum = mine.length ? '<span><b>'+mine.length+'</b> '+(mine.length === 1 ? 'event' : 'events')+'</span>'+(guests ? '<span><b>'+guests.toLocaleString('en-US')+'</b> guests</span>' : '')+(value ? '<span><b>'+catMoney(value)+'</b></span>' : '')
+    : '<span>Nothing this month</span>'+(jump ? '<button type="button" class="cv-jump" onclick="catMonthStep(\''+jump+'\')">Go to '+monthName(jump)+'</button>' : '');
+  const agenda = inMonth.length ? inMonth.map(k=>{ const d = new Date(k + 'T12:00:00');
+      return '<div class="cv-agday'+(k === today?' today':'')+'" data-d="'+k+'"><div class="cv-agdate">'+d.toLocaleDateString('en-US', { weekday:'short' })+'<b>'+d.getDate()+'</b></div><div class="cv-agitems">'+by[k].map(item).join('')+'</div></div>'; }).join('')
+    : '<div class="cv-agempty">Nothing this month.</div>';
+  return '<div class="cv-calhead"><div class="cv-calnav">'
+    + '<button type="button" class="cv-navb" onclick="catMonthStep(-1)" aria-label="Previous month" title="Previous month">'+cvIc('left')+'</button>'
+    + '<h3 class="cv-month" aria-live="polite">'+monthName(ym)+'</h3>'
+    + '<button type="button" class="cv-navb" onclick="catMonthStep(1)" aria-label="Next month" title="Next month">'+cvIc('right')+'</button>'
+    + '<button type="button" class="cv-todayb" onclick="catMonthStep(0)">Today</button></div>'
+    + '<div class="cv-calsum">'+sum+'</div></div>'
+    + '<div class="cv-calgrid">'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>'<div class="cv-dow">'+d+'</div>').join('')+cells+'</div>'
+    + '<div class="cv-agenda">'+agenda+'</div>'
+    + (undated.length ? '<div class="cv-undated"><span class="lbl">No date yet ('+undated.length+')</span>'+undated.map(item).join('')+'</div>' : '');
+}
 function catRender(){
   const everyone = catAll();
   const unread = everyone.filter(x=>x.r.unread).length;
@@ -2817,7 +2929,7 @@ function catRender(){
   const recs = rows.map(catRec);
   el.className = 'rec-list cv-' + CAT_VIEW;
   const keep = el.querySelector('.cv-scroll, .cv-cols'), sx = keep ? keep.scrollLeft : 0, sy = keep ? keep.scrollTop : 0;   // a re-draw (sort, refresh) keeps your place
-  el.innerHTML = board ? catBoardHtml(recs) : catTableHtml(recs);
+  el.innerHTML = board ? catBoardHtml(recs) : CAT_VIEW === 'calendar' ? catCalendarHtml(recs) : catTableHtml(recs);
   const now = el.querySelector('.cv-scroll, .cv-cols'); if(now && keep){ now.scrollLeft = sx; now.scrollTop = sy; }
 }
 async function catOpen(id){
