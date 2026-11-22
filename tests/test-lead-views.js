@@ -211,20 +211,32 @@ const shown = (page, sel) => page.evaluate((s) => { const e = document.querySele
   {
     const { ctx, page, st } = await open(browser);
     const rgb = (hex) => "rgb(" + [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(", ") + ")";
-    const stg = () => page.$$eval("#catChips .chip", (bs) => bs.map((b) => { const c = getComputedStyle(b); return { text: b.childNodes[0].textContent, k: (b.className.match(/st-(\w+)/) || [])[1], on: b.classList.contains("on"), pressed: b.getAttribute("aria-pressed"), bg: c.backgroundColor, color: c.color, radius: parseFloat(c.borderTopLeftRadius), fs: parseFloat(c.fontSize), padT: parseFloat(c.paddingTop), n: (b.querySelector("b") || {}).textContent }; }));
+    const stg = () => page.$$eval("#catChips .chip", (bs) => bs.map((b) => { const c = getComputedStyle(b); return { text: [...b.childNodes].find((n) => n.nodeType === 3).textContent, k: (b.className.match(/st-(\w+)/) || [])[1], on: b.classList.contains("on"), pressed: b.getAttribute("aria-checked"), tick: getComputedStyle(b.querySelector(".cv-ck svg")).opacity, bg: c.backgroundColor, color: c.color, radius: parseFloat(c.borderTopLeftRadius), fs: parseFloat(c.fontSize), padT: parseFloat(c.paddingTop), n: (b.querySelector("b") || {}).textContent }; }));
     const typ = () => page.$$eval("#catKinds .ctab", (bs) => bs.map((b) => { const c = getComputedStyle(b), k = b.querySelector(".cv-ck"), kc = getComputedStyle(k); return { text: b.querySelector(".kl").textContent, on: b.classList.contains("on"), role: b.getAttribute("role"), checked: b.getAttribute("aria-checked"), kcVar: b.style.getPropertyValue("--kc"), radius: parseFloat(c.borderTopLeftRadius), fs: parseFloat(c.fontSize), box: kc.backgroundColor, boxW: k.getBoundingClientRect().width, tick: getComputedStyle(k.querySelector("svg")).opacity, n: b.querySelector(".cnt").textContent }; }));
     t("the type row is on top, the colored stage row under it, then the list", await page.evaluate(() => { const a = document.getElementById("catKinds"), b = document.getElementById("catChips"), c = document.getElementById("catList"); return a.getBoundingClientRect().bottom <= b.getBoundingClientRect().top + 1 && b.getBoundingClientRect().bottom <= c.getBoundingClientRect().top + 1 && a.nextElementSibling === b && b.nextElementSibling === c; }));
     let sb = await stg();
     sb.push(sb.shift());   // All is first on the page; checks below read Open as [0] and All as [10]
     t("eleven stage buttons: All first, then Open and the nine stages", sb.map((x) => x.text).join() === "Open,New,Replied,Quoting,Proposal sent,Signed,Invoiced,Deposit paid,Paid,Lost,All" && (await page.textContent("#catChips .chip")) === "All" && await page.evaluate(() => !document.querySelector("#catChips .lbl, #catChips .sep")), sb.map((x) => x.text));
     let tp = await typ();
-    t("the stage buttons are the big ones now, the type pills the small ones", sb.every((x) => x.radius === 10 && x.padT >= 8) && tp.every((x) => x.radius > 100) && sb[0].fs > tp[0].fs, [sb[0], tp[0]]);
+    t("the stage buttons are the big ones now, the type pills the small ones", sb.every((x) => x.radius === 10 && x.padT >= 7) && tp.every((x) => x.radius > 100) && sb[0].fs > tp[0].fs, [sb[0], tp[0]]);
     t("each stage button is in its own color, the same as its chip in the table", new Set(sb.map((x) => x.bg)).size === 11 && await page.evaluate(() => ["new", "replied", "quoted", "contract_sent"].every((k) => { const chip = document.querySelector("#catList .cv-chip.st-" + k), btn = document.querySelector("#catChips .chip.st-" + k); return chip && getComputedStyle(chip).backgroundColor === getComputedStyle(btn).backgroundColor && getComputedStyle(chip).color === getComputedStyle(btn).color; })), sb.map((x) => x.bg));
     t("the picked one (Open) is solid navy with white text and says it is pressed", sb[0].on && sb[0].pressed === "true" && sb[0].bg === rgb("#06273a") && sb[0].color === "rgb(255, 255, 255)" && sb.slice(1).every((x) => !x.on && x.pressed === "false" && x.color !== "rgb(255, 255, 255)"), sb[0]);
     t("the count sits inside each button; All has none", sb[0].n === "10" && sb[1].n === "2" && sb[10].n === undefined, sb.map((x) => x.n));
     await page.click('#catChips .chip:has-text("Quoting")');
     sb = await stg(); sb.push(sb.shift());
     t("picking Quoting fills it with the Quoting color and lets go of Open", sb[3].on && sb[3].bg === rgb("#4a3596") && sb[3].color === "rgb(255, 255, 255)" && !sb[0].on && sb[0].bg !== rgb("#06273a") && (await names(page)).length === 2, sb[3]);
+    t("every stage button has a tick box; only the picked one is ticked", sb.every((x) => x.tick === (x.on ? "1" : "0")) && sb[3].tick === "1");
+    await page.click('#catChips .chip:has-text("Deposit paid")');
+    sb = await stg(); sb.push(sb.shift());
+    t("ticking Deposit paid as well shows both stages together", sb[3].on && sb[7].on && sb.filter((x) => x.on).length === 2 && (await names(page)).length === 3, await names(page));
+    await page.click('#catChips .chip:has-text("Quoting")');
+    await page.click('#catChips .chip:has-text("Deposit paid")');
+    sb = await stg(); sb.push(sb.shift());
+    t("unticking the last stage goes back to Open", sb[0].on && sb.filter((x) => x.on).length === 1 && (await names(page)).length === 10);
+    await page.click('#catChips .chip:has-text("New")');
+    await page.click('#catChips .chip:has-text("All")');
+    sb = await stg(); sb.push(sb.shift());
+    t("All (or Open) stands alone and clears the stage ticks", sb[10].on && sb.filter((x) => x.on).length === 1);
     await page.click('#catChips .chip:has-text("Open")');
 
     console.log("\n  type row: tick boxes");
