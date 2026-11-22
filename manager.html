@@ -1085,7 +1085,34 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
     .cv-cardfoot .cv-val{ margin-left:auto; font-weight:600; font-variant-numeric:tabular-nums; }
     .cv-cardfoot .cv-sub{ font-size:.74rem; color:var(--cv-sub); }
 
+    /* KIND BUTTONS (2026-11-22, Maverick: "change the look of the tabs, color code them, the whole thing like a button"):
+       each kind tab is a button in its own color (CAT_KINDS, the same color as its avatar and Type chip) — tinted when
+       idle, solid when picked. "All inquiries" has no kind, so it is the neutral one. */
+    #panel-catering .cat-kinds{ gap:8px; flex-wrap:wrap; overflow:visible; border-bottom:0; margin:16px 0 0; }
+    #panel-catering .cat-kinds .ctab{ --kc:#3d4654; margin:0; padding:8px 10px 8px 14px; gap:9px; border:1px solid color-mix(in srgb, var(--kc) 30%, #fff); border-radius:10px;
+      background:color-mix(in srgb, var(--kc) 13%, #fff); color:var(--kc); font-size:.84rem; font-weight:700; line-height:1.3; }
+    #panel-catering .cat-kinds .ctab:hover{ background:color-mix(in srgb, var(--kc) 21%, #fff); border-color:color-mix(in srgb, var(--kc) 48%, #fff); color:var(--kc); }
+    #panel-catering .cat-kinds .ctab.on{ background:var(--kc); border-color:var(--kc); color:#fff; box-shadow:0 1px 2px rgba(18,26,38,.2); }
+    #panel-catering .cat-kinds .ctab:focus-visible{ outline:2px solid #3a8bb3; outline-offset:2px; }
+    #panel-catering .cat-kinds .ctab .cnt{ background:#fff; color:var(--kc); min-width:24px; padding:1px 7px; }
+    #panel-catering .cat-kinds .ctab.on .cnt{ background:rgba(255,255,255,.24); color:#fff; }
+
+    /* MOVE COLUMNS: drag a column heading sideways to move it (Lead stays first). .cv-moving = the one being dragged,
+       #cvDrop = the line where it will land, #cvGhost = the label that follows the pointer. */
+    .cv-th{ touch-action:pan-y; -webkit-user-select:none; user-select:none; }
+    .cv-tbl th.cv-moving .cv-th{ background:#e3edf2; color:var(--cv-navy); }
+    .cv-tbl.cv-dragging, .cv-tbl.cv-dragging .cv-th, .cv-tbl.cv-dragging tbody tr{ cursor:grabbing; }
+    .cv-tbl.cv-dragging td.c-moving{ background:#f1f6f9; }
+    #cvDrop{ position:fixed; z-index:990; width:3px; margin-left:-2px; border-radius:2px; background:#06273a; pointer-events:none; }
+    #cvGhost{ position:fixed; z-index:991; pointer-events:none; padding:5px 10px; border-radius:8px; background:#06273a; color:#fff; font-size:.78rem; font-weight:600; line-height:1.3; white-space:nowrap; box-shadow:0 6px 16px rgba(18,26,38,.28); transform:translate(12px, 14px); }
+    .cv-reset{ appearance:none; border:0; background:none; padding:6px 4px; font:inherit; font-size:.8rem; font-weight:600; color:var(--cv-sub); cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+    .cv-reset:hover{ color:var(--cv-navy); }
+    .cv-reset[hidden]{ display:none; }
+
     @media (max-width:640px){
+      #panel-catering .cat-kinds{ flex-wrap:nowrap; overflow-x:auto; padding-bottom:2px; }
+      #panel-catering .cat-kinds .ctab{ padding:8px 9px 8px 12px; font-size:.82rem; }
+      .cv-reset{ display:none; }
       #panel-catering .cv-bar .cat-tools{ margin-left:0; }
       .cv-find{ flex:1 1 150px; }
       #catList .cv-scroll{ max-height:none; overflow:visible; }
@@ -2544,6 +2571,88 @@ const CV_COLS = [
   { k:'email',  l:'Email',         ic:'mail',  w:230 },
   { k:'phone',  l:'Phone',         ic:'phone', w:136 }
 ];
+// MOVE COLUMNS: the order is yours — drag a heading (or Alt+←/→ on it) and it is remembered on this device
+// (localStorage cat_cols). Lead always stays first: it is the column that stays put when you scroll sideways.
+const CV_DEFAULT = CV_COLS.slice(1).map(c=>c.k);
+let CAT_COLS = (function(){ let a = []; try{ a = JSON.parse(localStorage.getItem('cat_cols') || '[]'); }catch(_){}
+  a = (Array.isArray(a) ? a : []).filter((k,i,all)=>CV_DEFAULT.indexOf(k) >= 0 && all.indexOf(k) === i);
+  return a.concat(CV_DEFAULT.filter(k=>a.indexOf(k) < 0)); })();   // unknown names dropped, new columns added at the end
+function cvCols(){ return [CV_COLS[0]].concat(CAT_COLS.map(k=>CV_COLS.find(c=>c.k===k))); }
+function cvColsCustom(){ return CAT_COLS.join() !== CV_DEFAULT.join(); }
+// put column k just before column `before` (null = at the far right)
+function catMoveCol(k, before){
+  if(k === 'name' || before === 'name' || k === before || CAT_COLS.indexOf(k) < 0) return false;
+  const next = CAT_COLS.filter(x=>x !== k), at = before == null ? next.length : next.indexOf(before);
+  if(at < 0) return false;
+  next.splice(at, 0, k);
+  if(next.join() === CAT_COLS.join()) return false;
+  CAT_COLS = next; try{ localStorage.setItem('cat_cols', JSON.stringify(CAT_COLS)); }catch(_){}
+  catRender(); return true;
+}
+function catColsReset(){ CAT_COLS = CV_DEFAULT.slice(); try{ localStorage.removeItem('cat_cols'); }catch(_){} catRender(); }
+// Alt+← / Alt+→ on a heading moves that column one place (the keyboard way to do the drag)
+function cvThKey(ev, k){
+  if(!ev.altKey || (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') || k === 'name') return;
+  ev.preventDefault();
+  const i = CAT_COLS.indexOf(k), j = ev.key === 'ArrowLeft' ? i - 1 : i + 1; if(i < 0 || j < 0 || j >= CAT_COLS.length) return;
+  catMoveCol(k, ev.key === 'ArrowLeft' ? CAT_COLS[j] : (CAT_COLS[j + 1] || null));
+  const b = document.querySelector('#catList th.c-' + k + ' .cv-th'); if(b) b.focus();
+}
+// drag a heading sideways: a line shows where it will land; the table scrolls when you reach its edge
+function cvDragInit(el){
+  if(!el || el.__cvDrag) return; el.__cvDrag = true;
+  let d = null;
+  const clear = () => { if(!d) return; cancelAnimationFrame(d.raf); ['cvDrop','cvGhost'].forEach(id=>{ const n = document.getElementById(id); if(n) n.remove(); });
+    el.querySelectorAll('.cv-moving, .c-moving, .cv-dragging').forEach(n=>n.classList.remove('cv-moving','c-moving','cv-dragging'));
+    document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', cancel); document.removeEventListener('keydown', esc); d = null; };
+  const place = () => {   // which gap is the pointer nearest to?
+    const box = el.querySelector('.cv-scroll'), ths = [...el.querySelectorAll('thead th:not(.cv-first)')]; if(!box || !ths.length) return;
+    const br = box.getBoundingClientRect(), first = el.querySelector('thead th.cv-first').getBoundingClientRect();
+    let before = null, x = ths[ths.length - 1].getBoundingClientRect().right;
+    for(const th of ths){ const r = th.getBoundingClientRect(); if(d.x < r.left + r.width / 2){ before = th.dataset.k; x = r.left; break; } }
+    d.before = before;
+    const drop = document.getElementById('cvDrop'); if(!drop) return;
+    const lx = Math.max(first.right, Math.min(br.right - 1, x));
+    drop.style.left = lx + 'px'; drop.style.top = br.top + 'px'; drop.style.height = Math.min(br.height, window.innerHeight - br.top) + 'px';
+    drop.style.display = (x < first.right - 1 || x > br.right + 1) ? 'none' : '';
+  };
+  const tick = () => {     // near an edge of the table: scroll it
+    if(!d || !d.on) return;
+    const box = el.querySelector('.cv-scroll');
+    if(box){ const br = box.getBoundingClientRect(), left = el.querySelector('thead th.cv-first').getBoundingClientRect().right, edge = 56;
+      const step = d.x > br.right - edge ? Math.min(18, (d.x - (br.right - edge)) / 3 + 2) : d.x < left + edge ? -Math.min(18, ((left + edge) - d.x) / 3 + 2) : 0;
+      if(step){ box.scrollLeft += step; place(); } }
+    d.raf = requestAnimationFrame(tick);
+  };
+  const move = ev => {
+    if(!d) return; d.x = ev.clientX; d.y = ev.clientY;
+    if(!d.on){
+      if(Math.abs(ev.clientX - d.x0) < 7) return;
+      d.on = true;
+      const tbl = el.querySelector('.cv-tbl'); if(tbl) tbl.classList.add('cv-dragging');
+      d.th.classList.add('cv-moving'); el.querySelectorAll('td.c-' + d.k).forEach(n=>n.classList.add('c-moving'));
+      const drop = document.createElement('div'); drop.id = 'cvDrop'; document.body.appendChild(drop);
+      const g = document.createElement('div'); g.id = 'cvGhost'; g.textContent = d.label; document.body.appendChild(g);
+      d.raf = requestAnimationFrame(tick);
+    }
+    ev.preventDefault();
+    const g = document.getElementById('cvGhost'); if(g){ g.style.left = d.x + 'px'; g.style.top = d.y + 'px'; }
+    place();
+  };
+  const up = () => { if(!d) return; const on = d.on, k = d.k, before = d.before; clear();
+    if(on){ el.__cvJustDragged = true; setTimeout(()=>{ el.__cvJustDragged = false; }, 0); catMoveCol(k, before); } };
+  const cancel = () => clear();
+  const esc = ev => { if(ev.key === 'Escape') clear(); };
+  el.addEventListener('pointerdown', ev => {
+    const btn = ev.target.closest && ev.target.closest('.cv-th'), th = btn && btn.parentNode;
+    if(!th || th.classList.contains('cv-first') || !th.dataset.k || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
+    clear();
+    d = { k:th.dataset.k, th, label:btn.textContent.trim(), x0:ev.clientX, x:ev.clientX, y:ev.clientY, on:false, before:undefined, raf:0 };
+    document.addEventListener('pointermove', move, { passive:false }); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', cancel); document.addEventListener('keydown', esc);
+  });
+  // letting go after a drag must not also count as a click on the heading (that would sort)
+  el.addEventListener('click', ev => { if(el.__cvJustDragged && ev.target.closest && ev.target.closest('.cv-th')){ ev.stopPropagation(); ev.preventDefault(); } }, true);
+}
 function cvAgo(iso){
   const d = new Date(iso); if(!iso || isNaN(d)) return '';
   const m = Math.round((Date.now() - d) / 60000);
@@ -2583,7 +2692,10 @@ function catViewBar(){
   if(!bar.firstChild) bar.innerHTML = '<div class="cv-seg" role="group" aria-label="View">'
     + '<button type="button" data-v="table" onclick="catSetView(\'table\')">'+cvIc('table')+'Table</button>'
     + '<button type="button" data-v="board" onclick="catSetView(\'board\')">'+cvIc('board')+'Board</button></div>'
-    + '<label class="cv-find">'+cvIc('search')+'<input type="search" id="catFind" placeholder="Search leads" aria-label="Search leads" autocomplete="off" oninput="CAT_FIND=this.value;catRender()"></label>';
+    + '<label class="cv-find">'+cvIc('search')+'<input type="search" id="catFind" placeholder="Search leads" aria-label="Search leads" autocomplete="off" oninput="CAT_FIND=this.value;catRender()"></label>'
+    + '<button type="button" class="cv-reset" id="catColsReset" onclick="catColsReset()" title="Put the columns back in their original order" hidden>Reset columns</button>';
+  const rs = document.getElementById('catColsReset'); if(rs) rs.hidden = !(CAT_VIEW === 'table' && cvColsCustom());
+  cvDragInit(document.getElementById('catList'));
   bar.querySelectorAll('.cv-seg button').forEach(b=>{ const on = b.dataset.v === CAT_VIEW; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
 }
 const cvKey = "if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}";
@@ -2591,7 +2703,7 @@ function cvLead(a){ return '<span class="cv-lead"><span class="cv-av" style="--k
   +'<span class="cv-nm"><b>'+esc(a.name)+'</b>'+(a.company?'<span class="co">'+esc(a.company)+'</span>':'')+'</span></span>'; }
 function cvStage(a){ return '<span class="cv-chip st-'+a.stage+'"><i></i>'+esc(a.label)+'</span>'; }
 function catTableHtml(recs){
-  const rows = catSorted(recs), nil = '<span class="cv-nil">—</span>';
+  const rows = catSorted(recs), nil = '<span class="cv-nil">—</span>', COLS = cvCols();
   const cell = {
     name:a=>cvLead(a),
     stage:a=>cvStage(a),
@@ -2608,18 +2720,18 @@ function catTableHtml(recs){
     phone:a=>a.phone ? '<a href="tel:'+esc(a.phone)+'" onclick="event.stopPropagation()">'+esc(a.phone)+'</a>' : nil
   };
   const cls = c => (c.k === 'name' ? 'cv-first' : 'c-' + c.k) + (c.num ? ' num' : '');
-  const head = CV_COLS.map(c=>'<th scope="col" class="'+cls(c)+'"'+(CAT_SORT.k===c.k ? ' aria-sort="'+(CAT_SORT.d>0?'ascending':'descending')+'"' : '')+'>'
-    +'<button type="button" class="cv-th'+(c.num?' num':'')+'" onclick="catSortBy(\''+c.k+'\')" title="Sort by '+c.l.toLowerCase()+'">'+cvIc(c.ic)+'<span>'+c.l+'</span>'+cvIc('sort','cv-sort')+'</button></th>').join('');
+  const head = COLS.map(c=>'<th scope="col" class="'+cls(c)+'" data-k="'+c.k+'"'+(CAT_SORT.k===c.k ? ' aria-sort="'+(CAT_SORT.d>0?'ascending':'descending')+'"' : '')+'>'
+    +'<button type="button" class="cv-th'+(c.num?' num':'')+'" onclick="catSortBy(\''+c.k+'\')" onkeydown="cvThKey(event,\''+c.k+'\')" title="'+(c.k==='name' ? 'Click to sort' : 'Click to sort. Drag sideways to move this column.')+'">'+cvIc(c.ic)+'<span>'+c.l+'</span>'+cvIc('sort','cv-sort')+'</button></th>').join('');
   // phone: each lead folds to two lines — this cell is the second one (hidden on wider screens)
   const sum = a => [a.event, a.date ? cvDate(a.date) : '', a.guests ? a.guests + (a.guests === 1 ? ' guest' : ' guests') : '', a.shop, a.value != null ? catMoney(a.value) : ''].filter(Boolean).map(esc).join(', ');
   const body = rows.map(a=>'<tr class="'+(a.unread?'unread':'')+'" tabindex="0" onclick="'+a.open+'" onkeydown="'+cvKey+'">'
-    + CV_COLS.map(c=>'<td class="'+cls(c)+'">'+cell[c.k](a)+'</td>').join('') + '<td class="c-sum">'+sum(a)+'</td></tr>').join('');
+    + COLS.map(c=>'<td class="'+cls(c)+'">'+cell[c.k](a)+'</td>').join('') + '<td class="c-sum">'+sum(a)+'</td></tr>').join('');
   const tot = k => rows.reduce((s,a)=>s + (a[k]||0), 0);
   const foot = { name:'<b style="margin:0">'+rows.length+'</b> '+(rows.length===1?'lead':'leads'), guests:tot('guests') ? 'Sum<b>'+tot('guests').toLocaleString('en-US')+'</b>' : '',
     value:rows.some(a=>a.value!=null) ? 'Sum<b>'+catMoney(tot('value'))+'</b>' : '', paid:rows.some(a=>a.paid!=null) ? 'Sum<b>'+catMoney(tot('paid'))+'</b>' : '' };
-  return '<div class="cv-scroll"><table class="cv-tbl" style="min-width:'+CV_COLS.reduce((s,c)=>s+c.w,0)+'px"><colgroup>'+CV_COLS.map(c=>'<col style="width:'+c.w+'px">').join('')+'</colgroup>'
+  return '<div class="cv-scroll"><table class="cv-tbl" style="min-width:'+COLS.reduce((s,c)=>s+c.w,0)+'px"><colgroup>'+COLS.map(c=>'<col style="width:'+c.w+'px">').join('')+'</colgroup>'
     + '<thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody>'
-    + '<tfoot><tr>'+CV_COLS.map(c=>'<td class="'+cls(c)+'">'+(foot[c.k]||'')+'</td>').join('')+'</tr></tfoot></table></div>';
+    + '<tfoot><tr>'+COLS.map(c=>'<td class="'+cls(c)+'">'+(foot[c.k]||'')+'</td>').join('')+'</tr></tfoot></table></div>';
 }
 function catBoardHtml(recs){
   const by = {}; recs.forEach(a=>{ (by[a.stage] = by[a.stage] || []).push(a); });
@@ -2658,7 +2770,7 @@ function catRender(){
   all.filter(isOpen).forEach(x=>{ kc.all++; kc[x.kind]++; });
   const kd = document.getElementById('catKinds');
   if(kd) kd.innerHTML = [['all','All inquiries'],['catering','Catering'],['event','Private events'],['experience','Experiences'],['table','Table requests'],['donation','Donations'],['question','Questions']].map(([k,l])=>
-    '<button class="ctab'+(CAT_KIND===k?' on':'')+'" onclick="CAT_KIND=\''+k+'\';catRender()">'+(CAT_KINDS[k]?'<span class="kdot" style="background:'+CAT_KINDS[k][1]+'"></span>':'')+l+'<span class="cnt">'+kc[k]+'</span></button>').join('');
+    '<button type="button" class="ctab'+(CAT_KIND===k?' on':'')+'" aria-pressed="'+(CAT_KIND===k)+'"'+(CAT_KINDS[k]?' style="--kc:'+CAT_KINDS[k][1]+'"':'')+' onclick="CAT_KIND=\''+k+'\';catRender()">'+l+'<span class="cnt">'+kc[k]+'</span></button>').join('');
   const tools = document.getElementById('catTools');
   if(tools && !tools.querySelector('button')) tools.innerHTML = '<button class="btn btn-ghost btn-sm" onclick="catLoad();inqLoad()">↻ Refresh</button><button class="btn btn-gold btn-sm" onclick="catNew()">＋ New lead</button>';
   catViewBar();

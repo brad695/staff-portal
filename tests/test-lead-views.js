@@ -2,6 +2,8 @@
  * 💼 Catering Leads list views (manager.html, 2026-11-22 — "not happy with the look of our catering leads"):
  * the list draws as a TABLE (sortable columns, totals row, two-line rows on a phone) or a BOARD (a column per stage),
  * with a search box. Opening a lead, the kind tabs and the stage chips work as before.
+ * Same day: "make the columns rearrangeable, and change the look of the tabs, color code them, the whole thing like a
+ * button" — table columns move by dragging a heading (order remembered), and each kind tab is a button in its own color.
  * The page is served under the staging host; Supabase and the CDNs are stood in — nothing goes to the network.
  * Run: NODE_PATH=$(npm root -g) node tests/test-lead-views.js     (SHOTS=dir for screenshots, PW_CHROME=path, MANAGER=file)
  */
@@ -99,6 +101,7 @@ async function open(browser, opts) {
     return json({});
   });
   if (opts.view) await page.addInitScript((v) => { try { localStorage.setItem("cat_view", v); } catch (_) {} }, opts.view);
+  if (opts.cols) await page.addInitScript((v) => { try { localStorage.setItem("cat_cols", v); } catch (_) {} }, opts.cols);
   await page.goto(HOST + "/manager.html");
   await page.waitForFunction(() => !document.getElementById("consoleView").classList.contains("hide"), null, { timeout: 15000 });
   await page.evaluate(async () => { mtab("catering"); await catLoad(); await inqLoad(); });
@@ -195,6 +198,107 @@ const shown = (page, sel) => page.evaluate((s) => { const e = document.querySele
     t("Enter on a row opens it (keyboard)", (await page.textContent("#catTitle")) === "Marcus Lee");
     await page.evaluate(() => catClose());
     t("no errors on the page", st.errors.length === 0, st.errors);
+    await ctx.close();
+  }
+
+  console.log("\nmanager.html · 💼 Catering Leads → kind tabs as color-coded buttons");
+  {
+    const { ctx, page, st } = await open(browser);
+    const tabs = () => page.$$eval("#catKinds .ctab", (bs) => bs.map((b) => { const c = getComputedStyle(b); return { text: b.childNodes[0].textContent, on: b.classList.contains("on"), pressed: b.getAttribute("aria-pressed"), kc: b.style.getPropertyValue("--kc"), bg: c.backgroundColor, color: c.color, radius: parseFloat(c.borderTopLeftRadius), borderB: c.borderBottomWidth, borderT: c.borderTopWidth }; }));
+    const rgb = (hex) => "rgb(" + [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(", ") + ")";
+    let tb = await tabs();
+    t("seven buttons, each carrying its kind's color", tb.length === 7 && JSON.stringify(tb.map((x) => x.kc)) === JSON.stringify(["", "#06273a", "#7c3aed", "#b45309", "#0f766e", "#be185d", "#2563eb"]), tb.map((x) => x.kc));
+    t("the picked one is filled solid with white text and says it is pressed", tb[0].on && tb[0].pressed === "true" && tb[0].color === "rgb(255, 255, 255)" && tb[0].bg === "rgb(61, 70, 84)" && tb.slice(1).every((x) => x.pressed === "false"), tb[0]);
+    t("the others are tinted in their own color with colored text", tb.slice(1).every((x) => x.color === rgb(x.kc) && x.bg !== "rgba(0, 0, 0, 0)" && x.bg !== rgb(x.kc)) && new Set(tb.map((x) => x.bg)).size === 7, tb.map((x) => x.bg));
+    t("a whole button, not an underlined tab", tb.every((x) => x.radius >= 8 && x.borderB === x.borderT) && await page.evaluate(() => getComputedStyle(document.getElementById("catKinds")).borderBottomWidth === "0px" && !document.querySelector("#catKinds .kdot")));
+    await page.click('#catKinds .ctab:has-text("Experiences")');
+    tb = await tabs();
+    t("picking Experiences fills it with the experience color", tb[3].on && tb[3].bg === rgb("#b45309") && tb[3].color === "rgb(255, 255, 255)" && !tb[0].on && (await names(page)).length === 3, tb[3]);
+    t("the count sits inside the button", (await page.textContent("#catKinds .ctab.on .cnt")) === "3");
+    await shot(page, "views-kind-buttons");
+    t("no errors on the page", st.errors.length === 0, st.errors);
+    await ctx.close();
+  }
+
+  console.log("\nmanager.html · 💼 Catering Leads → moving columns");
+  {
+    const { ctx, page, st } = await open(browser);
+    const heads = () => page.$$eval("#catList .cv-tbl thead th", (h) => h.map((x) => x.textContent.trim()));
+    const DEF = ["Lead", "Stage", "Event date", "Guests", "Value", "Type", "Event", "Shop", "Paid", "Last activity", "Email", "Phone"];
+    const center = async (sel) => { const b = await page.locator(sel).boundingBox(); return { x: b.x + b.width / 2, y: b.y + b.height / 2, left: b.x, right: b.x + b.width }; };
+    const drag = async (from, toX, opts) => { const a = await center(from); await page.mouse.move(a.x, a.y); await page.mouse.down(); await page.mouse.move(a.x + (toX < a.x ? -12 : 12), a.y + 6, { steps: 3 }); await page.mouse.move(toX, a.y + 10, { steps: 8 }); if (opts && opts.mid) await opts.mid(); if (!(opts && opts.hold)) await page.mouse.up(); };
+    t("Reset columns is hidden while the order is the original", !(await shown(page, "#catColsReset")));
+    // Type -> just after Lead
+    let st0 = await center("#catList th.c-stage");
+    await drag("#catList th.c-kind .cv-th", st0.left + 14, { mid: async () => {
+      t("while dragging: a line shows where it lands and a label follows the pointer", await page.evaluate(() => { const d = document.getElementById("cvDrop"), g = document.getElementById("cvGhost"), s = document.querySelector("#catList th.c-stage").getBoundingClientRect(); return !!d && !!g && g.textContent === "Type" && Math.abs(parseFloat(d.style.left) - s.left) < 2 && document.querySelector("#catList th.c-kind").classList.contains("cv-moving"); }));
+    } });
+    t("dropping Type after Lead puts it there", JSON.stringify(await heads()) === JSON.stringify(["Lead", "Type", "Stage", "Event date", "Guests", "Value", "Event", "Shop", "Paid", "Last activity", "Email", "Phone"]), await heads());
+    t("every row's cells follow the headings", await page.evaluate(() => { const h = [...document.querySelectorAll("#catList thead th")].map((x) => x.className.replace(" num", "")); return [...document.querySelectorAll("#catList tbody tr, #catList tfoot tr")].every((r) => JSON.stringify([...r.children].filter((c) => !c.classList.contains("c-sum")).map((c) => c.className.replace(" num", ""))) === JSON.stringify(h)) && [...document.querySelectorAll("#catList col")].length === h.length; }));
+    t("the widths travel with the columns", await page.evaluate(() => { const c = document.querySelectorAll("#catList col"); return c[1].style.width === "158px" && c[2].style.width === "142px"; }));
+    t("the drag did not sort the table or leave anything behind", (await page.evaluate(() => CAT_SORT.k + CAT_SORT.d)) === "last-1" && await page.evaluate(() => !document.getElementById("cvDrop") && !document.getElementById("cvGhost") && !document.querySelector(".cv-moving, .c-moving, .cv-dragging")));
+    t("the order is remembered", (await page.evaluate(() => localStorage.getItem("cat_cols"))) === JSON.stringify(["kind", "stage", "date", "guests", "value", "event", "shop", "paid", "last", "email", "phone"]));
+    t("Reset columns shows up once the order is yours", await shown(page, "#catColsReset"));
+    // Stage -> far right: the table scrolls itself when the pointer reaches its edge
+    const box = await page.locator("#catList .cv-scroll").boundingBox();
+    await drag("#catList th.c-stage .cv-th", box.x + box.width - 8, { hold: true });
+    await page.waitForFunction(() => { const b = document.querySelector("#catList .cv-scroll"); return b.scrollLeft >= b.scrollWidth - b.clientWidth - 1; }, null, { timeout: 8000 });
+    await page.mouse.move(box.x + box.width - 6, box.y + 20);
+    await page.mouse.up();
+    let hs = await heads();
+    t("dragging to the right edge scrolls the table and drops the column at the end", hs[hs.length - 1] === "Stage" && hs[1] === "Type" && hs[2] === "Event date", hs);
+    // a plain click still sorts
+    await page.evaluate(() => { document.querySelector("#catList .cv-scroll").scrollLeft = 0; });
+    await page.click("#catList th.c-guests .cv-th");
+    t("a click on a heading still sorts", (await page.evaluate(() => CAT_SORT.k + CAT_SORT.d)) === "guests-1" && (await names(page))[0].indexOf("<img") === 0);
+    // Lead stays first
+    const g0 = await center("#catList th.c-guests");
+    await drag("#catList th.cv-first .cv-th", g0.x + 30);
+    t("Lead cannot be dragged away", (await heads())[0] === "Lead" && (await page.evaluate(() => CAT_COLS.indexOf("name"))) === -1);
+    const lead = await center("#catList th.cv-first");
+    await drag("#catList th.c-guests .cv-th", lead.x);
+    hs = await heads();
+    t("and nothing can be dropped in front of it", hs[0] === "Lead" && hs[1] === "Guests", hs);
+    // Escape cancels
+    const before = JSON.stringify(await heads());
+    const v0 = await center("#catList th.c-value");
+    await drag("#catList th.c-kind .cv-th", v0.right - 6, { hold: true });
+    await page.keyboard.press("Escape");
+    await page.mouse.up();
+    t("Esc while dragging leaves the order alone", JSON.stringify(await heads()) === before && await page.evaluate(() => !document.getElementById("cvDrop") && !document.getElementById("cvGhost")));
+    // keyboard
+    await page.focus("#catList th.c-kind .cv-th");
+    await page.keyboard.press("Alt+ArrowRight");
+    hs = await heads();
+    t("Alt+→ on a heading moves it one place and keeps the focus on it", hs[3] === "Type" && await page.evaluate(() => document.activeElement === document.querySelector("#catList th.c-kind .cv-th")), hs);
+    await page.keyboard.press("Alt+ArrowLeft");
+    t("Alt+← moves it back", (await heads())[2] === "Type");
+    // finger (pointer events, no mouse)
+    await page.evaluate(() => {
+      const th = document.querySelector("#catList th.c-value .cv-th"), r = th.getBoundingClientRect(), to = document.querySelector("#catList th.c-guests").getBoundingClientRect();
+      const ev = (type, x, target) => target.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerType: "touch", pointerId: 7, isPrimary: true, button: 0, clientX: x, clientY: r.top + 10 }));
+      ev("pointerdown", r.left + 20, th); ev("pointermove", r.left + 5, document); ev("pointermove", to.left + 6, document); ev("pointerup", to.left + 6, document);
+    });
+    hs = await heads();
+    t("it works with a finger too (touch pointer)", hs.indexOf("Value") === hs.indexOf("Guests") - 1 && (await page.evaluate(() => getComputedStyle(document.querySelector("#catList .cv-th")).touchAction)) === "pan-y", hs);
+    // reset
+    await page.click("#catColsReset");
+    t("Reset columns puts them back and forgets the saved order", JSON.stringify(await heads()) === JSON.stringify(DEF) && (await page.evaluate(() => localStorage.getItem("cat_cols"))) === null && !(await shown(page, "#catColsReset")));
+    await page.evaluate(() => catMoveCol("phone", "stage"));
+    await page.click('.cv-seg button[data-v="board"]');
+    t("no Reset link on the board", !(await shown(page, "#catColsReset")));
+    t("no errors on the page", st.errors.length === 0, st.errors);
+    await ctx.close();
+  }
+  {
+    const { ctx, page, st } = await open(browser, { cols: JSON.stringify(["phone", "bogus", "phone", "name", "kind"]) });
+    const hs = await page.$$eval("#catList .cv-tbl thead th", (h) => h.map((x) => x.textContent.trim()));
+    t("a saved order comes back on the next visit; junk in it is ignored and missing columns are added at the end", JSON.stringify(hs) === JSON.stringify(["Lead", "Phone", "Type", "Stage", "Event date", "Guests", "Value", "Event", "Shop", "Paid", "Last activity", "Email"]) && st.errors.length === 0, hs);
+    await ctx.close();
+  }
+  {
+    const { ctx, page, st } = await open(browser, { cols: "{not json" });
+    t("a broken saved order falls back to the original", (await page.$$eval("#catList .cv-tbl thead th", (h) => h.map((x) => x.textContent.trim())))[1] === "Stage" && st.errors.length === 0, st.errors);
     await ctx.close();
   }
 
