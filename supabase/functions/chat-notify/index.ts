@@ -232,8 +232,10 @@ Deno.serve(async (req) => {
 
   const id = String(b.id || "");
   const { data: m } = await db.from("chat_messages")
-    .select("id,convo_id,parent_id,emp_id,author_kind,body_html,is_note,files,fwd,deleted_at").eq("id", id).maybeSingle();
-  if (!m || m.deleted_at || m.author_kind === "bot" || m.author_kind === "system") return ok({ skipped: "nothing to send" });
+    .select("id,convo_id,parent_id,emp_id,author_kind,body_html,is_note,files,fwd,deleted_at,card").eq("id", id).maybeSingle();
+  // 2026-11-21: booking alert cards (chat_booking_post — Wix reservations, paid experiences) go to the whole channel
+  const alert = m?.author_kind === "bot" && !!(m as any).card?.alert;
+  if (!m || m.deleted_at || ((m.author_kind === "bot" || m.author_kind === "system") && !alert)) return ok({ skipped: "nothing to send" });
 
   const { data: c } = await db.from("chat_convos").select("id,kind,name,client_name").eq("id", m.convo_id).maybeSingle();
   if (!c) return ok({ skipped: "no conversation" });
@@ -245,6 +247,7 @@ Deno.serve(async (req) => {
   const text0 = plain(html);
   const mentioned = new Set([...html.matchAll(/data-uid="(\d+)"/g)].map((x) => Number(x[1])).filter((e) => memberIds.has(e)));
   const want = new Set<number>(mentioned);
+  if (alert) memberIds.forEach((e) => want.add(e));
   if (!m.is_note) {
     if (c.kind === "dm") memberIds.forEach((e) => want.add(e));
     if (c.kind === "client" && m.author_kind === "client") memberIds.forEach((e) => want.add(e));
@@ -281,7 +284,9 @@ Deno.serve(async (req) => {
   const first = (n: string) => String(n || "").split(" ")[0];
   const fromClient = m.author_kind === "client";
   const sender = fromClient ? (c.client_name || c.name || "Client") : (name[Number(m.emp_id)] || "Someone");
-  let text = text0 || (m.files?.length ? "Sent a file" : m.fwd ? "Forwarded a message" : "New message");
+  const cd: any = (m as any).card;
+  const cardText = alert ? [cd.t, ...(cd.f || []).filter((p: any) => ["When", "Guest", "Party", "Experience"].includes(p?.[0])).map((p: any) => p[1])].join(" · ") : "";
+  let text = cardText || text0 || (m.files?.length ? "Sent a file" : m.fwd ? "Forwarded a message" : "New message");
   if (text.length > 180) text = text.slice(0, 177) + "…";
   const solo = c.kind === "dm" && memberIds.size <= 2;
   const payloadFor = (e: number) => {
@@ -290,7 +295,7 @@ Deno.serve(async (req) => {
       : solo ? sender
       : [...memberIds].filter((x) => x !== e).map((x) => first(name[x])).filter(Boolean).join(", ") || "Group message";
     if (m.parent_id) t = "Thread in " + t;
-    return { t, b: solo || fromClient ? text : `${first(sender)}: ${text}`, c: c.id, m: m.id, tag: "c" + c.id };
+    return { t, b: solo || fromClient || alert ? text : `${first(sender)}: ${text}`, c: c.id, m: m.id, tag: "c" + c.id };
   };
   const r = await deliver(targets, payloadFor, v);
   return ok({ ...r, devices: targets.length });
