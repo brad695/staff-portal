@@ -7,8 +7,9 @@
  * Then "also do a calendar view" — a third view: the month by event date, leads with no date in a strip underneath,
  * a list of days on a phone.
  * Later: "switch the button designs, give bottom row the big prominent colored buttons, move top row to bottom and give
- * them checkmarks inside the button" — the stage row is on top as big buttons in each stage's color; the type row is
- * under it as small pills with a tick box (tick one or more kinds; All inquiries clears them).
+ * them checkmarks inside the button", then "swap positions though, colored on bottom" — the type row is on top as small
+ * pills with a tick box (tick one or more kinds; All inquiries clears them); the stage row is under it as big buttons
+ * in each stage's color.
  * The page is served under the staging host; Supabase and the CDNs are stood in — nothing goes to the network.
  * Run: NODE_PATH=$(npm root -g) node tests/test-lead-views.js     (SHOTS=dir for screenshots, PW_CHROME=path, MANAGER=file)
  */
@@ -206,13 +207,13 @@ const shown = (page, sel) => page.evaluate((s) => { const e = document.querySele
     await ctx.close();
   }
 
-  console.log("\nmanager.html · 💼 Catering Leads → stage buttons on top, type checkmarks under them");
+  console.log("\nmanager.html · 💼 Catering Leads → type checkmarks on top, big colored stage buttons under them");
   {
     const { ctx, page, st } = await open(browser);
     const rgb = (hex) => "rgb(" + [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(", ") + ")";
     const stg = () => page.$$eval("#catChips .chip", (bs) => bs.map((b) => { const c = getComputedStyle(b); return { text: b.childNodes[0].textContent, k: (b.className.match(/st-(\w+)/) || [])[1], on: b.classList.contains("on"), pressed: b.getAttribute("aria-pressed"), bg: c.backgroundColor, color: c.color, radius: parseFloat(c.borderTopLeftRadius), fs: parseFloat(c.fontSize), padT: parseFloat(c.paddingTop), n: (b.querySelector("b") || {}).textContent }; }));
     const typ = () => page.$$eval("#catKinds .ctab", (bs) => bs.map((b) => { const c = getComputedStyle(b), k = b.querySelector(".cv-ck"), kc = getComputedStyle(k); return { text: b.querySelector(".kl").textContent, on: b.classList.contains("on"), role: b.getAttribute("role"), checked: b.getAttribute("aria-checked"), kcVar: b.style.getPropertyValue("--kc"), radius: parseFloat(c.borderTopLeftRadius), fs: parseFloat(c.fontSize), box: kc.backgroundColor, boxW: k.getBoundingClientRect().width, tick: getComputedStyle(k.querySelector("svg")).opacity, n: b.querySelector(".cnt").textContent }; }));
-    t("the stage row is on top, the type row under it, then the list", await page.evaluate(() => { const a = document.getElementById("catChips"), b = document.getElementById("catKinds"), c = document.getElementById("catList"); return a.getBoundingClientRect().bottom <= b.getBoundingClientRect().top + 1 && b.getBoundingClientRect().bottom <= c.getBoundingClientRect().top + 1 && a.nextElementSibling === b && b.nextElementSibling === c; }));
+    t("the type row is on top, the colored stage row under it, then the list", await page.evaluate(() => { const a = document.getElementById("catKinds"), b = document.getElementById("catChips"), c = document.getElementById("catList"); return a.getBoundingClientRect().bottom <= b.getBoundingClientRect().top + 1 && b.getBoundingClientRect().bottom <= c.getBoundingClientRect().top + 1 && a.nextElementSibling === b && b.nextElementSibling === c; }));
     let sb = await stg();
     t("eleven stage buttons: Open, the nine stages, All", sb.map((x) => x.text).join() === "Open,New,Replied,Quoting,Proposal sent,Signed,Invoiced,Deposit paid,Paid,Lost,All" && await page.evaluate(() => !document.querySelector("#catChips .lbl, #catChips .sep")), sb.map((x) => x.text));
     let tp = await typ();
