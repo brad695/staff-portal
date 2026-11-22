@@ -992,12 +992,123 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       #catList .cat-card > .pill{ margin-left:auto; }
     }
   </style>
+  <style id="cat-views">
+    /* CAT-VIEWS (2026-11-22, Maverick: "not happy with the look of our catering leads" — picked the spreadsheet-style CRM look):
+       the lead list is a TABLE (one line per lead, sortable columns, totals row) or a BOARD (one column per stage).
+       Table | Board switch + search live in #catViewBar; the choice is remembered (localStorage cat_view).
+       Scoped to the list only — the lead window (catModal / inqModal) is untouched. Replaces the CAT-CARDS list above. */
+    #panel-catering{ --cv-line:#e4e7ec; --cv-soft:#f6f7f9; --cv-hover:#f2f6f9; --cv-sub:#67717d; --cv-navy:#06273a; }
+    #panel-catering .cv-bar{ display:flex; align-items:center; gap:10px 14px; flex-wrap:wrap; margin-top:14px; }
+    #panel-catering .cv-bar .cat-tools{ margin:0 0 0 auto; }
+    #panel-catering .cv-left{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; flex:1 1 300px; min-width:0; }
+    .cv-ic{ width:15px; height:15px; flex:none; fill:none; stroke:currentColor; stroke-width:1.4; stroke-linecap:round; stroke-linejoin:round; }
+    .cv-seg{ display:inline-flex; padding:3px; gap:2px; background:#eceff2; border-radius:9px; }
+    .cv-seg button{ appearance:none; border:0; background:none; font:inherit; font-size:.82rem; font-weight:600; color:#4a5462; padding:6px 12px 6px 9px; border-radius:7px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .cv-seg button:hover{ color:var(--ink); }
+    .cv-seg button.on{ background:#fff; color:var(--cv-navy); box-shadow:0 1px 2px rgba(18,26,38,.14); }
+    .cv-seg button:focus-visible, .cv-th:focus-visible, .cv-card:focus-visible{ outline:2px solid #3a8bb3; outline-offset:1px; }
+    .cv-find{ display:inline-flex; align-items:center; gap:7px; flex:0 1 250px; min-width:150px; height:34px; padding:0 10px; border:1px solid var(--line); border-radius:9px; background:#fff; color:var(--cv-sub); }
+    .cv-find:focus-within{ border-color:#3a8bb3; box-shadow:0 0 0 3px rgba(58,139,179,.15); }
+    .cv-find input{ flex:1; min-width:0; border:0; outline:0; background:none; font:inherit; font-size:.84rem; color:var(--ink); padding:0; }
+    .cv-find input::placeholder{ color:#8a939e; }
+
+    #catList.cv-table, #catList.cv-board{ display:block; }
+    #catList.cv-table{ border:1px solid var(--cv-line); border-radius:10px; background:#fff; overflow:hidden; }
+    #catList .cv-scroll{ overflow:auto; max-height:max(380px, calc(100vh - 372px)); scrollbar-width:thin; }
+    .cv-tbl{ border-collapse:separate; border-spacing:0; table-layout:fixed; width:100%; font-size:.82rem; line-height:1.3; color:var(--ink); font-variant-numeric:tabular-nums; }
+    .cv-tbl th, .cv-tbl td{ height:40px; padding:0 12px; text-align:left; vertical-align:middle; font-weight:400; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; background:#fff; border-bottom:1px solid var(--cv-line); border-right:1px solid var(--cv-line); }
+    .cv-tbl th:last-child, .cv-tbl td:last-child{ border-right:0; }
+    .cv-tbl thead th{ position:sticky; top:0; z-index:2; height:36px; padding:0; color:var(--cv-sub); font-weight:500; }
+    .cv-tbl .cv-first{ position:sticky; left:0; z-index:1; border-right-color:#d3d9e0; }
+    .cv-tbl thead .cv-first, .cv-tbl tfoot .cv-first{ z-index:3; }
+    .cv-th{ appearance:none; display:flex; align-items:center; gap:6px; width:100%; height:100%; padding:0 12px; border:0; background:none; font:inherit; color:inherit; cursor:pointer; text-align:left; }
+    .cv-th:hover{ background:var(--cv-soft); color:var(--ink); }
+    .cv-th .cv-sort{ margin-left:auto; width:12px; height:12px; opacity:0; }
+    .cv-th:hover .cv-sort{ opacity:.45; }
+    .cv-tbl th[aria-sort] .cv-th{ color:var(--cv-navy); font-weight:600; }
+    .cv-tbl th[aria-sort] .cv-sort{ opacity:1; }
+    .cv-tbl th[aria-sort="ascending"] .cv-sort{ transform:rotate(180deg); }
+    .cv-th.num{ justify-content:flex-end; }
+    .cv-th.num .cv-sort{ order:-1; margin:0 auto 0 0; }
+    .cv-tbl td.num{ text-align:right; }
+    .cv-tbl tbody tr{ cursor:pointer; }
+    .cv-tbl tbody tr:hover td, .cv-tbl tbody tr:focus-visible td{ background:var(--cv-hover); }
+    .cv-tbl tbody tr:focus-visible{ outline:2px solid #3a8bb3; outline-offset:-2px; }
+    .cv-tbl tfoot td{ position:sticky; bottom:0; z-index:2; height:36px; background:#fafbfc; color:var(--cv-sub); font-size:.78rem; border-bottom:0; box-shadow:0 -1px 0 var(--cv-line); }
+    .cv-tbl tfoot b{ color:var(--ink); font-weight:600; margin-left:5px; }
+    .cv-tbl td.c-sum{ display:none; }
+    .cv-lead{ display:flex; align-items:center; gap:9px; min-width:0; }
+    .cv-av{ position:relative; flex:none; width:22px; height:22px; border-radius:6px; display:grid; place-items:center; font-size:.62rem; font-weight:700; letter-spacing:.2px; background:color-mix(in srgb, var(--kc,#06273a) 13%, #fff); color:var(--kc,#06273a); }
+    .cv-nm{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .cv-nm b{ font-weight:600; }
+    .cv-nm .co{ color:var(--cv-sub); margin-left:6px; }
+    .unread .cv-nm b{ font-weight:800; }
+    .cv-dot{ position:absolute; top:-4px; right:-4px; width:10px; height:10px; border-radius:50%; background:#d97706; border:2px solid #fff; }
+    .cv-chip{ display:inline-flex; align-items:center; gap:6px; max-width:100%; padding:2px 8px 2px 7px; border-radius:6px; font-size:.76rem; font-weight:600; line-height:1.5; white-space:nowrap; background:var(--b,#eceef1); color:var(--t,#4b5563); }
+    .cv-chip i{ flex:none; width:6px; height:6px; border-radius:50%; background:var(--d,#9aa3af); }
+    .cv-chip.st-new{ --b:#fdf0d2; --t:#7a4a00; --d:#d98a00; }
+    .cv-chip.st-replied{ --b:#e1edfb; --t:#1b4a86; --d:#3b82c4; }
+    .cv-chip.st-quoted{ --b:#ebe6fb; --t:#4a3596; --d:#7c5cd6; }
+    .cv-chip.st-contract_sent{ --b:#fbe6f1; --t:#8a2560; --d:#cf4f95; }
+    .cv-chip.st-signed{ --b:#dcf3f0; --t:#0f5c56; --d:#1a9e93; }
+    .cv-chip.st-invoiced{ --b:#fde9dd; --t:#8a3a12; --d:#e0703a; }
+    .cv-chip.st-deposit_paid{ --b:#e8f5d6; --t:#3f6212; --d:#7cb518; }
+    .cv-chip.st-paid{ --b:#d5f2e0; --t:#0b5d33; --d:#1f9d57; }
+    .cv-chip.st-lost{ --b:#eceef1; --t:#4b5563; --d:#9aa3af; }
+    .cv-kind{ display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis; vertical-align:middle; padding:2px 8px; border-radius:6px; font-size:.76rem; font-weight:600; line-height:1.5; white-space:nowrap; background:color-mix(in srgb, var(--kc,#06273a) 9%, #fff); color:var(--kc,#06273a); }
+    .cv-nil{ color:#b3bac3; }
+    .cv-rel{ margin-left:8px; font-size:.74rem; color:var(--cv-sub); }
+    .cv-rel.soon{ color:#b45309; font-weight:600; }
+    .cv-full{ color:#0b5d33; font-weight:600; }
+    .cv-tbl td a{ color:inherit; text-decoration:none; }
+    .cv-tbl td a:hover{ color:var(--cv-navy); text-decoration:underline; }
+
+    #catList.cv-board{ border:0; border-radius:0; background:none; box-shadow:none; overflow:visible; }
+    .cv-cols{ display:flex; gap:10px; align-items:flex-start; overflow-x:auto; padding:2px 2px 14px; scrollbar-width:thin; }
+    .cv-col{ flex:0 0 268px; min-width:0; background:#f3f5f7; border-radius:12px; padding:10px 8px 8px; display:flex; flex-direction:column; gap:8px; }
+    .cv-colhead{ display:flex; align-items:center; gap:8px; padding:0 3px 2px; min-height:24px; }
+    .cv-col .cv-n{ font-size:.76rem; font-weight:600; color:var(--cv-sub); }
+    .cv-col .cv-total{ margin-left:auto; font-size:.76rem; color:var(--cv-sub); font-variant-numeric:tabular-nums; }
+    .cv-col.empty{ flex-basis:42px; padding:10px 0; align-items:center; min-height:168px; }
+    .cv-col.empty .cv-chip{ writing-mode:vertical-rl; padding:8px 3px 8px 3px; gap:7px; }
+    .cv-card{ display:grid; gap:7px; padding:11px 12px; background:#fff; border:1px solid var(--cv-line); border-radius:10px; box-shadow:0 1px 1px rgba(18,26,38,.04); cursor:pointer; font-size:.82rem; color:var(--ink); }
+    .cv-card:hover{ border-color:#c5ccd6; box-shadow:0 2px 8px rgba(18,26,38,.09); }
+    .cv-card .cv-nm{ white-space:normal; line-height:1.3; }
+    .cv-card .cv-nm .co{ display:block; margin:1px 0 0; font-size:.76rem; }
+    .cv-card .cv-lead{ align-items:flex-start; }
+    .cv-card .cv-ev{ color:#3f4854; line-height:1.35; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+    .cv-facts{ display:flex; flex-wrap:wrap; gap:4px 12px; color:var(--cv-sub); font-size:.76rem; font-variant-numeric:tabular-nums; }
+    .cv-facts span{ display:inline-flex; align-items:center; gap:4px; }
+    .cv-facts .cv-ic{ width:13px; height:13px; }
+    .cv-facts .soon{ color:#b45309; font-weight:600; }
+    .cv-cardfoot{ display:flex; align-items:center; gap:8px; padding-top:7px; border-top:1px solid var(--line-soft); }
+    .cv-cardfoot .cv-val{ margin-left:auto; font-weight:600; font-variant-numeric:tabular-nums; }
+    .cv-cardfoot .cv-sub{ font-size:.74rem; color:var(--cv-sub); }
+
+    @media (max-width:640px){
+      #panel-catering .cv-bar .cat-tools{ margin-left:0; }
+      .cv-find{ flex:1 1 150px; }
+      #catList .cv-scroll{ max-height:none; overflow:visible; }
+      .cv-tbl{ min-width:0 !important; }
+      .cv-tbl, .cv-tbl tbody{ display:block; }
+      .cv-tbl colgroup, .cv-tbl thead, .cv-tbl tfoot{ display:none; }
+      .cv-tbl tbody tr{ display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:3px 10px; padding:11px 12px; border-bottom:1px solid var(--cv-line); }
+      .cv-tbl tbody tr:last-child{ border-bottom:0; }
+      .cv-tbl tbody td{ display:none; height:auto; padding:0; border:0; position:static; background:none; }
+      .cv-tbl tbody td.cv-first, .cv-tbl tbody td.c-stage{ display:block; }
+      .cv-tbl tbody td.c-sum{ display:block; grid-column:1 / -1; padding-left:31px; white-space:normal; color:var(--cv-sub); font-size:.8rem; line-height:1.4; }
+      .cv-tbl tbody tr:hover td, .cv-tbl tbody tr:focus-visible td{ background:none; }
+      .cv-tbl .cv-nm{ font-size:.92rem; }
+      .cv-col{ flex-basis:78vw; }
+      .cv-col.empty{ flex-basis:42px; }
+    }
+  </style>
   <!-- Catering leads: HoneyBook-style pipeline — conversation → proposal → e-signed contract → Square invoice -->
   <div id="panel-catering" class="panel">
     <div class="section-card">
       <div class="cat-pagehead">
         <h2>💼 Catering Leads<button type="button" class="cat-help" aria-expanded="false" aria-controls="catHow" title="How it works" onclick="const h=document.getElementById('catHow');h.hidden=!h.hidden;this.setAttribute('aria-expanded',String(!h.hidden));">?</button></h2>
-        <div class="cat-tools" id="catTools"></div>
+        <div class="cv-bar"><div class="cv-left" id="catViewBar"></div><div class="cat-tools" id="catTools"></div></div>
         <div class="cat-howbox" id="catHow" hidden><strong>Every inquiry lands here</strong> — catering, private events and experiences from the inquiry form, plus any you add by hand. Memphis and Nashville tables booked on the form go straight into Reservations. Experiences open their own conversation with the held time and booking link; catering and private events get the proposal and invoice. Reply here and it's emailed from info@greyscheese.com; their replies come back in automatically (Gmail sync). Build the <strong>Proposal</strong>, send it, and the customer signs online — that <strong>creates a Square invoice</strong> (deposit now, balance before the event) with the signed agreement attached. No proposal needed? <strong>🧾 Save &amp; send invoice</strong> skips the signature and emails the Square invoice right away. Payment status refreshes from Square every 15 minutes.</div>
       </div>
       <div class="cat-kinds" id="catKinds"></div>
@@ -2396,10 +2507,146 @@ function catAll(){
   const b = (typeof INQ_ROWS!=='undefined' ? INQ_ROWS : []).map(r=>({ kind: (r.details&&r.details.kind==='event') ? 'event' : 'experience', stage: INQ_AS_CAT[r.stage]||'new', inq:true, r }));
   return a.concat(b).sort((x,y)=>String(y.r.last_message_at||'').localeCompare(String(x.r.last_message_at||'')));
 }
+// CAT-VIEWS (2026-11-22): the list draws as a table or a board — see <style id="cat-views">.
+let CAT_VIEW = (function(){ try{ return localStorage.getItem('cat_view')==='board' ? 'board' : 'table'; }catch(_){ return 'table'; } })();
+let CAT_SORT = { k:'last', d:-1 }, CAT_FIND = '';
+const CV_ICONS = {
+  table:'<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6.2h12M2 9.8h12M6.2 6.2v7.3"/>',
+  board:'<rect x="2" y="2.5" width="3.4" height="11" rx="1"/><rect x="6.3" y="2.5" width="3.4" height="7" rx="1"/><rect x="10.6" y="2.5" width="3.4" height="9" rx="1"/>',
+  search:'<circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2l3.3 3.3"/>',
+  user:'<circle cx="8" cy="5.5" r="2.5"/><path d="M3 13.5c.6-2.4 2.6-3.7 5-3.7s4.4 1.3 5 3.7"/>',
+  stage:'<circle cx="8" cy="8" r="5.5"/><path d="M8 2.5a5.5 5.5 0 0 1 0 11z" fill="currentColor" stroke="none"/>',
+  tag:'<path d="M2.5 8.2V3.5a1 1 0 0 1 1-1h4.7l5.3 5.3a1 1 0 0 1 0 1.4l-4.3 4.3a1 1 0 0 1-1.4 0z"/><circle cx="5.6" cy="5.6" r=".9" fill="currentColor" stroke="none"/>',
+  text:'<path d="M3 4.5h10M3 8h10M3 11.5h6"/>',
+  cal:'<rect x="2.5" y="3.5" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3"/>',
+  users:'<circle cx="6" cy="5.8" r="2.2"/><path d="M2 13c.4-2.1 2-3.3 4-3.3s3.6 1.2 4 3.3M10.6 3.8a2.2 2.2 0 0 1 0 4.1M12 9.9c1.1.5 1.8 1.6 2 3.1"/>',
+  pin:'<path d="M8 14s4.5-4 4.5-7.5a4.5 4.5 0 0 0-9 0C3.5 10 8 14 8 14z"/><circle cx="8" cy="6.5" r="1.6"/>',
+  money:'<path d="M8 1.8v12.4M11.2 4.6C10.7 3.7 9.6 3.2 8.2 3.2c-1.8 0-3 .8-3 2.2 0 3 6 1.6 6 4.8 0 1.5-1.3 2.4-3.1 2.4-1.6 0-2.8-.6-3.3-1.7"/>',
+  check:'<circle cx="8" cy="8" r="5.5"/><path d="M5.6 8.2l1.7 1.7 3.2-3.6"/>',
+  clock:'<circle cx="8" cy="8" r="5.5"/><path d="M8 4.8V8l2.2 1.4"/>',
+  mail:'<rect x="2" y="3.5" width="12" height="9" rx="1.5"/><path d="M2.5 4.5L8 8.8l5.5-4.3"/>',
+  phone:'<path d="M5.2 2.5H3.8a1.3 1.3 0 0 0-1.3 1.4c.4 4.8 4.2 8.6 9 9a1.3 1.3 0 0 0 1.4-1.3v-1.4L10.3 9l-1.4 1.4a6 6 0 0 1-3.3-3.3L7 5.7z"/>',
+  sort:'<path d="M4 6.5l4 4 4-4"/>'
+};
+const cvIc = (n, cls) => '<svg class="cv-ic'+(cls?' '+cls:'')+'" viewBox="0 0 16 16" aria-hidden="true">'+(CV_ICONS[n]||'')+'</svg>';
+// Lead, Stage, then what a caterer reads next: when, how many, how much. Contact details sit at the far right (the table scrolls sideways).
+const CV_COLS = [
+  { k:'name',   l:'Lead',          ic:'user',  w:250 },
+  { k:'stage',  l:'Stage',         ic:'stage', w:142 },
+  { k:'date',   l:'Event date',    ic:'cal',   w:186 },
+  { k:'guests', l:'Guests',        ic:'users', w:92,  num:1 },
+  { k:'value',  l:'Value',         ic:'money', w:138, num:1 },
+  { k:'kind',   l:'Type',          ic:'tag',   w:158 },
+  { k:'event',  l:'Event',         ic:'text',  w:216 },
+  { k:'shop',   l:'Shop',          ic:'pin',   w:112 },
+  { k:'paid',   l:'Paid',          ic:'check', w:138, num:1 },
+  { k:'last',   l:'Last activity', ic:'clock', w:152 },
+  { k:'email',  l:'Email',         ic:'mail',  w:230 },
+  { k:'phone',  l:'Phone',         ic:'phone', w:136 }
+];
+function cvAgo(iso){
+  const d = new Date(iso); if(!iso || isNaN(d)) return '';
+  const m = Math.round((Date.now() - d) / 60000);
+  if(m < 1) return 'Just now'; if(m < 60) return m + 'm ago';
+  const h = Math.round(m / 60); if(h < 24) return h + 'h ago';
+  const dd = Math.round(h / 24); if(dd === 1) return 'Yesterday'; if(dd < 7) return dd + 'd ago';
+  const o = { month:'short', day:'numeric' }; if(d.getFullYear() !== new Date().getFullYear()) o.year = 'numeric';
+  return d.toLocaleDateString('en-US', o);
+}
+// days from today to a yyyy-mm-dd date (negative = past), null when there is no date
+function cvDays(date){ if(!date) return null; const t = new Date(new Date().toLocaleDateString('en-CA')+'T12:00:00'), e = new Date(date+'T12:00:00'); return isNaN(e) ? null : Math.round((e - t) / 864e5); }
+function cvDate(date){ if(!date) return ''; const y = Number(String(date).slice(0,4)); return fmtDisplay(date) + (y && y !== new Date().getFullYear() ? ', ' + y : ''); }
+function cvWhen(n){ return n == null ? '' : n < 0 ? 'Past' : n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : n <= 14 ? 'in ' + n + ' days' : 'in ' + Math.round(n / 7) + ' wks'; }
+function cvInitials(name){ const w = String(name||'').trim().split(/\s+/).filter(Boolean); return ((w[0]||'?').charAt(0) + (w.length > 1 ? w[w.length-1].charAt(0) : '')).toUpperCase(); }
+// one flat record per lead — catering leads and experience inquiries read the same in both views
+function catRec(x){
+  const r = x.r, K = CAT_KINDS[x.kind] || CAT_KINDS.catering;
+  const base = { kind:x.kind, kc:K[1], kl:K[0], stage:x.stage, name:r.name||'', shop:r.location||'', last:r.last_message_at||'', email:r.email||'', phone:r.phone||'', unread:!!r.unread };
+  if(x.inq) return Object.assign(base, { open:"inqOpen('"+r.id+"')", company:'', label:INQ_STAGES[r.stage]||r.stage, event:r.experience_name||'Not sure yet',
+    date:String(r.preferred_date||'').slice(0,10), guests:Number(r.party_size)||null, value:null, paid:null });
+  const q = (r.catering_quotes||[]).filter(z=>z.status!=='canceled').sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at)))[0];
+  return Object.assign(base, { open:"catOpen('"+r.id+"')", company:r.company||'', label:CAT_STAGES[r.stage]||r.stage,
+    event:String(r.occasion||'').replace(/^(private event|table request|experience|donation request|question)\b\s*[—–:·-]*\s*/i,'').replace(/^./, c=>c.toUpperCase()),   // the Type column already says which kind it is
+    date:String(r.event_date||'').slice(0,10), guests:Number(r.guests)||null, value:q ? Number(q.total_cents)||0 : null, paid:q && Number(q.amount_paid_cents) > 0 ? Number(q.amount_paid_cents) : null });
+}
+function catSorted(recs){
+  const k = CAT_SORT.k, d = CAT_SORT.d, order = Object.keys(CAT_STAGES);
+  const val = ({ name:a=>a.name.toLowerCase(), stage:a=>order.indexOf(a.stage), kind:a=>a.kl, event:a=>a.event.toLowerCase(), date:a=>a.date, guests:a=>a.guests, shop:a=>a.shop,
+    value:a=>a.value, paid:a=>a.paid, last:a=>a.last, email:a=>a.email.toLowerCase(), phone:a=>a.phone })[k] || (a=>a.last);
+  const none = v => v == null || v === '';
+  return recs.slice().sort((a,b)=>{ const x = val(a), y = val(b); if(none(x) || none(y)) return none(x) - none(y); return (x < y ? -1 : x > y ? 1 : 0) * d; });   // blanks always last
+}
+function catSortBy(k){ CAT_SORT = CAT_SORT.k === k ? { k, d:-CAT_SORT.d } : { k, d: /^(last|value|paid|guests)$/.test(k) ? -1 : 1 }; catRender(); }
+function catSetView(v){ CAT_VIEW = v === 'board' ? 'board' : 'table'; try{ localStorage.setItem('cat_view', CAT_VIEW); }catch(_){} catRender(); }
+function catViewBar(){
+  const bar = document.getElementById('catViewBar'); if(!bar) return;
+  if(!bar.firstChild) bar.innerHTML = '<div class="cv-seg" role="group" aria-label="View">'
+    + '<button type="button" data-v="table" onclick="catSetView(\'table\')">'+cvIc('table')+'Table</button>'
+    + '<button type="button" data-v="board" onclick="catSetView(\'board\')">'+cvIc('board')+'Board</button></div>'
+    + '<label class="cv-find">'+cvIc('search')+'<input type="search" id="catFind" placeholder="Search leads" aria-label="Search leads" autocomplete="off" oninput="CAT_FIND=this.value;catRender()"></label>';
+  bar.querySelectorAll('.cv-seg button').forEach(b=>{ const on = b.dataset.v === CAT_VIEW; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+}
+const cvKey = "if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}";
+function cvLead(a){ return '<span class="cv-lead"><span class="cv-av" style="--kc:'+a.kc+'">'+esc(cvInitials(a.name))+(a.unread?'<span class="cv-dot" title="New message"></span>':'')+'</span>'
+  +'<span class="cv-nm"><b>'+esc(a.name)+'</b>'+(a.company?'<span class="co">'+esc(a.company)+'</span>':'')+'</span></span>'; }
+function cvStage(a){ return '<span class="cv-chip st-'+a.stage+'"><i></i>'+esc(a.label)+'</span>'; }
+function catTableHtml(recs){
+  const rows = catSorted(recs), nil = '<span class="cv-nil">—</span>';
+  const cell = {
+    name:a=>cvLead(a),
+    stage:a=>cvStage(a),
+    date:a=>{ if(!a.date) return nil; const n = cvDays(a.date), live = !/^(paid|lost)$/.test(a.stage);
+      return esc(cvDate(a.date)) + '<span class="cv-rel'+(live && n != null && n >= 0 && n <= 7 ? ' soon' : '')+'">'+cvWhen(n)+'</span>'; },
+    guests:a=>a.guests ? a.guests.toLocaleString('en-US') : nil,
+    value:a=>a.value != null ? catMoney(a.value) : nil,
+    kind:a=>'<span class="cv-kind" style="--kc:'+a.kc+'">'+esc(a.kl)+'</span>',
+    event:a=>a.event ? esc(a.event) : nil,
+    shop:a=>a.shop ? esc(a.shop) : nil,
+    paid:a=>a.paid != null ? '<span'+(a.value && a.paid >= a.value ? ' class="cv-full"' : '')+'>'+catMoney(a.paid)+'</span>' : nil,
+    last:a=>a.last ? '<span title="'+esc(inqWhen(a.last))+'">'+esc(cvAgo(a.last))+'</span>' : nil,
+    email:a=>a.email ? '<a href="mailto:'+esc(a.email)+'" onclick="event.stopPropagation()">'+esc(a.email)+'</a>' : nil,
+    phone:a=>a.phone ? '<a href="tel:'+esc(a.phone)+'" onclick="event.stopPropagation()">'+esc(a.phone)+'</a>' : nil
+  };
+  const cls = c => (c.k === 'name' ? 'cv-first' : 'c-' + c.k) + (c.num ? ' num' : '');
+  const head = CV_COLS.map(c=>'<th scope="col" class="'+cls(c)+'"'+(CAT_SORT.k===c.k ? ' aria-sort="'+(CAT_SORT.d>0?'ascending':'descending')+'"' : '')+'>'
+    +'<button type="button" class="cv-th'+(c.num?' num':'')+'" onclick="catSortBy(\''+c.k+'\')" title="Sort by '+c.l.toLowerCase()+'">'+cvIc(c.ic)+'<span>'+c.l+'</span>'+cvIc('sort','cv-sort')+'</button></th>').join('');
+  // phone: each lead folds to two lines — this cell is the second one (hidden on wider screens)
+  const sum = a => [a.event, a.date ? cvDate(a.date) : '', a.guests ? a.guests + (a.guests === 1 ? ' guest' : ' guests') : '', a.shop, a.value != null ? catMoney(a.value) : ''].filter(Boolean).map(esc).join(', ');
+  const body = rows.map(a=>'<tr class="'+(a.unread?'unread':'')+'" tabindex="0" onclick="'+a.open+'" onkeydown="'+cvKey+'">'
+    + CV_COLS.map(c=>'<td class="'+cls(c)+'">'+cell[c.k](a)+'</td>').join('') + '<td class="c-sum">'+sum(a)+'</td></tr>').join('');
+  const tot = k => rows.reduce((s,a)=>s + (a[k]||0), 0);
+  const foot = { name:'<b style="margin:0">'+rows.length+'</b> '+(rows.length===1?'lead':'leads'), guests:tot('guests') ? 'Sum<b>'+tot('guests').toLocaleString('en-US')+'</b>' : '',
+    value:rows.some(a=>a.value!=null) ? 'Sum<b>'+catMoney(tot('value'))+'</b>' : '', paid:rows.some(a=>a.paid!=null) ? 'Sum<b>'+catMoney(tot('paid'))+'</b>' : '' };
+  return '<div class="cv-scroll"><table class="cv-tbl" style="min-width:'+CV_COLS.reduce((s,c)=>s+c.w,0)+'px"><colgroup>'+CV_COLS.map(c=>'<col style="width:'+c.w+'px">').join('')+'</colgroup>'
+    + '<thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody>'
+    + '<tfoot><tr>'+CV_COLS.map(c=>'<td class="'+cls(c)+'">'+(foot[c.k]||'')+'</td>').join('')+'</tr></tfoot></table></div>';
+}
+function catBoardHtml(recs){
+  const by = {}; recs.forEach(a=>{ (by[a.stage] = by[a.stage] || []).push(a); });
+  const card = (a, col) => { const n = cvDays(a.date), live = !/^(paid|lost)$/.test(a.stage);
+    return '<article class="cv-card'+(a.unread?' unread':'')+'" tabindex="0" role="button" onclick="'+a.open+'" onkeydown="'+cvKey+'">'
+      + cvLead(a)
+      + (a.event ? '<div class="cv-ev">'+esc(a.event)+'</div>' : '')
+      + '<div class="cv-facts">'
+      + (a.date ? '<span'+(live && n != null && n >= 0 && n <= 7 ? ' class="soon"' : '')+' title="'+esc(cvWhen(n))+'">'+cvIc('cal')+esc(cvDate(a.date))+'</span>' : '')
+      + (a.guests ? '<span>'+cvIc('users')+a.guests.toLocaleString('en-US')+'</span>' : '')
+      + (a.shop ? '<span>'+cvIc('pin')+esc(a.shop)+'</span>' : '') + '</div>'
+      + '<div class="cv-cardfoot"><span class="cv-kind" style="--kc:'+a.kc+'">'+esc(a.kl)+'</span>'+(a.label !== col ? '<span class="cv-sub">'+esc(a.label)+'</span>' : '')
+      + (a.value != null ? '<span class="cv-val">'+catMoney(a.value)+'</span>' : '<span class="cv-val cv-sub" title="Last activity">'+esc(cvAgo(a.last))+'</span>') + '</div></article>'; };
+  return '<div class="cv-cols">' + Object.entries(CAT_STAGES).map(([k,l])=>{
+    const list = catSorted(by[k] || []), total = list.reduce((s,a)=>s + (a.value||0), 0);
+    if(!list.length) return '<section class="cv-col empty" aria-label="'+esc(l)+': no leads"><span class="cv-chip st-'+k+'"><i></i>'+esc(l)+'</span></section>';
+    return '<section class="cv-col" aria-label="'+esc(l)+'"><div class="cv-colhead"><span class="cv-chip st-'+k+'"><i></i>'+esc(l)+'</span><span class="cv-n">'+list.length+'</span>'
+      + (total ? '<span class="cv-total">'+catMoney(total)+'</span>' : '') + '</div>' + list.map(a=>card(a, l)).join('') + '</section>';
+  }).join('') + '</div>';
+}
 function catRender(){
-  const all = catAll();
-  const unread = all.filter(x=>x.r.unread).length;
+  const everyone = catAll();
+  const unread = everyone.filter(x=>x.r.unread).length;
   const bd = document.getElementById('catBadge'); if(bd){ bd.textContent = unread; bd.style.display = unread ? '' : 'none'; }
+  // search (CAT-VIEWS): narrows everything below it — the tab and stage counts follow what was typed
+  const find = CAT_FIND.trim().toLowerCase();
+  const all = !find ? everyone : everyone.filter(x=>{ const r = x.r; return [r.name, r.company, r.email, r.phone, r.occasion, r.experience_name, r.location, r.code].some(v=>v && String(v).toLowerCase().indexOf(find) >= 0); });
   // Open (2026-11-09) = every lead but Lost until its event date has passed — signed / deposit paid / paid ones
   // stay too; no date = stays until Lost. Unread stays under Open until someone opens it.
   const catToday = new Date().toLocaleDateString('en-CA');
@@ -2414,35 +2661,23 @@ function catRender(){
     '<button class="ctab'+(CAT_KIND===k?' on':'')+'" onclick="CAT_KIND=\''+k+'\';catRender()">'+(CAT_KINDS[k]?'<span class="kdot" style="background:'+CAT_KINDS[k][1]+'"></span>':'')+l+'<span class="cnt">'+kc[k]+'</span></button>').join('');
   const tools = document.getElementById('catTools');
   if(tools && !tools.querySelector('button')) tools.innerHTML = '<button class="btn btn-ghost btn-sm" onclick="catLoad();inqLoad()">↻ Refresh</button><button class="btn btn-gold btn-sm" onclick="catNew()">＋ New lead</button>';
+  catViewBar();
   const mine = all.filter(x=> CAT_KIND==='all' || x.kind===CAT_KIND);
   const counts = { open:0, archived:0 }; Object.keys(CAT_STAGES).forEach(k=>counts[k]=0);
   mine.forEach(x=>{ if(isArch(x)){ counts.archived++; return; } counts[x.stage]=(counts[x.stage]||0)+1; if(isOpen(x)) counts.open++; });
-  document.getElementById('catChips').innerHTML = '<span class="lbl">Stage</span>' + [['open','Open'],['sep'],...Object.entries(CAT_STAGES),['sep'],['archived','📦 Archived'],['all','All']].map(([k,l])=>
-    k==='sep' ? '<span class="sep"></span>' : '<button class="chip'+(CAT_FILTER===k?' on':'')+'" onclick="CAT_FILTER=\''+k+'\';catRender()">'+l+(k==='all'?'':'<b>'+(counts[k]||0)+'</b>')+'</button>').join('');
-  const rows = mine.filter(x=> CAT_FILTER==='archived' ? isArch(x) : isArch(x) ? false : CAT_FILTER==='all' ? true : CAT_FILTER==='open' ? isOpen(x) : x.stage===CAT_FILTER);
+  // the board already has a column per stage, so there it is just Open | Archived | All
+  const board = CAT_VIEW === 'board', filter = board && !['all','archived'].includes(CAT_FILTER) ? 'open' : CAT_FILTER;
+  const chips = board ? [['open','Open'],['archived','📦 Archived'],['all','All']] : [['open','Open'],['sep'],...Object.entries(CAT_STAGES),['sep'],['archived','📦 Archived'],['all','All']];
+  document.getElementById('catChips').innerHTML = '<span class="lbl">'+(board?'Show':'Stage')+'</span>' + chips.map(([k,l])=>
+    k==='sep' ? '<span class="sep"></span>' : '<button class="chip'+(filter===k?' on':'')+'" onclick="CAT_FILTER=\''+k+'\';catRender()">'+l+(k==='all'?'':'<b>'+(counts[k]||0)+'</b>')+'</button>').join('');
+  const rows = mine.filter(x=> filter==='archived' ? isArch(x) : isArch(x) ? false : filter==='all' ? true : filter==='open' ? isOpen(x) : x.stage===filter);
   const el = document.getElementById('catList');
-  if(!rows.length){ el.innerHTML = '<div class="rec-empty">Nothing here.</div>'; return; }
-  // CAT-CARDS (2026-10-14): one card per lead, colored tab on the left end = its kind (CAT_KINDS). No type badge,
-  // no message preview; guests as words ("35 guests") instead of the 👥 icon.
-  const ppl = n => n ? n+(Number(n)===1?' guest':' guests') : '';
-  el.innerHTML = rows.map(x=>{
-    const r = x.r, K = CAT_KINDS[x.kind];
-    let bits, label, open;
-    if(x.inq){
-      bits = [r.experience_name||'Not sure yet', r.preferred_date?fmtDisplay(r.preferred_date):'', ppl(r.party_size), r.location].filter(Boolean).join(' · ');
-      label = INQ_STAGES[r.stage]||r.stage; open = "inqOpen('"+r.id+"')";
-    } else {
-      const q = (r.catering_quotes||[]).filter(z=>z.status!=='canceled').sort((a,b)=>b.created_at.localeCompare(a.created_at))[0];
-      bits = [r.occasion, r.event_date?fmtDisplay(r.event_date):'', ppl(r.guests), r.location, q?catMoney(q.total_cents):''].filter(Boolean).join(' · ');
-      label = CAT_STAGES[r.stage]; open = "catOpen('"+r.id+"')";
-    }
-    const pill = x.stage==='paid'?'pill-ok':x.stage==='lost'?'pill-bad':x.stage==='new'?'pill-req':'pill-mid';
-    return '<div class="rec-row cat-card'+(r.unread?' unread':'')+'" data-kind="'+x.kind+'" style="--kc:'+K[1]+'" onclick="'+open+'">'
-      +'<div class="cat-main"><div class="res-r-name">'+(r.unread?'<span class="cat-new" title="New message"></span>':'')+esc(r.name)+(r.company?' <span class="co">('+esc(r.company)+')</span>':'')+'</div>'
-      +(bits?'<div class="cat-sub">'+esc(bits)+'</div>':'')+'</div>'
-      +'<span class="res-r-time">'+esc(inqWhen(r.last_message_at))+'</span>'
-      +'<span class="pill '+pill+'">'+esc(label)+'</span></div>';
-  }).join('');
+  if(!rows.length){ el.className = 'rec-list'; el.innerHTML = '<div class="rec-empty">'+(find ? 'No leads match “'+esc(CAT_FIND.trim())+'”.' : 'Nothing here.')+'</div>'; return; }
+  const recs = rows.map(catRec);
+  el.className = 'rec-list cv-' + CAT_VIEW;
+  const keep = el.querySelector('.cv-scroll, .cv-cols'), sx = keep ? keep.scrollLeft : 0, sy = keep ? keep.scrollTop : 0;   // a re-draw (sort, refresh) keeps your place
+  el.innerHTML = board ? catBoardHtml(recs) : catTableHtml(recs);
+  const now = el.querySelector('.cv-scroll, .cv-cols'); if(now && keep){ now.scrollLeft = sx; now.scrollTop = sy; }
 }
 // 📦 Archive / ↩ Unarchive one lead (catering_leads.archived / inquiries.archived)
 async function leadArchive(kind){

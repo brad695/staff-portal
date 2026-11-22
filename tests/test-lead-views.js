@@ -1,0 +1,266 @@
+/*
+ * 💼 Catering Leads list views (manager.html, 2026-11-22 — "not happy with the look of our catering leads"):
+ * the list draws as a TABLE (sortable columns, totals row, two-line rows on a phone) or a BOARD (a column per stage),
+ * with a search box. Opening a lead, the kind tabs and the stage chips work as before.
+ * The page is served under the staging host; Supabase and the CDNs are stood in — nothing goes to the network.
+ * Run: NODE_PATH=$(npm root -g) node tests/test-lead-views.js     (SHOTS=dir for screenshots, PW_CHROME=path, MANAGER=file)
+ */
+const { chromium } = require("playwright");
+const fs = require("fs");
+const path = require("path");
+
+const HOST = "https://greys-staff-portal-staging.onrender.com";
+const MANAGER = fs.readFileSync(process.env.MANAGER || path.join(__dirname, "..", "manager.html"));
+const SHOTS = process.env.SHOTS || "";
+let ok = 0, bad = 0;
+const t = (name, cond, extra) => { if (cond) { ok++; console.log("  ✓ " + name); } else { bad++; console.log("  ✗ " + name + (extra !== undefined ? "  -> " + JSON.stringify(extra).slice(0, 900) : "")); } };
+
+const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString("en-CA"); };
+const ago = (h) => new Date(Date.now() - h * 3600e3).toISOString();
+let n = 0; const id = () => "00000000-0000-0000-0000-" + String(++n).padStart(12, "0");
+const lead = (o) => Object.assign({ id: id(), code: "C" + String(n).padStart(5, "0"), company: "", phone: "9015550100", unread: false, location: "Memphis", fulfillment: "pickup", created_at: ago(400) }, o);
+function fresh() {
+  n = 0;
+  const L = [
+    lead({ name: "Jane Smith", email: "jane@example.com", stage: "new", unread: true, occasion: "Birthday dinner", event_date: day(20), event_time: "18:00", guests: 20, last_message_at: ago(1) }),
+    lead({ name: "Omar Reyes", company: "Acme Realty", email: "omar@acme.example", stage: "replied", occasion: "Private event — holiday party", location: "Nashville", event_date: day(28), guests: 40, last_message_at: ago(5), q: 248000 }),
+    lead({ name: "Priya Patel", company: "St. Jude Events", email: "priya@example.org", stage: "quoted", occasion: "Board lunch", event_date: day(9), guests: 60, last_message_at: ago(26), q: 131250 }),
+    lead({ name: "Marcus Lee", email: "marcus@example.com", stage: "contract_sent", occasion: "Wedding welcome party", event_date: day(41), guests: 120, last_message_at: ago(50), q: 685000 }),
+    lead({ name: "Lucia Romano", company: "Romano Law", email: "lucia@example.com", stage: "deposit_paid", occasion: "Private event", event_date: day(6), guests: 24, last_message_at: ago(120), q: 410000, paid: 205000 }),
+    lead({ name: "Tom Becker", email: "tom@example.com", stage: "paid", occasion: "Experience — Raclette", event_date: day(3), guests: 6, last_message_at: ago(140), q: 42000, paid: 42000 }),
+    lead({ name: "Grace Kim", email: "grace@example.com", stage: "paid", occasion: "Office holiday boards", event_date: day(-4), guests: 50, last_message_at: ago(300), q: 157500, paid: 157500 }),   // past: not Open
+    lead({ name: "Will Turner", email: "will@example.com", stage: "lost", occasion: "Rehearsal dinner", event_date: day(60), guests: 45, last_message_at: ago(200) }),                         // lost: not Open
+    lead({ name: "Ana Flores", email: "ana@example.com", stage: "replied", occasion: null, event_date: null, guests: null, last_message_at: ago(30) }),
+    lead({ name: '<img src=x onerror="window.__xss=1">', company: "<b>Co</b>", email: "x@example.com", stage: "quoted", occasion: "<script>window.__xss=2</script>", event_date: day(18), guests: 250, last_message_at: ago(8), q: 1234567 }),
+  ];
+  const quotes = [];
+  L.forEach((r) => { if (r.q) quotes.push({ id: id(), lead_id: r.id, status: r.paid ? "paid" : "sent", total_cents: r.q, amount_paid_cents: r.paid || 0, created_at: ago(100) }); delete r.q; delete r.paid; });
+  quotes.push({ id: id(), lead_id: L[1].id, status: "canceled", total_cents: 999900, amount_paid_cents: 0, created_at: ago(10) });   // a newer canceled proposal never counts
+  const I = [
+    { id: id(), code: "E00001", name: "Sam Lee", email: "sam@example.com", phone: "6155550100", stage: "new", unread: false, experience_name: "Raclette", preferred_date: day(11), preferred_time: "18:00", party_size: 6, location: "Memphis", last_message_at: ago(20), created_at: ago(20), details: {} },
+    { id: id(), code: "E00002", name: "Kelly Nguyen", email: "kelly@example.com", phone: "", stage: "link_sent", unread: false, experience_name: "Greysing Table", preferred_date: day(16), preferred_time: "19:00", party_size: 8, location: "Nashville", last_message_at: ago(44), created_at: ago(60), details: {} },
+  ];
+  return { catering_leads: L, catering_messages: [], catering_quotes: quotes, inquiries: I, inquiry_messages: [], catering_templates: [], site_content: [] };
+}
+
+// supabase-js stand-in: the tables are answered by this test (https://stub.local/db)
+const SB_STUB = `(function(){
+  function ask(what, payload){ return fetch('https://stub.local/' + what, { method: 'POST', body: JSON.stringify(payload) }).then(function(r){ return r.json(); }); }
+  var REAL = { catering_leads:1, catering_messages:1, catering_quotes:1, inquiries:1, inquiry_messages:1, catering_templates:1, site_content:1 };
+  function builder(table){
+    var q = { table: table, ops: [] };
+    var b = new Proxy({}, { get: function(_, k){
+      if (k === 'then') return function(a, r){ return (REAL[table] ? ask('db', q) : Promise.resolve({ data: q.single ? null : [], error: null, count: 0 })).then(a, r); };
+      if (k === 'maybeSingle' || k === 'single') return function(){ q.single = true; return b; };
+      return function(){ q.ops.push([k].concat([].slice.call(arguments))); return b; };
+    } });
+    return b;
+  }
+  var session = { access_token: 'tok-manager', user: { email: 'manager@greyscheese.com' } };
+  var client = {
+    auth: { getSession: function(){ return Promise.resolve({ data: { session: session } }); }, onAuthStateChange: function(){ return { data: { subscription: { unsubscribe: function(){} } } }; },
+      signOut: function(){ return Promise.resolve({}); }, getUser: function(){ return Promise.resolve({ data: { user: session.user } }); } },
+    rpc: function(name){ return Promise.resolve({ data: name === 'is_app_admin' ? true : null, error: null }); },
+    from: builder,
+    storage: { from: function(){ return { upload: function(){ return Promise.resolve({ data: {}, error: null }); }, getPublicUrl: function(p){ return { data: { publicUrl: 'https://stub.local/' + p } }; }, list: function(){ return Promise.resolve({ data: [], error: null }); } }; } },
+    channel: function(){ var c = { on: function(){ return c; }, subscribe: function(){ return c; } }; return c; }, removeChannel: function(){}
+  };
+  window.supabase = { createClient: function(){ return client; } };
+})();`;
+
+async function open(browser, opts) {
+  opts = opts || {};
+  const ctx = await browser.newContext({ viewport: opts.viewport || { width: 1440, height: 900 }, hasTouch: !!opts.touch });
+  const page = await ctx.newPage();
+  const st = { errors: [], updates: [], rows: fresh() };
+  page.on("pageerror", (e) => st.errors.push(String(e)));
+  page.on("dialog", (d) => { st.errors.push("dialog: " + d.message()); d.dismiss(); });
+  await page.route("**/*", async (route) => {
+    const req = route.request(), u = new URL(req.url());
+    const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "*" };
+    const json = (o, s) => route.fulfill({ status: s || 200, headers: CORS, contentType: "application/json", body: JSON.stringify(o) });
+    if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: CORS, body: "" });
+    if (u.hostname === "cdn.jsdelivr.net" && /supabase-js/.test(u.pathname)) return route.fulfill({ status: 200, contentType: "application/javascript", body: SB_STUB });
+    if (u.hostname === "stub.local" && u.pathname === "/db") {
+      const q = JSON.parse(req.postData()), all = st.rows[q.table] || [];
+      const eqs = q.ops.filter((o) => o[0] === "eq"), hit = all.filter((r) => eqs.every((e) => r[e[1]] === e[2]));
+      const upd = q.ops.find((o) => o[0] === "update");
+      if (upd) { st.updates.push({ table: q.table, set: upd[1], ids: hit.map((r) => r.id) }); hit.forEach((r) => Object.assign(r, upd[1])); return json({ data: hit, error: null }); }
+      const rows = hit.map((r) => Object.assign({}, r));
+      if (q.table === "catering_leads") rows.forEach((r) => { r.catering_messages = []; r.catering_quotes = st.rows.catering_quotes.filter((m) => m.lead_id === r.id); });
+      if (q.table === "inquiries") rows.forEach((r) => { r.inquiry_messages = []; });
+      return json({ data: q.single ? (rows[0] || null) : rows, error: null });
+    }
+    if (/^\/functions\/v1\//.test(u.pathname)) return json({ ok: true });
+    if (u.origin === HOST && (u.pathname === "/manager.html" || u.pathname === "/manager")) return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: MANAGER });
+    if (/fonts\.googleapis\.com/.test(u.hostname)) return route.fulfill({ status: 200, contentType: "text/css", body: "" });
+    if (/\.js(\?|$)/.test(u.pathname + u.search)) return route.fulfill({ status: 200, contentType: "application/javascript", body: "" });
+    if (/\.(png|svg|ico|jpg|webp|woff2?)$/.test(u.pathname)) return route.fulfill({ status: 404, body: "" });
+    return json({});
+  });
+  if (opts.view) await page.addInitScript((v) => { try { localStorage.setItem("cat_view", v); } catch (_) {} }, opts.view);
+  await page.goto(HOST + "/manager.html");
+  await page.waitForFunction(() => !document.getElementById("consoleView").classList.contains("hide"), null, { timeout: 15000 });
+  await page.evaluate(async () => { mtab("catering"); await catLoad(); await inqLoad(); });
+  return { ctx, page, st };
+}
+const shot = async (page, name) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, name + ".png") }); } };
+const names = (page) => page.$$eval("#catList .cv-tbl tbody tr", (rs) => rs.map((r) => r.querySelector(".cv-nm b").textContent));
+const cellOf = (page, name, cls) => page.evaluate(([nm, c]) => { const r = [...document.querySelectorAll("#catList .cv-tbl tbody tr")].find((x) => x.querySelector(".cv-nm b").textContent === nm); return r ? r.querySelector("td." + c).textContent.trim() : null; }, [name, cls]);
+const chips = (page) => page.$$eval("#catChips .chip", (bs) => bs.map((b) => b.textContent));
+const shown = (page, sel) => page.evaluate((s) => { const e = document.querySelector(s); return !!e && getComputedStyle(e).display !== "none"; }, sel);
+
+(async () => {
+  const browser = await chromium.launch({ executablePath: process.env.PW_CHROME || undefined });
+
+  console.log("\nmanager.html · 💼 Catering Leads → Table");
+  {
+    const { ctx, page, st } = await open(browser);
+    t("the list opens as a table", await page.evaluate(() => document.getElementById("catList").className === "rec-list cv-table" && !!document.querySelector("#catList table.cv-tbl")));
+    t("Table is the pressed view button", await page.evaluate(() => document.querySelector('.cv-seg button[data-v="table"]').getAttribute("aria-pressed") === "true" && document.querySelector('.cv-seg button[data-v="board"]').getAttribute("aria-pressed") === "false"));
+    const first = await names(page);
+    t("Open shows every lead but the lost one and the one whose date has passed", first.length === 10 && !first.includes("Will Turner") && !first.includes("Grace Kim"), first);
+    t("newest activity first to begin with", first[0] === "Jane Smith" && first[first.length - 1] === "Tom Becker", first);
+    t("the columns", JSON.stringify(await page.$$eval("#catList .cv-tbl thead th", (h) => h.map((x) => x.textContent.trim()))) === JSON.stringify(["Lead", "Stage", "Event date", "Guests", "Value", "Type", "Event", "Shop", "Paid", "Last activity", "Email", "Phone"]));
+    t("stage reads as a colored chip", await page.evaluate(() => { const c = [...document.querySelectorAll("#catList tbody tr")].find((r) => /Marcus Lee/.test(r.textContent)).querySelector("td.c-stage .cv-chip"); return c.textContent === "Proposal sent" && c.classList.contains("st-contract_sent"); }));
+    t("an experience inquiry keeps its own stage name", (await cellOf(page, "Kelly Nguyen", "c-stage")) === "Link sent");
+    t("the kind is taken off the front of the occasion (Type says it)", (await cellOf(page, "Omar Reyes", "c-event")) === "Holiday party" && (await cellOf(page, "Omar Reyes", "c-kind")) === "Private event" && (await cellOf(page, "Tom Becker", "c-event")) === "Raclette" && (await cellOf(page, "Tom Becker", "c-kind")) === "Experience");
+    t("a bare 'Private event' leaves the Event cell empty", (await cellOf(page, "Lucia Romano", "c-event")) === "—");
+    t("value is the newest proposal that isn't canceled", (await cellOf(page, "Omar Reyes", "c-value")) === "$2,480.00");
+    t("paid shows what has come in", (await cellOf(page, "Lucia Romano", "c-paid")) === "$2,050.00" && (await cellOf(page, "Tom Becker", "c-paid")) === "$420.00" && (await cellOf(page, "Jane Smith", "c-paid")) === "—");
+    t("an event inside a week is flagged, a paid one is not", await page.evaluate(() => { const row = (n) => [...document.querySelectorAll("#catList tbody tr")].find((r) => r.querySelector(".cv-nm b").textContent === n); return row("Lucia Romano").querySelector("td.c-date .cv-rel").classList.contains("soon") && !row("Tom Becker").querySelector("td.c-date .cv-rel").classList.contains("soon") && row("Lucia Romano").querySelector("td.c-date .cv-rel").textContent === "in 6 days"; }));
+    t("no date / guests / phone shows a dash, not 'null'", (await cellOf(page, "Ana Flores", "c-date")) === "—" && (await cellOf(page, "Ana Flores", "c-guests")) === "—" && (await cellOf(page, "Kelly Nguyen", "c-phone")) === "—" && !/null|undefined|NaN/.test(await page.textContent("#catList")));
+    t("the unread lead is marked", await page.evaluate(() => { const r = [...document.querySelectorAll("#catList tbody tr")].filter((x) => x.classList.contains("unread")); return r.length === 1 && /Jane Smith/.test(r[0].textContent) && !!r[0].querySelector(".cv-dot"); }));
+    t("totals row: count, guests, value, paid", await page.evaluate(() => { const f = (c) => document.querySelector("#catList tfoot td." + c).textContent.trim(); return f("cv-first") === "10 leads" && f("c-guests") === "Sum534" && f("c-value") === "Sum$27,508.17" && f("c-paid") === "Sum$2,470.00"; }), await page.$$eval("#catList tfoot td", (x) => x.map((y) => y.textContent)));
+    t("names, companies and occasions are written as text, never as markup", await page.evaluate(() => !window.__xss && !document.querySelector("#catList img, #catList script, #catList b b") && [...document.querySelectorAll("#catList .cv-nm b")].some((b) => b.textContent.indexOf("<img") === 0)));
+    await shot(page, "views-table");
+
+    console.log("\n  sorting");
+    await page.click('#catList th.c-value .cv-th');
+    let ns = await names(page);
+    t("Value: biggest first, leads with no proposal at the bottom", ns[0].indexOf("<img") === 0 && ns[1] === "Marcus Lee" && ["Jane Smith", "Ana Flores", "Sam Lee", "Kelly Nguyen"].includes(ns[ns.length - 1]), ns);
+    t("the sorted column says so", await page.evaluate(() => document.querySelector("#catList th.c-value").getAttribute("aria-sort") === "descending" && document.querySelectorAll("#catList th[aria-sort]").length === 1));
+    await page.click('#catList th.c-value .cv-th');
+    ns = await names(page);
+    t("again: smallest first, blanks still at the bottom", ns[0] === "Tom Becker" && ["Jane Smith", "Ana Flores", "Sam Lee", "Kelly Nguyen"].includes(ns[ns.length - 1]) && (await page.getAttribute("#catList th.c-value", "aria-sort")) === "ascending", ns);
+    await page.click('#catList th.c-stage .cv-th');
+    const stages = await page.$$eval("#catList tbody td.c-stage .cv-chip", (c) => c.map((x) => x.className.replace("cv-chip st-", "")));
+    t("Stage sorts in pipeline order, not A–Z", JSON.stringify([...new Set(stages)]) === JSON.stringify(["new", "replied", "quoted", "contract_sent", "deposit_paid", "paid"]), stages);
+    await page.click('#catList th.c-date .cv-th');
+    ns = await names(page);
+    t("Event date: soonest first, no date last", ns[0] === "Tom Becker" && ns[ns.length - 1] === "Ana Flores", ns);
+    await page.click('#catList th.cv-first .cv-th');
+    ns = await names(page);
+    t("Lead sorts A–Z", ns[1] === "Ana Flores" && ns[ns.length - 1] === "Tom Becker", ns);
+    await page.click('#catList th.c-last .cv-th');
+
+    console.log("\n  search, tabs and stage chips");
+    await page.fill("#catFind", "acme");
+    t("search finds a lead by company", JSON.stringify(await names(page)) === JSON.stringify(["Omar Reyes"]));
+    t("the tab and stage counts follow the search", (await page.textContent("#catKinds .ctab.on .cnt")) === "1" && (await chips(page))[0] === "Open1");
+    t("typing keeps the cursor in the box", await page.evaluate(() => document.activeElement === document.getElementById("catFind")));
+    await page.fill("#catFind", "KELLY@EXAMPLE");
+    t("search matches email, any case, and experience inquiries too", JSON.stringify(await names(page)) === JSON.stringify(["Kelly Nguyen"]));
+    await page.fill("#catFind", "zzzz");
+    t("nothing found says so", (await page.textContent("#catList")) === "No leads match “zzzz”." && (await page.getAttribute("#catList", "class")) === "rec-list");
+    t("the unread badge still counts every lead while searching", (await page.textContent("#catBadge")) === "1");
+    await page.fill("#catFind", "");
+    t("clearing the search brings the list back", (await names(page)).length === 10);
+    await page.click('#catKinds .ctab:has-text("Private events")');
+    t("kind tab: Private events", JSON.stringify((await names(page)).sort()) === JSON.stringify(["Lucia Romano", "Omar Reyes"]));
+    await page.click('#catKinds .ctab:has-text("All inquiries")');
+    await page.click('#catChips .chip:has-text("Quoting")');
+    t("stage chip: Quoting", (await names(page)).length === 2 && (await page.textContent("#catList tfoot td.cv-first")) === "2 leads");
+    await page.click('#catChips .chip:has-text("All")');
+    t("All brings back the lost and the past ones", (await names(page)).length === 12 && (await cellOf(page, "Grace Kim", "c-date")).endsWith("Past"));
+    await page.click('#catChips .chip:has-text("Open")');
+
+    console.log("\n  opening a lead");
+    await page.click('#catList tbody tr:has-text("Jane Smith")');
+    await page.waitForFunction(() => document.getElementById("catModal").style.display === "flex");
+    t("a click on the row opens the lead", (await page.textContent("#catTitle")) === "Jane Smith");
+    await page.waitForFunction(() => !document.querySelector("#catList tbody tr.unread"));
+    t("opening it marks it read", st.updates.some((u) => u.table === "catering_leads" && u.set.unread === false) && (await shown(page, "#catBadge")) === false);
+    await page.evaluate(() => catClose());
+    await page.click('#catList tbody tr:has-text("Sam Lee")');
+    await page.waitForFunction(() => document.getElementById("inqModal").style.display === "flex");
+    t("an experience inquiry opens its own window", /Sam Lee/.test(await page.textContent("#inqTitle")));
+    await page.evaluate(() => { document.getElementById("inqModal").style.display = "none"; });
+    await page.evaluate(() => { window.__nav = 0; document.querySelectorAll("#catList td.c-email a").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); window.__nav++; })); });
+    await page.evaluate(() => { const row = [...document.querySelectorAll("#catList tbody tr")].find((r) => /Marcus Lee/.test(r.textContent)); row.querySelector("td.c-email a").click(); });
+    t("the email link is a mailto and doesn't open the lead", (await page.evaluate(() => window.__nav)) === 1 && (await page.evaluate(() => document.getElementById("catModal").style.display)) !== "flex" && (await page.evaluate(() => document.querySelector("#catList td.c-email a").getAttribute("href"))).indexOf("mailto:") === 0);
+    await page.focus('#catList tbody tr:has-text("Marcus Lee")');
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => document.getElementById("catModal").style.display === "flex");
+    t("Enter on a row opens it (keyboard)", (await page.textContent("#catTitle")) === "Marcus Lee");
+    await page.evaluate(() => catClose());
+    t("no errors on the page", st.errors.length === 0, st.errors);
+    await ctx.close();
+  }
+
+  console.log("\nmanager.html · 💼 Catering Leads → Board");
+  {
+    const { ctx, page, st } = await open(browser);
+    await page.click('#catChips .chip:has-text("Quoting")');
+    await page.click('.cv-seg button[data-v="board"]');
+    await page.click('.cv-seg button[data-v="table"]');
+    t("back on the table the stage picked earlier is still on", (await names(page)).length === 2 && (await page.textContent("#catChips .chip.on")) === "Quoting2");
+    await page.click('.cv-seg button[data-v="board"]');
+    t("Board draws a column per stage, in pipeline order", JSON.stringify(await page.$$eval("#catList .cv-col", (c) => c.map((x) => x.querySelector(".cv-chip").textContent))) === JSON.stringify(["New", "Replied", "Quoting", "Proposal sent", "Signed", "Invoiced", "Deposit paid", "Paid", "Lost"]));
+    t("on the board the chips are just Open | All", JSON.stringify(await chips(page)) === JSON.stringify(["Open10", "All"]) && (await page.textContent("#catChips .chip.on")) === "Open10");
+    const col = (name) => page.evaluate((nm) => { const c = [...document.querySelectorAll("#catList .cv-col")].find((x) => x.querySelector(".cv-chip").textContent === nm); return { empty: c.classList.contains("empty"), cards: [...c.querySelectorAll(".cv-card .cv-nm b")].map((b) => b.textContent), n: (c.querySelector(".cv-n") || {}).textContent, total: (c.querySelector(".cv-total") || {}).textContent }; }, name);
+    let c = await col("New");
+    t("New holds the new catering lead and the new inquiry", JSON.stringify(c.cards) === JSON.stringify(["Jane Smith", "Sam Lee"]) && c.n === "2" && !c.total, c);
+    c = await col("Quoting");
+    t("a column adds up its proposals", c.n === "2" && c.total === "$13,658.17", c);
+    c = await col("Proposal sent");
+    t("a 'Link sent' inquiry sits under Proposal sent and says so on its card", c.cards.includes("Kelly Nguyen") && await page.evaluate(() => [...document.querySelectorAll(".cv-card")].find((x) => /Kelly Nguyen/.test(x.textContent)).querySelector(".cv-cardfoot .cv-sub").textContent === "Link sent"), c);
+    t("stages with nobody in them fold to a slim column", (await col("Signed")).empty && (await col("Invoiced")).empty && (await col("Lost")).empty && await page.evaluate(() => document.querySelector(".cv-col.empty").getBoundingClientRect().width < 60));
+    t("a card shows the date, guests, shop and amount", await page.evaluate(() => { const k = [...document.querySelectorAll(".cv-card")].find((x) => /Omar Reyes/.test(x.textContent)); return /Acme Realty/.test(k.textContent) && k.querySelector(".cv-ev").textContent === "Holiday party" && k.querySelectorAll(".cv-facts span").length === 3 && k.querySelector(".cv-val").textContent === "$2,480.00" && k.querySelector(".cv-kind").textContent === "Private event"; }));
+    t("the board's column heading is not styled as the page header", await page.evaluate(() => !document.querySelector("#catList header, #catList footer")));
+    await shot(page, "views-board");
+    await page.click('#catChips .chip:has-text("All")');
+    t("All adds the lost and past leads to their columns", (await col("Lost")).cards.includes("Will Turner") && (await col("Paid")).cards.includes("Grace Kim"));
+    await page.click('#catChips .chip:has-text("Open")');
+    await page.click('#catList .cv-card:has-text("Omar Reyes")');
+    await page.waitForFunction(() => document.getElementById("catModal").style.display === "flex");
+    t("a click on a card opens the lead", (await page.textContent("#catTitle")) === "Omar Reyes — Acme Realty");
+    await page.evaluate(() => catClose());
+    await page.fill("#catFind", "raclette");
+    t("search works on the board", JSON.stringify(await page.$$eval(".cv-card .cv-nm b", (b) => b.map((x) => x.textContent).sort())) === JSON.stringify(["Sam Lee", "Tom Becker"]));
+    await page.fill("#catFind", "");
+    t("the view is remembered", (await page.evaluate(() => localStorage.getItem("cat_view"))) === "board");
+    await page.click('.cv-seg button[data-v="table"]');
+    t("and so is switching back", (await page.evaluate(() => localStorage.getItem("cat_view"))) === "table" && (await page.getAttribute("#catList", "class")) === "rec-list cv-table");
+    t("nothing here was written to the database by looking", st.updates.length === 0, st.updates);
+    t("no errors on the page", st.errors.length === 0, st.errors);
+    await ctx.close();
+  }
+  {
+    const { ctx, page, st } = await open(browser, { view: "board" });
+    t("the page opens on the board when that was the last view", (await page.getAttribute("#catList", "class")) === "rec-list cv-board" && (await page.getAttribute('.cv-seg button[data-v="board"]', "aria-pressed")) === "true" && st.errors.length === 0, st.errors);
+    await ctx.close();
+  }
+
+  console.log("\nmanager.html · 💼 Catering Leads on a phone (390 wide)");
+  {
+    const { ctx, page, st } = await open(browser, { viewport: { width: 390, height: 844 }, touch: true });
+    t("no column headings or totals row — each lead is two lines", !(await shown(page, "#catList thead")) && !(await shown(page, "#catList tfoot")) && (await shown(page, "#catList tbody td.c-sum")) && !(await shown(page, "#catList tbody td.c-email")));
+    t("line two reads occasion, date, guests, shop, amount", (await cellOf(page, "Omar Reyes", "c-sum")).replace(/[A-Z][a-z]{2}, [A-Z][a-z]{2} \d+(, \d{4})?/, "DATE") === "Holiday party, DATE, 40 guests, Nashville, $2,480.00", await cellOf(page, "Omar Reyes", "c-sum"));
+    t("nothing runs off the side of the screen", await page.evaluate(() => { const w = document.documentElement.clientWidth; return [...document.querySelectorAll("#catList tbody tr, #catList td.c-stage .cv-chip, #catViewBar, #catTools")].every((e) => { const r = e.getBoundingClientRect(); return r.width === 0 || (r.left >= 0 && r.right <= w + 1); }) && document.documentElement.scrollWidth <= w + 1; }));
+    await shot(page, "views-table-phone");
+    await page.tap('#catList tbody tr:has-text("Omar Reyes")');
+    await page.waitForFunction(() => document.getElementById("catModal").style.display === "flex");
+    t("a tap opens the lead", (await page.textContent("#catTitle")) === "Omar Reyes — Acme Realty");
+    await page.evaluate(() => catClose());
+    await page.tap('.cv-seg button[data-v="board"]');
+    t("the board scrolls sideways inside the list, not the page", await page.evaluate(() => { const c = document.querySelector("#catList .cv-cols"); return c.scrollWidth > c.clientWidth && document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1; }));
+    await shot(page, "views-board-phone");
+    t("no errors on the page", st.errors.length === 0, st.errors);
+    await ctx.close();
+  }
+
+  await browser.close();
+  console.log("\n" + ok + " passed, " + bad + " failed");
+  process.exit(bad ? 1 : 0);
+})();
