@@ -1126,16 +1126,20 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
        colors as the stage chips in the table — tinted when idle, solid when picked. Open and All are not stages:
        Open is navy, All is outlined.
        (First pushed with the stage row on top; he then said "swap positions though, colored on bottom".) */
-    #panel-catering .cat-stages{ gap:6px; padding:0 0 14px; margin:10px 0 0; }
-    #panel-catering .cat-stages .chip{ display:inline-flex; align-items:center; gap:8px; margin:0; padding:8px 9px 8px 12px; border:1px solid color-mix(in srgb, var(--t,#3d4654) 26%, #fff); border-radius:10px;
-      background:var(--b,#eceef1); color:var(--t,#3d4654); font-size:.84rem; font-weight:700; line-height:1.3; }
+    #panel-catering .cat-stages{ gap:5px; padding:0 0 14px; margin:10px 0 0; }
+    #panel-catering .cat-stages .chip{ display:inline-flex; align-items:center; gap:6px; margin:0; padding:7px 7px 7px 9px; border:1px solid color-mix(in srgb, var(--t,#3d4654) 26%, #fff); border-radius:10px;
+      background:var(--b,#eceef1); color:var(--t,#3d4654); font-size:.8rem; font-weight:700; line-height:1.3; }
     #panel-catering .cat-stages .chip.st-open{ --b:#dde7ee; --t:#06273a; }
     #panel-catering .cat-stages .chip.st-all{ --b:#fff; --t:#3d4654; }   /* next to Lost (gray), so All is the outlined one */
     #panel-catering .cat-stages .chip:hover{ border-color:color-mix(in srgb, var(--t,#3d4654) 60%, #fff); background:color-mix(in srgb, var(--t,#3d4654) 9%, var(--b,#eceef1)); }
     #panel-catering .cat-stages .chip.on{ background:var(--t,#3d4654); border-color:var(--t,#3d4654); color:#fff; box-shadow:0 1px 2px rgba(18,26,38,.2); }
     #panel-catering .cat-stages .chip:focus-visible, #panel-catering .cat-kinds .ctab:focus-visible{ outline:2px solid #3a8bb3; outline-offset:2px; }
-    #panel-catering .cat-stages .chip b{ margin:0; opacity:1; min-width:24px; padding:1px 7px; border-radius:999px; background:#fff; color:var(--t,#3d4654); font-size:.68rem; font-weight:800; line-height:1.5; text-align:center; }
-    #panel-catering .cat-stages .chip.on b{ background:rgba(255,255,255,.24); color:#fff; }
+    #panel-catering .cat-stages .chip b{ margin:0 0 0 -1px; opacity:.7; min-width:0; padding:0 2px 0 0; border-radius:0; background:none; color:var(--t,#3d4654); font-size:.8rem; font-weight:800; line-height:1.3; text-align:center; }
+    #panel-catering .cat-stages .chip.on b{ background:none; color:#fff; opacity:.85; }
+    #panel-catering .cat-stages .chip .cv-ck{ flex:none; width:15px; height:15px; display:grid; place-items:center; border:1.5px solid color-mix(in srgb, var(--t,#3d4654) 50%, #fff); border-radius:5px; background:#fff; margin-left:-3px; }
+    #panel-catering .cat-stages .chip .cv-ck .cv-ic{ width:11px; height:11px; stroke:var(--t,#3d4654); stroke-width:2.6; opacity:0; }
+    #panel-catering .cat-stages .chip.on .cv-ck{ border-color:#fff; }
+    #panel-catering .cat-stages .chip.on .cv-ck .cv-ic{ opacity:1; }
     #panel-catering .cat-kinds{ gap:6px; flex-wrap:wrap; align-items:center; overflow:visible; border-bottom:0; margin:14px 0 0; padding:0; }
     #panel-catering .cat-kinds .lbl{ font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:var(--sub); margin-right:4px; }
     #panel-catering .cat-kinds .ctab{ --kc:#3d4654; margin:0; padding:5px 11px 5px 6px; gap:7px; border:1px solid var(--line); border-radius:999px; background:#fff; color:var(--sub); font-size:.76rem; font-weight:700; line-height:1.3; }
@@ -2650,7 +2654,14 @@ function catAll(){
 const CV_VIEWS = ['table', 'board', 'calendar'];
 let CAT_VIEW = (function(){ try{ const v = localStorage.getItem('cat_view'); return CV_VIEWS.indexOf(v) >= 0 ? v : 'table'; }catch(_){ return 'table'; } })();
 let CAT_MONTH = '';
-if(CAT_VIEW === 'calendar') CAT_FILTER = 'all';   // calendar opens on All (2026-11-22, "make calendar default to the all view")   // the month the calendar shows, 'YYYY-MM' ('' = this month)
+if(CAT_VIEW === 'calendar') CAT_FILTER = 'all';   // calendar opens on All (2026-11-22, "make calendar default to the all view")
+// STAGE TICKS (2026-11-22, "checkmarks on bottom row as well"): CAT_FILTER is 'all', 'open', or a list of ticked stages.
+// All and Open stand alone; stages can be ticked together. Unticking the last stage goes back to Open.
+function catStageToggle(k){
+  if(k === 'all' || k === 'open' || !CAT_STAGES[k]) CAT_FILTER = k;
+  else { const a = Array.isArray(CAT_FILTER) ? CAT_FILTER.slice() : [], i = a.indexOf(k); if(i >= 0) a.splice(i, 1); else a.push(k); CAT_FILTER = a.length ? a : 'open'; }
+  catRender();
+}
 let CAT_SORT = { k:'last', d:-1 }, CAT_FIND = '';
 const CV_ICONS = {
   table:'<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6.2h12M2 9.8h12M6.2 6.2v7.3"/>',
@@ -2952,8 +2963,9 @@ function catRender(){
   const board = CAT_VIEW === 'board', filter = board && CAT_FILTER !== 'all' ? 'open' : CAT_FILTER;
   const chips = board ? [['all','All'],['open','Open']] : [['all','All'],['open','Open'],...Object.entries(CAT_STAGES)];   // All first (2026-11-22, "move all button to far left")
   document.getElementById('catChips').innerHTML = chips.map(([k,l])=>
-    '<button type="button" class="chip cv-stg st-'+k+(filter===k?' on':'')+'" aria-pressed="'+(filter===k)+'" onclick="CAT_FILTER=\''+k+'\';catRender()">'+l+(k==='all'?'':'<b>'+(counts[k]||0)+'</b>')+'</button>').join('');
-  const rows = mine.filter(x=> filter==='all' ? true : filter==='open' ? isOpen(x) : x.stage===filter);
+    { const on = Array.isArray(filter) ? filter.indexOf(k) >= 0 : filter === k;
+      return '<button type="button" class="chip cv-stg st-'+k+(on?' on':'')+'" role="checkbox" aria-checked="'+on+'" onclick="catStageToggle(\''+k+'\')"><span class="cv-ck">'+cvIc('tick')+'</span>'+l+(k==='all'?'':'<b>'+(counts[k]||0)+'</b>')+'</button>'; }).join('');
+  const rows = mine.filter(x=> filter==='all' ? true : filter==='open' ? isOpen(x) : Array.isArray(filter) ? filter.indexOf(x.stage) >= 0 : x.stage===filter);
   const el = document.getElementById('catList');
   if(!rows.length){ el.className = 'rec-list'; el.innerHTML = '<div class="rec-empty">'+(find ? 'No leads match “'+esc(CAT_FIND.trim())+'”.' : 'Nothing here.')+'</div>'; return; }
   const recs = rows.map(catRec);
