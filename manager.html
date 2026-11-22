@@ -2618,7 +2618,8 @@ function catAll(){
 // CAT-VIEWS (2026-11-22): the list draws as a table or a board — see <style id="cat-views">.
 const CV_VIEWS = ['table', 'board', 'calendar'];
 let CAT_VIEW = (function(){ try{ const v = localStorage.getItem('cat_view'); return CV_VIEWS.indexOf(v) >= 0 ? v : 'table'; }catch(_){ return 'table'; } })();
-let CAT_MONTH = '';   // the month the calendar shows, 'YYYY-MM' ('' = this month)
+let CAT_MONTH = '';
+if(CAT_VIEW === 'calendar') CAT_FILTER = 'all';   // calendar opens on All (2026-11-22, "make calendar default to the all view")   // the month the calendar shows, 'YYYY-MM' ('' = this month)
 let CAT_SORT = { k:'last', d:-1 }, CAT_FIND = '';
 const CV_ICONS = {
   table:'<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6.2h12M2 9.8h12M6.2 6.2v7.3"/>',
@@ -2773,7 +2774,7 @@ function catSorted(recs){
   return recs.slice().sort((a,b)=>{ const x = val(a), y = val(b); if(none(x) || none(y)) return none(x) - none(y); return (x < y ? -1 : x > y ? 1 : 0) * d; });   // blanks always last
 }
 function catSortBy(k){ CAT_SORT = CAT_SORT.k === k ? { k, d:-CAT_SORT.d } : { k, d: /^(last|value|paid|guests)$/.test(k) ? -1 : 1 }; catRender(); }
-function catSetView(v){ CAT_VIEW = CV_VIEWS.indexOf(v) >= 0 ? v : 'table'; try{ localStorage.setItem('cat_view', CAT_VIEW); }catch(_){} catRender(); }
+function catSetView(v){ CAT_VIEW = CV_VIEWS.indexOf(v) >= 0 ? v : 'table'; if(CAT_VIEW === 'calendar') CAT_FILTER = 'all'; try{ localStorage.setItem('cat_view', CAT_VIEW); }catch(_){} catRender(); }
 function catViewBar(){
   const bar = document.getElementById('catViewBar'); if(!bar) return;
   if(!bar.firstChild) bar.innerHTML = '<div class="cv-seg" role="group" aria-label="View">'
@@ -2920,7 +2921,7 @@ function catRender(){
   mine.forEach(x=>{ if(isArch(x)){ counts.archived++; return; } counts[x.stage]=(counts[x.stage]||0)+1; if(isOpen(x)) counts.open++; });
   // the board already has a column per stage, so there it is just Open | All (a stage picked in the table comes back when you switch back)
   const board = CAT_VIEW === 'board', filter = board && !['all','archived'].includes(CAT_FILTER) ? 'open' : CAT_FILTER;
-  const chips = board ? [['open','Open'],['archived','📦 Archived'],['all','All']] : [['open','Open'],...Object.entries(CAT_STAGES),['archived','📦 Archived'],['all','All']];
+  const chips = board ? [['all','All'],['open','Open']] : [['all','All'],['open','Open'],...Object.entries(CAT_STAGES)];   // All first (2026-11-22, "move all button to far left")
   document.getElementById('catChips').innerHTML = chips.map(([k,l])=>
     '<button type="button" class="chip cv-stg st-'+k+(filter===k?' on':'')+'" aria-pressed="'+(filter===k)+'" onclick="CAT_FILTER=\''+k+'\';catRender()">'+l+(k==='all'?'':'<b>'+(counts[k]||0)+'</b>')+'</button>').join('');
   const rows = mine.filter(x=> filter==='archived' ? isArch(x) : isArch(x) ? false : filter==='all' ? true : filter==='open' ? isOpen(x) : x.stage===filter);
@@ -14281,7 +14282,7 @@ const mbMoney=c=>'$'+(Math.round(Number(c)||0)/100).toFixed(2).replace(/\.00$/,'
 const mbDay=iso=>iso?new Date(String(iso).length>10?iso:iso+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
 const mbWhen=iso=>iso?new Date(iso).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}):'';
 const mbMonth=m=>m?new Date(String(m).slice(0,10)+'T12:00:00').toLocaleDateString('en-US',{month:'long'}):'';
-const MB_FILTERS=[['current','Current'],['monthly','Monthly'],['comp','Prepaid & comp'],['paused','Paused & skipping'],['ending','Ending & ended'],['attention','Needs attention'],['archived','📦 Archived'],['all','All']];
+const MB_FILTERS=[['current','Current'],['monthly','Monthly'],['comp','Prepaid & comp'],['paused','Paused & skipping'],['ending','Ending & ended'],['attention','Needs attention'],['archived','📦 Archived'],['archived','📦 Archived'],['all','All']];
 function mbMatch(m,f){
   if(f==='current')return m.live;
   if(f==='monthly')return m.live&&m.billing==='square';
