@@ -2582,6 +2582,7 @@ let CAT_KSEL = [];   // the kinds ticked in the Type row (catering | event | exp
 // tick / untick a kind; 'all' (All inquiries) clears the ticks. Ticking every kind is the same as none, so it resets.
 function catKindToggle(k){
   if(k === 'all' || !CAT_KINDS[k]) CAT_KSEL = [];
+  else if(!CAT_KSEL.length) CAT_KSEL = Object.keys(CAT_KINDS).filter(x=>x!==k);   // All on = every kind ticked, so a click unticks just that one (2026-11-23)
   else { const i = CAT_KSEL.indexOf(k); if(i >= 0) CAT_KSEL.splice(i, 1); else CAT_KSEL.push(k); if(CAT_KSEL.length >= Object.keys(CAT_KINDS).length) CAT_KSEL = []; }
   catRender();
 }
@@ -3010,7 +3011,7 @@ function catRender(){
   const kc = { all:0, catering:0, event:0, experience:0, table:0, donation:0, question:0 };
   all.filter(isOpen).forEach(x=>{ kc.all++; kc[x.kind]++; });
   const kd = document.getElementById('catKinds');
-  const kOn = k => k === 'all' ? !CAT_KSEL.length : CAT_KSEL.indexOf(k) >= 0;
+  const kOn = k => !CAT_KSEL.length || CAT_KSEL.indexOf(k) >= 0;   // All on shows every kind ticked
   if(kd) kd.innerHTML = '<span class="lbl">Type</span>' + [['all','All inquiries'],['catering','Catering'],['event','Private events'],['experience','Experiences'],['table','Table requests'],['donation','Donations'],['question','Questions']].map(([k,l])=>
     '<button type="button" class="ctab'+(kOn(k)?' on':'')+'" role="checkbox" aria-checked="'+kOn(k)+'"'+(CAT_KINDS[k]?' style="--kc:'+CAT_KINDS[k][1]+'"':'')+' onclick="catKindToggle(\''+k+'\')"><span class="cv-ck">'+cvIc('tick')+'</span><span class="kl">'+l+'</span><span class="cnt">'+kc[k]+'</span></button>').join('');
   const tools = document.getElementById('catTools');
