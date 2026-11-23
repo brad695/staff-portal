@@ -2642,7 +2642,8 @@ if(CAT_VIEW === 'calendar') CAT_FILTER = 'all';   // calendar opens on All (2026
 // All and Open stand alone; stages can be ticked together. Unticking the last stage goes back to Open.
 function catStageToggle(k){
   if(k === 'all' || k === 'open' || !CAT_STAGES[k]) CAT_FILTER = k;
-  else { const a = Array.isArray(CAT_FILTER) ? CAT_FILTER.slice() : [], i = a.indexOf(k); if(i >= 0) a.splice(i, 1); else a.push(k); CAT_FILTER = a.length ? a : 'open'; }
+  else if(CAT_FILTER === 'all') CAT_FILTER = Object.keys(CAT_STAGES).filter(x=>x!==k);   // All on = every stage ticked, a click unticks just that one (2026-11-23)
+  else { const a = Array.isArray(CAT_FILTER) ? CAT_FILTER.slice() : [], i = a.indexOf(k); if(i >= 0) a.splice(i, 1); else a.push(k); CAT_FILTER = a.length >= Object.keys(CAT_STAGES).length ? 'all' : a.length ? a : 'open'; }
   catRender();
 }
 let CAT_SORT = { k:'last', d:-1 }, CAT_FIND = '';
@@ -3024,7 +3025,7 @@ function catRender(){
   const board = CAT_VIEW === 'board', filter = board && !['all','archived'].includes(CAT_FILTER) ? 'open' : CAT_FILTER;
   const chips = board ? [['all','All'],['open','Open'],['archived','📦 Archived']] : [['all','All'],['open','Open'],...Object.entries(CAT_STAGES),['archived','📦 Archived']];   // All first (2026-11-22, "move all button to far left")
   document.getElementById('catChips').innerHTML = chips.map(([k,l])=>
-    { const on = Array.isArray(filter) ? filter.indexOf(k) >= 0 : filter === k;
+    { const on = Array.isArray(filter) ? filter.indexOf(k) >= 0 : filter === k || (filter === 'all' && !!CAT_STAGES[k]);
       return '<button type="button" class="chip cv-stg st-'+k+(on?' on':'')+'" role="checkbox" aria-checked="'+on+'" onclick="catStageToggle(\''+k+'\')"><span class="cv-ck">'+cvIc('tick')+'</span>'+l+(k==='all'?'':'<b>'+(counts[k]||0)+'</b>')+'</button>'; }).join('');
   const rows = mine.filter(x=> filter==='archived' ? isArch(x) : isArch(x) ? false : filter==='all' ? true : filter==='open' ? isOpen(x) : Array.isArray(filter) ? filter.indexOf(x.stage) >= 0 : x.stage===filter);
   const el = document.getElementById('catList');
