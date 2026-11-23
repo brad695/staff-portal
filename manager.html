@@ -3021,7 +3021,7 @@ function catRender(){
   mine.forEach(x=>{ if(isArch(x)){ counts.archived++; return; } counts[x.stage]=(counts[x.stage]||0)+1; if(isOpen(x)) counts.open++; });
   // the board already has a column per stage, so there it is just Open | All (a stage picked in the table comes back when you switch back)
   const board = CAT_VIEW === 'board', filter = board && !['all','archived'].includes(CAT_FILTER) ? 'open' : CAT_FILTER;
-  const chips = board ? [['all','All'],['open','Open']] : [['all','All'],['open','Open'],...Object.entries(CAT_STAGES)];   // All first (2026-11-22, "move all button to far left")
+  const chips = board ? [['all','All'],['open','Open'],['archived','📦 Archived']] : [['all','All'],['open','Open'],...Object.entries(CAT_STAGES),['archived','📦 Archived']];   // All first (2026-11-22, "move all button to far left")
   document.getElementById('catChips').innerHTML = chips.map(([k,l])=>
     { const on = Array.isArray(filter) ? filter.indexOf(k) >= 0 : filter === k;
       return '<button type="button" class="chip cv-stg st-'+k+(on?' on':'')+'" role="checkbox" aria-checked="'+on+'" onclick="catStageToggle(\''+k+'\')"><span class="cv-ck">'+cvIc('tick')+'</span>'+l+(k==='all'?'':'<b>'+(counts[k]||0)+'</b>')+'</button>'; }).join('');
@@ -14384,7 +14384,7 @@ const mbMoney=c=>'$'+(Math.round(Number(c)||0)/100).toFixed(2).replace(/\.00$/,'
 const mbDay=iso=>iso?new Date(String(iso).length>10?iso:iso+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
 const mbWhen=iso=>iso?new Date(iso).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}):'';
 const mbMonth=m=>m?new Date(String(m).slice(0,10)+'T12:00:00').toLocaleDateString('en-US',{month:'long'}):'';
-const MB_FILTERS=[['current','Current'],['monthly','Monthly'],['comp','Prepaid & comp'],['paused','Paused & skipping'],['ending','Ending & ended'],['attention','Needs attention'],['archived','📦 Archived'],['archived','📦 Archived'],['archived','📦 Archived'],['all','All']];
+const MB_FILTERS=[['current','Current'],['monthly','Monthly'],['comp','Prepaid & comp'],['paused','Paused & skipping'],['ending','Ending & ended'],['attention','Needs attention'],['archived','📦 Archived'],['all','All']];
 function mbMatch(m,f){
   if(f==='current')return m.live;
   if(f==='monthly')return m.live&&m.billing==='square';
