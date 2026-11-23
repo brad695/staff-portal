@@ -1961,14 +1961,53 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
     });
   }
   function likeLit(s){ return String(s).replace(/([\\%_])/g, '\\$1'); }   // literal match for ilike (same as schedule.html)
+  // MAGIC-LINK (staging, 2026-11-22): sign in with your work email — a link is emailed, tapping it signs you in
+  // and fills greys_emp_id from your employee row (matched on the email in portal_employee_contacts, rpc portal_me).
+  // The employee-ID box stays as a fallback while staff move over.
   function signIn(next, opts){
     opts=opts||{};
     var s=sheet('<div class="v8-h"><b>'+esc(opts.title||'Sign in to edit your tiles')+'</b><button type="button" class="v8-x" data-x aria-label="Close"><i class="ti ti-x" aria-hidden="true"></i></button></div>'
-      +'<p class="v8-p">'+esc(opts.blurb||'Your tiles save to your employee ID, so they follow you to any phone or iPad.')+'</p>'
-      +'<input class="v8-in" type="text" placeholder="Your employee ID" aria-label="Your employee ID" autocomplete="off" autocapitalize="off" spellcheck="false">'
+      +'<div data-pane="mail">'
+      +'<p class="v8-p">Enter your email and we’ll send you a sign-in link. Tap it on this phone and you’re in.</p>'
+      +'<input class="v8-in" data-mail type="email" inputmode="email" placeholder="you@email.com" aria-label="Your email" autocomplete="email" autocapitalize="off" spellcheck="false">'
       +'<div class="v8-err" role="alert"></div>'
-      +'<div class="v8-acts"><button type="button" class="v8-btn" data-x>Cancel</button><button type="button" class="v8-btn pri" data-go>Sign in</button></div>');
-    var inp=$q('.v8-in', s), err=$q('.v8-err', s), go=$q('[data-go]', s);
+      +'<div class="v8-acts"><button type="button" class="v8-btn" data-x>Cancel</button><button type="button" class="v8-btn pri" data-send>Email me a link</button></div>'
+      +'<p class="v8-p" style="margin-top:12px"><a href="#" data-useid style="color:#6b7280">Use my employee ID instead</a></p>'
+      +'</div>'
+      +'<div data-pane="sent" hidden><p class="v8-p"><b data-sentto></b><br>Check your email and tap <b>Sign in to GREYS</b>. Open the link on this phone. It can take a minute — check spam too.</p>'
+      +'<div class="v8-acts"><button type="button" class="v8-btn" data-back>Use a different email</button><button type="button" class="v8-btn pri" data-x>OK</button></div></div>'
+      +'<div data-pane="id" hidden>'
+      +'<p class="v8-p">'+esc(opts.blurb||'Your tiles save to your employee ID, so they follow you to any phone or iPad.')+'</p>'
+      +'<input class="v8-in" data-id type="text" placeholder="Your employee ID" aria-label="Your employee ID" autocomplete="off" autocapitalize="off" spellcheck="false">'
+      +'<div class="v8-err" role="alert"></div>'
+      +'<div class="v8-acts"><button type="button" class="v8-btn" data-x>Cancel</button><button type="button" class="v8-btn pri" data-go>Sign in</button></div>'
+      +'</div>');
+    function pane(n){ ['mail','sent','id'].forEach(function(k){ var el=$q('[data-pane="'+k+'"]', s); if(el) el.hidden=(k!==n); }); var f=$q('[data-pane="'+n+'"] input', s); if(f) f.focus(); }
+    var mail=$q('[data-mail]', s), merr=$q('[data-pane="mail"] .v8-err', s), send=$q('[data-send]', s);
+    try{ mail.value=lsGet('greys_emp_email')||''; }catch(e){}
+    function sendLink(){
+      var v=mail.value.trim().toLowerCase(); merr.textContent='';
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)){ merr.textContent='Enter the email your manager has on file.'; mail.focus(); return; }
+      send.disabled=true; send.textContent='Sending…';
+      Promise.resolve().then(function(){
+        return sb.auth.signInWithOtp({ email:v, options:{ emailRedirectTo: location.origin + '/', shouldCreateUser:true } });
+      }).catch(function(e){ return { error:e }; }).then(function(r){
+        send.disabled=false; send.textContent='Email me a link';
+        if(r && r.error){
+          var m=String((r.error && r.error.message)||'');
+          merr.textContent=/rate|seconds|too many/i.test(m) ? 'A link was just sent — wait a minute, then try again.' : 'Couldn’t send the link — try again.';
+          return;
+        }
+        lsSet('greys_emp_email', v);
+        $q('[data-sentto]', s).textContent='Link sent to '+v+'.';
+        pane('sent');
+      });
+    }
+    send.addEventListener('click', sendLink);
+    mail.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); sendLink(); } });
+    $q('[data-back]', s).addEventListener('click', function(){ pane('mail'); });
+    $q('[data-useid]', s).addEventListener('click', function(e){ e.preventDefault(); pane('id'); });
+    var inp=$q('[data-id]', s), err=$q('[data-pane="id"] .v8-err', s), go=$q('[data-go]', s);
     function run(){
       var v=inp.value.trim(); err.textContent='';
       if(!v){ err.textContent='Enter your employee ID.'; inp.focus(); return; }
@@ -2107,7 +2146,29 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
 const SB_URL = 'https://vdvtrevhqalmjwhjhjug.supabase.co';
 const SB_KEY = 'sb_publishable_LnlevWReed7K8cFk_f_Mxg_UywktQ5_';
 const FN_URL = SB_URL + '/functions/v1/portal-api';
+// MAGIC-LINK: was this page opened from an emailed sign-in link? (checked before the client reads and clears the URL)
+const MAGIC_RETURN = /access_token=|type=magiclink|[?&]code=/.test(location.hash + location.search);
 const sb = window.supabase.createClient(SB_URL, SB_KEY);
+(function(){
+  if(!MAGIC_RETURN) return;
+  var done=false;
+  function finish(session){
+    if(done || !session) return; done=true;
+    sb.rpc('portal_me').then(function(r){
+      var me=r && r.data && r.data[0];
+      if(me && me.login_id){
+        localStorage.setItem('greys_emp_id', String(me.login_id).trim());
+        if(session.user && session.user.email) localStorage.setItem('greys_emp_email', session.user.email.toLowerCase());
+        location.replace(location.origin + '/');
+      } else {
+        sb.auth.signOut({ scope:'local' }).catch(function(){});
+        history.replaceState(null, '', location.origin + '/');
+        alert((session.user && session.user.email ? session.user.email : 'That email') + ' isn’t on the staff list. Ask a manager to add it to your employee profile.');
+      }
+    }, function(){ done=false; alert('Couldn’t finish signing in — open the link again.'); });
+  }
+  sb.auth.onAuthStateChange(function(ev, session){ if(ev==='SIGNED_IN' || ev==='INITIAL_SESSION') setTimeout(function(){ finish(session); }, 0); });
+})();
 
 /* top-bar logout: clears the staff schedule sign-in (and any manager session) */
 async function topLogout(){
