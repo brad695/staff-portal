@@ -82,6 +82,9 @@
 //   No row, enabled not true, no items or no ship_on = no shipping (menu.ship is null and pay refuses).
 //   test_enabled (2026-11-13): the TEST COPY's own on/off, so staging can show shipping while the live site keeps it
 //   off. Not set = the test copy follows enabled. The live function never reads it.
+//   test_items (v19.1, 2026-11-25, Maverick: the holiday gift boxes "launch on test site first"): the TEST COPY's own
+//   list of what ships, so staging can ship new boxes before the live site does. Not set = the test copy follows
+//   items; an empty list = nothing ships there. The live function never reads it.
 //   rates (v18, 2026-11-14, Maverick: "charge shipping based on their location" → near vs far):
 //     { ground_miles: 600, ground: { first_cents, each_cents }, air: { first_cents, each_cents } }
 //   The ship-to ZIP decides: its 3-digit area within ground_miles of the from-shop's (as the crow flies, the way UPS
@@ -252,7 +255,8 @@ function parseShip(raw: any): ShipCfg | null {
   const on = TEST_COPY && "test_enabled" in raw ? raw.test_enabled : raw.enabled; // test copy: its own switch (see SHIPPING)
   if (on !== true) return null;
   const day = (k: string) => (DATE_ONLY.test(String(raw[k] ?? "")) ? String(raw[k]) : null);
-  const items = (Array.isArray(raw.items) ? raw.items : []).map((x: unknown) => String(x ?? "").trim()).filter((x: string) => /^[A-Z0-9]{8,40}$/.test(x));
+  const list = TEST_COPY && Array.isArray(raw.test_items) ? raw.test_items : raw.items; // test copy: its own items
+  const items = (Array.isArray(list) ? list : []).map((x: unknown) => String(x ?? "").trim()).filter((x: string) => /^[A-Z0-9]{8,40}$/.test(x));
   const ship_on = day("ship_on");
   if (!items.length || !ship_on) return null;
   const cents = (v: unknown, d: number) => (Number.isInteger(Number(v)) && Number(v) >= 0 && Number(v) <= 50000 ? Number(v) : d);
