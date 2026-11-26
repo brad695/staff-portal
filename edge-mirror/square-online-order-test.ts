@@ -15,6 +15,7 @@
 // Cheesemas …) are seasonal pre-orders, each with its own pickup window. They get their own "Special Offers"
 // section, first on the page, and carry preorder: true. Special Offers wins over the online / catering menus
 // for an item that sits in more than one, and a pre-order is never a catering item.
+//   v19.3 (2026-11-26): SHIP DAYS — a shipped box that isn't a pre-order ships the next open day (see SHIP DAYS).
 //   v19.2 (2026-11-26, Maverick: "the gift box is just for sale and shipping, no pre order or dates to pick up"):
 //   only a Special Offers item WITH a pickup window (below) is a pre-order. One without a window — the holiday
 //   gift boxes — still sits in the Special Offers section but is an everyday item: preorder false, ASAP or
@@ -251,7 +252,7 @@ type Service = "ground" | "air";
 type Tier = { first_cents: number; each_cents: number };
 type Rates = { miles: number; ground: Tier; air: Tier };
 type ShipCfg = {
-  from: Shop; items: string[]; order_by: string | null; ship_on: string; arrive_from: string | null; arrive_by: string | null;
+  from: Shop; items: string[]; order_by: string | null; soon_order_by: string | null; ship_on: string; arrive_from: string | null; arrive_by: string | null;
   first_cents: number; each_cents: number; limit: number; tax_states: string[]; rates: Rates | null;
 };
 let shipCfg: ShipCfg | null = null;
@@ -276,7 +277,7 @@ function parseShip(raw: any): ShipCfg | null {
   const r = raw.rates && typeof raw.rates === "object" ? raw.rates : null;
   const g = tier(r?.ground), a = tier(r?.air), mi = Number(r?.ground_miles);
   return {
-    from: raw.from === "nashville" ? "nashville" : "memphis", items, order_by: day("order_by"), ship_on,
+    from: raw.from === "nashville" ? "nashville" : "memphis", items, order_by: day("order_by"), soon_order_by: day("soon_order_by"), ship_on,
     arrive_from: day("arrive_from"), arrive_by: day("arrive_by"), first_cents: first, each_cents: cents(raw.each_cents, first),
     limit: Math.max(0, Math.min(100000, Math.floor(Number(raw.limit) || 0))), tax_states: taxStates,
     rates: g && a ? { miles: Number.isFinite(mi) && mi >= 50 && mi <= 3000 ? Math.round(mi) : 600, ground: g, air: a } : null,
@@ -1072,16 +1073,45 @@ function arriveText(c: ShipCfg) {
   return one ? `arrives by ${fmtLongDay(one)}` : "";
 }
 const shipText = (c: ShipCfg) => [`Ships ${fmtLongDay(c.ship_on)}`, arriveText(c)].filter(Boolean).join(" · ");
+// SHIP DAYS (v19.3, "next day depending on order, we are closed sun mon"): two kinds of box ship.
+//   dated — a pre-order box (it has a pickup window: the 12 Days box). It ships on the page's one ship day (ship_on),
+//           and order_by / ship_on close it.
+//   soon  — everything else that ships (the holiday gift boxes). It ships the next day the shop is open after the
+//           order: never a Sunday or Monday, never an all-day closed date. order_by and ship_on don't touch it;
+//           its own last day to order is the setting soon_order_by ('YYYY-MM-DD', "order by dec 16th"; none = no end).
+// A bag with any dated box ships whole on ship_on (one address, one shipment).
+const NO_SHIP_DOW = new Set([0, 1]); // Sunday, Monday: the shops are closed
+function nextShipDay(shop: Shop, now = Date.now()): string {
+  let ms = dayAt(localDate(now), 12);
+  for (let i = 0; i < 30; i++) {
+    ms += 86400_000;
+    const d = localDate(ms);
+    if (NO_SHIP_DOW.has(new Date(dayAt(d, 12)).getUTCDay())) continue;
+    const shut = closedOn(shop, d);
+    if (shut && shut.close == null) continue;
+    return d;
+  }
+  return localDate(ms);
+}
+type ShipPlan = { dated: boolean; ship_on: string; arrive_from: string | null; arrive_by: string | null; text: string };
+function shipPlan(c: ShipCfg, dated: boolean): ShipPlan {
+  if (dated) return { dated, ship_on: c.ship_on, arrive_from: c.arrive_from, arrive_by: c.arrive_by, text: shipText(c) };
+  const on = nextShipDay(c.from);
+  return { dated, ship_on: on, arrive_from: null, arrive_by: null, text: `Ships ${fmtLongDay(on)}` };
+}
+const datedLines = (lines: Line[]) => lines.some((l) => l.item.preorder);
 // boxes already paid for shipping (this env) — what `limit` counts against. From Square (v17): every line of a ship
 // order is a box that ships; refunded orders don't count.
 async function shippedBoxes(e: Env, _c: ShipCfg, fresh = false): Promise<number> {
   return (await shipOrders(e, fresh)).filter((o) => !o.refunded).reduce((n, o) => n + o.boxes, 0);
 }
 // why shipping can't take an order right now (null = it can)
-function shipClosed(c: ShipCfg, e: Env): string | null {
+// dated false = a bag of "soon" boxes only: the ship day's dates don't close it (SHIP DAYS)
+function shipClosed(c: ShipCfg, e: Env, dated = true): string | null {
   const today = localDate(Date.now());
-  if (c.order_by && today > c.order_by) return `Shipped orders closed on ${fmtDay(c.order_by)}. You can still pick up at the shop.`;
-  if (today >= c.ship_on) return "Shipped orders are closed for this season. You can still pick up at the shop.";
+  if (dated && c.order_by && today > c.order_by) return `Shipped orders closed on ${fmtDay(c.order_by)}. You can still pick up at the shop.`;
+  if (dated && today >= c.ship_on) return "Shipped orders are closed for this season. You can still pick up at the shop.";
+  if (!dated && c.soon_order_by && today > c.soon_order_by) return `Shipped orders closed on ${fmtDay(c.soon_order_by)}. You can still pick up at the shop.`;
   if (!accepting(c.from, e)) return closedMsg(c.from, e);
   return null;
 }
@@ -1090,10 +1120,19 @@ async function publicShip(e: Env) {
   if (!c) return null;
   let left: number | null = null;
   if (c.limit) { try { left = Math.max(0, c.limit - (await shippedBoxes(e, c))); } catch (err) { console.error(err); } }
-  const why = shipClosed(c, e) ?? (left === 0 ? "Shipped boxes are sold out. You can still pick up at the shop." : null);
+  // SHIP DAYS: which boxes ship soon (not pre-orders) — the page shows them their own ship day
+  let soonIds: string[] = [];
+  try { const fm = await loadMenu(c.from); soonIds = c.items.filter((id) => fm.items[id] && !fm.items[id].preorder); } catch (err) { console.error(err); }
+  const soldOut = left === 0 ? "Shipped boxes are sold out. You can still pick up at the shop." : null;
+  const datedWhy = shipClosed(c, e, true) ?? soldOut;
+  const soonWhy = shipClosed(c, e, false) ?? soldOut;
+  const hasDated = c.items.length > soonIds.length;
+  const why = !soonIds.length ? datedWhy : !soonWhy || (hasDated && !datedWhy) ? null : soonWhy;
+  const sp = shipPlan(c, false);
   return {
     open: !why, message: why, from: c.from, from_label: SHOPS[c.from].label, items: c.items,
     order_by: c.order_by, ship_on: c.ship_on, arrive_from: c.arrive_from, arrive_by: c.arrive_by, text: shipText(c),
+    soon: soonIds.length ? { items: soonIds, ship_on: sp.ship_on, text: sp.text, order_by: c.soon_order_by, open: !soonWhy, message: soonWhy } : null, dated_open: !datedWhy, dated_message: datedWhy,
     first_cents: c.first_cents, each_cents: c.each_cents, left,
     states: Object.keys(US_STATES).filter((s) => !NO_SHIP.has(s)).map((s) => ({ code: s, name: US_STATES[s] })),
     tax_states: c.tax_states,
@@ -1182,8 +1221,8 @@ function buildShipOrder(e: Env, m: Menu, c: ShipCfg, lines: Line[], state: strin
       state: "PROPOSED",
       shipment_details: {
         recipient,
-        expected_shipped_at: new Date(dayAt(c.ship_on, 12, m.location.tz)).toISOString(),
-        shipping_note: [`SHIP ${fmtLongDay(c.ship_on)}`, service ? SERVICE_LABEL[service] : "", `Online ${code}`, `From ${cust.first} ${cust.last}`.trim(), to.gift_note ? `Gift note: “${to.gift_note}”` : "", note]
+        expected_shipped_at: new Date(dayAt(shipPlan(c, datedLines(lines)).ship_on, 12, m.location.tz)).toISOString(),
+        shipping_note: [`SHIP ${fmtLongDay(shipPlan(c, datedLines(lines)).ship_on)}`, service ? SERVICE_LABEL[service] : "", `Online ${code}`, `From ${cust.first} ${cust.last}`.trim(), to.gift_note ? `Gift note: “${to.gift_note}”` : "", note]
           .filter(Boolean).join(" · ").slice(0, 500),
       },
     }];
@@ -1224,6 +1263,7 @@ async function quoteShip(req: Request, b: any) {
   const t = totalsOf(d.order);
   return {
     ok: true, env: e, ...t, shipping_cents: Number(d.order?.total_service_charge_money?.amount ?? 0), state, tax_known: !!state && shipKnown,
+    ship_on: shipPlan(c, datedLines(lines)).ship_on, ship_text: shipPlan(c, datedLines(lines)).text,
     shipping_known: shipKnown, service: zone.service, service_label: zone.service ? SERVICE_LABEL[zone.service] : null, zip_problem: zone.problem,
     lines: (d.order?.line_items ?? []).map((li: any, i: number) => ({ ...lineSummary([lines[i]])[0], total_cents: Number(li.total_money?.amount ?? 0), tax_cents: Number(li.total_tax_money?.amount ?? 0) })),
   };
@@ -1234,8 +1274,7 @@ async function payShip(req: Request, b: any) {
   const c = shipCfg;
   if (!c) throw new PublicError("Shipping isn't available right now. Nothing was charged.", 409);
   const e = envFor(req);
-  const why = shipClosed(c, e);
-  if (why) throw new PublicError(why, 409);
+  if (!accepting(c.from, e)) throw new PublicError(closedMsg(c.from, e), 409);
   const shop = c.from;
   const sourceId = clean(b.source_id, 400);
   const gift = readGift(b); // a GREYS gift card pays some or all of it (GIFT CARDS at the top)
@@ -1257,6 +1296,9 @@ async function payShip(req: Request, b: any) {
   const m = await loadMenu(shop);
   const lines = priceLines(m, b.lines);
   const boxes = shipLines(c, lines);
+  const plan = shipPlan(c, datedLines(lines)); // SHIP DAYS: a pre-order box ships on the ship day, the rest the next open day
+  const whyDated = shipClosed(c, e, plan.dated);
+  if (whyDated) throw new PublicError(whyDated + " Nothing was charged.", 409);
   await checkStock(m, lines);
   if (c.limit) {
     const left = Math.max(0, c.limit - (await shippedBoxes(e, c, true)));
@@ -1296,8 +1338,8 @@ async function payShip(req: Request, b: any) {
 
   const { data: prior } = await admin.from("online_orders").select("id, status, code, square_payment_id, receipt_url, card, total_cents").eq("square_order_id", o.id).maybeSingle();
   const shipOut = {
-    name: to.name, city: to.city, state: to.state, zip: to.zip, ship_on: c.ship_on, arrive_from: c.arrive_from, arrive_by: c.arrive_by,
-    label: shipText(c), from: shop, from_label: SHOPS[shop].label,
+    name: to.name, city: to.city, state: to.state, zip: to.zip, ship_on: plan.ship_on, arrive_from: plan.arrive_from, arrive_by: plan.arrive_by,
+    label: plan.text, from: shop, from_label: SHOPS[shop].label,
     service: zone.service, service_label: zone.service ? SERVICE_LABEL[zone.service] : null,
   };
   const result = (row: { card: string | null; receipt_url: string | null }, emailSent: boolean | null) => ({
@@ -1310,7 +1352,7 @@ async function payShip(req: Request, b: any) {
     customer_name: `${first} ${last}`.trim(), email, phone: cust.phone ?? digits, pickup_at: null, asap: false, catering: false, note: note || null,
     lines: lineSummary(lines), subtotal_cents: t.subtotal_cents, tax_cents: t.tax_cents, tip_cents: 0, total_cents: charge,
     square_order_id: o.id, updated_at: new Date().toISOString(),
-    fulfillment: "ship", ship_to: zone.service ? { ...to, service: zone.service } : to, gift_note: to.gift_note || null, shipping_cents: shipCents, ship_on: c.ship_on,
+    fulfillment: "ship", ship_to: zone.service ? { ...to, service: zone.service } : to, gift_note: to.gift_note || null, shipping_cents: shipCents, ship_on: plan.ship_on,
   };
   let w = prior ? await admin.from("online_orders").update(row).eq("id", prior.id) : await admin.from("online_orders").insert(row);
   if (w.error && /column|schema cache/i.test(w.error.message)) { // the shipping columns aren't there yet: log the rest
@@ -1638,7 +1680,7 @@ async function mailShipTracking(e: Env, o: ShipOrder): Promise<boolean> {
   const L = (await loadMenu(from)).location;
   const test = e === "sandbox";
   const what = o.lines.map((l) => `${l.qty}× ${l.name}`).join(", ");
-  const arrive = c ? arriveText(c) : "";
+  const arrive = c && o.ship_on === c.ship_on ? arriveText(c) : ""; // the ship day's arrival dates, not a "soon" box's
   const link = o.tracking_url ? `<a href="${esc(o.tracking_url)}" style="display:inline-block;background:#06273A;color:#fff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:8px">Track your box</a>` : "";
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#221E1B;line-height:1.5">
   ${test ? `<div style="background:#FDECC8;padding:8px 12px;margin-bottom:14px;font-size:13px"><b>Test order</b> — Square sandbox. Nothing was charged and nothing shipped.</div>` : ""}
