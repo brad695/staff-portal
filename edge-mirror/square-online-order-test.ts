@@ -998,12 +998,6 @@ function buildOrder(e: Env, m: Menu, lines: Line[], pickup: Pickup | null, cust:
     if (l.note) li.note = l.note;
     return li;
   });
-  // shirts (v19.4): ad-hoc lines, both environments; "Printful ·" keeps them out of the box counts
-  ml.forEach((l, i) => line_items.push({
-    uid: "m" + (i + 1), name: `${l.m.name} Tee`, variation_name: l.s.size, quantity: String(l.qty),
-    base_price_money: { amount: l.s.price, currency: "USD" }, note: `Printful · ${l.s.sku}`.slice(0, 200),
-  }));
-  const boxesIn = lines.length > 0;
   const order: Record<string, unknown> = {
     location_id: locationId,
     source: { name: "Greys online ordering" },
@@ -1253,6 +1247,12 @@ function buildShipOrder(e: Env, m: Menu, c: ShipCfg, lines: Line[], state: strin
     if (l.note) li.note = l.note;
     return li;
   });
+  // shirts (v19.4): ad-hoc lines, both environments; "Printful ·" keeps them out of the box counts
+  ml.forEach((l, i) => line_items.push({
+    uid: "m" + (i + 1), name: `${l.m.name} Tee`, variation_name: l.s.size, quantity: String(l.qty),
+    base_price_money: { amount: l.s.price, currency: "USD" }, note: `Printful · ${l.s.sku}`.slice(0, 200),
+  }));
+  const boxesIn = lines.length > 0;
   const order: Record<string, unknown> = {
     location_id: locationId,
     source: { name: "Greys online ordering" },
