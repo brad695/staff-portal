@@ -15,6 +15,7 @@
 // Cheesemas …) are seasonal pre-orders, each with its own pickup window. They get their own "Special Offers"
 // section, first on the page, and carry preorder: true. Special Offers wins over the online / catering menus
 // for an item that sits in more than one, and a pre-order is never a catering item.
+//   v21.1 (2026-11-26): a soon box shows no ship date to the customer (SOON_TEXT).
 //   v21 (2026-11-26, go-live of the test site): v19.4 (new look's menu, gift boxes, ship days, the tee) + the v20 CREDIT CARD FEE that was live.
 //   v19.3 (2026-11-26): SHIP DAYS — a shipped box that isn't a pre-order ships the next open day (see SHIP DAYS).
 //   v19.2 (2026-11-26, Maverick: "the gift box is just for sale and shipping, no pre order or dates to pick up"):
@@ -1157,11 +1158,15 @@ function nextShipDay(shop: Shop, now = Date.now()): string {
   }
   return localDate(ms);
 }
+// v21.1 (2026-11-26, Maverick: "there's no shipping nov 28th for gift boxes, stop saying that"): a soon box is never
+// given a ship DATE in anything a customer reads — the page, the confirmation, the emails say the rule instead. The
+// date still goes on the Square order and the packing list for the shop.
+const SOON_TEXT = "Ships the next day we’re open (Tuesday–Saturday)";
 type ShipPlan = { dated: boolean; ship_on: string; arrive_from: string | null; arrive_by: string | null; text: string };
 function shipPlan(c: ShipCfg, dated: boolean): ShipPlan {
   if (dated) return { dated, ship_on: c.ship_on, arrive_from: c.arrive_from, arrive_by: c.arrive_by, text: shipText(c) };
   const on = nextShipDay(c.from);
-  return { dated, ship_on: on, arrive_from: null, arrive_by: null, text: `Ships ${fmtLongDay(on)}` };
+  return { dated, ship_on: on, arrive_from: null, arrive_by: null, text: SOON_TEXT }; // no date in words (v21.1): the customer reads the rule, not a day
 }
 const datedLines = (lines: Line[]) => lines.some((l) => l.item.preorder);
 // boxes already paid for shipping (this env) — what `limit` counts against. From Square (v17): every line of a ship
@@ -1441,7 +1446,7 @@ async function payShip(req: Request, b: any) {
 
   const { data: prior } = await admin.from("online_orders").select("id, status, code, square_payment_id, receipt_url, card, total_cents").eq("square_order_id", o.id).maybeSingle();
   const shipOut = {
-    name: to.name, city: to.city, state: to.state, zip: to.zip, ship_on: plan.ship_on, arrive_from: plan.arrive_from, arrive_by: plan.arrive_by,
+    name: to.name, city: to.city, state: to.state, zip: to.zip, dated: plan.dated, ship_on: plan.ship_on, arrive_from: plan.arrive_from, arrive_by: plan.arrive_by,
     label: plan.text, from: shop, from_label: SHOPS[shop].label,
     service: zone.service, service_label: zone.service ? SERVICE_LABEL[zone.service] : null,
   };
@@ -2411,7 +2416,7 @@ async function mailShipConfirmation(r: any, cust: Cust, to: ShipTo, note: string
     headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICE },
     body: JSON.stringify({
       to: cust.email,
-      subject: `${test ? "[TEST] " : ""}Your Greys order ${r.code}${r.boxes === 0 ? "" : ` · ships ${fmtDay(r.ship.ship_on)}`}`,
+      subject: `${test ? "[TEST] " : ""}Your Greys order ${r.code}${r.boxes === 0 ? "" : r.ship.dated === false ? " · ships the next day we’re open" : ` · ships ${fmtDay(r.ship.ship_on)}`}`,
       html,
       from: Deno.env.get("INQUIRY_FROM") || "GREYS Fine Cheeses <info@greyscheese.com>",
       replyTo: L.email || Deno.env.get("INQUIRY_REPLY_TO") || "brad@greyscheese.com",
