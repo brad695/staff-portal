@@ -47,6 +47,11 @@
 //   admin (a signed-in console admin — Authorization: Bearer <session token>, checked with is_app_admin() — or {pass} =
 //   NOTES_PASS, or {secret} = app_secrets.cc_cron_secret for server-side SQL): admin_orders · admin_retry {code} ·
 //   admin_confirm {code} · admin_printful_setup · admin_printful_sync {dry_run?}
+//   merch {secret, phase, …}  server-to-server from square-online-order(-test) (2026-11-26): the order site sells shirts
+//     in its own cart on its own Square order; this keeps the Shirt Shop ledger, Printful draft, webhook and "shipped"
+//     email working. phase "draft" (before the card is charged: a shirt_orders row + the Printful draft — a bad address
+//     is refused, nothing charged) · phase "paid" (marks it paid, confirms in "confirm" mode, pings Brad).
+//     The row's code is the order site's code; square_order_id is the order site's combined Square order.
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 const env = (k: string) => {
@@ -147,10 +152,11 @@ export const db = {
     if (error) console.error("shirt_orders insert", error.message);
   },
   // notPaid: leave a paid row alone (a late failure must never overwrite a payment)
-  async updateOrder(match: { id?: string; square_order_id?: string }, patch: Record<string, unknown>, notPaid = false) {
+  async updateOrder(match: { id?: string; square_order_id?: string; code?: string }, patch: Record<string, unknown>, notPaid = false) {
     let q: any = admin().from("shirt_orders").update({ ...patch, updated_at: new Date().toISOString() });
     if (match.id) q = q.eq("id", match.id);
     if (match.square_order_id) q = q.eq("square_order_id", match.square_order_id);
+    if (match.code) q = q.eq("code", match.code);
     if (notPaid) q = q.neq("status", "paid");
     const { error } = await q;
     if (error) console.error("shirt_orders update", error.message);
@@ -1070,6 +1076,88 @@ async function mailShipped(row: any, tr: any): Promise<boolean> {
 }
 
 // ---------- router ----------
+// ---------- the order site's cart (merch, 2026-11-26) ----------
+async function merchAction(b: any) {
+  const secret = await db.cronSecret();
+  if (!secret || String(b.secret ?? "") !== secret) throw new PublicError("Not allowed.", 401);
+  const s = await settings();
+  const e: Env = b.env === "production" ? "production" : "sandbox";
+  const code = clean(b.code, 20).toUpperCase();
+  if (!/^[A-Z0-9-]{4,20}$/.test(code)) throw new PublicError("Bad code.");
+  const prior = await db.orderByCode(code);
+  if (b.phase === "paid") {
+    if (!prior) return { ok: false, error: "no draft for " + code };
+    if (prior.status === "paid") return { ok: true, code, printful_status: prior.printful_status ?? null, already: true };
+    const mode = pfMode(s, e);
+    const patch: Record<string, unknown> = {
+      status: "paid", square_payment_id: clean(b.square_payment_id, 80) || null, receipt_url: clean(b.receipt_url, 400) || null,
+      card: clean(b.card, 80) || null, error: null, paid_at: new Date().toISOString(),
+    };
+    if (!prior.printful_order_id && !prior.printful_status) patch.printful_status = mode === "skip" ? "skipped" : "not sent";
+    await db.updateOrder({ id: prior.id }, patch);
+    let pfStatus = String(prior.printful_status ?? patch.printful_status ?? "");
+    let confirmErr = "";
+    if (prior.printful_order_id && mode === "confirm" && e === "production" && prior.printful_status === "draft") {
+      try {
+        const c = await printful(`/orders/${prior.printful_order_id}/confirm`, { method: "POST" });
+        pfStatus = String(c?.status ?? "pending");
+        await db.updateOrder({ id: prior.id }, { printful_status: pfStatus, printful_cost_cents: pfCost(c) ?? prior.printful_cost_cents ?? null });
+      } catch (err) {
+        confirmErr = String((err as Error).message).slice(0, 380);
+        await db.updateOrder({ id: prior.id }, { printful_error: "confirm failed: " + confirmErr });
+      }
+    }
+    if (e === "production") {
+      const ls = Array.isArray(prior.lines) ? prior.lines : [];
+      const where = !prior.printful_order_id
+        ? `<b>Not in Printful</b> (${esc(String(prior.printful_error ?? "not sent"))}) — send it from Shirt Shop admin (Retry) or the Printful dashboard.`
+        : confirmErr ? `Printful draft made, but <b>confirm failed</b>: ${esc(confirmErr)} — confirm it in Printful.`
+        : pfStatus === "draft" ? "It's a Printful <b>draft</b> — confirm it in Printful (or Shirt Shop admin) to print it."
+        : `Sent to Printful to print (${esc(pfStatus)}).`;
+      await alert(`New shirt order ${code} (online ordering) · ${money(Number(prior.total_cents) || 0)}`,
+        `<p><b>${esc(code)}</b> · sold in the online ordering cart · ${esc(String(prior.customer_name ?? ""))} · ${esc(String(prior.email ?? ""))}</p>` +
+          `<p>${ls.map((l: any) => `${Number(l.qty)}× ${esc(String(l.name))} · ${esc(String(l.size))}`).join("<br>")}</p>` +
+          `<p>Ship to ${esc(String(prior.ship_to?.city ?? ""))}, ${esc(String(prior.ship_to?.state_code ?? ""))}</p><p>${where}</p>`);
+    }
+    return { ok: true, code, printful_status: pfStatus };
+  }
+  // phase "draft"
+  const cust = readCustomer(b.customer ?? {});
+  const ship = readShip(b.ship_to ?? {}, cust.name);
+  const lines = priceLines(await catalog(), b.lines, e);
+  const sub = lines.reduce((a, l) => a + l.qty * l.v.price_cents, 0);
+  const shipping = Math.max(0, Math.round(Number(b.shipping_cents)) || 0);
+  const tax = Math.max(0, Math.round(Number(b.tax_cents)) || 0);
+  const t: Totals = { subtotal_cents: sub, shipping_cents: shipping, tax_cents: tax, total_cents: sub + shipping + tax };
+  if (prior?.status === "paid") return { ok: true, code, already: true };
+  const row = {
+    code, shop: SHOP, env: e, status: "pending", error: null, customer_name: cust.name, email: cust.email, phone: cust.phone,
+    ship_to: ship, lines: lineSummary(lines), ...t, square_location_id: clean(b.square_location_id, 64) || null,
+    square_order_id: clean(b.square_order_id, 64) || null,
+  };
+  if (prior) await db.updateOrder({ id: prior.id }, row, true);
+  else await db.insertOrder(row);
+  const mode = pfMode(s, e);
+  if (mode !== "draft" && mode !== "confirm") {
+    const note = mode === "skip" ? "test order" : printfulReady() ? "Printful is switched off" : "Printful isn't connected";
+    await db.updateOrder({ code }, { printful_status: mode === "skip" ? "skipped" : "not sent", printful_error: mode === "skip" ? null : note }, true);
+    return { ok: true, code, printful: mode };
+  }
+  try {
+    const pf = await printfulDraft(code, cust, ship, lines, t);
+    await db.updateOrder({ code }, { printful_order_id: pf.id ?? null, printful_status: pf.status ?? "draft", printful_cost_cents: pfCost(pf), printful_error: null }, true);
+    return { ok: true, code, printful: pf.status ?? "draft" };
+  } catch (err) {
+    const msg = String((err as Error).message);
+    if (err instanceof PrintfulError && err.status >= 400 && err.status < 500) {
+      await db.updateOrder({ code }, { status: "failed", error: ("printful: " + msg).slice(0, 500), printful_error: msg.slice(0, 400) }, true);
+      throw new PublicError(addressish(msg) ? "We couldn't ship the shirt to that address — please check it." : "We couldn't set the shirt up with our printer.", 400);
+    }
+    await db.updateOrder({ code }, { printful_status: "not sent", printful_error: ("not sent: " + msg).slice(0, 400) }, true);
+    return { ok: true, code, printful: "not sent" }; // Printful down: take the sale, Retry from the console later
+  }
+}
+
 export async function handle(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsFor(req) });
   const ref = crypto.randomUUID().slice(0, 8);
@@ -1087,6 +1175,7 @@ export async function handle(req: Request): Promise<Response> {
     if (action === "status") return json(req, await status(body));
     if (action === "sweep") return json(req, await sweep(body));
     if (action === "printful_hook") return json(req, await printfulHook(req, url, body));
+    if (action === "merch") return json(req, await merchAction(body));
     if (action === "admin_orders") return json(req, await adminOrders(req, body));
     if (action === "admin_retry") return json(req, await adminRetry(req, body));
     if (action === "admin_confirm") return json(req, await adminConfirm(req, body));
