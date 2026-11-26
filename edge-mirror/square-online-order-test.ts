@@ -14,7 +14,12 @@
 // PRE-ORDERS (v7, 2026-10-29): the items in a shop's "Special Offers" category (Fall Gooeys, 12 Days of
 // Cheesemas …) are seasonal pre-orders, each with its own pickup window. They get their own "Special Offers"
 // section, first on the page, and carry preorder: true. Special Offers wins over the online / catering menus
-// for an item that sits in more than one, and a pre-order is never a catering item. A bag with a pre-order in
+// for an item that sits in more than one, and a pre-order is never a catering item.
+//   v19.2 (2026-11-26, Maverick: "the gift box is just for sale and shipping, no pre order or dates to pick up"):
+//   only a Special Offers item WITH a pickup window (below) is a pre-order. One without a window — the holiday
+//   gift boxes — still sits in the Special Offers section but is an everyday item: preorder false, ASAP or
+//   scheduled like the rest of the menu, and it can share a bag. (Before, it was a pre-order with no window.)
+// A bag with a pre-order in
 // it may hold nothing else, can't be ASAP, and must be scheduled — up to RULES.preorder_max_days ahead (every
 // other bag keeps RULES.max_days). Shop hours and quarter-hour slots are checked as usual, and the Square
 // fulfillment note starts with "PRE-ORDER".
@@ -669,12 +674,15 @@ async function buildMenu(shop: Shop): Promise<Menu> {
     const inOnline = cats.find((c) => onlineCats.has(c.id));
     const inCatering = cats.find((c) => cateringCats.has(c.id));
     if (!inSpecial && !inOnline && !inCatering) continue;
-    const preorder = !!inSpecial; // Special Offers wins: a pre-order is never a catering item
-    const catering = !preorder && !inOnline;
+    const special = !!inSpecial; // Special Offers wins: it is never a catering item
+    const catering = !special && !inOnline;
     const ord = Number((inSpecial ?? inOnline ?? inCatering)?.ordinal ?? 0);
     // a pre-order whose pickup window — or its last day to order — has gone by simply stops selling
-    const win = preorder ? preorderWindow(it) : null;
+    const win = special ? preorderWindow(it) : null;
     if (win && (today > win.to || (win.order_by && today > win.order_by))) continue;
+    // v19.2: a PRE-ORDER is a Special Offers item WITH a pickup window. One without (the holiday gift boxes) is an
+    // everyday item that sits in the Special Offers section — ASAP or scheduled, and it can share a bag.
+    const preorder = special && !!win;
 
     const vars: Var[] = [];
     for (const v of i.variations ?? []) {
@@ -708,7 +716,7 @@ async function buildMenu(shop: Shop): Promise<Menu> {
     items[it.id] = {
       id: it.id, name: displayName(full, catering), full_name: full, desc, meta, min_qty,
       img: imgUrl(rel, (i.image_ids ?? [])[0]) ?? vars.find((v) => v.img)?.img ?? null,
-      catering, preorder, window: win, section: preorder ? "special" : catering ? "catering" : sectionFor(full, lists, catNames), ord, vars, lists, taxes: itemTaxes,
+      catering, preorder, window: win, section: special ? "special" : catering ? "catering" : sectionFor(full, lists, catNames), ord, vars, lists, taxes: itemTaxes,
       sold_out: vars.every((v) => v.sold_out),
     };
   }
@@ -744,6 +752,11 @@ async function buildMenu(shop: Shop): Promise<Menu> {
   return { at: Date.now(), shop, location, sections, items, taxes };
 }
 
+// the line under "Special Offers": pre-orders (pickup windows), everyday specials (the gift boxes), or both (v19.2)
+function specialBlurb(items: (Item | undefined)[]) {
+  const pre = items.filter((it) => it?.preorder).length, all = items.filter(Boolean).length;
+  return pre === all ? "Seasonal pre-orders, each with its own pickup window." : pre === 0 ? "Holiday gifts and seasonal specials." : "Holiday gifts, and seasonal pre-orders with their own pickup windows.";
+}
 function publicMenu(m: Menu, e: Env) {
   const pct = (it: Item) => Math.round(it.taxes.map((t) => m.taxes[t]).filter((t) => t && !t.inclusive).reduce((s, t) => s + Number(t.pct), 0) * 1000) / 1000;
   return {
@@ -753,7 +766,7 @@ function publicMenu(m: Menu, e: Env) {
     location: m.location,
     rules: RULES,
     closed_dates: closedFor(m.shop, m.location.tz),
-    sections: m.sections.map((s) => ({ id: s.id, name: s.name, blurb: s.blurb, catering: !!s.catering, items: s.items })),
+    sections: m.sections.map((s) => ({ id: s.id, name: s.name, blurb: s.id === "special" ? specialBlurb(s.items.map((id) => m.items[id])) : s.blurb, catering: !!s.catering, items: s.items })),
     items: Object.fromEntries(Object.values(m.items).map((it) => [it.id, {
       id: it.id, name: it.name, desc: it.desc, meta: it.meta, min_qty: it.min_qty, img: it.img, catering: it.catering, preorder: it.preorder, window: it.window, sold_out: it.sold_out,
       tax_pct: pct(it),
