@@ -161,6 +161,14 @@
 //   Tried against the Square sandbox 2026-11-16: a split with the tip on the card, on the gift card and on both; gift
 //   card only with a tip; INSUFFICIENT_FUNDS; a voided hold goes back on the gift card.
 //
+// SHIRTS IN THE SHIP BAG (v19.4, test copy first, 2026-11-26): order_shipping.test_merch (test copy) / .merch (live) lists
+//   shirt_products ids sold on the Ship page. Prices + sizes come from shirt_products / shirt_variants (the Shirt Shop's
+//   catalog); shipping from site_content.shirt_shop (ship_first_cents / ship_each_cents) as a separate "Shirt shipping"
+//   line; ad-hoc lines on the same Square order (note "Printful · sku"), never counted as boxes. Printful prints and ships
+//   them: before the card is charged shirt-shop?action=merch phase "draft" makes the shirt_orders row + Printful draft
+//   (a bad address is refused, nothing charged); after, phase "paid". A shirt-only bag has no SHIPMENT fulfillment
+//   (it stays off the Memphis packing list) and ignores the box dates and limits. order_shipping.merch_images
+//   {product_id: url} overrides the product photo.
 // Actions (POST ?action=…): config · menu · quote · gift_balance · pay · status · sweep · ship_days · ship_orders · ship_mark ·
 // ship_email · track                                                            verify_jwt = false
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -256,6 +264,51 @@ type ShipCfg = {
   first_cents: number; each_cents: number; limit: number; tax_states: string[]; rates: Rates | null;
 };
 let shipCfg: ShipCfg | null = null;
+// ---- shirts (merch, v19.4) ----
+type MSize = { id: string; size: string; price: number; sku: string };
+type Merch = { id: string; name: string; image: string; blurb: string; sizes: MSize[] };
+type MLine = { m: Merch; s: MSize; qty: number };
+let merchIds: string[] = [];
+let merchImages: Record<string, string> = {};
+let merchShip = { first: 600, each: 200, tax_rates: { TN: "9.75" } as Record<string, string> };
+let merchCache: { at: number; key: string; v: Merch[] } | null = null;
+async function loadMerch(): Promise<Merch[]> {
+  if (!merchIds.length) return [];
+  const key = merchIds.join(",") + JSON.stringify(merchImages);
+  if (merchCache && merchCache.key === key && Date.now() - merchCache.at < 60_000) return merchCache.v;
+  try {
+    const { data, error } = await admin.from("shirt_products").select("id, name, tagline, image_url, active, shirt_variants(id, size, sku, price_cents, active, sort_order, printful_sync_variant_id, printful_variant_id, print_file_url)").in("id", merchIds);
+    if (error) throw error;
+    const v: Merch[] = merchIds.map((id) => (data ?? []).find((p: any) => p.id === id)).filter((p: any) => p && p.active).map((p: any) => ({
+      id: p.id, name: String(p.name), blurb: String(p.tagline ?? ""), image: merchImages[p.id] || String(p.image_url ?? ""),
+      sizes: (p.shirt_variants ?? []).filter((x: any) => x.active && (x.printful_sync_variant_id || (x.printful_variant_id && x.print_file_url)))
+        .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+        .map((x: any) => ({ id: x.id, size: String(x.size), price: Number(x.price_cents), sku: String(x.sku ?? "") })),
+    })).filter((m) => m.sizes.length);
+    merchCache = { at: Date.now(), key, v };
+    return v;
+  } catch (err) { console.error("merch read failed", err); return merchCache?.v ?? []; }
+}
+function priceMerch(list: Merch[], raw: unknown): MLine[] {
+  if (raw == null) return [];
+  if (!Array.isArray(raw)) throw new PublicError("Please check the shirts in your bag.");
+  const out: MLine[] = [];
+  for (const r of raw.slice(0, 20)) {
+    const id = String((r as any)?.variant_id ?? "");
+    let hit: MLine | null = null;
+    for (const m of list) { const sz = m.sizes.find((x) => x.id === id); if (sz) hit = { m, s: sz, qty: 0 }; }
+    if (!hit) throw new PublicError("A shirt in your bag isn't available in that size anymore. Please remove it and try again.", 409);
+    const q = Math.floor(Number((r as any)?.qty));
+    if (!(q >= 1 && q <= 10)) throw new PublicError("Up to 10 of each shirt per order, please.");
+    const same = out.find((x) => x.s.id === id);
+    if (same) { same.qty += q; if (same.qty > 10) throw new PublicError("Up to 10 of each shirt per order, please."); }
+    else { hit.qty = q; out.push(hit); }
+  }
+  return out;
+}
+const merchCount = (ml: MLine[]) => ml.reduce((n, l) => n + l.qty, 0);
+const merchFee = (ml: MLine[]) => (merchCount(ml) ? merchShip.first + (merchCount(ml) - 1) * merchShip.each : 0);
+const merchSummary = (ml: MLine[]) => ml.map((l) => ({ merch: true, variant_id: l.s.id, name: l.m.name + " Tee", option: l.s.size, qty: l.qty, unit_cents: l.s.price, mods: [] as string[], note: "Printed and shipped by Printful" }));
 function parseShip(raw: any): ShipCfg | null {
   if (!raw || typeof raw !== "object") return null;
   const on = TEST_COPY && "test_enabled" in raw ? raw.test_enabled : raw.enabled; // test copy: its own switch (see SHIPPING)
@@ -286,7 +339,7 @@ function parseShip(raw: any): ShipCfg | null {
 async function refreshSwitch() {
   if (Date.now() - switchAt < 10_000) return;
   try {
-    const { data, error } = await admin.from("site_content").select("key, data").in("key", ["online_ordering", "order_closed_dates", "order_shipping"]);
+    const { data, error } = await admin.from("site_content").select("key, data").in("key", ["online_ordering", "order_closed_dates", "order_shipping", "shirt_shop"]);
     if (error) throw error;
     const row = (k: string): any => (data ?? []).find((r: any) => r.key === k)?.data ?? {};
     const d: any = row("online_ordering");
@@ -299,6 +352,15 @@ async function refreshSwitch() {
         close: /^([01]\d|2[0-3]):[0-5]\d$/.test(String(x.close_at ?? "")) ? hm(x.close_at) : null,
       }));
     shipCfg = parseShip(row("order_shipping"));
+    { // shirts (v19.4)
+      const os: any = row("order_shipping");
+      const ml = TEST_COPY && Array.isArray(os?.test_merch) ? os.test_merch : os?.merch;
+      merchIds = (Array.isArray(ml) ? ml : []).map((x: unknown) => String(x ?? "").trim()).filter((x: string) => /^[0-9a-f-]{36}$/i.test(x));
+      merchImages = os?.merch_images && typeof os.merch_images === "object" ? Object.fromEntries(Object.entries(os.merch_images).filter(([, u]) => /^https:\/\//.test(String(u))).map(([k, u]) => [k, String(u)])) : {};
+      const ss: any = row("shirt_shop");
+      const ct = (v: unknown, d: number) => (Number.isInteger(Number(v)) && Number(v) >= 0 && Number(v) <= 10000 ? Number(v) : d);
+      merchShip = { first: ct(ss?.ship_first_cents, 600), each: ct(ss?.ship_each_cents, 200), tax_rates: ss?.tax_rates && typeof ss.tax_rates === "object" ? ss.tax_rates : { TN: "9.75" } };
+    }
     switchAt = Date.now();
   } catch (err) { console.error("online_ordering switch read failed", err); }
 }
@@ -681,7 +743,7 @@ async function buildMenu(shop: Shop): Promise<Menu> {
     // a pre-order whose pickup window — or its last day to order — has gone by simply stops selling
     const win = special ? preorderWindow(it) : null;
     if (win && (today > win.to || (win.order_by && today > win.order_by))) continue;
-    // v19.2: a PRE-ORDER is a Special Offers item WITH a pickup window. One without (the holiday gift boxes) is an
+    // v19.4: a PRE-ORDER is a Special Offers item WITH a pickup window. One without (the holiday gift boxes) is an
     // everyday item that sits in the Special Offers section — ASAP or scheduled, and it can share a bag.
     const preorder = special && !!win;
 
@@ -753,7 +815,7 @@ async function buildMenu(shop: Shop): Promise<Menu> {
   return { at: Date.now(), shop, location, sections, items, taxes };
 }
 
-// the line under "Special Offers": pre-orders (pickup windows), everyday specials (the gift boxes), or both (v19.2)
+// the line under "Special Offers": pre-orders (pickup windows), everyday specials (the gift boxes), or both (v19.4)
 function specialBlurb(items: (Item | undefined)[]) {
   const pre = items.filter((it) => it?.preorder).length, all = items.filter(Boolean).length;
   return pre === all ? "Seasonal pre-orders, each with its own pickup window." : pre === 0 ? "Holiday gifts and seasonal specials." : "Holiday gifts, and seasonal pre-orders with their own pickup windows.";
@@ -936,6 +998,12 @@ function buildOrder(e: Env, m: Menu, lines: Line[], pickup: Pickup | null, cust:
     if (l.note) li.note = l.note;
     return li;
   });
+  // shirts (v19.4): ad-hoc lines, both environments; "Printful ·" keeps them out of the box counts
+  ml.forEach((l, i) => line_items.push({
+    uid: "m" + (i + 1), name: `${l.m.name} Tee`, variation_name: l.s.size, quantity: String(l.qty),
+    base_price_money: { amount: l.s.price, currency: "USD" }, note: `Printful · ${l.s.sku}`.slice(0, 200),
+  }));
+  const boxesIn = lines.length > 0;
   const order: Record<string, unknown> = {
     location_id: locationId,
     source: { name: "Greys online ordering" },
@@ -1138,6 +1206,9 @@ async function publicShip(e: Env) {
     tax_states: c.tax_states,
     // near vs far (v18): the two prices and the ZIP areas that ship Ground; null = the flat price above
     rates: c.rates ? { miles: c.rates.miles, ground: c.rates.ground, air: c.rates.air, ground_zip3: groundZip3(c) } : null,
+    // shirts (v19.4): sold in the ship bag, printed + shipped by Printful; their own shipping, any time
+    merch: (await loadMerch()).map((m) => ({ id: m.id, name: m.name, blurb: m.blurb, image: m.image, sizes: m.sizes.map((x) => ({ id: x.id, size: x.size, price_cents: x.price })) })),
+    merch_ship: { first_cents: merchShip.first, each_cents: merchShip.each },
   };
 }
 // a ship bag holds shippable items only; returns how many boxes
@@ -1165,7 +1236,7 @@ function readShipTo(s: any, cust: Cust): ShipTo {
   return t;
 }
 // The Square order for a ship bag: SHIPMENT fulfillment, a "Shipping" service charge, and taxes only for tax_states.
-function buildShipOrder(e: Env, m: Menu, c: ShipCfg, lines: Line[], state: string | null, to: ShipTo | null, cust: Cust | null, locationId: string, code: string, note: string, service: Service | null = null) {
+function buildShipOrder(e: Env, m: Menu, c: ShipCfg, lines: Line[], state: string | null, to: ShipTo | null, cust: Cust | null, locationId: string, code: string, note: string, service: Service | null = null, ml: MLine[] = []) {
   const taxed = !!state && c.tax_states.includes(state);
   const taxIds = [...new Set(lines.flatMap((l) => l.item.taxes))].filter((t) => m.taxes[t]);
   const line_items = lines.map((l, i) => {
@@ -1191,7 +1262,8 @@ function buildShipOrder(e: Env, m: Menu, c: ShipCfg, lines: Line[], state: strin
   };
   if (code) {
     order.reference_id = code;
-    order.metadata = { web_code: code, shop: m.shop, fulfillment: "ship" };
+    order.metadata = { web_code: code, shop: m.shop, fulfillment: boxesIn ? "ship" : "merch" };
+    if (ml.length) (order.metadata as Record<string, string>).merch = String(merchCount(ml));
     if (service) (order.metadata as Record<string, string>).ship_service = service; // which label to buy (v18)
     if (cust) { // the packing list reads these back (v17)
       const md = order.metadata as Record<string, string>;
@@ -1199,6 +1271,10 @@ function buildShipOrder(e: Env, m: Menu, c: ShipCfg, lines: Line[], state: strin
       if (cust.phone) md.buyer_phone = cust.phone;
       if (to?.gift_note) md.gift_note = to.gift_note.slice(0, 255);
     }
+  }
+  const merchRate = state ? merchShip.tax_rates[state] ?? null : null;
+  if (taxed && !taxIds.length && ml.length && merchRate) { // a shirt-only bag: the Shirt Shop's sales tax for that state
+    order.taxes = [{ uid: "t-merch", name: `${state} sales tax`, percentage: String(merchRate), type: "ADDITIVE", scope: "ORDER" }];
   }
   if (taxed && taxIds.length) {
     // ORDER scope: the boxes AND the taxable Shipping charge
@@ -1211,7 +1287,11 @@ function buildShipOrder(e: Env, m: Menu, c: ShipCfg, lines: Line[], state: strin
   if (fee > 0) {
     order.service_charges = [{ uid: "ship", name: "Shipping", amount_money: { amount: fee, currency: "USD" }, calculation_phase: "SUBTOTAL_PHASE", taxable: taxed }];
   }
-  if (to && cust) {
+  const mfee = merchFee(ml);
+  if (mfee > 0) {
+    order.service_charges = [...((order.service_charges as unknown[]) ?? []), { uid: "shipm", name: "Shirt shipping", amount_money: { amount: mfee, currency: "USD" }, calculation_phase: "SUBTOTAL_PHASE", taxable: taxed }];
+  }
+  if (to && cust && boxesIn) {
     const address: Record<string, string> = { address_line_1: to.address1, locality: to.city, administrative_district_level_1: to.state, postal_code: to.zip, country: "US" };
     if (to.address2) address.address_line_2 = to.address2;
     const recipient: Record<string, unknown> = { display_name: to.name.slice(0, 255), email_address: cust.email, address };
@@ -1222,7 +1302,7 @@ function buildShipOrder(e: Env, m: Menu, c: ShipCfg, lines: Line[], state: strin
       shipment_details: {
         recipient,
         expected_shipped_at: new Date(dayAt(shipPlan(c, datedLines(lines)).ship_on, 12, m.location.tz)).toISOString(),
-        shipping_note: [`SHIP ${fmtLongDay(shipPlan(c, datedLines(lines)).ship_on)}`, service ? SERVICE_LABEL[service] : "", `Online ${code}`, `From ${cust.first} ${cust.last}`.trim(), to.gift_note ? `Gift note: “${to.gift_note}”` : "", note]
+        shipping_note: [`SHIP ${fmtLongDay(shipPlan(c, datedLines(lines)).ship_on)}`, service ? SERVICE_LABEL[service] : "", `Online ${code}`, `From ${cust.first} ${cust.last}`.trim(), to.gift_note ? `Gift note: “${to.gift_note}”` : "", ml.length ? `+ ${merchCount(ml)} shirt${merchCount(ml) === 1 ? "" : "s"} shipped separately by Printful` : "", note]
           .filter(Boolean).join(" · ").slice(0, 500),
       },
     }];
@@ -1252,21 +1332,39 @@ async function quoteShip(req: Request, b: any) {
   if (!c) throw new PublicError("Shipping isn't available right now.", 409);
   const e = envFor(req);
   const m = await loadMenu(c.from);
-  const lines = priceLines(m, b.lines);
+  const ml = priceMerch(await loadMerch(), b.merch);
+  const lines = Array.isArray(b.lines) && b.lines.length || !ml.length ? priceLines(m, b.lines) : [];
   shipLines(c, lines);
   const st = clean(b.ship?.state, 2).toUpperCase();
   const state = US_STATES[st] && !NO_SHIP.has(st) ? st : null; // no state yet: totals before tax
-  const zone = shipZone(c, clean(b.ship?.zip, 10), state); // near/far rates: the ZIP sets the shipping (v18)
-  const shipKnown = !c.rates || !!zone.service;
-  const order = buildShipOrder(e, m, c, lines, state, null, null, await paymentLocation(c.from, e), "", "", zone.service);
+  const zone = lines.length ? shipZone(c, clean(b.ship?.zip, 10), state) : { service: null, problem: null }; // near/far rates: the ZIP sets the shipping (v18)
+  const shipKnown = !lines.length || !c.rates || !!zone.service;
+  const order = buildShipOrder(e, m, c, lines, state, null, null, await paymentLocation(c.from, e), "", "", zone.service, ml);
   const d = await square("/v2/orders/calculate", { method: "POST", body: JSON.stringify({ order }) }, e);
   const t = totalsOf(d.order);
   return {
     ok: true, env: e, ...t, shipping_cents: Number(d.order?.total_service_charge_money?.amount ?? 0), state, tax_known: !!state && shipKnown,
     ship_on: shipPlan(c, datedLines(lines)).ship_on, ship_text: shipPlan(c, datedLines(lines)).text,
     shipping_known: shipKnown, service: zone.service, service_label: zone.service ? SERVICE_LABEL[zone.service] : null, zip_problem: zone.problem,
-    lines: (d.order?.line_items ?? []).map((li: any, i: number) => ({ ...lineSummary([lines[i]])[0], total_cents: Number(li.total_money?.amount ?? 0), tax_cents: Number(li.total_tax_money?.amount ?? 0) })),
+    lines: (d.order?.line_items ?? []).map((li: any, i: number) => ({ ...(i < lines.length ? lineSummary([lines[i]])[0] : merchSummary([ml[i - lines.length]])[0]), total_cents: Number(li.total_money?.amount ?? 0), tax_cents: Number(li.total_tax_money?.amount ?? 0) })),
+    merch_shipping_cents: merchFee(ml),
   };
+}
+
+// shirt-shop?action=merch (v19.4). refused = shirt-shop said no on purpose (bad address): stop, nothing charged.
+// Anything else (unreachable, 5xx) is logged and the sale goes on — the Shirt Shop console can Retry it.
+async function shirtShop(body: Record<string, unknown>): Promise<{ ok: boolean; refused?: boolean; error?: string }> {
+  try {
+    const { data: sec } = await admin.from("app_secrets").select("value").eq("name", "cc_cron_secret").maybeSingle();
+    const res = await fetch(SUPABASE_URL + "/functions/v1/shirt-shop?action=merch", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICE },
+      body: JSON.stringify({ ...body, secret: sec?.value ?? "" }),
+    });
+    const d: any = await res.json().catch(() => ({}));
+    if (res.status === 400 && d?.error) return { ok: false, refused: true, error: String(d.error) };
+    if (!res.ok || d?.ok === false) console.error("shirt-shop merch", body.phase, body.code, res.status, d?.error);
+    return { ok: res.ok && d?.ok !== false };
+  } catch (err) { console.error("shirt-shop merch", body.phase, body.code, err); return { ok: false }; }
 }
 
 async function payShip(req: Request, b: any) {
@@ -1274,6 +1372,8 @@ async function payShip(req: Request, b: any) {
   const c = shipCfg;
   if (!c) throw new PublicError("Shipping isn't available right now. Nothing was charged.", 409);
   const e = envFor(req);
+  const ml = priceMerch(await loadMerch(), b.merch); // shirts (v19.4)
+  const boxesAsked = Array.isArray(b.lines) && b.lines.length > 0;
   if (!accepting(c.from, e)) throw new PublicError(closedMsg(c.from, e), 409);
   const shop = c.from;
   const sourceId = clean(b.source_id, 400);
@@ -1289,18 +1389,18 @@ async function payShip(req: Request, b: any) {
   if (digits.length < 10) throw new PublicError("Please add a phone number so we can reach you about your order.");
   const cust: Cust = { first, last, email, phone: e164(digits) };
   const to = readShipTo(b.ship, cust);
-  const zone = shipZone(c, to.zip, to.state); // near/far rates (v18)
+  const zone = boxesAsked || !ml.length ? shipZone(c, to.zip, to.state) : { service: null, problem: null }; // near/far rates (v18)
   if (zone.problem) throw new PublicError(zone.problem + " Nothing was charged.");
-  if (c.rates && !zone.service) throw new PublicError("Please check the ZIP code. Nothing was charged.");
+  if (c.rates && !zone.service && (boxesAsked || !ml.length)) throw new PublicError("Please check the ZIP code. Nothing was charged.");
 
   const m = await loadMenu(shop);
-  const lines = priceLines(m, b.lines);
+  const lines = boxesAsked || !ml.length ? priceLines(m, b.lines) : [];
   const boxes = shipLines(c, lines);
   const plan = shipPlan(c, datedLines(lines)); // SHIP DAYS: a pre-order box ships on the ship day, the rest the next open day
-  const whyDated = shipClosed(c, e, plan.dated);
+  const whyDated = lines.length ? shipClosed(c, e, plan.dated) : null; // a shirt-only bag ignores the box dates
   if (whyDated) throw new PublicError(whyDated + " Nothing was charged.", 409);
-  await checkStock(m, lines);
-  if (c.limit) {
+  if (lines.length) await checkStock(m, lines);
+  if (c.limit && boxes > 0) {
     const left = Math.max(0, c.limit - (await shippedBoxes(e, c, true)));
     if (left <= 0) throw new PublicError("Shipped boxes are sold out. You can still pick up at the shop. Nothing was charged.", 409);
     if (boxes > left) throw new PublicError(`Only ${left} shipped box${left === 1 ? "" : "es"} left — please lower the quantity. Nothing was charged.`, 409);
@@ -1313,10 +1413,11 @@ async function payShip(req: Request, b: any) {
   const sig = JSON.stringify({
     a: clean(b.attempt, 80) || crypto.randomUUID(), e, shop, ship: 1, c: cust, t: to, n: note,
     l: lines.map((l) => [l.v.id, l.qty, l.chosen.map((x) => x.mod.id), l.note]),
+    ...(ml.length ? { mm: ml.map((l) => [l.s.id, l.qty]) } : {}),
   });
   const hash = await sha256hex(sig);
   const code = codeFrom(hash);
-  const order = buildShipOrder(e, m, c, lines, to.state, to, cust, locationId, code, note, zone.service);
+  const order = buildShipOrder(e, m, c, lines, to.state, to, cust, locationId, code, note, zone.service, ml);
   const od = await square("/v2/orders", { method: "POST", body: JSON.stringify({ idempotency_key: "s-" + hash.slice(0, 60), order }) }, e);
   let o = od?.order;
   if (!o?.id) throw new Error("Square did not return an order");
@@ -1344,15 +1445,16 @@ async function payShip(req: Request, b: any) {
   };
   const result = (row: { card: string | null; receipt_url: string | null }, emailSent: boolean | null) => ({
     ok: true, env: e, code, ...t, shipping_cents: shipCents, tip_cents: 0, charged_cents: charge, fulfillment: "ship", ship: shipOut,
-    location: m.location, card: row.card, receipt_url: row.receipt_url, email_sent: emailSent, lines: lineSummary(lines),
+    location: m.location, card: row.card, receipt_url: row.receipt_url, email_sent: emailSent, lines: [...lineSummary(lines), ...merchSummary(ml)],
+    boxes, shirts: merchCount(ml),
   });
   if (prior?.status === "paid") return result(prior as any, null); // already paid: never charge twice
   const row = {
     code, env: e, location: shop, square_location_id: locationId, status: "pending", error: null,
     customer_name: `${first} ${last}`.trim(), email, phone: cust.phone ?? digits, pickup_at: null, asap: false, catering: false, note: note || null,
-    lines: lineSummary(lines), subtotal_cents: t.subtotal_cents, tax_cents: t.tax_cents, tip_cents: 0, total_cents: charge,
+    lines: [...lineSummary(lines), ...merchSummary(ml)], subtotal_cents: t.subtotal_cents, tax_cents: t.tax_cents, tip_cents: 0, total_cents: charge,
     square_order_id: o.id, updated_at: new Date().toISOString(),
-    fulfillment: "ship", ship_to: zone.service ? { ...to, service: zone.service } : to, gift_note: to.gift_note || null, shipping_cents: shipCents, ship_on: plan.ship_on,
+    fulfillment: lines.length ? "ship" : "merch", ship_to: zone.service ? { ...to, service: zone.service } : to, gift_note: to.gift_note || null, shipping_cents: shipCents, ship_on: plan.ship_on,
   };
   let w = prior ? await admin.from("online_orders").update(row).eq("id", prior.id) : await admin.from("online_orders").insert(row);
   if (w.error && /column|schema cache/i.test(w.error.message)) { // the shipping columns aren't there yet: log the rest
@@ -1374,6 +1476,18 @@ async function payShip(req: Request, b: any) {
     throw new PublicError(`Your total is now ${money(charge)} — please review it and place the order again. Nothing was charged.`, 409, { totals: { ...t, shipping_cents: shipCents, tip_cents: 0 } });
   }
 
+  // shirts (v19.4): the Shirt Shop ledger + Printful draft BEFORE the charge (a bad address costs nothing)
+  if (ml.length) {
+    const mfee = merchFee(ml), msub = ml.reduce((n, l) => n + l.qty * l.s.price, 0);
+    const rate = c.tax_states.includes(to.state) ? Number(merchShip.tax_rates[to.state] ?? (lines.length ? 9.75 : 0)) : 0;
+    const r = await shirtShop({
+      phase: "draft", env: e, code, square_order_id: oid, square_location_id: locationId,
+      customer: { name: `${first} ${last}`.trim(), email, phone: cust.phone },
+      ship_to: { name: to.name, address1: to.address1, address2: to.address2, city: to.city, state_code: to.state, zip: to.zip },
+      lines: ml.map((l) => ({ variant_id: l.s.id, qty: l.qty })), shipping_cents: mfee, tax_cents: Math.round((msub + mfee) * rate / 100),
+    });
+    if (r.refused) { await fail("shirt: " + r.error); throw new PublicError(r.error + " Nothing was charged.", 400); }
+  }
   const shippingAddress = {
     address_line_1: to.address1, ...(to.address2 ? { address_line_2: to.address2 } : {}), locality: to.city,
     administrative_district_level_1: to.state, postal_code: to.zip, country: "US",
@@ -1420,6 +1534,7 @@ async function payShip(req: Request, b: any) {
   // the gift card columns aren't there (migration online_orders_gift): still mark it paid
   if (gp && pu.error) await admin.from("online_orders").update(paidRow).eq("square_order_id", oid);
   delete shipCache[e]; // the next menu and packing list count this box
+  if (ml.length) await shirtShop({ phase: "paid", env: e, code, square_payment_id: pmt.id ?? null, receipt_url: receiptUrl, card });
   const out = { ...result({ card, receipt_url: receiptUrl }, null), ...(gp ? giftOut(gp) : {}) };
   const sent = await mailShipConfirmation(out, cust, to, note).catch((err) => { console.error("mail", code, err); return false; });
   await admin.from("online_orders").update({ email_sent: sent }).eq("square_order_id", oid);
@@ -1478,6 +1593,7 @@ function shipOrderOf(o: any): ShipOrder | null {
     name: clean(li.name, 120), option: li.variation_name && li.variation_name !== "Regular" ? clean(li.variation_name, 80) : "",
     qty: Math.max(0, Number(li.quantity) || 0), note: clean(li.note, 200),
   }));
+  const boxLines = lines.filter((l: { note: string }) => !l.note.startsWith("Printful")); // shirts (v19.4) aren't boxes
   const shipMs = Date.parse(sd.expected_shipped_at ?? "");
   return {
     id: o.id, code: clean(o.reference_id || md.web_code, 12), state: o.state, created_at: o.created_at,
@@ -1487,7 +1603,7 @@ function shipOrderOf(o: any): ShipOrder | null {
       name: clean(r.display_name, 120), phone: clean(r.phone_number, 40), address1: clean(a.address_line_1, 120), address2: clean(a.address_line_2, 120),
       city: clean(a.locality, 80), state: clean(a.administrative_district_level_1, 2), zip: clean(a.postal_code, 10),
     },
-    gift_note: gift, note: clean(o.note, 300), lines, boxes: lines.reduce((n: number, l: { qty: number }) => n + l.qty, 0),
+    gift_note: gift, note: clean(o.note, 300), lines, boxes: boxLines.reduce((n: number, l: { qty: number }) => n + l.qty, 0),
     total_cents: total, shipping_cents: Number(o.total_service_charge_money?.amount ?? 0), tax_cents: Number(o.total_tax_money?.amount ?? 0),
     fulfillment_uid: String(f.uid ?? ""), fulfillment_state: String(f.state ?? ""),
     carrier: clean(sd.carrier, 40), tracking_number: clean(sd.tracking_number, 60), tracking_url: clean(sd.tracking_url, 300),
@@ -2170,7 +2286,8 @@ async function mailShipConfirmation(r: any, cust: Cust, to: ShipTo, note: string
   ${test ? `<div style="background:#FDECC8;padding:8px 12px;margin-bottom:14px;font-size:13px"><b>Test order</b> — Square sandbox. No card was charged and nothing will ship.</div>` : ""}
   <div style="font:700 22px Georgia,serif;letter-spacing:.04em;border-bottom:2px solid #E0A21C;padding-bottom:8px;margin-bottom:18px">GREYS <span style="font:400 12px Arial">Fine Cheeses · Shipped from ${esc(L.label)}</span></div>
   <p>Thanks, ${esc(cust.first)}! We've got your order.</p>
-  <p style="font-size:18px;margin:14px 0"><b>${esc(r.ship.label)}</b></p>
+  ${r.boxes === 0 ? "" : `<p style="font-size:18px;margin:14px 0"><b>${esc(r.ship.label)}</b></p>`}
+  ${r.shirts ? `<p style="font-size:14px;margin:0 0 14px"><b>Your shirt${r.shirts === 1 ? " is" : "s are"} printed to order</b> and ship${r.shirts === 1 ? "s" : ""} separately from our printer — usually within two weeks, with ${r.boxes === 0 ? "its" : "their"} own tracking email.</p>` : ""}
   <p style="font-size:14px;margin:0 0 14px"><b>Shipping to</b><br>${esc(to.name)}<br>${esc(to.address1)}${to.address2 ? "<br>" + esc(to.address2) : ""}<br>${esc(to.city)}, ${esc(to.state)} ${esc(to.zip)}</p>
   ${to.gift_note ? `<p style="font-size:14px;margin:0 0 14px"><b>Gift note</b> (we'll tuck it in the box)<br>“${esc(to.gift_note)}”</p>` : ""}
   <p style="margin:0 0 6px;color:#6E6353;font-size:13px">Order ${esc(r.code)}</p>
@@ -2183,14 +2300,14 @@ async function mailShipConfirmation(r: any, cust: Cust, to: ShipTo, note: string
   </table>
   ${r.card ? `<p style="color:#6E6353;font-size:13px">Paid with ${esc(r.card)}${r.receipt_url ? ` · <a href="${esc(r.receipt_url)}" style="color:#7C1F15">receipt</a>` : ""}</p>` : ""}
   ${note ? `<p style="font-size:14px">Your note: “${esc(note)}”</p>` : ""}
-  <p style="font-size:14px">It's cheese, so it travels cold: please put the box in the fridge as soon as it arrives. We'll send tracking when it ships.</p>
+  ${r.boxes === 0 ? "" : `<p style="font-size:14px">It's cheese, so it travels cold: please put the box in the fridge as soon as it arrives. We'll send tracking when it ships.</p>`}
   <p style="font-size:14px">Need to change something? Call us${L.phone ? ` at <b>${esc(L.phone)}</b>` : ""} or reply to this email.</p></div>`;
   const res = await fetch(SUPABASE_URL + "/functions/v1/send-mail", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICE },
     body: JSON.stringify({
       to: cust.email,
-      subject: `${test ? "[TEST] " : ""}Your Greys order ${r.code} · ships ${fmtDay(r.ship.ship_on)}`,
+      subject: `${test ? "[TEST] " : ""}Your Greys order ${r.code}${r.boxes === 0 ? "" : ` · ships ${fmtDay(r.ship.ship_on)}`}`,
       html,
       from: Deno.env.get("INQUIRY_FROM") || "GREYS Fine Cheeses <info@greyscheese.com>",
       replyTo: L.email || Deno.env.get("INQUIRY_REPLY_TO") || "brad@greyscheese.com",
