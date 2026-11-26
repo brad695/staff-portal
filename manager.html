@@ -20459,7 +20459,8 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
        Print → a packing list (one table) + one packing slip per order (ship-to, items, the gift note to tuck in).
      SETTINGS: site_content 'order_shipping' (policy site_content_write: is_app_admin), read by the function every ~10 s:
        { enabled, from, items[], order_by, ship_on, arrive_from, arrive_by, first_cents, each_cents, limit, tax_states[] }
-     Keys this form doesn't know (note …) are kept. The item list comes from the function's own menu for that shop. -->
+     Keys this form doesn't know (note …) are kept. The item list comes from the function's own menu for that shop.
+     On the staging portal the on/off box and the ticks are the TEST order site's own: test_enabled, test_items. -->
 <style id="sh-style">
 .sh-tabpill{ display:none; margin-left:6px; padding:1px 7px; border-radius:999px; background:#0e7490; color:#fff; font-size:.68rem; font-weight:700; vertical-align:middle; }
 .sh-tabpill.show{ display:inline-block; }
@@ -20552,9 +20553,13 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
   Object.keys(F).forEach(function(k){ F[k] = document.getElementById(F[k]); });
   // TEST SWITCH (2026-11-13, Maverick: shipping on the test site to show the owner, live stays off): on the staging
   // portal the on/off box is the TEST order site's own switch, order_shipping.test_enabled (read only by
-  // square-online-order-test; not set = follows enabled). It never changes the live site's `enabled`. The other
-  // settings (dates, prices, items) are still shared with the live site.
-  if (STAGE && F.enabled && F.enabled.nextElementSibling) F.enabled.nextElementSibling.innerHTML = 'Offer <b>Ship it</b> on the <b>test</b> order site <span style="font-weight:400;color:#6b7280">(staging only — dates, prices and items are shared with the live site)</span>';
+  // square-online-order-test; not set = follows enabled). It never changes the live site's `enabled`.
+  // TEST ITEMS (2026-11-25, Maverick: the holiday gift boxes "launch on test site first"): the same for the ticks.
+  // On the staging portal "Items that ship" is the TEST order site's own list, order_shipping.test_items (read only
+  // by square-online-order-test; not set = follows items). It never changes the live site's `items` — a box goes
+  // live when it is ticked on the live portal. The dates and prices are still shared with the live site.
+  if (STAGE && F.enabled && F.enabled.nextElementSibling) F.enabled.nextElementSibling.innerHTML = 'Offer <b>Ship it</b> on the <b>test</b> order site <span style="font-weight:400;color:#6b7280">(staging only — the dates and prices are shared with the live site)</span>';
+  if (STAGE && itemsEl && itemsEl.parentNode.querySelector('legend')) itemsEl.parentNode.querySelector('legend').innerHTML = 'Items that ship on the <b>test</b> order site <span style="font-weight:400;color:#6b7280">(staging only — tick them on the live portal to ship them for customers)</span>';
   var st = { orders:null, env:'', cfg:null, fromLabel:'Memphis', filter:'todo', open:'', busy:{}, msg:{}, err:'', loading:false,
              row:null, menu:{}, menuErr:'', picked:[], showAll:false, saving:false };
   var CARRIERS = ['UPS', 'USPS', 'FedEx', 'Other'];
@@ -20750,7 +20755,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     F.miles.value = r.ground_miles ? String(r.ground_miles) : '600';
     F.limit.value = d.limit ? String(d.limit) : '0';
     F.tax.value = (Array.isArray(d.tax_states) ? d.tax_states : ['TN']).join(', ');
-    st.picked = Array.isArray(d.items) ? d.items.slice() : [];
+    st.picked = (STAGE && Array.isArray(d.test_items) ? d.test_items : Array.isArray(d.items) ? d.items : []).slice(); // staging: the test site's list (TEST ITEMS)
   }
   async function loadSettings(){
     try {
@@ -20837,7 +20842,7 @@ window.EMC_STARTERS = [{"name": "Cheeseboard promo — A (story, BOARD10)", "sub
     var why = problem(d);
     if (why) { setMsg.className = 'sh-setmsg bad'; setMsg.textContent = why; return; }
     delete d.bad_states;
-    if (STAGE) { d.test_enabled = d.enabled; delete d.enabled; } // staging saves the test site's switch; live's `enabled` is kept as it is
+    if (STAGE) { d.test_enabled = d.enabled; delete d.enabled; d.test_items = d.items; delete d.items; } // staging saves the test site's switch and list; live's `enabled` and `items` are kept as they are
     var s = await session(), who = s && s.user && s.user.email ? s.user.email : 'manager';
     var data = Object.assign({}, st.row && st.row.data ? st.row.data : {}, d); // keeps keys this form doesn't know (note …)
     st.saving = true; saveBtn.disabled = true; setMsg.className = 'sh-setmsg'; setMsg.textContent = 'Saving…';

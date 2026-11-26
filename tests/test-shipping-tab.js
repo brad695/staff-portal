@@ -181,7 +181,7 @@ const txt = (page, sel) => page.evaluate((s) => { const e = document.querySelect
     const up = await page.evaluate(() => (window.__sbCalls || []).filter((c) => c[0] === "site_content" && c[1] === "upsert").pop());
     const d = up && up[2] && up[2].data;
     t("Save: upserts order_shipping with the new values", !!d && up[2].key === "order_shipping" && d.order_by === "2026-12-04"
-      && JSON.stringify(d.tax_states) === '["TN","MS"]' && JSON.stringify(d.items) === '["EN2OPFWI6P6WHF3DDHD4T2V2"]', JSON.stringify(up && up[2]));
+      && JSON.stringify(d.tax_states) === '["TN","MS"]' && JSON.stringify(d.items) === '["EN2OPFWI6P6WHF3DDHD4T2V2"]' && JSON.stringify(d.test_items) === '["EN2OPFWI6P6WHF3DDHD4T2V2"]', JSON.stringify(up && up[2]));
     t("…near/far: Ground $35 + $25, 2nd Day Air $45 each, 600 miles", !!d && JSON.stringify(d.rates) === JSON.stringify({ ground_miles: 600, ground: { first_cents: 3500, each_cents: 2500 }, air: { first_cents: 4500, each_cents: 4500 } }), JSON.stringify(d && d.rates));
     t("…the old flat price is left alone", !!d && d.first_cents === 3000 && d.each_cents === 3000, JSON.stringify(d && [d.first_cents, d.each_cents]));
     t("…keeps keys the form doesn't know, says who saved", !!d && d.note === "keep me" && up[2].updated_by === "manager@greyscheese.com" && /Saved/.test(await txt(page, "#shSetMsg")));
@@ -217,6 +217,37 @@ const txt = (page, sel) => page.evaluate((s) => { const e = document.querySelect
     t("staging: no test_enabled yet → the box follows live (off)", !(await page.evaluate(() => document.getElementById("shEnabled").checked)));
     await page.check("#shEnabled"); const d = await settingsSave(page);
     t("…tick + Save: test_enabled true, live enabled stays false", !!d && d.test_enabled === true && d.enabled === false, JSON.stringify(d));
+    t("no page errors", st.errors.length === 0, st.errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
+  // TEST ITEMS (2026-11-25): the staging portal's ticks are the test site's order_shipping.test_items; live's are items
+  console.log("\nmanager.html · the test site's own list of items that ship");
+  const ticks = (page) => page.evaluate(() => [...document.querySelectorAll('#shItems input[data-sh="item"]')].filter((b) => b.checked).map((b) => b.value));
+  const BOXES = ["FALL1", "EN2OPFWI6P6WHF3DDHD4T2V2"];
+  const legend = (page) => page.evaluate(() => document.getElementById("shItems").parentNode.querySelector("legend").textContent.replace(/\s+/g, " ").trim());
+  {
+    const { ctx, page, st } = await openSettings({ row: Object.assign({}, CFG, { rates: RATES, test_enabled: true, test_items: BOXES }) });
+    t("staging: the ticks are the test site's list", JSON.stringify(await ticks(page)) === JSON.stringify(BOXES), JSON.stringify(await ticks(page)));
+    t("…and the heading says so", /on the test order site/.test(await legend(page)), await legend(page));
+    await page.uncheck('#shItems input[value="FALL1"]'); const d = await settingsSave(page);
+    t("…untick + Save: test_items changes, live items left alone", !!d && JSON.stringify(d.test_items) === '["EN2OPFWI6P6WHF3DDHD4T2V2"]' && JSON.stringify(d.items) === '["EN2OPFWI6P6WHF3DDHD4T2V2"]' && d.note === "keep me", JSON.stringify(d));
+    t("no page errors", st.errors.length === 0, st.errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
+  {
+    const { ctx, page, st } = await openSettings({ row: Object.assign({}, CFG, { rates: RATES, test_enabled: true }) });
+    t("staging: no test_items yet → the ticks follow live", JSON.stringify(await ticks(page)) === '["EN2OPFWI6P6WHF3DDHD4T2V2"]', JSON.stringify(await ticks(page)));
+    await page.check('#shItems input[value="FALL1"]'); const d = await settingsSave(page);
+    t("…tick a box + Save: it ships on the test site only", !!d && JSON.stringify(d.test_items) === '["EN2OPFWI6P6WHF3DDHD4T2V2","FALL1"]' && JSON.stringify(d.items) === '["EN2OPFWI6P6WHF3DDHD4T2V2"]', JSON.stringify(d));
+    t("no page errors", st.errors.length === 0, st.errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
+  {
+    const { ctx, page, st } = await openSettings({ host: "https://staff.greyscheese.com", row: Object.assign({}, CFG, { rates: RATES, test_items: BOXES }) });
+    t("live portal: the ticks are the live list, the test list doesn't tick anything", JSON.stringify(await ticks(page)) === '["EN2OPFWI6P6WHF3DDHD4T2V2"]', JSON.stringify(await ticks(page)));
+    t("…heading unchanged", (await legend(page)) === "Items that ship", await legend(page));
+    await page.check('#shItems input[value="FALL1"]'); const d = await settingsSave(page);
+    t("…tick a box + Save: items changes, test_items kept as it was", !!d && JSON.stringify(d.items) === '["EN2OPFWI6P6WHF3DDHD4T2V2","FALL1"]' && JSON.stringify(d.test_items) === JSON.stringify(BOXES), JSON.stringify(d));
     t("no page errors", st.errors.length === 0, st.errors.slice(0, 3).join(" | "));
     await ctx.close();
   }
