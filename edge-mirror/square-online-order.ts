@@ -15,6 +15,7 @@
 // Cheesemas …) are seasonal pre-orders, each with its own pickup window. They get their own "Special Offers"
 // section, first on the page, and carry preorder: true. Special Offers wins over the online / catering menus
 // for an item that sits in more than one, and a pre-order is never a catering item.
+//   v21.2 (2026-11-26): ADDRESS CHECK — UPS Address Validation on the ship-to address (check_address + payShip).
 //   v21.1 (2026-11-26): a soon box shows no ship date to the customer (SOON_TEXT).
 //   v21 (2026-11-26, go-live of the test site): v19.4 (new look's menu, gift boxes, ship days, the tee) + the v20 CREDIT CARD FEE that was live.
 //   v19.3 (2026-11-26): SHIP DAYS — a shipped box that isn't a pre-order ships the next open day (see SHIP DAYS).
@@ -1236,6 +1237,97 @@ function readShipTo(s: any, cust: Cust): ShipTo {
   if (!/^\d{5}(-\d{4})?$/.test(t.zip)) throw new PublicError("Please check the ZIP code.");
   return t;
 }
+// ---------- ADDRESS CHECK (v21.2, 2026-11-26, Maverick: "i purposely entered a wrong address, it took it") ----------
+// UPS Address Validation (XAV, street level) on every ship-to address — check_address for the page as it's typed,
+// and again in payShip before anything is charged. Keys: Supabase secrets UPS_CLIENT_ID + UPS_CLIENT_SECRET (an app
+// on developer.ups.com with the "Address Validation" product; UPS_ENV=cie uses UPS's test server). Results:
+//   ok   — UPS knows it (or one of its candidates is what was typed)
+//   fix  — UPS has close matches but not this one: the page shows "Did you mean…" and the order waits for a pick
+//   bad  — UPS has no match (or only house-number ranges): the order is refused, nothing charged
+//   skip — no keys yet / UPS didn't answer in 6 s: the order goes through as before (logged), so UPS can't stop sales
+type AddrSug = { address1: string; address2: string; city: string; state: string; zip: string; label: string };
+type AddrCheck = { status: "ok" | "fix" | "bad" | "skip"; suggestions: AddrSug[] };
+let upsTok: { token: string; until: number } | null = null;
+const upsBase = () => (Deno.env.get("UPS_ENV") ?? "").trim().toLowerCase() === "cie" ? "https://wwwcie.ups.com" : "https://onlinetools.ups.com";
+async function upsKeys(): Promise<{ id: string; secret: string } | null> {
+  let id = (Deno.env.get("UPS_CLIENT_ID") ?? "").trim(), secret = (Deno.env.get("UPS_CLIENT_SECRET") ?? "").trim();
+  if (!id || !secret) { // or rows in app_secrets (ups_client_id / ups_client_secret)
+    const { data } = await admin.from("app_secrets").select("name,value").in("name", ["ups_client_id", "ups_client_secret"]);
+    for (const r of data ?? []) { if (r.name === "ups_client_id") id = id || String(r.value ?? "").trim(); else secret = secret || String(r.value ?? "").trim(); }
+  }
+  return id && secret ? { id, secret } : null;
+}
+async function upsToken(): Promise<string | null> {
+  if (upsTok && upsTok.until > Date.now()) return upsTok.token;
+  const k = await upsKeys();
+  if (!k) return null;
+  const res = await fetch(upsBase() + "/security/v1/oauth/token", {
+    method: "POST", signal: AbortSignal.timeout(6000),
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: "Basic " + btoa(k.id + ":" + k.secret) },
+    body: "grant_type=client_credentials",
+  });
+  const d: any = await res.json().catch(() => ({}));
+  if (!res.ok || !d.access_token) { console.error("ups token", res.status, JSON.stringify(d).slice(0, 300)); return null; }
+  upsTok = { token: String(d.access_token), until: Date.now() + Math.max(60, Number(d.expires_in ?? 3600) - 120) * 1000 };
+  return upsTok.token;
+}
+const ADDR_WORDS: Record<string, string> = {
+  STREET: "ST", AVENUE: "AVE", AV: "AVE", ROAD: "RD", DRIVE: "DR", LANE: "LN", COURT: "CT", BOULEVARD: "BLVD", PLACE: "PL",
+  CIRCLE: "CIR", COVE: "CV", PARKWAY: "PKWY", HIGHWAY: "HWY", TERRACE: "TER", TRAIL: "TRL", SQUARE: "SQ", PIKE: "PIKE",
+  NORTH: "N", SOUTH: "S", EAST: "E", WEST: "W", NORTHEAST: "NE", NORTHWEST: "NW", SOUTHEAST: "SE", SOUTHWEST: "SW",
+  APARTMENT: "APT", SUITE: "STE", UNIT: "UNIT", BUILDING: "BLDG", FLOOR: "FL",
+};
+const normAddr = (s: string) => s.toUpperCase().replace(/[.,#]/g, " ").split(/\s+/).filter(Boolean).map((w) => ADDR_WORDS[w] ?? w).join(" ");
+const RANGE = /^\s*\d+[A-Z]?\s*-\s*\d+[A-Z]?\s/i; // "100-198 MAIN ST": UPS knows the street, not the number
+const asList = (x: unknown): any[] => Array.isArray(x) ? x : x ? [x] : [];
+function addrSug(c: any, typed: { address2: string }): AddrSug | null {
+  const k = c?.AddressKeyFormat ?? {};
+  const lines = asList(k.AddressLine).map((s) => String(s).trim()).filter(Boolean);
+  if (!lines.length || RANGE.test(lines[0])) return null;
+  const zip = String(k.PostcodePrimaryLow ?? "").trim();
+  const city = String(k.PoliticalDivision2 ?? "").trim(), state = String(k.PoliticalDivision1 ?? "").trim().toUpperCase();
+  if (!/^\d{5}$/.test(zip) || !city || !state) return null;
+  const tc = (s: string) => s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()); // MEMPHIS → Memphis
+  const address1 = tc(lines[0]).replace(/\b(Ne|Nw|Se|Sw)\b/g, (m) => m.toUpperCase());
+  const address2 = lines[1] ? tc(lines[1]) : typed.address2;
+  return { address1, address2, city: tc(city), state, zip, label: `${address1}${address2 ? ", " + address2 : ""}, ${tc(city)}, ${state} ${zip}` };
+}
+async function checkAddress(t: { address1: string; address2: string; city: string; state: string; zip: string }): Promise<AddrCheck> {
+  const skip: AddrCheck = { status: "skip", suggestions: [] };
+  try {
+    const tok = await upsToken();
+    if (!tok) return skip;
+    const res = await fetch(upsBase() + "/api/addressvalidation/v2/1?regionalrequestindicator=false&maximumcandidatelistsize=5", {
+      method: "POST", signal: AbortSignal.timeout(6000),
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + tok, transId: crypto.randomUUID().slice(0, 32), transactionSrc: "greys-order" },
+      body: JSON.stringify({ XAVRequest: { AddressKeyFormat: {
+        AddressLine: [t.address1, t.address2].filter(Boolean), PoliticalDivision2: t.city, PoliticalDivision1: t.state,
+        PostcodePrimaryLow: t.zip.slice(0, 5), CountryCode: "US",
+      } } }),
+    });
+    const d: any = await res.json().catch(() => ({}));
+    if (res.status === 401) upsTok = null;
+    const x = d?.XAVResponse;
+    if (!res.ok || !x) { console.error("ups xav", res.status, JSON.stringify(d).slice(0, 300)); return skip; }
+    const sugs = asList(x.Candidate).map((c) => addrSug(c, t)).filter((s): s is AddrSug => !!s);
+    if ("NoCandidatesIndicator" in x || !sugs.length) return { status: "bad", suggestions: [] };
+    if ("ValidAddressIndicator" in x) return { status: "ok", suggestions: sugs.slice(0, 1) };
+    const mine = normAddr(t.address1), zip5 = t.zip.slice(0, 5), city = normAddr(t.city);
+    if (sugs.some((s) => normAddr(s.address1) === mine && s.zip === zip5 && normAddr(s.city) === city)) return { status: "ok", suggestions: [] };
+    return { status: "fix", suggestions: sugs.slice(0, 3) };
+  } catch (err) { console.error("ups xav", err); return skip; }
+}
+const ADDR_BAD = "UPS can't find that address. Please check the street number, street name, city and ZIP.";
+const ADDR_FIX = "UPS doesn't recognize that address exactly — please pick the right one below, or fix it.";
+async function checkAddressAction(req: Request, b: any) {
+  await rateLimit(req, "addr", 80);
+  const s = b?.ship ?? {};
+  const t = { address1: clean(s.address1, 120), address2: clean(s.address2, 120), city: clean(s.city, 80), state: clean(s.state, 2).toUpperCase(), zip: clean(s.zip, 10) };
+  if (!t.address1 || !t.city || !US_STATES[t.state] || !/^\d{5}(-\d{4})?$/.test(t.zip)) return { ok: true, status: "skip", suggestions: [] };
+  const r = await checkAddress(t);
+  return { ok: true, ...r, message: r.status === "bad" ? ADDR_BAD : r.status === "fix" ? ADDR_FIX : null };
+}
+
 // The Square order for a ship bag: SHIPMENT fulfillment, a "Shipping" service charge, and taxes only for tax_states.
 function buildShipOrder(e: Env, m: Menu, c: ShipCfg, lines: Line[], state: string | null, to: ShipTo | null, cust: Cust | null, locationId: string, code: string, note: string, service: Service | null = null, ml: MLine[] = []) {
   const taxed = !!state && c.tax_states.includes(state);
@@ -1399,6 +1491,10 @@ async function payShip(req: Request, b: any) {
   const zone = boxesAsked || !ml.length ? shipZone(c, to.zip, to.state) : { service: null, problem: null }; // near/far rates (v18)
   if (zone.problem) throw new PublicError(zone.problem + " Nothing was charged.");
   if (c.rates && !zone.service && (boxesAsked || !ml.length)) throw new PublicError("Please check the ZIP code. Nothing was charged.");
+  const addr = await checkAddress(to); // UPS address check (ADDRESS CHECK)
+  if (addr.status === "bad") throw new PublicError(ADDR_BAD + " Nothing was charged.", 400, { address_status: "bad", address_suggestions: [] });
+  if (addr.status === "fix") throw new PublicError(ADDR_FIX + " Nothing was charged.", 400, { address_status: "fix", address_suggestions: addr.suggestions });
+  if (addr.status === "skip") console.warn("address not checked (UPS keys missing or UPS unreachable)", to.state, to.zip.slice(0, 5));
 
   const m = await loadMenu(shop);
   const lines = boxesAsked || !ml.length ? priceLines(m, b.lines) : [];
@@ -2451,6 +2547,7 @@ Deno.serve(async (req) => {
     if (action === "config") return json(req, { ok: true, ...(await payConfig(shopOf(body.location || "memphis"), envFor(req))) });
     if (action === "quote") return json(req, await quote(req, body));
     if (action === "pay") return json(req, body.ship ? await payShip(req, body) : await pay(req, body));
+    if (action === "check_address") return json(req, await checkAddressAction(req, body)); // UPS address check (v21.2)
     if (action === "gift_balance") return json(req, await giftBalance(req, body));
     if (action === "status") return json(req, await status(body));
     if (action === "sweep") return json(req, await sweep(body));
