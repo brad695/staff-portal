@@ -4399,6 +4399,7 @@ async function toDel(id){ if(!confirm('Delete this request?')) return; const r =
    STAFF SCHEDULING — weekly shift grid
    =================================================================== */
 let sgWeek = sgMonday(new Date());
+const SG_DIRTY = {};   // loc -> true while a ▲▼ row order is waiting for 💾 Save
 const SG = { memphis:{emps:[],shifts:[],to:[]}, nashville:{emps:[],shifts:[],to:[]}, franklin:{emps:[],shifts:[],to:[]} };
 let SH_CTX = null; // { loc, empId, date, shiftId }
 
@@ -4431,8 +4432,13 @@ async function sgLoad(){
       sb.from('portal_publishes').select('*').eq('week_start',from).order('published_at',{ascending:false})
     ]);
     LOC_KEYS.forEach(l=>{
-      const locEmps = (emps.data||[]).filter(e=>LOC_GROUPS[l].includes(e.location)
+      let locEmps = (emps.data||[]).filter(e=>LOC_GROUPS[l].includes(e.location)
         && (e.on_schedule!==false || (shifts.data||[]).some(s=>s.employee_id===e.id)));   // off-schedule staff (owners/admins) stay off
+      // an unsaved ▲▼ order survives the reload that every shift edit / week change does
+      if(SG_DIRTY[l] && SG[l] && SG[l].emps){
+        const pos = new Map(SG[l].emps.map((e,k)=>[e.id,k]));
+        locEmps = locEmps.map((e,k)=>[e,k]).sort((a,b)=>(pos.has(a[0].id)?pos.get(a[0].id):1e6+a[1])-(pos.has(b[0].id)?pos.get(b[0].id):1e6+b[1])).map(x=>x[0]);
+      }
       const empIds = locEmps.map(e=>e.id);
       SG[l] = {
         emps: locEmps,
@@ -4550,8 +4556,7 @@ function sgRender(){
   }).join('');
 }
 
-/* move an employee up/down the schedule (local until 💾 Save) */
-const SG_DIRTY = {};
+/* move an employee up/down the schedule (local until 💾 Save; kept across grid reloads until then) */
 function sgReorder(loc, empId, dir){
   const list = SG[loc].emps, i = list.findIndex(e=>e.id===empId), j = i+dir;
   if(i<0 || j<0 || j>=list.length) return;
