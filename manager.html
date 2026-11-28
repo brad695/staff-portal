@@ -417,6 +417,10 @@
     @media(min-width:821px){
       .sect.more{ display:none; }
     }
+.sg-mv{float:right;display:inline-flex;flex-direction:column;gap:1px;margin-left:4px;}
+.sg-mv button{border:0;background:#eee;border-radius:3px;font-size:9px;line-height:1;padding:2px 4px;cursor:pointer;color:#444;}
+.sg-mv button:hover{background:#ddd;} .sg-mv button:disabled{opacity:.25;cursor:default;}
+@media print{.sg-mv{display:none;}}
 </style>
 <style id="theme-v3">
 /* ═══════════════════════════════════════════════════════════════════
@@ -4277,6 +4281,7 @@ async function toDel(id){ if(!confirm('Delete this request?')) return; const r =
    STAFF SCHEDULING — weekly shift grid
    =================================================================== */
 let sgWeek = sgMonday(new Date());
+const SG_DIRTY = {};   // loc -> true while a ▲▼ row order is waiting for 💾 Save
 const SG = { memphis:{emps:[],shifts:[],to:[]}, nashville:{emps:[],shifts:[],to:[]}, franklin:{emps:[],shifts:[],to:[]} };
 let SH_CTX = null; // { loc, empId, date, shiftId }
 
@@ -4302,15 +4307,20 @@ async function sgLoad(){
     sgWeek.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+sgAdd(sgWeek,6).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   try{
     const [emps, shifts, toff, avail, pubs] = await Promise.all([
-      sb.from('portal_employees').select('*').eq('active',true).order('name'),
+      sb.from('portal_employees').select('*').eq('active',true).order('sched_order',{ascending:true,nullsFirst:false}).order('name'),
       sb.from('portal_shifts').select('*').gte('date',from).lte('date',to).order('start_time'),
       sb.from('portal_time_off').select('*').eq('status','approved').lte('start_date',to),
       sb.from('portal_availability').select('*'),
       sb.from('portal_publishes').select('*').eq('week_start',from).order('published_at',{ascending:false})
     ]);
     LOC_KEYS.forEach(l=>{
-      const locEmps = (emps.data||[]).filter(e=>LOC_GROUPS[l].includes(e.location)
+      let locEmps = (emps.data||[]).filter(e=>LOC_GROUPS[l].includes(e.location)
         && (e.on_schedule!==false || (shifts.data||[]).some(s=>s.employee_id===e.id)));   // off-schedule staff (owners/admins) stay off
+      // an unsaved ▲▼ order survives the reload that every shift edit / week change does
+      if(SG_DIRTY[l] && SG[l] && SG[l].emps){
+        const pos = new Map(SG[l].emps.map((e,k)=>[e.id,k]));
+        locEmps = locEmps.map((e,k)=>[e,k]).sort((a,b)=>(pos.has(a[0].id)?pos.get(a[0].id):1e6+a[1])-(pos.has(b[0].id)?pos.get(b[0].id):1e6+b[1])).map(x=>x[0]);
+      }
       const empIds = locEmps.map(e=>e.id);
       SG[l] = {
         emps: locEmps,
@@ -4405,7 +4415,11 @@ function sgRender(){
         const all = days.map((d,wd)=>sgCell(loc,emp,d,wd));
         const hrs = all.reduce((t,c)=>t+c.hrs,0);
         const cells = narrow ? all[sgDay].html : all.map(c=>c.html).join('');
-        return '<tr><td class="sg-nm"><b>'+esc(emp.name)+'</b>'
+        const ix = g.emps.indexOf(emp), last = g.emps.length-1;
+        const mv = '<span class="sg-mv">'
+          +'<button title="Move up" '+(ix===0?'disabled ':'')+'onclick="event.stopPropagation();sgReorder(\''+loc+'\','+emp.id+',-1)">▲</button>'
+          +'<button title="Move down" '+(ix===last?'disabled ':'')+'onclick="event.stopPropagation();sgReorder(\''+loc+'\','+emp.id+',1)">▼</button></span>';
+        return '<tr><td class="sg-nm">'+mv+'<b>'+esc(emp.name)+'</b>'
           +'<span>'+esc(emp.role||'')+(hrs?(emp.role?' · ':'')+(Math.round(hrs*10)/10)+' hrs':'')+'</span></td>'+cells+'</tr>';
       }).join('');
     }
@@ -4413,6 +4427,7 @@ function sgRender(){
     return '<div class="section-card">'
       +'<h2>📍 '+LOC_LABELS[loc]+(pub?' <span class="pill '+pub.cls+'" style="vertical-align:3px;margin-left:6px;">'+pub.label+'</span>':'')+'</h2>'
       +'<div class="toolbar" style="margin-top:10px;">'
+        +'<button class="btn btn-navy btn-sm" onclick="sgSave(\''+loc+'\')">💾 Save'+(SG_DIRTY[loc]?' •':'')+'</button>'
         +'<button class="btn btn-gold btn-sm" onclick="publishWeek(\''+loc+'\')">📣 Publish &amp; notify</button>'
         +'<button class="btn btn-navy btn-sm" onclick="printGrid(\''+loc+'\')">🖨 Print</button>'
         +'<button class="btn btn-ghost btn-sm" onclick="sgCopyPrev(\''+loc+'\')">⧉ Copy previous week</button>'
@@ -4421,6 +4436,27 @@ function sgRender(){
       +dayStrip+'<div class="bulk-wrap sg-wrap"><table class="bulk sg-grid'+(narrow?' sg-1day':'')+'"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table></div>'
     +'</div>';
   }).join('');
+}
+
+/* move an employee up/down the schedule (local until 💾 Save; kept across grid reloads until then) */
+function sgReorder(loc, empId, dir){
+  const list = SG[loc].emps, i = list.findIndex(e=>e.id===empId), j = i+dir;
+  if(i<0 || j<0 || j>=list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  SG_DIRTY[loc] = true;
+  sgRender();
+  const el = document.getElementById('sgMsg-'+loc); if(el) el.textContent='Order changed — click 💾 Save';
+}
+/* SAVE, DON'T PUBLISH — stores the row order; shifts already save as you edit them. No notifications. */
+async function sgSave(loc){
+  const el = document.getElementById('sgMsg-'+loc);
+  if(el) el.textContent='Saving…';
+  const ids = SG[loc].emps.map(e=>e.id);
+  const { error } = await sb.rpc('portal_employee_set_order', { p_ids: ids });
+  if(error){ if(el) el.textContent='❌ Not saved: '+error.message; return; }
+  SG_DIRTY[loc] = false;
+  await sgLoad();
+  const el2 = document.getElementById('sgMsg-'+loc); if(el2) el2.textContent='✓ Saved (not published)';
 }
 
 function printGrid(loc){
@@ -4622,6 +4658,7 @@ async function sgDrop(ev, loc, empId, date){
 
 /* ── publish & notify ── */
 async function publishWeek(loc){
+  if(SG_DIRTY[loc]){ const r=await sb.rpc('portal_employee_set_order',{p_ids:SG[loc].emps.map(e=>e.id)}); if(!r.error) SG_DIRTY[loc]=false; }
   if(!confirm('Publish the '+LOC_LABELS[loc]+' schedule for this week?\n\nEveryone whose week changed gets an email and/or text with their shifts (whatever contact info they have on file).')) return;
   const el = document.getElementById('sgMsg-'+loc);
   el.className='save-msg'; el.textContent='Publishing…';

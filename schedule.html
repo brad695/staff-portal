@@ -576,7 +576,7 @@ async function loadWeek(){
     e.toLocaleDateString('en-US', sameMonth?{day:'numeric'}:{month:'short',day:'numeric'});
   const GROUP = LOC_GROUPS[LOC];
   const [emps, shifts, toff] = await Promise.all([
-    sb.from('portal_employees').select('*').in('location', GROUP).eq('active', true).order('name'),
+    sb.from('portal_employees').select('*').in('location', GROUP).eq('active', true).order('sched_order',{ascending:true,nullsFirst:false}).order('name'),
     sb.from('portal_shifts').select('*').in('location', GROUP).gte('date', from).lte('date', to).order('start_time'),
     sb.from('portal_time_off').select('*').in('location', GROUP).eq('status','approved').lte('start_date', to)
   ]);
