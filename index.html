@@ -223,6 +223,9 @@
     /* expandable agenda rows: title only until tapped */
     .ag-body{ flex:1; min-width:0; }
     .ag-row.ag-x{ cursor:pointer; }
+    .ag-row.ag-archived{ opacity:.5; } .ag-row.ag-archived .ag-tag::after{ content:' · archived'; }
+    .cal-arch.on{ outline:2px solid #e0a21c; }
+    .ag-arch{ display:inline-block; margin-top:6px; }
     .ag-chev{ font-style:normal; font-size:0.66rem; color:var(--sub); margin-left:6px; display:inline-block; transition:transform .15s ease; }
     .ag-row.open .ag-chev{ transform:rotate(180deg); }
     .ag-det{ display:none; font-size:0.82rem; color:var(--sub); margin-top:6px; padding:7px 0 3px 10px; border-left:2px solid var(--line); white-space:pre-wrap; }
@@ -316,7 +319,7 @@
 
       /* calendar header: keep the "Calendar" title + month label, drop the interactive buttons */
       .sec-head { position:static !important; background:transparent !important; padding:0 0 8px !important; }
-      .sec-head .back-btn, .cal-nav, .cal-today, .cal-print { display:none !important; }
+      .sec-head .back-btn, .cal-nav, .cal-today, .cal-print, .ag-arch { display:none !important; }
       .sec-head h2 { color:#000 !important; }
       .sec-body { padding:0 !important; }
       .cal-bar { margin-bottom:10px !important; }
@@ -2108,6 +2111,7 @@ body.home-resizing, body.home-resizing *{ cursor:nwse-resize !important; -webkit
         <button class="cal-nav" onclick="calNav(1)">›</button>
         <button class="cal-today" onclick="calGoToday()">Today</button>
         <button class="cal-print" onclick="window.print()">🖨 Print</button>
+        <button class="cal-print cal-arch" id="calArchBtn" style="display:none" onclick="calToggleArchived()" title="Show the rows you archived">🗄 Archived</button>
       </div>
       <div id="agendaList" class="agenda"></div>
     </div>
@@ -2755,7 +2759,7 @@ function shipRow(s){
     ['What', 'Shipped online orders — pack them cold (gel packs, insulated box) and ship them today.'],
     ['Packing list', 'Manager → Online Ordering → Shipping']
   ]) + '<a class="xt-a" href="/manager#shipping" onclick="event.stopPropagation()">🚚 Open the ship list →</a>';
-  return agRow('t-ship','Ship day','🚚 '+esc(txt),detail);
+  return agRow('t-ship','Ship day','🚚 '+esc(txt),detail,'ship');
 }
 // One agenda line per order: when, who, what it is worth, and whether the
 // money is already in. Item names go on a second, quieter line.
@@ -2785,7 +2789,7 @@ function ordRow(o){
   ]) + (o.beo_pdf ? '<a class="xt-a" href="/beo.html?u='+encodeURIComponent(o.beo_pdf)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">📄 Open BEO PDF</a>' : '')
     // order-form pre-orders (Snap Order tile): the photo of the paper form, a 7-day signed link from the feed
     + (o.photo ? '<a class="xt-a" href="'+esc(o.photo)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">📷 Order form photo</a>' : '');
-  return agRow(meta.tag, meta.label, esc(when)+' \u00b7 '+esc(o.name)+money+paid, detail);
+  return agRow(meta.tag, meta.label, esc(when)+' \u00b7 '+esc(o.name)+money+paid, detail, 'ord|'+(o.beo_code||o.source+'|'+o.at+'|'+o.name));
 }
 // One calendar load at a time: overlapping loads each reset then refill the same
 // _calData buckets, which doubled/tripled reservations and orders.
@@ -2796,7 +2800,7 @@ async function _renderCalendar(opt){
   const y=opt.y!=null?opt.y:_calYear, m=opt.m!=null?opt.m:_calMonth, tgt=opt.target||_calTarget;
   const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const labelEl=tgt.label&&document.getElementById(tgt.label); if(labelEl) labelEl.textContent=months[m]+' '+y;
-  await loadCalMonth(y,m);
+  await Promise.all([ loadCalMonth(y,m), loadCalArchive() ]);
   const mS=fmt(new Date(y,m,1)), mE=fmt(new Date(y,m+1,0));
   await Promise.all([ loadCalClasses(mS,mE), loadCalOrders(mS,mE), loadCalExperiences(mS,mE), loadCalShips(mS,mE) ]);
   _calData.ev={}; _calEvents.forEach(ev=>occurrences(ev,mS,mE).forEach(d=>{(_calData.ev[d]=_calData.ev[d]||[]).push({name:ev.name,time:ev.time,desc:ev.desc,status:ev.status,endDate:ev.endDate,repeat:ev.repeat});}));
@@ -2816,14 +2820,48 @@ function statusChip(st){
        : st==='tentative' ? ' <span class="ag-tent">\u2753</span>' : '';
 }
 let _agSeq=0;
+// ── ARCHIVE (2026-11-28, Maverick: "add the option to archive any entry on the calendar") ──
+// Hides a row without touching the order / reservation / event behind it. Keys live in
+// portal_calendar_archive (supabase/sql/2026-11-28_calendar_archive.sql); everyone reads them,
+// only a manager sign-in on this device can archive, unarchive or see the archived rows.
+let _calArch=new Set(), _calAdmin=false, _calAdminChecked=false, _calShowArch=false, _agDate='';
+function calKey(date,key){ return date+'|'+String(key).replace(/\s+/g,' ').trim().toLowerCase().slice(0,300); }
+async function loadCalArchive(){
+  try{ const { data, error } = await sb.from('portal_calendar_archive').select('entry_key').eq('location', LOC);
+    if(!error) _calArch=new Set((data||[]).map(r=>r.entry_key)); }catch(e){}
+  if(!_calAdminChecked){ _calAdminChecked=true;
+    try{ const s=(await sb.auth.getSession()).data.session; _calAdmin=!!s && (await sb.rpc('is_app_admin')).data===true; }catch(e){ _calAdmin=false; }
+    const b=document.getElementById('calArchBtn'); if(b) b.style.display=_calAdmin?'':'none'; }
+}
+function calToggleArchived(){ _calShowArch=!_calShowArch; const b=document.getElementById('calArchBtn'); if(b) b.classList.toggle('on', _calShowArch); renderCalendar(); }
+async function calArchive(a){
+  const k=a.getAttribute('data-k'), on=!_calArch.has(k);
+  a.textContent='\u2026';
+  const t=sb.from('portal_calendar_archive');
+  const { error } = on ? await t.upsert({ location:LOC, entry_key:k, entry_date:k.slice(0,10), label:a.getAttribute('data-l') })
+                       : await t.delete().eq('location', LOC).eq('entry_key', k);
+  if(error){ a.textContent='\u26a0\ufe0f '+error.message; return; }
+  if(on) _calArch.add(k); else _calArch.delete(k);
+  renderCalendar(); if(document.getElementById('todayList')) renderToday();
+}
 function agToggle(id){ const el=document.getElementById(id); if(el) el.classList.toggle('open'); }
 // One agenda line. `detail` is optional: when present the row shows the title
 // only and opens to the full details on tap.
-function agRow(tag,label,text,detail){
+function agRow(tag,label,text,detail,key){
+  // Archive (2026-11-28): rows are matched by date + a stable key; archived ones are hidden
+  // unless a manager turns on "Archived". Only inside a calendar day (_agDate set).
+  let cls='';
+  if(_agDate){
+    const plain=String(text).replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
+    const k=calKey(_agDate, key || tag+'|'+plain), arch=_calArch.has(k);
+    if(arch && !_calShowArch) return '';
+    if(arch) cls=' ag-archived';
+    if(_calAdmin) detail=(detail||'')+'<a class="xt-a ag-arch" href="#" data-k="'+esc(k)+'" data-l="'+esc(label+': '+plain)+'" onclick="event.stopPropagation();event.preventDefault();calArchive(this)">'+(arch?'\u21a9 Unarchive':'\ud83d\uddc4 Archive')+'</a>';
+  }
   const head='<span class="ag-tag '+tag+'">'+label+'</span>';
-  if(!detail) return '<div class="ag-row">'+head+'<span class="ag-body">'+text+'</span></div>';
+  if(!detail) return '<div class="ag-row'+cls+'">'+head+'<span class="ag-body">'+text+'</span></div>';
   const id='agx'+(++_agSeq);
-  return '<div class="ag-row ag-x" id="'+id+'" onclick="agToggle(\''+id+'\')">'+head
+  return '<div class="ag-row ag-x'+cls+'" id="'+id+'" onclick="agToggle(\''+id+'\')">'+head
     +'<span class="ag-body"><span>'+text+'<i class="ag-chev">\u25be</i></span>'
     +'<div class="ag-det">'+detail+'</div></span></div>';
 }
@@ -2836,24 +2874,24 @@ function renderAgenda(y,m,tgt,only){
     const date=fmt(new Date(y,m,d));
     const res=_calData.res[date]||[], ev=_calData.ev[date]||[], sp=_calData.sp[date]||[], sch=_calData.sch[date]||[], off=_calData.off[date]||[], cls=_calData.cls[date]||[], ord=_calData.ord[date]||[], exp=_calData.exp[date]||[], shp=_calData.shp[date]||[];
     if(!(res.length||ev.length||sp.length||sch.length||off.length||cls.length||ord.length||exp.length||shp.length)) continue;
-    any=true;
+    _agDate=date;
     const dl=new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
     let rows='';
     sp.forEach(t=>rows+=agRow('t-special','Special',esc(t.title||t),agDetail([
       ['Details', t.body], ['Time', t.time?fmtTime(t.time):''],
       ['Runs', (t.repeat&&t.repeat!=='none')?repeatLabel(t.repeat):'']
-    ])));
+    ]), 'sp|'+(t.id||t.title)));
     shp.forEach(s=>rows+=shipRow(s));
     ord.forEach(o=>rows+=ordRow(o));
     ev.forEach(e=>rows+=agRow('t-event','Event',esc(e.name)+(e.time?' · '+fmtTime(e.time):'')+statusChip(e.status),agDetail([
       ['Details', e.desc], ['Status', e.status==='confirmed'?'Confirmed':e.status==='tentative'?'Tentative':''],
       ['Through', (e.endDate&&e.endDate!==date)?fmtDisplay(e.endDate):''],
       ['Runs', (e.repeat&&e.repeat!=='none')?repeatLabel(e.repeat):'']
-    ])));
+    ]), 'ev|'+e.name+'|'+(e.time||'')));
     // Mahjong sells whole tables: show tables, not seats (capacity is stored in seats)
     cls.forEach(c=>{ const ps=c.party>1?c.party:1;
       const cnt=!c.capacity?'':ps>1?' · 🎟 '+Math.ceil(c.booked/ps)+'/'+Math.floor(c.capacity/ps)+' tables booked':' · 🎟 '+c.booked+'/'+c.capacity+' booked';
-      rows+=agRow('t-class', c.kind==='class'?'Class':'Ticketed', (c.time?fmtTime(c.time)+' · ':'')+esc(c.title)+cnt); });
+      rows+=agRow('t-class', c.kind==='class'?'Class':'Ticketed', (c.time?fmtTime(c.time)+' · ':'')+esc(c.title)+cnt, '', 'class|'+c.time+'|'+c.title); });
     exp.forEach(x=>{ const hold=x.status==='pending';
       const hu=hold&&x.hold_expires_at?new Date(x.hold_expires_at).toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
       rows+=agRow('t-exp', hold?'On hold':'Experience',
@@ -2861,14 +2899,17 @@ function renderAgenda(y,m,tgt,only){
         +(x.payment_status==='paid'?' <span class="ag-ok">\u2705</span>':hold?' <span class="ag-tent">\u23f3</span>':''),
       agDetail([['Time', x.time+(x.until?' – '+x.until:'')], ['Tables', x.tables||''],
         ['Status', hold?'Held for an inquiry until '+hu+' — not paid yet':''],
-        ['Paid', hold?'':(x.payment_status==='paid'?'Yes':'Not yet')], ['Confirmation', x.code], ['Notes', x.notes]])+expBeoHtml(x)+expThreadHtml(x)); });
-    res.forEach(r=>{ const c=can.includes(r.status); const txt=esc(r.time)+' · '+esc(r.name)+' · 👥'+esc(r.party); rows+=agRow(c?'t-cancel':'t-res', c?'Cancelled':'Reserved', c?'<span class="ag-strike">'+txt+'</span>':txt); });
+        ['Paid', hold?'':(x.payment_status==='paid'?'Yes':'Not yet')], ['Confirmation', x.code], ['Notes', x.notes]])+expBeoHtml(x)+expThreadHtml(x), 'exp|'+(x.code||x.time+'|'+x.guest_name)); });
+    res.forEach(r=>{ const c=can.includes(r.status); const txt=esc(r.time)+' · '+esc(r.name)+' · 👥'+esc(r.party); rows+=agRow(c?'t-cancel':'t-res', c?'Cancelled':'Reserved', c?'<span class="ag-strike">'+txt+'</span>':txt, '', resKey(r)); });
     sch.forEach(n=>rows+=agRow('t-sched','Schedule',esc(n.name||n),agDetail([
       ['Notes', n.note], ['Through', (n.endDate&&n.endDate!==date)?fmtDisplay(n.endDate):'']
-    ])));
+    ]), n.id?'sched|'+n.id:''));
     off.forEach(n=>rows+=agRow('t-off','Time Off',esc(n.name||n)+(n.startTime?' · '+offHours(n):''),agDetail([
       ['Reason', n.note], ['Through', (n.endDate&&n.endDate!==date)?fmtDisplay(n.endDate):'']
-    ])));
+    ]), n.id?'off|'+n.id:''));
+    _agDate='';
+    if(!rows) continue;   // everything that day is archived
+    any=true;
     html+= only ? rows : '<div class="ag-day'+(date<today?' ag-past':'')+(date===today?' ag-is-today':'')+'" data-date="'+date+'"><div class="ag-date">'+dl+(date===today?'<span class="ag-today">Today</span>':'')+'</div>'+rows+'</div>';
   }
   list.innerHTML = any ? html : '<div class="empty"><span class="ic">📅</span>'+(only?'Nothing on the calendar.':'Nothing scheduled this month.')+'</div>';
@@ -2881,7 +2922,9 @@ function calNav(dir){ _calMonth+=dir; if(_calMonth>11){_calMonth=0;_calYear++;} 
 let _todayOff=0, _todaySeq=0;   // _todayOff = weeks from this one
 function wkRange(a,b){ const o={ month:'short', day:'numeric' };
   return a.getMonth()===b.getMonth() ? a.toLocaleDateString('en-US',o)+' – '+b.getDate() : a.toLocaleDateString('en-US',o)+' – '+b.toLocaleDateString('en-US',o); }
-function wkResRow(list){
+function resKey(r){ return 'res|'+r.time+'|'+r.name; }
+function wkResRow(list,date){
+  if(date && list) list=list.filter(r=>_calShowArch || !_calArch.has(calKey(date,resKey(r))));
   if(!list || !list.length) return '';
   const can=['CANCELLED','CANCELED','DECLINED','NO_SHOW'], ok=list.filter(r=>!can.includes(r.status));
   const guests=ok.reduce((n,r)=>n+(Number(r.party)||0),0);
@@ -2918,7 +2961,7 @@ async function renderToday(){
     if(el){
       const h=el.querySelector('.ag-date'); if(h) h.remove();
       const resRows=[...el.querySelectorAll('.ag-row')].filter(r=>r.querySelector('.ag-tag.t-res, .ag-tag.t-cancel'));
-      if(resRows.length){ const sum=document.createElement('div'); sum.innerHTML=wkResRow(resBy[k]);
+      if(resRows.length){ const sum=document.createElement('div'); sum.innerHTML=wkResRow(resBy[k],k);
         if(sum.firstElementChild) resRows[0].parentNode.insertBefore(sum.firstElementChild, resRows[0]);
         resRows.forEach(r=>r.remove()); }
       rows=el.innerHTML;
