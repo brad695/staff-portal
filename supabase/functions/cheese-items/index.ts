@@ -71,6 +71,12 @@ Deno.serve(async (req) => {
     if ("net_weight" in body) {
       extra.net_weight = String(body.net_weight ?? "").trim() || null;
     }
+    // What GREYS pays per unit (2026-11-28). Portal only; not sent to Square.
+    if ("cost" in body) {
+      const c = num(body.cost);
+      if (c !== null && c < 0) return json({ error: "cost can't be negative" }, 400);
+      extra.cost = c;
+    }
     if ("unit_of_measure" in body) {
       const u = cleanUnit(body.unit_of_measure);
       if (!u) return json({ error: "unit of measure must be LB, OZ, G, KG or EA" }, 400);
@@ -94,6 +100,11 @@ Deno.serve(async (req) => {
 
     if ("tax_preset" in body) row = { ...row, _tax_preset: body.tax_preset };
     if (Array.isArray(body.tax_ids)) row = { ...row, _tax_ids: body.tax_ids };
+    // "Track inventory" on the add form: stock counts down in Square as it sells.
+    if (body.track_inventory === true) {
+      row = { ...row, _track_inventory: true };
+      if (body.inventory_qty && typeof body.inventory_qty === "object") row = { ...row, _inventory_qty: body.inventory_qty };
+    }
     const updated = await syncItem(row, { dcg: !retail, square: true });
     return json({ item: updated });
   }
@@ -113,6 +124,11 @@ Deno.serve(async (req) => {
     if ("marketing_name" in body) patch.marketing_name = String(body.marketing_name ?? "").trim() || null;
     if ("price" in body) patch.price = num(body.price);
     if ("price_per_lb" in body) patch.price_per_lb = num(body.price_per_lb);
+    if ("cost" in body) {
+      const c = num(body.cost);
+      if (c !== null && c < 0) return json({ error: "cost can't be negative" }, 400);
+      patch.cost = c;
+    }
     if ("net_weight" in body) patch.net_weight = String(body.net_weight ?? "").trim() || null;
     if ("unit_of_measure" in body) {
       const u = cleanUnit(body.unit_of_measure);

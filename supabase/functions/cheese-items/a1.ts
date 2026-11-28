@@ -136,6 +136,10 @@ export const SQUARE_CATEGORY_IDS: Record<string, string> = {
   "Memphis Retail": "K6GGAWH5QMAFUSTPDPZHYSDW",
 };
 
+// Square location ids for starting stock counts (Cheese Entry "Track inventory", 2026-11-28).
+export const SQUARE_LOC_MEMPHIS = "LCXWZ0HAQ69RM";   // Greys Memphis
+export const SQUARE_LOC_NASHVILLE = "LJ33VDYHS1JAR"; // Greys Nashville
+
 export const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",

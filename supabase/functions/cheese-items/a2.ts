@@ -124,7 +124,7 @@ export async function resolveCategoryId(name: string | null | undefined, token: 
 
 export function buildVariation(
   item: Record<string, unknown>,
-  opts: { id: string; version?: number },
+  opts: { id: string; version?: number; existing?: Record<string, unknown> },
 ) {
   const unit = unitOf(item);
   const unitId = SQUARE_UNIT_IDS[unit]; 
@@ -145,6 +145,14 @@ export function buildVariation(
   if (priced) vd.price_money = { amount: Math.round(Number(amount) * 100), currency: "USD" };
   
   vd.measurement_unit_id = byWeight ? unitId : null;
+  // Inventory settings live on the variation. A catalog upsert REPLACES the variation, so carry
+  // over whatever tracking the item already has (set here or in the dashboard) or an edit would
+  // silently switch stock tracking off.
+  const prev = (opts.existing?.item_variation_data ?? {}) as Record<string, unknown>;
+  for (const k of ["track_inventory", "location_overrides", "inventory_alert_type", "inventory_alert_threshold"]) {
+    if (prev[k] !== undefined) vd[k] = prev[k];
+  }
+  if (item._track_inventory === true) vd.track_inventory = true;
 
   return {
     type: "ITEM_VARIATION",

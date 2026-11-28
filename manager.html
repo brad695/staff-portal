@@ -1796,6 +1796,10 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
           <label class="fld"><span id="pf_pplLabel">Price per lb ($)</span>
             <input id="pf_ppl" type="number" step="0.01" min="0" inputmode="decimal" placeholder="24.99" />
           </label>
+          <label class="fld"><span id="pf_costLabel">Cost ($)</span>
+            <input id="pf_cost" type="number" step="0.01" min="0" inputmode="decimal" placeholder="What we pay" />
+            <span class="fnote" id="pf_costNote"></span>
+          </label>
           <label class="fld">Unit of Measure
             <select id="pf_unit"></select>
             <span class="fnote" id="pf_unitNote"></span>
@@ -1856,9 +1860,9 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
       <div class="bulk-wrap">
         <table class="bulk">
           <thead>
-            <tr><th>PLU</th><th>Kind</th><th>Name</th><th>Marketing</th><th>Category</th><th>Price</th><th>Per unit</th><th>Unit</th><th>Barcode</th><th>DateCodeGenie</th><th>Square</th><th></th></tr>
+            <tr><th>PLU</th><th>Kind</th><th>Name</th><th>Marketing</th><th>Category</th><th>Price</th><th>Per unit</th><th>Cost</th><th>Unit</th><th>Barcode</th><th>DateCodeGenie</th><th>Square</th><th></th></tr>
           </thead>
-          <tbody id="pluBody"><tr><td colspan="12" class="empty-row">Loading…</td></tr></tbody>
+          <tbody id="pluBody"><tr><td colspan="13" class="empty-row">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -15193,6 +15197,18 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     $('pf_pplLabel').textContent = unit === 'EA' ? 'Price per lb ($) — not used'
       : 'Price per ' + UNIT_WORD[unit] + ' ($)';
     $('pf_ppl').disabled = unit === 'EA';
+    {
+      const byWt = entryKind !== 'retail' && unit !== 'EA' && $('pf_ppl').value !== '' && Number($('pf_ppl').value) > 0;
+      $('pf_costLabel').textContent = byWt ? 'Cost per ' + UNIT_WORD[unit] + ' ($)' : 'Cost each ($)';
+      const c = $('pf_cost').value === '' ? null : Number($('pf_cost').value);
+      const sell = byWt ? Number($('pf_ppl').value) : ($('pf_price').value === '' ? null : Number($('pf_price').value));
+      const cn = $('pf_costNote');
+      cn.className = 'fnote' + (c !== null && c < 0 ? ' bad' : '');
+      cn.textContent = c === null ? 'Optional — what GREYS pays. Stays in the portal, not sent to Square.'
+        : c < 0 ? "Cost can't be negative"
+        : (sell && sell > 0) ? 'Margin ' + Math.round((sell - c) / sell * 100) + '% ($' + (sell - c).toFixed(2) + (byWt ? '/' + UNIT_WORD[unit] : ' each') + ')'
+        : 'Add a price to see the margin';
+    }
     $('pf_unitNote').className = 'fnote';
     $('pf_unitNote').textContent = unit === 'EA'
       ? 'Whole units — the register never asks for a weight'
@@ -15246,7 +15262,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
 
     const body = $('pluBody');
     if (!filtered.length){
-      body.innerHTML = '<tr><td colspan="12" class="empty-row">'+(items.length?'No matches.':'No items yet.')+'</td></tr>';
+      body.innerHTML = '<tr><td colspan="13" class="empty-row">'+(items.length?'No matches.':'No items yet.')+'</td></tr>';
       return;
     }
 
@@ -15269,6 +15285,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
           '<td data-l="Category"><select id="pe_category">'+optionsHtml(catList2, i.category||'Cheese')+'</select></td>'+
           '<td data-l="Price">'+inp('pe_price',i.price,'Price','number')+'</td>'+
           '<td data-l="Per lb">'+inp('pe_ppl',i.price_per_lb,'Per lb','number')+'</td>'+
+          '<td data-l="Cost">'+inp('pe_cost',i.cost,'Cost','number')+'</td>'+
           '<td data-l="Unit"><select id="pe_unit">'+optionsHtml(UNITS, u)+'</select></td>'+
           '<td data-l="Barcode">'+inp('pe_barcode',i.barcode,'Barcode')+'</td>'+
           '<td data-l="Printer"><select id="pe_printer">'+optionsHtml(profList, i.printer_profile||'Greys Cheese Label')+'</select></td>'+
@@ -15305,6 +15322,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
         '<td data-l="Category">'+(i.category?esc(i.category):'—')+'</td>'+
         '<td data-l="Price">'+money(i.price)+'</td>'+
         '<td data-l="Per lb">'+money(i.price_per_lb)+'</td>'+
+        '<td data-l="Cost">'+money(i.cost)+'</td>'+
         '<td data-l="Unit">'+esc(unitOf(i))+'</td>'+
         '<td class="mono" data-l="Barcode">'+(i.barcode?esc(i.barcode):'—')+'</td>'+
         '<td data-l="DateCodeGenie">'+dcgPill+'</td>'+
@@ -15319,6 +15337,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     e.preventDefault();
     const name = $('pf_name').value.trim();
     if (!name){ setNotice('err','Name is required.'); $('pf_name').focus(); return; }
+    if ($('pf_cost').value !== '' && !(Number($('pf_cost').value) >= 0)){ setNotice('err',"Cost can't be negative."); $('pf_cost').focus(); return; }
 
     const mode = saveMode();
     if (overridePlu && mode.plu && !/^\d{1,6}$/.test(mode.plu)){ setNotice('err','PLU must be a number.'); return; }
@@ -15338,6 +15357,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
         marketing_name: $('pf_marketing').value.trim() || null,
         price: $('pf_price').value === '' ? null : Number($('pf_price').value),
         price_per_lb: retail ? null : ($('pf_ppl').value === '' ? null : Number($('pf_ppl').value)),
+        cost: $('pf_cost').value === '' ? null : Number($('pf_cost').value),
         unit_of_measure: retail ? 'EA' : ($('pf_unit').value || DEFAULT_UNIT),
         dcg_locations: retail ? undefined : chosenLocations(),
         barcode: mode.barcode || null,
@@ -15364,7 +15384,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
         : (retailSaved && it.square_status === 'skipped') ? 'warn' : 'ok';
       setNotice(worst, 'Saved ' + it.name + ' as ' + (hasPlu(it.plu) ? 'PLU ' + pad5(it.plu) : 'barcode ' + it.barcode) + '. ' +
         part('DateCodeGenie', it.dcg_status, it.dcg_error) + ' · ' + part('Square', it.square_status, it.square_error));
-      ['pf_name','pf_marketing','pf_price','pf_ppl','pf_barcode','pf_plu'].forEach(id => $(id).value = '');
+      ['pf_name','pf_marketing','pf_price','pf_ppl','pf_cost','pf_barcode','pf_plu'].forEach(id => $(id).value = '');
       $('pf_unit').value = retail ? 'EA' : DEFAULT_UNIT;
       $('pf_locMem').checked = true; $('pf_locNash').checked = true;
       overridePlu = false; $('pf_plu').disabled = true; $('pf_pluToggle').textContent = 'override';
@@ -15407,7 +15427,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     renderForm();
   });
 
-  ['pf_barcode','pf_plu','pf_name','pf_marketing','pf_price','pf_ppl'].forEach(id =>
+  ['pf_barcode','pf_plu','pf_name','pf_marketing','pf_price','pf_ppl','pf_cost'].forEach(id =>
     $(id).addEventListener('input', renderForm));
   ['pf_unit','pf_locMem','pf_locNash'].forEach(id =>
     $(id).addEventListener('change', renderForm));
@@ -15450,6 +15470,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
           marketing_name: $('pe_marketing').value,
           price: $('pe_price').value === '' ? null : Number($('pe_price').value),
           price_per_lb: $('pe_ppl').value === '' ? null : Number($('pe_ppl').value),
+          cost: $('pe_cost').value === '' ? null : Number($('pe_cost').value),
           unit_of_measure: $('pe_unit').value || DEFAULT_UNIT,
           barcode: $('pe_barcode').value,
           category: $('pe_category').value,
@@ -15523,8 +15544,8 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
       return a.plu - b.plu;
     });
     const rows = [
-      ['PLU','Kind','Name','Marketing Name','Price','Price per unit','Unit','Barcode','Category','Printer Profile','Hot Buttons','DCG Status','Square Status','Square Pricing','Square Item ID'],
-      ...sorted.map(i => [pad5(i.plu), kindLabel(i), i.name, i.marketing_name||'', i.price ?? '', i.price_per_lb ?? '', unitOf(i),
+      ['PLU','Kind','Name','Marketing Name','Price','Price per unit','Cost','Unit','Barcode','Category','Printer Profile','Hot Buttons','DCG Status','Square Status','Square Pricing','Square Item ID'],
+      ...sorted.map(i => [pad5(i.plu), kindLabel(i), i.name, i.marketing_name||'', i.price ?? '', i.price_per_lb ?? '', i.cost ?? '', unitOf(i),
         i.barcode||'', i.category||'', i.printer_profile||'', i.hot_buttons !== false ? 'x':'',
         i.dcg_status, i.square_status, priceMode(i).label, i.square_item_id||''])
     ];

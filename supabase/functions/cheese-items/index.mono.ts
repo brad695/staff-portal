@@ -174,6 +174,10 @@ const SQUARE_CATEGORY_IDS: Record<string, string> = {
   "Memphis Retail": "K6GGAWH5QMAFUSTPDPZHYSDW",
 };
 
+// Square location ids for starting stock counts (Cheese Entry "Track inventory", 2026-11-28).
+const SQUARE_LOC_MEMPHIS = "LCXWZ0HAQ69RM";   // Greys Memphis
+const SQUARE_LOC_NASHVILLE = "LJ33VDYHS1JAR"; // Greys Nashville
+
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -430,7 +434,7 @@ async function resolveCategoryId(name: string | null | undefined, token: string)
 // DateCodeGenie-only workaround and must never leak into the register.
 function buildVariation(
   item: Record<string, unknown>,
-  opts: { id: string; version?: number },
+  opts: { id: string; version?: number; existing?: Record<string, unknown> },
 ) {
   const unit = unitOf(item);
   const unitId = SQUARE_UNIT_IDS[unit]; // undefined for EA
@@ -451,6 +455,14 @@ function buildVariation(
   if (priced) vd.price_money = { amount: Math.round(Number(amount) * 100), currency: "USD" };
   // Explicit null so switching to EA clears a weight unit the item already had.
   vd.measurement_unit_id = byWeight ? unitId : null;
+  // Inventory settings live on the variation. A catalog upsert REPLACES the variation, so carry
+  // over whatever tracking the item already has (set here or in the dashboard) or an edit would
+  // silently switch stock tracking off.
+  const prev = (opts.existing?.item_variation_data ?? {}) as Record<string, unknown>;
+  for (const k of ["track_inventory", "location_overrides", "inventory_alert_type", "inventory_alert_threshold"]) {
+    if (prev[k] !== undefined) vd[k] = prev[k];
+  }
+  if (item._track_inventory === true) vd.track_inventory = true;
 
   return {
     type: "ITEM_VARIATION",
@@ -459,6 +471,46 @@ function buildVariation(
     present_at_all_locations: true,
     item_variation_data: vd,
   };
+}
+
+// Starting on-hand counts, sent once right after the item is created in Square.
+// qtys = { memphis, nashville }; a blank skips that store, 0 is a real count.
+async function setStartingInventory(
+  token: string,
+  variationId: string,
+  qtys: Record<string, unknown> | null | undefined,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!qtys || typeof qtys !== "object") return { ok: true };
+  const occurred_at = new Date().toISOString();
+  const changes: Record<string, unknown>[] = [];
+  for (const [location_id, raw] of [[SQUARE_LOC_MEMPHIS, qtys.memphis], [SQUARE_LOC_NASHVILLE, qtys.nashville]] as const) {
+    if (raw === null || raw === undefined || raw === "") continue;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) return { ok: false, error: `bad count "${raw}"` };
+    changes.push({
+      type: "PHYSICAL_COUNT",
+      physical_count: {
+        catalog_object_id: variationId,
+        location_id,
+        state: "IN_STOCK",
+        quantity: String(Number(n.toFixed(5))),
+        occurred_at,
+      },
+    });
+  }
+  if (!changes.length) return { ok: true };
+  try {
+    const res = await fetch(`${squareBase()}/v2/inventory/changes/batch-create`, {
+      method: "POST",
+      headers: squareHeaders(token),
+      body: JSON.stringify({ idempotency_key: crypto.randomUUID(), changes, ignore_unchanged_counts: false }),
+    });
+    const text = await res.text();
+    if (!res.ok) return { ok: false, error: `Square inventory ${res.status}: ${text.slice(0, 400)}` };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e).slice(0, 400) };
+  }
 }
 
 async function pushToSquare(item: Record<string, unknown>) {
@@ -497,6 +549,7 @@ async function pushToSquare(item: Record<string, unknown>) {
     const variation = buildVariation(item, {
       id: (existingVariation?.id as string) ?? "#variation",
       version: existingVariation?.version as number | undefined,
+      existing: existingVariation,
     });
 
     // Only the first variation is ours to manage; anything added in the dashboard rides along.
@@ -545,10 +598,28 @@ async function pushToSquare(item: Record<string, unknown>) {
     const text = await res.text();
     if (!res.ok) return { status: "error", error: `Square ${res.status}: ${text.slice(0, 500)}` };
     let squareId: string | undefined;
+    let variationId: string | undefined;
     try {
-      squareId = JSON.parse(text)?.catalog_object?.id;
+      const saved = JSON.parse(text)?.catalog_object;
+      squareId = saved?.id;
+      variationId = saved?.item_data?.variations?.[0]?.id;
     } catch { /* ignore */ }
-    return { status: "synced", square_item_id: squareId ?? (item.square_item_id as string | undefined) };
+    squareId = squareId ?? (item.square_item_id as string | undefined);
+
+    // The item is in Square either way. A failed count only earns a warning; it never undoes the add.
+    let inventoryWarning: string | undefined;
+    if (!isUpdate && item._track_inventory === true) {
+      if (!variationId) inventoryWarning = "Square didn't return the new variation id";
+      else {
+        const inv = await setStartingInventory(token, variationId, item._inventory_qty as Record<string, unknown>);
+        if (!inv.ok) inventoryWarning = inv.error ?? "inventory update failed";
+      }
+    }
+    return {
+      status: "synced",
+      square_item_id: squareId,
+      ...(inventoryWarning ? { inventory_warning: `Starting stock counts weren't set: ${inventoryWarning}` } : {}),
+    };
   } catch (e) {
     return { status: "error", error: String(e).slice(0, 500) };
   }
@@ -566,7 +637,7 @@ async function syncItem(item: Record<string, unknown>, targets: { dcg: boolean; 
   if (targets.square) {
     const s = await pushToSquare(item);
     patch.square_status = s.status;
-    patch.square_error = s.error ?? null;
+    patch.square_error = s.error ?? (s as { inventory_warning?: string }).inventory_warning ?? null;
     if (s.square_item_id) patch.square_item_id = s.square_item_id;
   }
   const { data: updated } = await supabase
@@ -686,6 +757,12 @@ Deno.serve(async (req) => {
     if ("net_weight" in body) {
       extra.net_weight = String(body.net_weight ?? "").trim() || null;
     }
+    // What GREYS pays per unit (2026-11-28). Portal only; not sent to Square.
+    if ("cost" in body) {
+      const c = num(body.cost);
+      if (c !== null && c < 0) return json({ error: "cost can't be negative" }, 400);
+      extra.cost = c;
+    }
     if ("unit_of_measure" in body) {
       const u = cleanUnit(body.unit_of_measure);
       if (!u) return json({ error: "unit of measure must be LB, OZ, G, KG or EA" }, 400);
@@ -709,6 +786,11 @@ Deno.serve(async (req) => {
 
     if ("tax_preset" in body) row = { ...row, _tax_preset: body.tax_preset };
     if (Array.isArray(body.tax_ids)) row = { ...row, _tax_ids: body.tax_ids };
+    // "Track inventory" on the add form: stock counts down in Square as it sells.
+    if (body.track_inventory === true) {
+      row = { ...row, _track_inventory: true };
+      if (body.inventory_qty && typeof body.inventory_qty === "object") row = { ...row, _inventory_qty: body.inventory_qty };
+    }
     const updated = await syncItem(row, { dcg: !retail, square: true });
     return json({ item: updated });
   }
@@ -728,6 +810,11 @@ Deno.serve(async (req) => {
     if ("marketing_name" in body) patch.marketing_name = String(body.marketing_name ?? "").trim() || null;
     if ("price" in body) patch.price = num(body.price);
     if ("price_per_lb" in body) patch.price_per_lb = num(body.price_per_lb);
+    if ("cost" in body) {
+      const c = num(body.cost);
+      if (c !== null && c < 0) return json({ error: "cost can't be negative" }, 400);
+      patch.cost = c;
+    }
     if ("net_weight" in body) patch.net_weight = String(body.net_weight ?? "").trim() || null;
     if ("unit_of_measure" in body) {
       const u = cleanUnit(body.unit_of_measure);
