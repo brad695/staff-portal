@@ -1576,6 +1576,13 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
                                text-transform:none; letter-spacing:0; font-size:0.86rem; cursor:pointer; }
     #panel-plu .locwrap input{ width:18px; height:18px; min-width:18px; flex:none; margin:0; }
 
+    /* Track inventory (2026-11-28): starting on-hand counts per store, sent to Square on save */
+    #panel-plu .invqty{ display:flex; flex-wrap:wrap; gap:10px 16px; padding:2px 0 4px; }
+    #panel-plu .invqty[hidden]{ display:none; }
+    #panel-plu .invqty label{ display:flex; align-items:center; gap:8px; font-weight:400; text-transform:none;
+                              letter-spacing:0; font-size:0.86rem; }
+    #panel-plu .invqty input{ width:96px; }
+
     #panel-plu .sq-hint{ font-size:0.76rem; color:var(--sub); margin-top:9px; line-height:1.6; }
     #panel-plu .sq-hint b{ color:var(--ink); font-family:ui-monospace,Menlo,monospace; }
     #panel-plu .notice{ margin-top:12px; padding:10px 13px; border-radius:var(--r); font-size:0.84rem; display:none; line-height:1.5; }
@@ -1830,6 +1837,14 @@ table.bulk thead th{ background:#f7f8fa; color:#5a6472; border-bottom:1px solid 
           <label class="fld retail-hide" id="pf_hotFld">Hot Buttons
             <span class="hotwrap"><input id="pf_hot" type="checkbox" checked /><span>Enable in the app</span></span>
           </label>
+          <div class="fld span2" id="pf_invFld">Inventory
+            <label class="hotwrap"><input id="pf_trackInv" type="checkbox" /><span>Track inventory in Square — stock counts down as it sells</span></label>
+            <span class="invqty" id="pf_invQty" hidden>
+              <label>Memphis on hand <input id="pf_qtyMem" type="number" min="0" step="1" inputmode="decimal" placeholder="0" /></label>
+              <label>Nashville on hand <input id="pf_qtyNash" type="number" min="0" step="1" inputmode="decimal" placeholder="0" /></label>
+            </span>
+            <span class="fnote" id="pf_invNote"></span>
+          </div>
         </div>
         <div class="row-actions">
           <button type="submit" class="btn btn-gold" id="pluSubmit">Save</button>
@@ -14462,6 +14477,7 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
       $('pf_tax').value = 'auto';
     }
     updateTaxNote();
+    $('pf_trackInv').checked = retail; // on by default for Wine/Retail, off for Cheese
     if (retail){
       $('pf_unit').value = 'EA';
       $('pf_ppl').value = '';
@@ -14474,6 +14490,25 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
       $('pf_hot').checked = true;
     }
     renderForm();
+  }
+
+  // starting on-hand counts for the add form; blank = don't set that store
+  function invCounts(){
+    const q = {};
+    const mem = $('pf_qtyMem').value.trim(), nash = $('pf_qtyNash').value.trim();
+    if (mem !== '') q.memphis = Number(mem);
+    if (nash !== '') q.nashville = Number(nash);
+    return q;
+  }
+  function invCountProblem(){
+    if (!$('pf_trackInv').checked) return '';
+    const whole = ($('pf_unit').value || DEFAULT_UNIT) === 'EA' || entryKind === 'retail';
+    for (const [store, v] of Object.entries(invCounts())){
+      const name = store === 'memphis' ? 'Memphis' : 'Nashville';
+      if (!Number.isFinite(v) || v < 0) return name + ' count must be 0 or more';
+      if (whole && !Number.isInteger(v)) return name + ' count must be a whole number';
+    }
+    return '';
   }
 
   function renderForm(){
@@ -14508,6 +14543,16 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
     $('pf_unitNote').textContent = unit === 'EA'
       ? 'Whole units — the register never asks for a weight'
       : 'The register asks for a weight in ' + UNIT_WORD[unit];
+
+    const tracking = $('pf_trackInv').checked;
+    $('pf_invQty').hidden = !tracking;
+    const invStep = unit === 'EA' ? '1' : '0.01';
+    ['pf_qtyMem','pf_qtyNash'].forEach(id => { $(id).step = invStep; });
+    const invBad = invCountProblem();
+    $('pf_invNote').className = 'fnote' + (invBad ? ' bad' : '');
+    $('pf_invNote').textContent = !tracking ? 'Off — Square won\'t keep a stock count for this item'
+      : invBad ? invBad
+      : 'Starting counts' + (unit === 'EA' ? '' : ' in ' + UNIT_WORD[unit]) + '. Leave a store blank to count it later in Square.';
 
     const locs = chosenLocations();
     const locNote = $('pf_locNote');
@@ -14638,6 +14683,9 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
       setNotice('err','Barcode ' + mode.barcode + ' is already on another item.'); return;
     }
     if (entryKind !== 'retail' && !chosenLocations().length){ setNotice('err','Pick at least one store.'); return; }
+    const invBad = invCountProblem();
+    if (invBad){ setNotice('err', invBad + '.'); return; }
+    const trackInv = $('pf_trackInv').checked;
 
     const btn = $('pluSubmit');
     btn.disabled = true; btn.textContent = 'Saving…';
@@ -14659,7 +14707,9 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
         printer_profile: retail ? null : $('pf_printer').value,
         hot_buttons: retail ? false : $('pf_hot').checked,
         item_kind: retail ? 'retail' : 'cheese',
-        skip_dcg: retail
+        skip_dcg: retail,
+        track_inventory: trackInv,
+        inventory_qty: trackInv ? invCounts() : undefined
       })});
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || 'HTTP ' + res.status);
@@ -14670,12 +14720,19 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
         return st === 'synced' ? label + ' ✓'
           : st === 'error' ? label + ' failed (' + (err||'error') + ')' : label + ' not sent (key not set up)';
       };
+      // Square took the item but the starting counts didn't go through: still saved, just warn
+      const invWarn = (trackInv && it.square_status === 'synced' && it.square_error) ? it.square_error : '';
       const worst = [it.dcg_status, it.square_status].includes('error') ? 'err'
+        : invWarn ? 'warn'
         : (!retailSaved && [it.dcg_status, it.square_status].includes('skipped')) ? 'warn'
         : (retailSaved && it.square_status === 'skipped') ? 'warn' : 'ok';
       setNotice(worst, 'Saved ' + it.name + ' as ' + (hasPlu(it.plu) ? 'PLU ' + pad5(it.plu) : 'barcode ' + it.barcode) + '. ' +
-        part('DateCodeGenie', it.dcg_status, it.dcg_error) + ' · ' + part('Square', it.square_status, it.square_error));
-      ['pf_name','pf_marketing','pf_price','pf_ppl','pf_barcode','pf_plu'].forEach(id => $(id).value = '');
+        part('DateCodeGenie', it.dcg_status, it.dcg_error) + ' · ' + part('Square', it.square_status, it.square_error) +
+        (invWarn ? ' ⚠ The item was added, but ' + invWarn.replace(/^Starting stock counts/, 'its starting stock counts') +
+          ' — set them in Square Dashboard → Items.'
+          : (trackInv && it.square_status === 'synced') ? ' · Inventory tracked' +
+            (Object.keys(invCounts()).length ? ' (' + Object.entries(invCounts()).map(([k,v]) => (k==='memphis'?'Memphis ':'Nashville ') + v).join(', ') + ')' : '') : ''));
+      ['pf_name','pf_marketing','pf_price','pf_ppl','pf_barcode','pf_plu','pf_qtyMem','pf_qtyNash'].forEach(id => $(id).value = '');
       $('pf_unit').value = retail ? 'EA' : DEFAULT_UNIT;
       $('pf_locMem').checked = true; $('pf_locNash').checked = true;
       overridePlu = false; $('pf_plu').disabled = true; $('pf_pluToggle').textContent = 'override';
@@ -14720,8 +14777,9 @@ document.getElementById('ccModalBg').addEventListener('click', function(e){ if(e
 
   ['pf_barcode','pf_plu','pf_name','pf_marketing','pf_price','pf_ppl'].forEach(id =>
     $(id).addEventListener('input', renderForm));
-  ['pf_unit','pf_locMem','pf_locNash'].forEach(id =>
+  ['pf_unit','pf_locMem','pf_locNash','pf_trackInv'].forEach(id =>
     $(id).addEventListener('change', renderForm));
+  ['pf_qtyMem','pf_qtyNash'].forEach(id => $(id).addEventListener('input', renderForm));
   if ($('pf_category')) $('pf_category').addEventListener('change', () => { updateTaxNote(); renderForm(); });
   if ($('pf_tax')) $('pf_tax').addEventListener('change', () => { updateTaxNote(); renderForm(); });
   $('pluSearch').addEventListener('input', render);

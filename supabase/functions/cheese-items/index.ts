@@ -94,6 +94,11 @@ Deno.serve(async (req) => {
 
     if ("tax_preset" in body) row = { ...row, _tax_preset: body.tax_preset };
     if (Array.isArray(body.tax_ids)) row = { ...row, _tax_ids: body.tax_ids };
+    // "Track inventory" on the add form: stock counts down in Square as it sells.
+    if (body.track_inventory === true) {
+      row = { ...row, _track_inventory: true };
+      if (body.inventory_qty && typeof body.inventory_qty === "object") row = { ...row, _inventory_qty: body.inventory_qty };
+    }
     const updated = await syncItem(row, { dcg: !retail, square: true });
     return json({ item: updated });
   }

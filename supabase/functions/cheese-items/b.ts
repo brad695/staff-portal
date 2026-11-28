@@ -1,4 +1,6 @@
 import {
+  SQUARE_LOC_MEMPHIS,
+  SQUARE_LOC_NASHVILLE,
   VALID_UNITS,
   json,
   supabase,
@@ -11,6 +13,46 @@ import {
   squareBase,
   squareHeaders
 } from "./a2.ts";
+
+// Starting on-hand counts, sent once right after the item is created in Square.
+// qtys = { memphis, nashville }; a blank skips that store, 0 is a real count.
+export async function setStartingInventory(
+  token: string,
+  variationId: string,
+  qtys: Record<string, unknown> | null | undefined,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!qtys || typeof qtys !== "object") return { ok: true };
+  const occurred_at = new Date().toISOString();
+  const changes: Record<string, unknown>[] = [];
+  for (const [location_id, raw] of [[SQUARE_LOC_MEMPHIS, qtys.memphis], [SQUARE_LOC_NASHVILLE, qtys.nashville]] as const) {
+    if (raw === null || raw === undefined || raw === "") continue;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) return { ok: false, error: `bad count "${raw}"` };
+    changes.push({
+      type: "PHYSICAL_COUNT",
+      physical_count: {
+        catalog_object_id: variationId,
+        location_id,
+        state: "IN_STOCK",
+        quantity: String(Number(n.toFixed(5))),
+        occurred_at,
+      },
+    });
+  }
+  if (!changes.length) return { ok: true };
+  try {
+    const res = await fetch(`${squareBase()}/v2/inventory/changes/batch-create`, {
+      method: "POST",
+      headers: squareHeaders(token),
+      body: JSON.stringify({ idempotency_key: crypto.randomUUID(), changes, ignore_unchanged_counts: false }),
+    });
+    const text = await res.text();
+    if (!res.ok) return { ok: false, error: `Square inventory ${res.status}: ${text.slice(0, 400)}` };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: String(e).slice(0, 400) };
+  }
+}
 
 export async function pushToSquare(item: Record<string, unknown>) {
   const token = Deno.env.get("SQUARE_ACCESS_TOKEN");
@@ -48,6 +90,7 @@ export async function pushToSquare(item: Record<string, unknown>) {
     const variation = buildVariation(item, {
       id: (existingVariation?.id as string) ?? "#variation",
       version: existingVariation?.version as number | undefined,
+      existing: existingVariation,
     });
 
     
@@ -98,10 +141,28 @@ export async function pushToSquare(item: Record<string, unknown>) {
     const text = await res.text();
     if (!res.ok) return { status: "error", error: `Square ${res.status}: ${text.slice(0, 500)}` };
     let squareId: string | undefined;
+    let variationId: string | undefined;
     try {
-      squareId = JSON.parse(text)?.catalog_object?.id;
-    } catch {  }
-    return { status: "synced", square_item_id: squareId ?? (item.square_item_id as string | undefined) };
+      const saved = JSON.parse(text)?.catalog_object;
+      squareId = saved?.id;
+      variationId = saved?.item_data?.variations?.[0]?.id;
+    } catch { /* ignore */ }
+    squareId = squareId ?? (item.square_item_id as string | undefined);
+
+    // The item is in Square either way. A failed count only earns a warning; it never undoes the add.
+    let inventoryWarning: string | undefined;
+    if (!isUpdate && item._track_inventory === true) {
+      if (!variationId) inventoryWarning = "Square didn't return the new variation id";
+      else {
+        const inv = await setStartingInventory(token, variationId, item._inventory_qty as Record<string, unknown>);
+        if (!inv.ok) inventoryWarning = inv.error ?? "inventory update failed";
+      }
+    }
+    return {
+      status: "synced",
+      square_item_id: squareId,
+      ...(inventoryWarning ? { inventory_warning: `Starting stock counts weren't set: ${inventoryWarning}` } : {}),
+    };
   } catch (e) {
     return { status: "error", error: String(e).slice(0, 500) };
   }
@@ -118,7 +179,7 @@ export async function syncItem(item: Record<string, unknown>, targets: { dcg: bo
   if (targets.square) {
     const s = await pushToSquare(item);
     patch.square_status = s.status;
-    patch.square_error = s.error ?? null;
+    patch.square_error = s.error ?? (s as { inventory_warning?: string }).inventory_warning ?? null;
     if (s.square_item_id) patch.square_item_id = s.square_item_id;
   }
   const { data: updated } = await supabase
